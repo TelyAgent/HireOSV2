@@ -1,0 +1,535 @@
+<!DOCTYPE html>
+<html data-page-node-id="4YGrNoa6Gv6uZ9WblEUV8B" lang="zh-CN">
+<head data-page-node-id="dHJ4dBg1aep7xOU9DcGRvi">
+<meta data-page-node-id="FeSf9ntP8UAnE5QycvCdLe" charset="UTF-8">
+<meta data-page-node-id="IqFic6BMNhUWESi30pHSRD" content="width=device-width, initial-scale=1" name="viewport">
+<title data-page-node-id="I4axLCL5EVJTuMSOdZYmpZ" data-pnid-children="a4rgc6kI0Xt1on0utnhWxa">HireOS 演进式组合架构 · 完整说明</title>
+<style data-page-node-id="T6V8F2GyE415NyYeh7JBSV" data-pnid-children="niyUghLXcuCI76N2pVNIDz">
+  :root{
+    --ink:#1F2733; --ink2:#5B6773; --ink3:#8A94A0;
+    --line:#E3E7EC; --line2:#D3D9E0;
+    --blue:#2563EB; --blue-bg:#EFF5FF; --blue-line:#BBD4FB;
+    --purple:#6D4AFF; --purple-bg:#F3EFFF; --purple-line:#D5CBFA;
+    --amber:#B45309; --amber-bg:#FFF7E8; --amber-line:#F5D9A8;
+    --green:#0F7A4A;
+    --gray-bg:#F4F6F8;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:#F7F8FA;color:var(--ink);
+    font-family:-apple-system,BlinkMacSystemFont,"PingFang SC","Hiragino Sans GB","Microsoft YaHei",sans-serif;
+    line-height:1.6;}
+  .wrap{max-width:1060px;margin:0 auto;padding:32px 24px 64px}
+  h1{font-size:22px;font-weight:600;margin:0 0 6px}
+  .sub{color:var(--ink2);font-size:14px;margin:0 0 10px}
+  section{background:#fff;border:1px solid var(--line);border-radius:14px;padding:22px 22px 18px;margin-bottom:22px}
+  h2{font-size:16px;font-weight:600;margin:0 0 4px}
+  .q{color:var(--ink2);font-size:13px;margin:0 0 16px}
+  svg{display:block;width:100%;height:auto}
+  text{font-family:-apple-system,BlinkMacSystemFont,"PingFang SC","Hiragino Sans GB","Microsoft YaHei",sans-serif}
+  table{border-collapse:collapse;width:100%;font-size:13px;margin:4px 0 8px}
+  th,td{border:1px solid var(--line);padding:9px 12px;text-align:left;vertical-align:top}
+  th{background:#F7F8FA;font-weight:600;font-size:12px;color:var(--ink2)}
+  .key{background:#FFF7E8;border:1px solid var(--amber-line);border-radius:10px;padding:14px 16px;margin:14px 0 0}
+  .key p{margin:0 0 8px;font-size:13px}
+  .key p:last-child{margin-bottom:0}
+  .key b{color:#7C3A06}
+  ul{margin:8px 0 0;padding-left:20px;font-size:13px;color:var(--ink2)}
+  li{margin-bottom:6px}
+</style>
+</head>
+<body data-page-node-id="MZaXLm31BQK8AzP99AmUWD">
+<div data-page-node-id="kHfQDuUcWj6hPd4iIttXPo" class="wrap">
+
+  <h1 data-page-node-id="B54xKbt2bOtTcxpjnIZqHz"><!--pnid:txO4oEJd2ViP4IlhZlb7kx-->HireOS 演进式组合架构</h1>
+  <p data-page-node-id="6sHtp0ERb2KtNdReTPPM18" class="sub"><!--pnid:habZCC7KQQTdN9rruzynU2-->目标 1：各子系统独立迭代、独立上线　·　目标 2：未来合并时改动尽量少、数据与账号打通。</p>
+  <p data-page-node-id="PCRKCaLaNOpdG6AwthU0rf" class="sub"><!--pnid:v2URPoaDnBHD3UAB85EWYb-->本文用五张图讲完整件事：<b data-page-node-id="KvSKRHGh39DLkjYnoM7wzp"><!--pnid:b6RK3p7N8AF2MsFuogutIw-->图 1、2</b><!--pnid:IUY5zLTEeKoecz9lkQVAgv--> 讲「最终长什么样 vs 起步怎么建」，<b data-page-node-id="OHqhrZYIURkhFN45w9dfxP"><!--pnid:Fgb8yHbZbvG0XeX88yq0R8-->图 3</b><!--pnid:flB80YCylZxJK1E7gD5sZv--> 讲「两个目标靠哪一层实现」，<b data-page-node-id="64m2RujVBR31RhBDoDEsUU"><!--pnid:wpG8uD0hRoLvtdwCzd4mWa-->图 4</b><!--pnid:KYg4hswd6kBvzOZYiZ1W36--> 讲「单个子系统长什么样」，<b data-page-node-id="YU4IEINJLbYgHYdhNmykMc"><!--pnid:86XkTQqT5Mm9GPqhGq2Rlp-->图 5</b><!--pnid:DWLw4hqSbmM3hYEp3scPIP--> 讲「什么时候上线、什么时候合并」。</p>
+
+  <!--pnid:WUzopmMXbx55QomgVeYRFk--><!-- 图 1 -->
+  <section data-page-node-id="qXo3k6v6fj3vlWlG7hr9QE">
+    <h2 data-page-node-id="cW6qZ43EbNWXrPVvTvae4u"><!--pnid:GTnGeEEJI6cUKO4ZRCA8zG-->图 1　目标架构：最终形态（验收视角）</h2>
+    <p data-page-node-id="jgzZmbMTtmdup5ZuIB6ZpL" class="q"><!--pnid:HGW92YzQdpASFkjOoBOFor-->这是最终交付给用户看到的样子：一个系统、一套账号、一份数据。它是<b data-page-node-id="lD5fXaM943qR1FOJNgiOgK"><!--pnid:WGV7hpPmGmp7wBoFp6qud0-->验收标准</b><!--pnid:u4QqWkzLmbez0Ynso6K14N-->，不是施工图。</p>
+
+    <svg data-page-node-id="6YABKACdkrMLFP224BChnF" role="img" viewBox="0 0 960 348">
+      <title data-page-node-id="9cwjHzrfYVR4DJqunRyaVY" data-pnid-children="lpryKThGSgZghadRCfvxyV">目标架构：最终形态</title>
+
+      <rect data-page-node-id="FaiHFedPsrWsRntzDAcNut" fill="#fff" height="296" rx="16" stroke="#D3D9E0" stroke-width="1" width="920" x="20" y="24"/>
+      <text data-page-node-id="50MpZh5N2msOK6Lbknxjbs" fill="#1F2733" font-size="15" font-weight="600" x="44" y="56"><!--pnid:6NpsOuWcFwEGgRyLeEnZ40-->HireOS Command　·　用户视角：一个系统</text>
+      <text data-page-node-id="7HabSGRE7EaRK3PC9YVavZ" fill="#5B6773" font-size="12" x="44" y="78"><!--pnid:x92IeuN548j9121hHzTdTl-->五个业务能力在一个工作台内，一套账号、一份数据、一条时间线</text>
+
+      <rect data-page-node-id="vAPRDKQN45jN1AnHcYQ3s0" fill="#FFF7E8" height="70" rx="10" stroke="#F5D9A8" stroke-width="1" width="872" x="44" y="92"/>
+      <text data-page-node-id="GHY53ap8m6zIDRLC8J0xvn" fill="#7C3A06" font-size="13" font-weight="600" x="64" y="114"><!--pnid:1HeXgSe8Y73dYi8qybwQlM-->统一工作台 · Shell</text>
+      <rect data-page-node-id="orPUCtEUBVD9L3jImAp9gB" fill="#fff" height="28" rx="6" stroke="#F5D9A8" width="132" x="64" y="122"/>
+      <text data-page-node-id="lTVLp8P7BEIGSf2WzPFPDE" fill="#B45309" font-size="11" text-anchor="middle" x="130" y="140"><!--pnid:bDRQjYEuRzLkrls4825UB9-->My Focus</text>
+      <rect data-page-node-id="AuM3uUENOAB5GSJzDBqVkw" fill="#fff" height="28" rx="6" stroke="#F5D9A8" width="132" x="204" y="122"/>
+      <text data-page-node-id="VceHgrPmdAwUAfK1iSMFGF" fill="#B45309" font-size="11" text-anchor="middle" x="270" y="140"><!--pnid:VQ67yOMSVSW0OXHzt5Td8l-->Task Feed</text>
+      <rect data-page-node-id="cGKggS7dVTORFW0UN2gLH4" fill="#fff" height="28" rx="6" stroke="#F5D9A8" width="132" x="344" y="122"/>
+      <text data-page-node-id="sIRCVE9dToqRNduJPtMZiV" fill="#B45309" font-size="11" text-anchor="middle" x="410" y="140"><!--pnid:wbnyw09cA6QczGycRZeHgo-->Jobs</text>
+      <rect data-page-node-id="23XYGv0XzCvnyO9YbsBoRA" fill="#fff" height="28" rx="6" stroke="#F5D9A8" width="132" x="484" y="122"/>
+      <text data-page-node-id="Vi4CqcvpfoHXCV6bjP1P5s" fill="#B45309" font-size="11" text-anchor="middle" x="550" y="140"><!--pnid:G0kabDCYQuimP5AQp72RNv-->Overview</text>
+      <rect data-page-node-id="Vveshbz92Yci1RXOoiC9q9" fill="#fff" height="28" rx="6" stroke="#F5D9A8" width="132" x="624" y="122"/>
+      <text data-page-node-id="I77Th41RDak8xN7rJqjG4D" fill="#B45309" font-size="11" text-anchor="middle" x="690" y="140"><!--pnid:k4mr1KAH9RaDtJrS2mnOI3-->Settings</text>
+      <rect data-page-node-id="vkb3EJCHHaMSJCpyoskV8k" fill="#fff" height="28" rx="6" stroke="#F5D9A8" width="132" x="764" y="122"/>
+      <text data-page-node-id="wOmA95HczGsDA0zkCIIZqV" fill="#B45309" font-size="11" text-anchor="middle" x="830" y="140"><!--pnid:R7gKXbDVJZDXr3SFCMROYw-->Copilot</text>
+
+      <rect data-page-node-id="c305aSDM5f2PlIdkf77Oj0" fill="#EFF5FF" height="70" rx="10" stroke="#BBD4FB" stroke-width="1" width="872" x="44" y="176"/>
+      <text data-page-node-id="VtsgOze5Xw646BSCE9NVqm" fill="#1E3F9E" font-size="13" font-weight="600" x="64" y="198"><!--pnid:UBKLmWajiLOIp2RWlHjWPB-->业务能力 · 五个业务子系统</text>
+      <rect data-page-node-id="cUJ0OfpTH5nVd5N0Ve01AU" fill="#fff" height="28" rx="6" stroke="#BBD4FB" width="160" x="64" y="206"/>
+      <text data-page-node-id="HwR5QHjuIVzJMN66gBWCEQ" fill="#1E3F9E" font-size="12" text-anchor="middle" x="144" y="224"><!--pnid:QjKszTQ1v0tpBAOoEYVbkL-->JD</text>
+      <rect data-page-node-id="zBejwP4GZcHjb3QWBAAIDo" fill="#fff" height="28" rx="6" stroke="#BBD4FB" width="160" x="232" y="206"/>
+      <text data-page-node-id="g5oRWuhRGndlCpgmEtVGkE" fill="#1E3F9E" font-size="12" text-anchor="middle" x="312" y="224"><!--pnid:68Mp6VYMEIC4EkODMMWKSd-->Screening</text>
+      <rect data-page-node-id="YPD4qgKmmkjib6Erh3Elxy" fill="#fff" height="28" rx="6" stroke="#BBD4FB" width="160" x="400" y="206"/>
+      <text data-page-node-id="7X5ckwXAQ6EYq9bxQC6O2n" fill="#1E3F9E" font-size="12" text-anchor="middle" x="480" y="224"><!--pnid:4qnZ3A9ZGmk3jpCjUF7Obc-->Assessment</text>
+      <rect data-page-node-id="IHo50mRe9XtRQZT4WE2LZ2" fill="#fff" height="28" rx="6" stroke="#BBD4FB" width="160" x="568" y="206"/>
+      <text data-page-node-id="jqb3BMSav8vCBLuQSvjwyH" fill="#1E3F9E" font-size="12" text-anchor="middle" x="648" y="224"><!--pnid:scGQafAXNOlOC9Bt8Pn6Sb-->Interview</text>
+      <rect data-page-node-id="Q4KVjcCtUHJehJhTvjbbng" fill="#fff" height="28" rx="6" stroke="#BBD4FB" width="160" x="736" y="206"/>
+      <text data-page-node-id="YPuHjKZ8huAeEgpBu7Xj5Y" fill="#1E3F9E" font-size="12" text-anchor="middle" x="816" y="224"><!--pnid:h3OwgCuccs71rPnUkQmVuF-->Offer</text>
+
+      <rect data-page-node-id="XxOu7v7TalD1YsZfbceGk9" fill="#F3EFFF" height="46" rx="10" stroke="#D5CBFA" stroke-width="1" width="872" x="44" y="260"/>
+      <rect data-page-node-id="IK2JUh7ClpNaE6Yv1HyVsf" fill="#fff" height="30" rx="6" stroke="#D5CBFA" width="200" x="64" y="268"/>
+      <text data-page-node-id="ExZEX2VoOvhrvF6Q2bPUB5" fill="#4C2FB8" font-size="12" text-anchor="middle" x="164" y="287"><!--pnid:xBIHgyxnsNrN5ctWYIvZPw-->统一账号</text>
+      <rect data-page-node-id="zDMJ7yhVcPmC6ARyW4Vdcv" fill="#fff" height="30" rx="6" stroke="#D5CBFA" width="200" x="274" y="268"/>
+      <text data-page-node-id="tvyOQ3Ebp3k9kNPc2x3ClY" fill="#4C2FB8" font-size="12" text-anchor="middle" x="374" y="287"><!--pnid:ILcDUUwRUzT9133uWdKE9E-->统一主档 Candidate/Job/Application</text>
+      <rect data-page-node-id="fVCZyf5LQJj20xQijbc2U5" fill="#fff" height="30" rx="6" stroke="#D5CBFA" width="200" x="484" y="268"/>
+      <text data-page-node-id="8O4byvZKjrgDjsgaJt0RSg" fill="#4C2FB8" font-size="12" text-anchor="middle" x="584" y="287"><!--pnid:2gjHsCovDQWpOEJIbohjnF-->统一时间线与审计</text>
+      <rect data-page-node-id="SynrRz03byAQ6O1so4zzSb" fill="#fff" height="30" rx="6" stroke="#D5CBFA" width="200" x="694" y="268"/>
+      <text data-page-node-id="TKJIy6wzTbtSjrH1RElrf2" fill="#4C2FB8" font-size="12" text-anchor="middle" x="794" y="287"><!--pnid:ROoOZM4PROKJZOx7BWeqU4-->统一指标口径</text>
+
+      <text data-page-node-id="8IrspaBCPab9Qk5UFMOpTY" fill="#8A94A0" font-size="12" x="44" y="336"><!--pnid:VmE2gKvKPMjeMX2WAeTGG5-->这张图描述的是「体验统一」与「数据语义统一」，不描述进程怎么拆、代码怎么放。</text>
+    </svg>
+  </section>
+
+  <!--pnid:K4atiHu4jKz9qD6FZUgsXL--><!-- 图 2 -->
+  <section data-page-node-id="07rtsc16faAREKWdvDz3Cj">
+    <h2 data-page-node-id="DBdcFqwitj36Z4CRCUtWgW"><!--pnid:yNbjKMVRZuNuetbwSIFmn8-->图 2　实施架构：起步就按这个建（建设视角）</h2>
+    <p data-page-node-id="A0WJHRkPEHZBKFu81sIfpX" class="q"><!--pnid:7MvhD5fyBdtf9RC6dnjiAO-->物理上从第一天就是 N 个独立部署单元。白框 = 一个可独立发布的进程或前端产物。虚线框 = 后续阶段接入。</p>
+
+    <svg data-page-node-id="460hWwfOPHJ3rbp6HVYphY" role="img" viewBox="0 0 960 590">
+      <title data-page-node-id="glmOO9IrVya8jnShleBf5x" data-pnid-children="eTA7tsQwZCYMQIQTHiD9FJ">实施架构：物理部署视角</title>
+      <defs data-page-node-id="H45mjpsw2P62UnBbuTMnEe">
+        <marker data-page-node-id="kUoFWh6ETi5883R4CoTpxR" id="a" markerHeight="6" markerWidth="6" orient="auto-start-reverse" refX="8" refY="5" viewBox="0 0 10 10">
+          <path data-page-node-id="hupXeDN1Nz1Cd1qawHeGCM" d="M2 1L8 5L2 9" fill="none" stroke="context-stroke" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"/>
+        </marker>
+      </defs>
+
+      <rect data-page-node-id="9nA25r91ta2on2usmgI7kZ" fill="#F7F9FC" height="80" rx="12" stroke="#E3E7EC" stroke-width="1" width="920" x="20" y="24"/>
+      <text data-page-node-id="HACB94cHmvqORiP9bRhfiK" fill="#5B6773" font-size="12" font-weight="600" x="36" y="44"><!--pnid:Q0GENPOz5jCsGZW3ok08Fp-->访问与前端域</text>
+      <rect data-page-node-id="sk5P2ly7ghghDLocF5gz8G" fill="#fff" height="36" rx="6" stroke="#D3D9E0" width="160" x="40" y="56"/>
+      <text data-page-node-id="rSAEB0mahyOEdOAfuMAAar" fill="#3A4550" font-size="12" text-anchor="middle" x="120" y="78"><!--pnid:MuMpJWj0lVBQWHnZIEoqrm-->Browser Client</text>
+      <path data-page-node-id="szCfhVvBrtDmgktFGBTiHn" d="M200 74 L228 74" fill="none" marker-end="url(#a)" stroke="#8A94A0" stroke-width="1.2"/>
+      <text data-page-node-id="9DcUYvqcAWWS5sSGM6p6nx" fill="#8A94A0" font-size="11" x="202" y="66"><!--pnid:Xeznl4fSyQuOAOOgj6wkdu-->HTTPS</text>
+      <rect data-page-node-id="cxNiwt5uSUy0u2YOrnAppd" fill="#FFF7E8" height="36" rx="6" stroke="#F5D9A8" width="240" x="230" y="56"/>
+      <text data-page-node-id="eBECEsuJlmJEHXQ1jrhM5E" fill="#B45309" font-size="12" text-anchor="middle" x="350" y="70"><!--pnid:Utwqjf2lSjlAlIkRf3h6xX-->Shell / Portal（BFF）</text>
+      <text data-page-node-id="eBECEsuJlmJEHXQ1jrhM5F" fill="#B45309" font-size="11" text-anchor="middle" x="350" y="86"><!--pnid:ehcMNIqPn8AHLjZbtNaBBB-->含子系统注册表</text>
+      <path data-page-node-id="9P8q1ufqCUYeksxA0MTkRH" d="M470 74 L498 74" fill="none" marker-end="url(#a)" stroke="#8A94A0" stroke-width="1.2"/>
+      <text data-page-node-id="EQiy0iaasWlAZBI1pv3iTp" fill="#8A94A0" font-size="11" x="474" y="66"><!--pnid:kY9RTHFxuVDiDNh8vpX62L-->嵌入</text>
+      <rect data-page-node-id="dwqjvD0MAk40OaqLc8UOEc" fill="#fff" height="36" rx="6" stroke="#D3D9E0" width="420" x="500" y="56"/>
+      <text data-page-node-id="TjVtAbEym20QSHaI2rETV4" fill="#3A4550" font-size="12" text-anchor="middle" x="710" y="78"><!--pnid:Lr5Mco5JTKMGfwmrc9H7e8-->子系统前端 bundle　·　每个子系统独立构建</text>
+
+      <rect data-page-node-id="kB9sCjEtsF1W3SwG9EhTfZ" fill="#F7F9FC" height="210" rx="12" stroke="#E3E7EC" stroke-width="1" width="920" x="20" y="120"/>
+      <text data-page-node-id="pmNcZF4BziU2MGF3UhAxFw" fill="#5B6773" font-size="12" font-weight="600" x="36" y="142"><!--pnid:KIMubvHVuEOG6zOulJ9NbT-->应用运行进程域　·　每个白框 = 一个独立部署单元，可独立发布</text>
+
+      <rect data-page-node-id="dSoMHO7dNgmzNhOVetFot6" fill="#F3EFFF" height="162" rx="10" stroke="#D5CBFA" stroke-width="1" width="250" x="40" y="158"/>
+      <text data-page-node-id="3QYqzr2Ki2wfe74aOy1Ljs" fill="#4C2FB8" font-size="12" font-weight="600" x="58" y="180"><!--pnid:9If07JQod2PAqrQ3SC0oFy-->平台地基 L1（S0 建成）</text>
+      <rect data-page-node-id="3EBx6m54JTDhddea3Io8ga" fill="#fff" height="36" rx="6" stroke="#D5CBFA" width="214" x="58" y="190"/>
+      <text data-page-node-id="MPi0esCUzTJOcxU5R3QcvH" fill="#3B2A8C" font-size="12" text-anchor="middle" x="165" y="212"><!--pnid:EIPYB2OMlTgrCZOmqJkSmA-->Identity Service</text>
+      <rect data-page-node-id="zkZjKYxORX0wD8vBHXO0Gh" fill="#fff" height="36" rx="6" stroke="#6D4AFF" stroke-width="1.4" width="214" x="58" y="232"/>
+      <text data-page-node-id="pQy2VHh3CsFmJ4Y5QfXFsE" fill="#3B2A8C" font-size="12" font-weight="600" text-anchor="middle" x="165" y="248"><!--pnid:3O9IGsBmAja5Kd7R3tATxY-->Core Record Service</text>
+      <text data-page-node-id="pQy2VHh3CsFmJ4Y5QfXFsF" fill="#4C2FB8" font-size="11" text-anchor="middle" x="165" y="262"><!--pnid:1DIVKvwwvJnqkkaP82pHFN-->主档唯一写入方</text>
+      <rect data-page-node-id="B5IiVqEMMkYhatouJytC8n" fill="#fff" height="36" rx="6" stroke="#D5CBFA" width="214" x="58" y="274"/>
+      <text data-page-node-id="gtrFet9l6su2XPDn3hv5cd" fill="#3B2A8C" font-size="12" text-anchor="middle" x="165" y="296"><!--pnid:HWgeQKbS32aK7jd1Dr0YoI-->Audit / Timeline Service</text>
+
+      <rect data-page-node-id="NLZFkZCqGUs36YRXJx9ndB" fill="#EFF5FF" height="162" rx="10" stroke="#BBD4FB" stroke-width="1" width="420" x="310" y="158"/>
+      <text data-page-node-id="4QEnt5zlZcpX7mceBFDWsR" fill="#1E3F9E" font-size="12" font-weight="600" x="328" y="180"><!--pnid:eT4SYyAq7m5zoXUKjKxBE8-->业务子系统 L2（逐个接入）</text>
+      <rect data-page-node-id="nHUZEfm7sqMEtBJf2GRXWb" fill="#fff" height="36" rx="6" stroke="#BBD4FB" width="122" x="326" y="190"/>
+      <text data-page-node-id="xpFUUNda7Nymc3FaLP7lw1" fill="#1E3F9E" font-size="12" text-anchor="middle" x="387" y="212"><!--pnid:fQJoTcQBNJ9v3cOCbLozCR-->JD</text>
+      <rect data-page-node-id="kTDHuIFbLjRmfF7Yo6L7Db" fill="#fff" height="36" rx="6" stroke="#BBD4FB" width="122" x="460" y="190"/>
+      <text data-page-node-id="MrMdLpdD3MFuZxzREXwikd" fill="#1E3F9E" font-size="12" text-anchor="middle" x="521" y="212"><!--pnid:7H2DIIcY84l5ffeIEWVvkD-->Screening</text>
+      <rect data-page-node-id="hpafb3K19JD8Fh03kgyT90" fill="#fff" height="36" rx="6" stroke="#BBD4FB" stroke-dasharray="4 3" width="122" x="594" y="190"/>
+      <text data-page-node-id="HSw6eSnRx8Q9urXCxrNjnJ" fill="#2563EB" font-size="12" text-anchor="middle" x="655" y="212"><!--pnid:eDdq5OopEZGDwRevQ9MkgP-->Assessment</text>
+      <rect data-page-node-id="JYcUchmFpwxLr2reNFL7Eu" fill="#fff" height="36" rx="6" stroke="#BBD4FB" stroke-dasharray="4 3" width="122" x="326" y="232"/>
+      <text data-page-node-id="PWuQtJtcVxP0rNTeNedt1j" fill="#2563EB" font-size="12" text-anchor="middle" x="387" y="254"><!--pnid:H7QwleJzD4NWVk2cd0NLq8-->Interview</text>
+      <rect data-page-node-id="ftJ9f3yFOKnzwpqerO8o0A" fill="#fff" height="36" rx="6" stroke="#BBD4FB" stroke-dasharray="4 3" width="122" x="460" y="232"/>
+      <text data-page-node-id="UmkJJ1kpLXeWvgr8KHuxDF" fill="#2563EB" font-size="12" text-anchor="middle" x="521" y="254"><!--pnid:PMPaF3mC4YiPw8KY2a4tOm-->Offer</text>
+      <text data-page-node-id="nLdBBfmAui5YTOG8MmEZRX" fill="#1E3F9E" font-size="11" x="328" y="284"><!--pnid:buCxjfsIXxZ6l0xxW5G1OQ-->写自己的表　→　直连自己的 schema，不经任何中间件</text>
+      <text data-page-node-id="nLdBBfmAui5YTOG8MmEZRY" fill="#4C2FB8" font-size="11" x="328" y="300"><!--pnid:XhGcJKTw7pUunl9OroUZzI-->读写主档　→　调 Core Record 同步 API，拿不到主档库连接</text>
+      <text data-page-node-id="nLdBBfmAui5YTOG8MmEZRZ" fill="#5B6773" font-size="11" x="328" y="316"><!--pnid:95NmF9TU5CbTymtx7DKqHp-->虚线框 = 后续阶段接入</text>
+
+      <path data-page-node-id="6eqiJtIIdhzVYb301lJXLO" d="M306 250 L282 250" fill="none" marker-end="url(#a)" stroke="#6D4AFF" stroke-width="1.4"/>
+
+      <rect data-page-node-id="WxO0qOCsqzLxZdn4yUVpDJ" fill="#fff" height="76" rx="10" stroke="#D3D9E0" stroke-width="1" width="170" x="750" y="158"/>
+      <text data-page-node-id="hqX3f8cVisZ0pchwid767F" fill="#3A4550" font-size="12" font-weight="600" text-anchor="middle" x="835" y="182"><!--pnid:tBCIpB5oIPgyUcsjhAzL2t-->AI Service</text>
+      <text data-page-node-id="XlmQmMAD6WVWS1PQFOe7Wp" fill="#5B6773" font-size="11" text-anchor="middle" x="835" y="202"><!--pnid:6Phm5dGh6zzR7H8t91ND2t-->模型网关 / Agent</text>
+      <text data-page-node-id="eFdUGkAuuiCDB5ECdELnjJ" fill="#5B6773" font-size="11" text-anchor="middle" x="835" y="220"><!--pnid:cHCXMJW1IAx3aDqcebW0aX-->全系统共用</text>
+
+      <rect data-page-node-id="eGxqnH28ivS1QaR5XEcvRe" fill="#fff" height="76" rx="10" stroke="#D3D9E0" stroke-width="1" width="170" x="750" y="244"/>
+      <text data-page-node-id="ZpsXLX56U9RxGTPQm7fQif" fill="#3A4550" font-size="12" font-weight="600" text-anchor="middle" x="835" y="268"><!--pnid:KVvwB2P8udLV3CCuBWVF1V-->Worker / Async</text>
+      <text data-page-node-id="qLDmrOLJPMtfrpol4kpdGW" fill="#5B6773" font-size="11" text-anchor="middle" x="835" y="288"><!--pnid:Iri6lfSTDMNRPDOMFGjLSV-->导入 / 批处理</text>
+      <text data-page-node-id="JDFNnsGVI4qyFXDuWTUYNg" fill="#5B6773" font-size="11" text-anchor="middle" x="835" y="306"><!--pnid:0u9RnupXIxxJ7aHS2yUyNZ-->失败重试</text>
+
+      <path data-page-node-id="rPLRSnVDUz8oU63bwSaSBo" d="M430 330 L430 360 L124 360 L124 418" fill="none" marker-end="url(#a)" stroke="#8A94A0" stroke-width="1.4"/>
+      <text data-page-node-id="85v3YMzHrroKKN9k8Cs0hr" fill="#3A4550" font-size="11" x="136" y="352"><!--pnid:3aTL0CUhkp66CfpVxeUAdi-->① 直连自己的 schema，不经事件总线</text>
+
+      <path data-page-node-id="NfUWbElGiodurlwO2RIDMq" d="M610 330 L610 360 L480 360 L480 418" fill="none" marker-end="url(#a)" stroke="#6D4AFF" stroke-dasharray="5 3" stroke-width="1.4"/>
+      <text data-page-node-id="aDJYZqOqgyozM5qqPtgqvY" fill="#4C2FB8" font-size="11" x="496" y="352"><!--pnid:jLpePwWcKzDFOuBqzD9t1S-->② 发布 / 订阅　子系统之间唯一通道</text>
+
+      <rect data-page-node-id="zss6SEILeuBKiADelhXBLE" fill="#F7F9FC" height="100" rx="12" stroke="#E3E7EC" stroke-width="1" width="920" x="20" y="390"/>
+      <text data-page-node-id="vUBRYOwJBOeCxBb4OUy849" fill="#5B6773" font-size="12" font-weight="600" x="36" y="410"><!--pnid:o4vMFuz86UxsnkH2ImzAxT-->数据与基础设施 L0　·　全部部署单元共用</text>
+
+      <rect data-page-node-id="tRdHEcPS63Fwxfddf85yEf" fill="#fff" height="54" rx="6" stroke="#D3D9E0" stroke-width="1" width="168" x="40" y="424"/>
+      <text data-page-node-id="tzmzr67fgrv3EQ0itgWyBW" fill="#3A4550" font-size="12" font-weight="600" text-anchor="middle" x="124" y="446"><!--pnid:0SJ8e2Fuqg0aWdJuJT2sUT-->Postgres</text>
+      <text data-page-node-id="tzmzr67fgrv3EQ0itgWyBX" fill="#5B6773" font-size="11" text-anchor="middle" x="124" y="464"><!--pnid:IFzemUMOTx8aGJu3XSVwiB-->每子系统独立 schema</text>
+
+      <rect data-page-node-id="gaYetmWuciorlgn67LB58X" fill="#fff" height="54" rx="6" stroke="#D3D9E0" stroke-width="1" width="168" x="218" y="424"/>
+      <text data-page-node-id="wjvcxsRDNmbmS3qVq4rXm3" fill="#3A4550" font-size="12" font-weight="600" text-anchor="middle" x="302" y="446"><!--pnid:V4V6SHj8KOyxJ0UdcYcEMz-->Redis + Queue</text>
+      <text data-page-node-id="wjvcxsRDNmbmS3qVq4rXm4" fill="#5B6773" font-size="11" text-anchor="middle" x="302" y="464"><!--pnid:SoqLChDreLx2QMao3WmqUT-->缓存 / 异步任务</text>
+
+      <rect data-page-node-id="bHMP5FIL4dheWAWORASQH2" fill="#F3EFFF" height="54" rx="6" stroke="#6D4AFF" stroke-width="1.4" width="168" x="396" y="424"/>
+      <text data-page-node-id="WkdGPfhFGd3sfnrWNcWSxx" fill="#4C2FB8" font-size="12" font-weight="600" text-anchor="middle" x="480" y="446"><!--pnid:J0iqZ3qFaNDudC5FGOgWmy-->事件总线</text>
+      <text data-page-node-id="WkdGPfhFGd3sfnrWNcWSxy" fill="#6D4AFF" font-size="11" text-anchor="middle" x="480" y="464"><!--pnid:Vlm2M68bDqCogtcrqPCHDH-->S0 用 Redis Streams</text>
+
+      <rect data-page-node-id="Lhp9z7M6wCDvyX1vt9ATRc" fill="#fff" height="54" rx="6" stroke="#D3D9E0" stroke-width="1" width="168" x="574" y="424"/>
+      <text data-page-node-id="L6nTuFHYD4CRAwfd4PMxrP" fill="#3A4550" font-size="12" font-weight="600" text-anchor="middle" x="658" y="446"><!--pnid:nu6bttq1P95KOf1pnJZIJc-->对象存储</text>
+      <text data-page-node-id="L6nTuFHYD4CRAwfd4PMxrQ" fill="#5B6773" font-size="11" text-anchor="middle" x="658" y="464"><!--pnid:Dob5p7cloSN3b0kruNQKLm-->简历 / 文件</text>
+
+      <rect data-page-node-id="H5SO5pOT0dO6dq8hHBd9aW" fill="#fff" height="54" rx="6" stroke="#D3D9E0" stroke-width="1" width="168" x="752" y="424"/>
+      <text data-page-node-id="Puec5EbYa9R3LuaEoorCE6" fill="#3A4550" font-size="12" font-weight="600" text-anchor="middle" x="836" y="446"><!--pnid:1NRLMsXK2gk9BMdygr2oDJ-->可观测性</text>
+      <text data-page-node-id="Puec5EbYa9R3LuaEoorCE7" fill="#5B6773" font-size="11" text-anchor="middle" x="836" y="464"><!--pnid:4F0BDs2imEvhRZAOV6VenX-->日志 / 指标 / 链路</text>
+
+      <rect data-page-node-id="x7FQtz1JoHAvECkHE580Yl" fill="#F7F9FC" height="64" rx="12" stroke="#E3E7EC" stroke-width="1" width="920" x="20" y="506"/>
+      <text data-page-node-id="2lYlzZlCpD2QP8UhN0UZif" fill="#5B6773" font-size="12" font-weight="600" x="36" y="526"><!--pnid:ah6J48UXvOl1a1HEiFdawZ-->外部系统</text>
+      <rect data-page-node-id="CdsxLFcRSyNHZaTr0tBvTS" fill="#fff" height="22" rx="5" stroke="#D3D9E0" width="168" x="40" y="538"/>
+      <text data-page-node-id="IrdIVDEfCNAAdbBk3Ez6Yb" fill="#5B6773" font-size="11" text-anchor="middle" x="124" y="553"><!--pnid:EhDkrl3meKxKurjGRG1FXl-->Model Provider</text>
+      <rect data-page-node-id="3wwBCBuNyS6X7m0hij2pXn" fill="#fff" height="22" rx="5" stroke="#D3D9E0" width="168" x="218" y="538"/>
+      <text data-page-node-id="897UCJ73t956EUj6vSD5z7" fill="#5B6773" font-size="11" text-anchor="middle" x="302" y="553"><!--pnid:OMvS8kbxwsXecLjxQ9E4MF-->招聘邮箱</text>
+      <rect data-page-node-id="8CN08xRV2BQIGfUFCjGFhc" fill="#fff" height="22" rx="5" stroke="#D3D9E0" width="168" x="396" y="538"/>
+      <text data-page-node-id="FFIQl9pj5aN7lCeaXZewCs" fill="#5B6773" font-size="11" text-anchor="middle" x="480" y="553"><!--pnid:QCaErFiLq3fbrmtzOpDpkA-->Calendar</text>
+      <rect data-page-node-id="9hLx7c8DHvjJpZSkLPt0tx" fill="#fff" height="22" rx="5" stroke="#D3D9E0" width="168" x="574" y="538"/>
+      <text data-page-node-id="LcwewRFUkp0JhjB7QS2One" fill="#5B6773" font-size="11" text-anchor="middle" x="658" y="553"><!--pnid:N9fe61PMMLC4O7YdmckczM-->HRIS / ATS</text>
+      <rect data-page-node-id="VAap47CcuHL3wOIIkqsH2q" fill="#fff" height="22" rx="5" stroke="#D3D9E0" width="168" x="752" y="538"/>
+      <text data-page-node-id="ET1FkBBMEoyEKgBZM4xgAt" fill="#5B6773" font-size="11" text-anchor="middle" x="836" y="553"><!--pnid:jRd1Ku8sW1SUvKopIycpB4-->文件 / CSV 源</text>
+    </svg>
+
+    <div data-page-node-id="967WFV9AA1tsSHy1K7qRfw" class="key">
+      <p data-page-node-id="YdiFT1CEugIGTX7qh7tChC"><b data-page-node-id="sDIHMvWvjGiQJ2jUkZcYK2"><!--pnid:oybh3pZOsku55eA5Bnmf3j-->子系统访问数据只有三条路径。图里 ① 和 ② 是两条互不相干的线 —— 落库从来不经过事件总线。</b></p>
+      <p data-page-node-id="EqvDO29iPUQwhNR6YekYpB"><!--pnid:jIXwowQ88DQVRX7Beyyi3Q-->① <b data-page-node-id="JAAvOjjFqCsDNnq9HCpeev"><!--pnid:fs045kJn9kXvpxWj47qfPX-->读写自己的私有表</b><!--pnid:CsXPYRjmVEKtGLyDXhA8Lt-->：直连自己的 schema，本地事务，不经任何中间件；② <b data-page-node-id="bq6qffRl8D7xYS59rORTiS"><!--pnid:AETH0ATNFU4f6MDzilWPBa-->读写主档</b><!--pnid:InkKCqOa4IYTLZq8L4M5Pm-->：调 Core Record 同步 API，拿不到主档库连接；③ <b data-page-node-id="5mantbNy3iWa85KsNQ3vVh"><!--pnid:ejlopZebBADo3sO8GIajTj-->告诉别人我变了</b><!--pnid:7ySdJP0f2JjGwcONr49apQ-->：往事件总线发一条事件，这是子系统之间唯一的通道。</p>
+    </div>
+
+    <p data-page-node-id="xtj8D1Sal7kiZnUOyjT8dj" style="margin-top:16px"><b data-page-node-id="HS7VxhemmFY3dS8n93CCOv"><!--pnid:gqfnSHj7Jya98HiDXZHazT-->Core Record Service 是干什么的</b></p>
+    <p data-page-node-id="jFUOyhz6gChjlTXmdqPMy6"><!--pnid:3TZD4wvoF1K4i8ZVRM75uy-->它是「<b data-page-node-id="Sp2ejZlaxiSg9s6GD7y482"><!--pnid:2UMzWoNAo3og3WJirO50jo-->同一个人、同一个岗位、同一次投递</b><!--pnid:33Pbbd93zX20s2x1DoLIjt-->」在全部子系统里的<b data-page-node-id="eh9HWhZlwpPgdQ8EJUnZAA"><!--pnid:hukDkviihTpn9hkyNPWZPG-->唯一一份档案</b><!--pnid:6kFWFE9Yfg0QvGxN6x7bhw-->，也是唯一能写这份档案的进程。它管四样东西：Candidate（这个人）、Job（这个岗位）、Application（这个人对这个岗位的这次投递）、File（文件）。</p>
+    <p data-page-node-id="S4TiqyApYPNWDpg5w4YwUT"><!--pnid:I6di8QtmRrgLmeEH5n0pW7-->为什么必须单独拎出来：如果 JD 自己存一份岗位、Screening 自己再存一份，合并时就会出现「同一个岗位有两个版本、不知道该信谁」。集中成一份之后，五个子系统引用的是同一个 <code data-page-node-id="wmCLoymq21JpYfl5eOTPtA"><!--pnid:RyPNVjs4kLoWl9RawB6jNn-->job_id</code><!--pnid:vPxMK3hwoeMMLXdch8sWsB-->、同一个 <code data-page-node-id="7cH8b0Owbfkk9ATeUSs6RJ"><!--pnid:KrTOZ1GlV5QfFmd8bCx8FV-->application_id</code><!--pnid:NSGzbAuxtk45gcIGLoW3oC-->，这才是「数据能打通」的物理基础。JD 创建岗位是<b data-page-node-id="kVRGcopOj6VY2X5hE1DisW"><!--pnid:fvti6yzvlJKiSBZf0coEys-->调它的 API 让它写</b><!--pnid:uDajoMM5EUC9UyZRCTFk36-->，不是自己写一份。</p>
+
+    <p data-page-node-id="5BHRjiNu7TbfCcyh7U3Wid" style="margin-top:14px"><b data-page-node-id="GMjt7IIukIDicbN3255zwX"><!--pnid:9EizJMKgyaMvvHvcrO5Y5q-->为什么图里没有「集成域」</b></p>
+    <p data-page-node-id="MaI4Po3dOH66Uv33tVCh5x"><!--pnid:xdvuHeCEi4kQygJgkS5YyD-->这个词已废弃。它原本装在三样东西，但没有一样构成一个层或一个域：<b data-page-node-id="YGWWJFounGhwCYGV6qabtL"><!--pnid:8CVx3RQTCjXMdAV7fPwsS6-->事件总线</b><!--pnid:nkR8MxSll5ePuGvLqGvSch-->就是一个消息中间件（和 Kafka 同类，S0 用已有的 Redis Streams，不新建），已并入 L0 基础设施；<b data-page-node-id="gj9RuVBagsptnwtjsxYRTD"><!--pnid:l2lmwzdpDUjZNlP9MLgZ8q-->Schema Registry</b><!--pnid:1nx67N53lywmdRQcnEJOo7--> 是事件格式的文件仓库 + 一条 CI 校验，不是运行时；<b data-page-node-id="W2NiXHCPkYNPJtgD8NZ48M"><!--pnid:zAqvzQkZ3pwsavcIYjwhzp-->子系统注册表</b><!--pnid:Qoi5eK9WYiI0T4hNPECNgq--> 是 Shell 的配置，跟着 Shell 走。剩下的只有规则，不是东西 —— 三条：跨系统只能发事件、主档只能经 Core Record、A 不许直接调 B。</p>
+
+    <p data-page-node-id="ZxKNchdkODoQ5V64dmQDHf" style="margin-top:14px"><b data-page-node-id="iG3rjxXBZBVs9MWbxs9wCa"><!--pnid:6pIIeAMqZ6JzwnVUZ8hfDB-->事件总线和 Queue 是不是重复</b></p>
+    <p data-page-node-id="aZ3DecPf7aqZA7h1KlOnEA"><!--pnid:0206l4AuWRGUGaFEkEcGhz-->技术上不重复的两个产品，是<b data-page-node-id="Ix1gf0unbffPmwAiurNf1K"><!--pnid:4MBUhYJzGw8me4ed7rMonA-->同一个 Redis 上的两种用法</b><!--pnid:tRvmX4JJob9I1fgiO1nW8j-->：Queue 是一条活只干一次、消费完删除（AI 解析、发邮件、导入）；事件总线是一件事广播给多方、保留可重放（岗位发布 → Screening 建投影、Tasks 生成任务、Timeline 记一笔）。等事件需要长期留存、需要重放补数、订阅方和量级上来了，再把事件总线换成 Kafka —— 因为消费者只认标准 envelope，换的时候不改业务代码。</p>
+  </section>
+
+  <!--pnid:jwEqmkab6ONjt5aJ1tuimf--><!-- 对比 -->
+  <section data-page-node-id="gcWpAn7bfNTzHCiBJfC8gN">
+    <h2 data-page-node-id="1CecY2zH2WcICbOTT0aqgE"><!--pnid:2XsQmARbSERsEKyPsFMPOl-->为什么不能照着图 1 直接建</h2>
+    <p data-page-node-id="tkOnVY6JtKWVBUDjfGHkxd" class="q"><!--pnid:vuPXGBE4UjZLoVhTJLL8K9-->把图 1 当成施工图，就会建成一个单体，两个目标同时失守。</p>
+
+    <table data-page-node-id="lfksxjhenz6i8vczqKuyGG">
+      <tr data-page-node-id="CjFOi2MgxEMukeQqQd6QGj"><th data-page-node-id="XFKtDnj4YaTsloHbXm5EOc" style="width:22%"><!--pnid:akM5233g7u9t0FStaUuZji-->做法</th><th data-page-node-id="4z7vFr23C0jcOuQ3L6vkeT" style="width:39%"><!--pnid:i0Cy7q7oBYVT3ots4aqecA-->照图 1 直接建（单体）</th><th data-page-node-id="PUDJ3VdgKil0XXeI4IM6EV" style="width:39%"><!--pnid:nJe9zSlgWM9YR5E8szIawk-->照图 2 建（本文方案）</th></tr>
+      <tr data-page-node-id="WWhybKF4RCsKgJ7UotEFfb"><td data-page-node-id="HtUPrtQItAAF10pCJAxHvb"><!--pnid:8IAEQpkRGFOAYJSG4Is2Pi-->代码与库</td><td data-page-node-id="urV5JFvJQfc6xzu2e7bEcM"><!--pnid:un0z41DwkgknlJo4xM36gf-->一个进程、一个库，五个业务域共用表</td><td data-page-node-id="t19PI9OzeEm09D0W94yvf7"><!--pnid:8X2ZTSraEDLFCw8Kq2ZyJg-->每个子系统独立进程、独立 schema，主档由 Core Record 独占写入</td></tr>
+      <tr data-page-node-id="4BIs6d4nHzjpNy7jcJITeT"><td data-page-node-id="iZHRXvOVcPbu4YBbp2V3Vc"><!--pnid:EeUmepFfQiynfBoD9OjTMk-->改一个业务域</td><td data-page-node-id="XJKAZfpYMCaySZUU4olypj"><!--pnid:ZRWzjNXDgTKx6IRAHWTxhb-->要全量回归、整体发版，其他域陪跑</td><td data-page-node-id="iprhoHOzeGhbbKy4kNg5T6"><!--pnid:0ytZmiXefVsd22ftKKinam-->只发自己的进程，其他域不动</td></tr>
+      <tr data-page-node-id="z9EPhRshp8z31mwjmyBrlV"><td data-page-node-id="pW4oZgU4StTdSGWm3eh98m"><!--pnid:tRdwhnCl37UnRiBavvNket-->目标 1 独立上线</td><td data-page-node-id="FatRzP8818GGgzroFTJiBa"><b data-page-node-id="Rup6gbXgXmmhAK17k2nmYY"><!--pnid:GWojwe0Os9OL62IUBktoZM-->做不到</b></td><td data-page-node-id="KM5lCFF3j3EKMXyPakWA8e"><!--pnid:ndAaYYVTarhK11kNC6U32d-->天然满足</td></tr>
+      <tr data-page-node-id="G90Gy23CBe8zCJJvwnbB3Q"><td data-page-node-id="LEAdjcq6SN2Do3J8VhptsP"><!--pnid:Y1C3puj2vnm8IDvlOzSHBc-->目标 2 后期合并</td><td data-page-node-id="EVlBCbznxohl3gkJFOEg1X"><!--pnid:F0NAFU8j4Y8fNMh1z4wr22-->表面已经"合"了，但合并的是代码耦合，不是能力组合</td><td data-page-node-id="zBXMRdCC3G9oQFB63J5Oot"><!--pnid:A4UrDYkdt413fsgdfJctJA-->合并发生在组合层与注册表，子系统不改</td></tr>
+      <tr data-page-node-id="P7NELLzxJ7bBmTYbbI99Er"><td data-page-node-id="FbtYPl042WSvPSHaZ8cgOC"><!--pnid:JGMeC6c18ztwWbaaQoVynE-->代价</td><td data-page-node-id="PKSjglVpMxAClcbrRmDB4t"><!--pnid:kerGc4dqgmQm9Py0I7vavj-->前期快，后期每加一个域都更慢</td><td data-page-node-id="AxNEx3rwChsSR6oNsXkQ50"><!--pnid:w0WyWuzUdFZQVoLtwuTtW4-->S0 阶段无业务产出，之后每个新域成本恒定</td></tr>
+    </table>
+
+    <div data-page-node-id="whsPN7uYj9lFHZWhsHki9F" class="key">
+      <p data-page-node-id="QUeGZQAw4ymYcpuYBOU6ww"><b data-page-node-id="g62TGlqzOMMqQ4TyoTWfrH"><!--pnid:xJWRyMxbOPjvTO0Lw0tLgP-->一句话：图 1 是"合完之后看起来什么样"，图 2 是"怎么建才能合得起来"。直接照图 1 建，等于把目标当成了施工图。</b></p>
+    </div>
+  </section>
+
+  <!--pnid:eV0xHeUelCk3f4HFMEhFOf--><!-- 图 3 -->
+  <section data-page-node-id="8OO1HY1zXxYUirDfcwLpQq">
+    <h2 data-page-node-id="1L6tmmainvZIjtmAcAWLVT"><!--pnid:ifgVYTUJ3nAhTI7SvCsh9a-->图 3　两个目标分别靠哪几层实现</h2>
+    <p data-page-node-id="khXkSBGlB5qlGV8wfSubU3" class="q"><!--pnid:uOulW02pdjS7aO6WZ0evBj-->左右是<b data-page-node-id="auts4GAGrPB46RJb4NUlew"><!--pnid:B2BrMcPjV9fQyMpHlU3Er5-->同一套四层</b><!--pnid:7u2ZDjUT9NqjwAl4K4QwPa-->，只是高亮不同：左图 = 目标 1 生效在哪几层，右图 = 目标 2 生效在哪几层。灰色 = 该层对此目标不起决定作用。</p>
+    <p data-page-node-id="Ku7PFl5ZWWjXpbcTfJCYQu" class="q"><!--pnid:utyaLoxtTpidTeH3JAyjMq-->原本设过一层「契约与集成层」，现已撤销：事件总线归入 L0 基础设施，子系统注册表归入 L3 组合层，API 与事件契约改为跨层纪律（见底部紫条）。分层从五层减为四层，没有信息丢失。</p>
+
+    <svg data-page-node-id="oCSctxdqpBS2J9EY0vAXgr" role="img" viewBox="0 0 960 604">
+      <title data-page-node-id="WKFD46XVjtL8rDGdbWGlNY" data-pnid-children="4uo6oEMBERpXjlexReg7Xc">两个目标分别靠哪几层实现</title>
+
+      <rect data-page-node-id="Ih2VM5bYxWViH1CdJg0ggE" fill="#EFF5FF" height="52" rx="10" stroke="#BBD4FB" stroke-width="1" width="460" x="20" y="20"/>
+      <text data-page-node-id="RzJJLpYPkWOhQoYvRCPGub" fill="#1D4ED8" font-size="13" font-weight="600" x="40" y="42"><!--pnid:u4dCoCOBjJIxpZ35qz8z10-->目标 1 · 独立迭代、独立上线</text>
+      <text data-page-node-id="Yb2uIVNsqUTip4MBJ3fh83" fill="#2563EB" font-size="12" x="40" y="60"><!--pnid:gReSUyIhWRtJ6ldQnUmQSu-->任一子系统发布，不需要其他子系统配合或停机</text>
+
+      <rect data-page-node-id="lr5sKPucbUcHaCz4CCINur" fill="#F3EFFF" height="52" rx="10" stroke="#D5CBFA" stroke-width="1" width="460" x="500" y="20"/>
+      <text data-page-node-id="ztpXIEjFGDW10q7g6zmY2r" fill="#5B34D6" font-size="13" font-weight="600" x="520" y="42"><!--pnid:mBH9DUIhyyVIHN6cqDsNAd-->目标 2 · 合并时改动尽量少</text>
+      <text data-page-node-id="M8YxSIVqh2Lw2LqXreM7ak" fill="#6D4AFF" font-size="12" x="520" y="60"><!--pnid:IdvRp0HavKlUioTlTPw4jp-->新增子系统时，已上线的业务代码改动为 0</text>
+
+      <rect data-page-node-id="lTsR1mKdoqlY8Ohy2Bbr7i" fill="#F4F6F8" height="62" rx="10" stroke="#D3D9E0" stroke-width="1" width="460" x="20" y="88"/>
+      <text data-page-node-id="KDs1I10arW9UB4cIOStPm2" fill="#8A94A0" font-size="14" font-weight="600" x="40" y="112"><!--pnid:7OdPWdCfY0ZszsjByTmao6-->L3　体验组合层</text>
+      <text data-page-node-id="gbm6a2Yps7YfnnH9IcCNPI" fill="#8A94A0" font-size="12" x="40" y="134"><!--pnid:dJcZgPqVeF0bVwM5nCZpA2-->子系统不依赖组合层也能独立运行</text>
+      <rect data-page-node-id="G1XgGN5rZsUOY8ZqEFGNDr" fill="#fff" height="26" rx="13" stroke="#D3D9E0" stroke-width="1" width="120" x="340" y="106"/>
+      <text data-page-node-id="2iAkBq7SXbAovZc1v8FwKh" fill="#8A94A0" font-size="12" text-anchor="middle" x="400" y="123"><!--pnid:9tgB3oA7CzRd6920nUcGdh-->不参与</text>
+
+      <rect data-page-node-id="fmOc4eizL3lxL1NoCkLsmv" fill="#EFF5FF" height="62" rx="10" stroke="#2563EB" stroke-width="1.6" width="460" x="20" y="158"/>
+      <text data-page-node-id="rI5ZYst4Dtu9wFTF9r7Oj5" fill="#1E3F9E" font-size="14" font-weight="600" x="40" y="182"><!--pnid:Ad14y0qrGRxZI6mJLA2EPS-->L2　业务子系统层</text>
+      <text data-page-node-id="gUs07TL11wN2aMp3nn7eDf" fill="#2563EB" font-size="12" x="40" y="204"><!--pnid:PpitRFTyFEiRyEPAt7Fez6-->独立进程 · 独立 schema · 独立前端 bundle</text>
+      <rect data-page-node-id="T0O14wCflaQldvwFteWdzv" fill="#2563EB" height="26" rx="13" width="120" x="340" y="176"/>
+      <text data-page-node-id="bTDCXP9LefJObECnLnHcRy" fill="#fff" font-size="12" text-anchor="middle" x="400" y="193"><!--pnid:LuXCuLcMVID3lpHYpVBEhh-->核心</text>
+
+      <rect data-page-node-id="s5jbwO0n49goToyyJV5ajv" fill="#F3EFFF" height="62" rx="10" stroke="#D5CBFA" stroke-width="1" width="460" x="20" y="228"/>
+      <text data-page-node-id="iHUoP3txBf904MecAbmX9K" fill="#4C2FB8" font-size="14" font-weight="600" x="40" y="252"><!--pnid:yJozmRf7xgWEm4bK3JTW4r-->L1　平台地基层</text>
+      <text data-page-node-id="McWvMREe9CxptSNTfRM7pW" fill="#6D4AFF" font-size="12" x="40" y="274"><!--pnid:7cwaCctwVitHgpE31fXfM8-->地基独立部署，子系统各自依赖而非互相依赖</text>
+      <rect data-page-node-id="8oo7q5lJ3JdvbMKARK4IUo" fill="#F3EFFF" height="26" rx="13" stroke="#6D4AFF" stroke-width="1" width="120" x="340" y="246"/>
+      <text data-page-node-id="MAcI6LvNZHN9PqmnyemOtK" fill="#4C2FB8" font-size="12" text-anchor="middle" x="400" y="263"><!--pnid:DZzKnXshna0BEunIZMqOBE-->保障</text>
+
+      <rect data-page-node-id="24bHZkUOjprJXPBAwabq8G" fill="#F4F6F8" height="62" rx="10" stroke="#D3D9E0" stroke-width="1" width="460" x="20" y="298"/>
+      <text data-page-node-id="w0wbzM6lyFK79ToxPydbXq" fill="#8A94A0" font-size="14" font-weight="600" x="40" y="322"><!--pnid:EAhGzAOYC7WWTO6Um1Geyq-->L0　基础设施（含事件总线）</text>
+      <text data-page-node-id="BnRaJo9tL0iciWaCL14vOU" fill="#8A94A0" font-size="12" x="40" y="344"><!--pnid:NC3YnsnLFc2CzhHUWH0hjI-->共用，靠 schema 与命名空间隔离</text>
+      <rect data-page-node-id="kEt5Qb7ru0m7ssnWgFuLED" fill="#fff" height="26" rx="13" stroke="#D3D9E0" stroke-width="1" width="120" x="340" y="316"/>
+      <text data-page-node-id="oUjMmGNig3UfCT472LBMOo" fill="#8A94A0" font-size="12" text-anchor="middle" x="400" y="333"><!--pnid:XbD1Lrb4IFCDia1QblVw1b-->底座</text>
+
+      <rect data-page-node-id="zEpNbSFdUC2XlPsF6Qt3RJ" fill="#EAF7F1" height="56" rx="10" stroke="#BFE3D0" stroke-width="1" width="460" x="20" y="376"/>
+      <text data-page-node-id="XRWYIX8LxhY06DSwq0IhEs" fill="#0F7A4A" font-size="12" x="40" y="400"><!--pnid:tCDYI5eQIwsaZZkN1wpRj8-->结论：每个子系统都是一个自包含的可发布单元，</text>
+      <text data-page-node-id="H73HXpsLqfOL4mL0lwSBHz" fill="#0F7A4A" font-size="12" x="40" y="420"><!--pnid:vJ4KEHUv524HwsMuIDYpl1-->彼此不共享代码与库，改自己不影响别人。</text>
+
+      <rect data-page-node-id="BjA0oiWypX8pxoTLZBJXkG" fill="#FFF7E8" height="62" rx="10" stroke="#E0A94A" stroke-width="1.6" width="460" x="500" y="88"/>
+      <text data-page-node-id="sqdft2Wwkk1Q87CaJeVDrq" fill="#7C3A06" font-size="14" font-weight="600" x="520" y="112"><!--pnid:I3ILjKzAWmKRadNyHeLKKJ-->L3　体验组合层</text>
+      <text data-page-node-id="cNDaT0OfY8DAK2pSDUTjo0" fill="#B45309" font-size="12" x="520" y="134"><!--pnid:8RRUahoOMcCOIp34FURT5A-->注册表驱动，加一个子系统 = 加一条配置</text>
+      <rect data-page-node-id="vsP6vGsvClqUqtJk4awhf7" fill="#B45309" height="26" rx="13" width="120" x="820" y="106"/>
+      <text data-page-node-id="5xH71g8Kenf0ohhXOhYxl4" fill="#fff" font-size="12" text-anchor="middle" x="880" y="123"><!--pnid:IE2sUrf6Ydvh6Nz7nsSjbA-->核心</text>
+
+      <rect data-page-node-id="oR0RO1GealLAtWkxy1Gapy" fill="#F4F6F8" height="62" rx="10" stroke="#D3D9E0" stroke-width="1" width="460" x="500" y="158"/>
+      <text data-page-node-id="DocptOXs91BNSqlpHd6JXg" fill="#8A94A0" font-size="14" font-weight="600" x="520" y="182"><!--pnid:bYv0xWrkIphGggWD0n6VVh-->L2　业务子系统层</text>
+      <text data-page-node-id="63lEzBLTaXevayPbZ299te" fill="#8A94A0" font-size="12" x="520" y="204"><!--pnid:cy3Lb4Wa8SmCpueb9dic2V-->接入后不再改动，横向零直调</text>
+      <rect data-page-node-id="xxbnm3gFOGDrkMbtl8028u" fill="#fff" height="26" rx="13" stroke="#D3D9E0" stroke-width="1" width="120" x="820" y="176"/>
+      <text data-page-node-id="RLhvzCxhMhkH1QbBUjDcDV" fill="#8A94A0" font-size="12" text-anchor="middle" x="880" y="193"><!--pnid:BCS7oF7A1QqlW2FBF1lDWW-->不改</text>
+
+      <rect data-page-node-id="qqoQd4ubmypBDXNWgrY7AA" fill="#F3EFFF" height="62" rx="10" stroke="#6D4AFF" stroke-width="1.6" width="460" x="500" y="228"/>
+      <text data-page-node-id="HvvvhzyWJ610TQZuD5rjdR" fill="#4C2FB8" font-size="14" font-weight="600" x="520" y="252"><!--pnid:lVlottQxLvyFKG5Uhjrzot-->L1　平台地基层</text>
+      <text data-page-node-id="SNIOoG777UoI9a3zg1BomY" fill="#6D4AFF" font-size="12" x="520" y="274"><!--pnid:cjVdfzHYwIWVLQa2LmSaHy-->账号 / 主档 / 审计第一天统一，后期不换主键</text>
+      <rect data-page-node-id="F7pv2ERRvVg5Ll2cEQQSTU" fill="#5B34D6" height="26" rx="13" width="120" x="820" y="246"/>
+      <text data-page-node-id="DEBJ9LShZRS2EoTlYIPMA5" fill="#fff" font-size="12" text-anchor="middle" x="880" y="263"><!--pnid:6MMjg1RaIc8mJ5U86yAMx6-->核心</text>
+
+      <rect data-page-node-id="93UUeUbTpuKwdMatjjRID6" fill="#F4F6F8" height="62" rx="10" stroke="#D3D9E0" stroke-width="1" width="460" x="500" y="298"/>
+      <text data-page-node-id="DzGtnfse1wtpuwkJudpgwS" fill="#8A94A0" font-size="14" font-weight="600" x="520" y="322"><!--pnid:rROOdmu4OvSz0slwTL3hl2-->L0　基础设施（含事件总线）</text>
+      <text data-page-node-id="tb9sAPzsmmDV9VOcA1hMSb" fill="#8A94A0" font-size="12" x="520" y="344"><!--pnid:3oUC4SFalpCo8qgL9cZfK1-->事件总线是合并时要对接的接缝，但本身不改</text>
+      <rect data-page-node-id="W1QNnu2JHbNis663EcWonY" fill="#fff" height="26" rx="13" stroke="#D3D9E0" stroke-width="1" width="120" x="820" y="316"/>
+      <text data-page-node-id="6F82Z0xVZ43WgBhZHA6pxY" fill="#8A94A0" font-size="12" text-anchor="middle" x="880" y="333"><!--pnid:ibXjw866Q07s4LIPe4MSsq-->底座</text>
+
+      <rect data-page-node-id="qUuxcD7I5IChKbAAlPALHk" fill="#EAF7F1" height="56" rx="10" stroke="#BFE3D0" stroke-width="1" width="460" x="500" y="376"/>
+      <text data-page-node-id="KjcYvlwnUPbQ4zgesyaIW9" fill="#0F7A4A" font-size="12" x="520" y="400"><!--pnid:YV2Yxl2uRvqxlmzkrt89SP-->结论：合并发生在 L3 与 L1，</text>
+      <text data-page-node-id="4PZ6HUZYKVjxRbxha3uVLO" fill="#0F7A4A" font-size="12" x="520" y="420"><!--pnid:RJU4fgkrYl6xcADliIDWuQ-->L2 里已上线的子系统不动业务代码。</text>
+
+      <rect data-page-node-id="9wZfDrlJ93AiHERcZaNOHJ" fill="#F3EFFF" height="60" rx="10" stroke="#D5CBFA" stroke-width="1" width="920" x="20" y="448"/>
+      <text data-page-node-id="N9aDnRcB2XFcWnnbpnPud8" fill="#4C2FB8" font-size="13" font-weight="600" x="40" y="474"><!--pnid:56xdGsGSStIbHiYUrtPrz0-->横向纪律　·　契约与注册表只加不改（不属于任何一层）</text>
+      <text data-page-node-id="cIaXnIW5rTsVLh1BJgOBDj" fill="#6D4AFF" font-size="12" x="40" y="496"><!--pnid:CdkjyETtXVz5q0NLKp5Zxh-->API 与事件 schema 集中登记、CI 做破坏性变更检测 —— 它同时服务两个目标，但不占一个层，也不多一个部署单元。</text>
+
+      <rect data-page-node-id="OcfyIosHUWhJpZNgIc9ODq" fill="#FFF7E8" height="60" rx="10" stroke="#F5D9A8" stroke-width="1" width="920" x="20" y="520"/>
+      <text data-page-node-id="UBZ2RBXFLsDGm0H6Cy45y1" fill="#B45309" font-size="12" x="40" y="544"><!--pnid:gnO9lGOFqbjV2oUVeJpD0S-->同一套四层，两个目标生效的层不同：<tspan data-page-node-id="mCU6Qiqy3jYYYNtw8wSja9" font-weight="600"><!--pnid:8P1lPMSCctedxSOYRGvec8-->目标 1 落在 L2，目标 2 落在 L3 / L1。</tspan></text>
+      <text data-page-node-id="hDJvn4ztzYvssujysJmnUR" fill="#B45309" font-size="12" x="40" y="566"><!--pnid:qZPJqOdu2w2yC6AnXNio6w-->L1 同时服务两个目标 —— 它是 S0 必须一次建好的部分，也就是「提前付的一次性成本」。</text>
+    </svg>
+  </section>
+
+  <!--pnid:C6qXgz53V9ZfzrHTcj88bO--><!-- 图 4 -->
+  <section data-page-node-id="CDU31SK64qHvRnlu57ZDZh">
+    <h2 data-page-node-id="4ybEHSbawSJJoEp2pgxihm"><!--pnid:zYsq5kPuNKRLodcHxLMZxW-->图 4　单个子系统视角：它对外的全部接口</h2>
+    <p data-page-node-id="djhTIgXDX5LxQOZGHywQ9Y" class="q"><!--pnid:JT6reZbdKNC6Y0GBKD6hLX-->以 Screening 为例。它自己只有四样东西，其余全靠左边地基、右边事件总线与注册表——所以换掉它或新增别的系统，都不影响别人。</p>
+
+    <svg data-page-node-id="MKDL3uLJAtKGWxearbbCh2" role="img" viewBox="0 0 960 524">
+      <title data-page-node-id="gzxb3j9RgUKbhYSaK0Ht9L" data-pnid-children="sTlAzSxwxY1siKEvCiR2s7">单个子系统视角的系统架构</title>
+
+      <rect data-page-node-id="rcb5BZe9QaJnz1YIzY2qGV" fill="#FFF7E8" height="64" rx="12" stroke="#F5D9A8" stroke-width="1" width="650" x="290" y="30"/>
+      <text data-page-node-id="Xg05Igqj71dmKPy9OduOrB" fill="#7C3A06" font-size="14" font-weight="600" x="310" y="54"><!--pnid:R4y7OfeUptk1Vy9g5fDnri-->L3　组合层 Shell（含注册表）</text>
+      <text data-page-node-id="HiKXALQCQEXSZTOwOoMThK" fill="#B45309" font-size="12" x="310" y="74"><!--pnid:2dLUiOuv6FSxoEtivTtw99-->登录、导航装配、统一 Tasks 聚合　·　只消费注册表，不写死子系统</text>
+
+      <rect data-page-node-id="aIy7oGIfClUolwv7mCipZP" fill="#F3EFFF" height="300" rx="12" stroke="#D5CBFA" stroke-width="1" width="200" x="20" y="130"/>
+      <text data-page-node-id="ohrDca1AWLY1IP5sgUvXkC" fill="#4C2FB8" font-size="14" font-weight="600" x="38" y="156"><!--pnid:0uyqFDgnqrFPmsA0uESKWd-->L1　平台地基</text>
+      <rect data-page-node-id="psYE4nhGJsKLE8YuDFIkxv" fill="#fff" height="58" rx="8" stroke="#D5CBFA" width="164" x="38" y="180"/>
+      <text data-page-node-id="CE3vPWHXr9oEaHTI3w4jJ6" fill="#3B2A8C" font-size="13" font-weight="600" text-anchor="middle" x="120" y="202"><!--pnid:Q4vc21sbs2TIJ9iIA3LUvg-->Identity</text>
+      <text data-page-node-id="Uxo30BqWNbcBvP7r9m0Zto" fill="#6D4AFF" font-size="11" text-anchor="middle" x="120" y="222"><!--pnid:6vsccDNo4Ux6gcv8mGw1Kn-->账号 · 组织 · 权限</text>
+      <rect data-page-node-id="dNfV6BLLdVoKeg0cxSxasj" fill="#fff" height="58" rx="8" stroke="#D5CBFA" width="164" x="38" y="255"/>
+      <text data-page-node-id="sbAqHk3LPX4tcDFN2RIIoH" fill="#3B2A8C" font-size="13" font-weight="600" text-anchor="middle" x="120" y="277"><!--pnid:1mhabXqdbnrA72zK1Ky5EB-->Core Record</text>
+      <text data-page-node-id="lJbYx7vbt2aui2TyroTBQH" fill="#6D4AFF" font-size="11" text-anchor="middle" x="120" y="297"><!--pnid:nN9c7OmafVC6FhfB5LUw7o-->主档唯一写入方</text>
+      <rect data-page-node-id="ApfAQIDWgjWjFltsiVpPVO" fill="#fff" height="58" rx="8" stroke="#D5CBFA" width="164" x="38" y="330"/>
+      <text data-page-node-id="AESxu7mQd7izeXPXoAnywo" fill="#3B2A8C" font-size="13" font-weight="600" text-anchor="middle" x="120" y="352"><!--pnid:VgHxBtyGoNgcWML9sY48I2-->Audit / Timeline</text>
+      <text data-page-node-id="5T1SlHNgqr6UBAsM2a6yBD" fill="#6D4AFF" font-size="11" text-anchor="middle" x="120" y="372"><!--pnid:SuXE0nH3LxAXEA27msmTi8-->决策 · 时间线 · 审计</text>
+
+      <rect data-page-node-id="9BpaGkg6Zr2cffCj33QdnV" fill="#EFF5FF" height="300" rx="12" stroke="#BBD4FB" stroke-width="1" width="340" x="290" y="130"/>
+      <text data-page-node-id="ZnIi8yd4gVnKX0IPS8oGdh" fill="#1E3F9E" font-size="14" font-weight="600" x="310" y="156"><!--pnid:H2QeY6bFCMAV80K8oR3MZ0-->业务子系统　·　以 Screening 为例</text>
+      <text data-page-node-id="F3SDrFTcaa2SdHFyDDlfDD" fill="#2563EB" font-size="11" x="310" y="174"><!--pnid:EeVLNxnj0d1porau2VQbeK-->独立进程　·　独立 schema　·　独立前端 bundle</text>
+      <rect data-page-node-id="DQSsUtzfuicjypMeqy5onB" fill="#fff" height="50" rx="8" stroke="#BBD4FB" width="300" x="310" y="192"/>
+      <text data-page-node-id="k0xcAdThl1AF56gzNLDdyX" fill="#1E3F9E" font-size="13" font-weight="600" x="326" y="212"><!--pnid:3Mu4udeYTIKjrFe5qdYssi-->前端 bundle</text>
+      <text data-page-node-id="f9vJ9bbKrWD5Ng5B1EPymZ" fill="#2563EB" font-size="11" x="326" y="231"><!--pnid:dlrRdMvxK0P2xiKa69u3Fo-->可无导航嵌入　·　稳定深链</text>
+      <rect data-page-node-id="68RCxBwhoAG2MwdGaaxmtJ" fill="#fff" height="50" rx="8" stroke="#BBD4FB" width="300" x="310" y="252"/>
+      <text data-page-node-id="NKkZtqNg0tzM0GKqg9dfsx" fill="#1E3F9E" font-size="13" font-weight="600" x="326" y="272"><!--pnid:cQnawfPp1uufPQvpBc8iCl-->API 服务</text>
+      <text data-page-node-id="3CSVv5sjSkmgi8MRvqh8KC" fill="#2563EB" font-size="11" x="326" y="291"><!--pnid:HVyxr98IFtjqaUrOWIaM9Z-->Screening 的领域逻辑与业务动作</text>
+      <rect data-page-node-id="hLFX4d8DvLM8XySwZC68ue" fill="#fff" height="50" rx="8" stroke="#BBD4FB" width="300" x="310" y="312"/>
+      <text data-page-node-id="JCaBSsRR0FhWQwBEbDVNFf" fill="#1E3F9E" font-size="13" font-weight="600" x="326" y="332"><!--pnid:TZs2j9ECN759XsOncjx0RC-->私有库 schema</text>
+      <text data-page-node-id="GEpRCXY2zPzf11TyXpWiUa" fill="#2563EB" font-size="11" x="326" y="351"><!--pnid:9p66pkB0eWpj9h8Qlm2mMw-->只存自己的表，主档只存引用 ID</text>
+      <rect data-page-node-id="sY1Ls3PtgdHwsEPlnHmoo3" fill="#fff" height="50" rx="8" stroke="#BBD4FB" width="300" x="310" y="372"/>
+      <text data-page-node-id="m2eiaBqK9imWdbhiv1pDBE" fill="#1E3F9E" font-size="13" font-weight="600" x="326" y="392"><!--pnid:9U0niWftFoOxTDgd67I8xF-->对外契约</text>
+      <text data-page-node-id="FAEwNEMHelwXcAcDSmhfIC" fill="#2563EB" font-size="11" x="326" y="411"><!--pnid:1ikOrB7eJMNEdcDd4y6Wce-->OpenAPI　·　produced / consumed 事件　·　注册条目</text>
+
+      <rect data-page-node-id="pkwwtPA8cH3kk3AYroJaIV" fill="#F3EFFF" height="130" rx="12" stroke="#D5CBFA" stroke-width="1" width="250" x="690" y="130"/>
+      <text data-page-node-id="OXxl3WmMx4Lg4WE3LoIdVg" fill="#4C2FB8" font-size="14" font-weight="600" x="708" y="156"><!--pnid:TFEyNcOTp1wxwyRgzVmfYp-->L3　注册表</text>
+      <text data-page-node-id="mos2qfHlnAzh8Otd1Jn61F" fill="#6D4AFF" font-size="12" x="708" y="184"><!--pnid:ntaIRj7AEEe4KSLohAb2HZ-->identity　·　ui　·　api　·　events</text>
+      <text data-page-node-id="61iGHfQCHlI6BANY7bcP0b" fill="#6D4AFF" font-size="12" x="708" y="206"><!--pnid:q0r4NBeyyeCawKRh4tukzm-->data　·　tasks　·　level</text>
+      <text data-page-node-id="Fxx7zNHIR0C63XsKqwISUq" fill="#8A6BFF" font-size="11" x="708" y="234"><!--pnid:l7RGr1IS2ZEhYMvKaSUSsb-->上线时登记一次，组合层自动装配</text>
+
+      <rect data-page-node-id="3jBoHZjabo1krjHAGFuSDF" fill="#F3EFFF" height="140" rx="12" stroke="#D5CBFA" stroke-width="1" width="250" x="690" y="290"/>
+      <text data-page-node-id="LDW1ouk9AuBURpLgenFzlt" fill="#4C2FB8" font-size="14" font-weight="600" x="708" y="316"><!--pnid:bB59jOlca9o9UC0ZX3kft6-->L0　事件总线</text>
+      <text data-page-node-id="USFKLf3J8MSTB6PUSAo3IM" fill="#6D4AFF" font-size="12" x="708" y="338"><!--pnid:RFUGgF2NGPS6tAa5B5P0tH-->+ Schema Registry</text>
+      <text data-page-node-id="MwExbUnfjHxerDgiR54sAa" fill="#8A6BFF" font-size="11" x="708" y="366"><!--pnid:ricrnkCAxZxrNCecB711Yv-->子系统之间唯一允许的通道</text>
+      <text data-page-node-id="GOHxIbhDr0bxXDkXJitNmP" fill="#8A6BFF" font-size="11" x="708" y="386"><!--pnid:JlDBnd1i0ZptIqbQQpsxsH-->禁止 A 直接调用 B</text>
+      <text data-page-node-id="jhf9KMrMuqRekKpRLYyXSL" fill="#8A6BFF" font-size="11" x="708" y="412"><!--pnid:hkEujJLhI3lClFS3xnkoee-->事件只带 ID 与变更摘要</text>
+
+      <path data-page-node-id="tzQOhm4ka0kYPkL3PjwUtz" d="M430 94 L430 128" fill="none" marker-end="url(#a)" stroke="#B45309" stroke-width="1.4"/>
+      <text data-page-node-id="Gd55DKX1rgyZLjbjgJGIEs" fill="#B45309" font-size="11" x="444" y="116"><!--pnid:RNMYAswMwPuvH0op8Qq35z-->嵌入页面 + 传递 token</text>
+
+      <path data-page-node-id="5MnfyWzwSHp2K1sBCVUq7g" d="M220 209 L288 209" fill="none" marker-end="url(#a)" stroke="#6D4AFF" stroke-width="1.4"/>
+      <text data-page-node-id="N0lY8XPORH5dsdPIr7pyON" fill="#6D4AFF" font-size="11" x="231" y="199"><!--pnid:Tm3OKpwDpJXjG1vTUvZkNM-->认证·权限</text>
+      <path data-page-node-id="H5QdmWMmbbbbydkMDR7Wcl" d="M220 284 L288 284" fill="none" marker-end="url(#a)" stroke="#6D4AFF" stroke-width="1.4"/>
+      <text data-page-node-id="nwng7P7WCsBSGXnbiupZWX" fill="#6D4AFF" font-size="11" x="231" y="274"><!--pnid:fPGMLKPNpRdkOPkicEow80-->读主档</text>
+      <path data-page-node-id="eJf4eTilDllziCMQJdh70I" d="M220 359 L288 359" fill="none" marker-end="url(#a)" stroke="#6D4AFF" stroke-width="1.4"/>
+      <text data-page-node-id="KVpE2JsgDXzYjzAjra1hmH" fill="#6D4AFF" font-size="11" x="231" y="349"><!--pnid:QdoiHbI5yleXW309kXMcs6-->写审计</text>
+
+      <path data-page-node-id="Tjtwfr7aOnB8pE45bQuOjP" d="M630 197 L688 197" fill="none" marker-end="url(#a)" stroke="#6D4AFF" stroke-width="1.4"/>
+      <text data-page-node-id="aKPoYqmDzx9sOI9IQRztNt" fill="#6D4AFF" font-size="11" x="638" y="188"><!--pnid:7sX5ySEIDze5NhWYd1nSZ4-->注册</text>
+      <path data-page-node-id="jN4pWIcfD3P3dWMBAaMSxn" d="M630 350 L688 350" fill="none" marker-end="url(#a)" stroke="#6D4AFF" stroke-width="1.4"/>
+      <text data-page-node-id="3mmNofaw8KNd30bjnOiV8j" fill="#6D4AFF" font-size="11" x="638" y="341"><!--pnid:YsU3zADQcqidHr836h8GSe-->发布</text>
+      <path data-page-node-id="d1RjIad2ixuXPEgiaJwW04" d="M688 380 L630 380" fill="none" marker-end="url(#a)" stroke="#6D4AFF" stroke-width="1.4"/>
+      <text data-page-node-id="I9336ZnXr1OAx1YShZFlWM" fill="#6D4AFF" font-size="11" x="638" y="400"><!--pnid:IIT5cXalIZk3E7lTs1ZKcJ-->订阅</text>
+
+      <path data-page-node-id="ih9ArJPCBvoTXyYeG7JaTd" d="M815 130 L815 96" fill="none" marker-end="url(#a)" stroke="#B45309" stroke-width="1.4"/>
+      <text data-page-node-id="UxN58D4MhOR3pwDKb6MEcS" fill="#B45309" font-size="11" x="825" y="116"><!--pnid:YPH5P7Qx8v1zRjfPclIa9Y-->消费注册表</text>
+
+      <rect data-page-node-id="EqcB78d3KA3mC4kPz4vLza" fill="#F4F6F8" height="44" rx="10" stroke="#D3D9E0" stroke-width="1" width="920" x="20" y="460"/>
+      <text data-page-node-id="amtjuFkjk5DdxGk1dLasId" fill="#5B6773" font-size="12" x="40" y="487"><!--pnid:FrZ3JpTQTivhUUJRpte5Al-->L0　基础设施：Postgres + pgvector　·　Redis　·　Queue　·　事件总线　·　对象存储　·　可观测性 —— 全部部署单元共用</text>
+    </svg>
+  </section>
+
+  <!--pnid:e93PeNomWxOUHreJjdugKd--><!-- 图 5 -->
+  <section data-page-node-id="Yp9p7BheqemXTm2GXTnSST">
+    <h2 data-page-node-id="WFKvOWmGCtBRZAEbU7qEUh"><!--pnid:CFZGftHu7DKwDqssqU3x8p-->图 5　时序：什么时候上、什么时候合并、合并时改什么</h2>
+    <p data-page-node-id="mhYYNdqTzMJFB8jhGN9ZTV" class="q"><!--pnid:h2VHbe1tIJkajcSiCwzvbm-->深色是「本阶段新增」，浅色是「已上线、持续运行、不改动」。合并不是一次性开关，随子系统接入逐级发生。</p>
+
+    <svg data-page-node-id="hOd3Y3Y47bzDNrLMSo7VuT" role="img" viewBox="0 0 960 486">
+      <title data-page-node-id="cj7MllE5dmotNYJBbv9zaP" data-pnid-children="M6Qq78Hg9rEBWlH3FljgLf">子系统上线与合并时序</title>
+
+      <rect data-page-node-id="xM44GMS5bc9jiWgFXk1CaT" fill="#F4F6F8" height="34" rx="8" stroke="#D3D9E0" stroke-width="1" width="184" x="10" y="20"/>
+      <text data-page-node-id="wg8fgAo6uxPl1GM8X3jWdq" fill="#3A4550" font-size="13" font-weight="600" x="24" y="42"><!--pnid:d8oetjnLEIyGdYGmpUZXD5-->S0　地基就绪</text>
+      <rect data-page-node-id="JB7vOBLw19kElsHOKd4y8d" fill="#F4F6F8" height="34" rx="8" stroke="#D3D9E0" stroke-width="1" width="184" x="200" y="20"/>
+      <text data-page-node-id="4YL534NTqt9fwg5ytlySiC" fill="#3A4550" font-size="13" font-weight="600" x="214" y="42"><!--pnid:E0GTccsSzkpDOXuaq4nPTf-->S1　首个上线</text>
+      <rect data-page-node-id="iUBDg4Ht0fE57UIIAAS5Ms" fill="#EFF5FF" height="34" rx="8" stroke="#BBD4FB" stroke-width="1" width="184" x="390" y="20"/>
+      <text data-page-node-id="WGssogfklIjaXMUZtNbC5Y" fill="#1E3F9E" font-size="13" font-weight="600" x="404" y="42"><!--pnid:wygIwPYI2rg5a4iSqXN2WL-->S2　第二个</text>
+      <rect data-page-node-id="3YnB2GVP0WfvpT8MvlhfEt" fill="#EFF5FF" height="34" rx="8" stroke="#BBD4FB" stroke-width="1" width="184" x="580" y="20"/>
+      <text data-page-node-id="Kt8DULG2WX6BFCMZxoMAo0" fill="#1E3F9E" font-size="13" font-weight="600" x="594" y="42"><!--pnid:kG1mx80H2EmqkWscWQyAC4-->S3　三 · 四接入</text>
+      <rect data-page-node-id="vjIp7b61aSCvn1CUrILFfQ" fill="#FFF7E8" height="34" rx="8" stroke="#F5D9A8" stroke-width="1" width="184" x="770" y="20"/>
+      <text data-page-node-id="vnz79S4UccgBFf50CmFDhd" fill="#7C3A06" font-size="13" font-weight="600" x="784" y="42"><!--pnid:uERTFKldh44SVMKu5kGnu7-->S4　全量组合</text>
+
+      <rect data-page-node-id="8eEpFVTVtn1SNkRL6DB1Ds" fill="#FFF7E8" height="30" rx="6" stroke="#F5D9A8" stroke-width="1" width="184" x="10" y="64"/>
+      <text data-page-node-id="NJyqcCQDESNA4OIg77o0k8" fill="#B45309" font-size="12" text-anchor="middle" x="102" y="83"><!--pnid:TfpTqOuv4aWvadpJioNhy4-->Shell（空壳）</text>
+      <rect data-page-node-id="xnK8DdQmGnJ83zW5hgD29J" fill="#FFF7E8" height="30" rx="6" stroke="#F5D9A8" stroke-width="1" width="184" x="200" y="64"/>
+      <text data-page-node-id="7XD9KYH4mLHS6eEyObu88J" fill="#B45309" font-size="12" text-anchor="middle" x="292" y="83"><!--pnid:baap7NdEqh0cOqD5CF3Gau-->Shell · 1 个入口</text>
+      <rect data-page-node-id="SRW9O251x8y7Qt1x2mZm2Y" fill="#FCEBC8" height="30" rx="6" stroke="#F5D9A8" stroke-width="1" width="184" x="390" y="64"/>
+      <text data-page-node-id="NEM30hxFHx91WL53vv55NY" fill="#B45309" font-size="12" text-anchor="middle" x="482" y="83"><!--pnid:qJjWU0pok8UnbW3SVdNKkU-->Shell · 跨系统视图</text>
+      <rect data-page-node-id="HlUmipO6Gsk9qhTgJsBk7f" fill="#FCEBC8" height="30" rx="6" stroke="#F5D9A8" stroke-width="1" width="184" x="580" y="64"/>
+      <text data-page-node-id="162fEjUyGFSqsuLb3d7pI8" fill="#B45309" font-size="12" text-anchor="middle" x="672" y="83"><!--pnid:ojGa2h0U8Y2fcW3jUqKG1R-->Shell · 统一 Tasks</text>
+      <rect data-page-node-id="5skHmsMmVwwoJbJyDfkjU3" fill="#F5D9A8" height="30" rx="6" stroke="#E0A94A" stroke-width="1" width="184" x="770" y="64"/>
+      <text data-page-node-id="wrLgDoaJZOlKi6PcQ9OypF" fill="#7C3A06" font-size="12" text-anchor="middle" x="862" y="83"><!--pnid:rnNM0x4mHpbC3pLi5XogNI-->Shell · 统一编排与指标</text>
+
+      <rect data-page-node-id="t3kAfAEqyprJvnCZPdquy7" fill="#BBD4FB" height="30" rx="6" stroke="#2563EB" stroke-width="1" width="184" x="200" y="104"/>
+      <text data-page-node-id="xB5BqCoRgA32vFCo6Fy4nF" fill="#1E3F9E" font-size="12" font-weight="600" text-anchor="middle" x="292" y="123"><!--pnid:L9483nJxdd3BqJcbKQb4v4-->JD</text>
+      <rect data-page-node-id="9ThKmMst8WHgNeo9R0vmvk" fill="#DCE9FD" height="30" rx="6" stroke="#BBD4FB" stroke-width="1" width="184" x="390" y="104"/>
+      <text data-page-node-id="6Icqn2Qs2AtmaBQHG7RjHp" fill="#2563EB" font-size="12" text-anchor="middle" x="482" y="123"><!--pnid:PQa28R7RpDVdxytLn27kAW-->JD</text>
+      <rect data-page-node-id="l2Ba5RHN06s5gvYElu6zaa" fill="#DCE9FD" height="30" rx="6" stroke="#BBD4FB" stroke-width="1" width="184" x="580" y="104"/>
+      <text data-page-node-id="vVjZa06dEcSLfUEpt1zHcJ" fill="#2563EB" font-size="12" text-anchor="middle" x="672" y="123"><!--pnid:shjeVE27wFi8MfRW3Spo4g-->JD</text>
+      <rect data-page-node-id="NIEEzVpknniLdl6YjDugLF" fill="#DCE9FD" height="30" rx="6" stroke="#BBD4FB" stroke-width="1" width="184" x="770" y="104"/>
+      <text data-page-node-id="Ji6CAKozUTDnMrvE4JFEgC" fill="#2563EB" font-size="12" text-anchor="middle" x="862" y="123"><!--pnid:q2wM4TdurabYe5GPPKL6nO-->JD</text>
+
+      <rect data-page-node-id="zup56DGaUz5YBtNj5nuVbX" fill="#BBD4FB" height="30" rx="6" stroke="#2563EB" stroke-width="1" width="184" x="390" y="140"/>
+      <text data-page-node-id="dzfAdhwfmp6553OKEAi10M" fill="#1E3F9E" font-size="12" font-weight="600" text-anchor="middle" x="482" y="159"><!--pnid:hAQKNli48gndZ69UiQe8Ey-->Screening</text>
+      <rect data-page-node-id="mAMFHBdW5gNgH4KexXCwqL" fill="#DCE9FD" height="30" rx="6" stroke="#BBD4FB" stroke-width="1" width="184" x="580" y="140"/>
+      <text data-page-node-id="C27C1acZ7EVk3HBErjjwCq" fill="#2563EB" font-size="12" text-anchor="middle" x="672" y="159"><!--pnid:fFHgzi4SeK8IOfv0Ccvfg8-->Screening</text>
+      <rect data-page-node-id="LsGY1PSC2xB2Xjc7QUh7jV" fill="#DCE9FD" height="30" rx="6" stroke="#BBD4FB" stroke-width="1" width="184" x="770" y="140"/>
+      <text data-page-node-id="sYFl4AcNK12qtw0GH3O5Hp" fill="#2563EB" font-size="12" text-anchor="middle" x="862" y="159"><!--pnid:CVMMsQRqvG41NpFYZ6PjlD-->Screening</text>
+
+      <rect data-page-node-id="nOK4JTcwsxq3PgAOXhsaYC" fill="#BBD4FB" height="30" rx="6" stroke="#2563EB" stroke-width="1" width="184" x="580" y="176"/>
+      <text data-page-node-id="eFCOaOgWlxRYAQ6uHsG7dN" fill="#1E3F9E" font-size="12" font-weight="600" text-anchor="middle" x="672" y="195"><!--pnid:Jrbqf4J6Suja7ktVj5Z7nC-->Assessment</text>
+      <rect data-page-node-id="rBa5vphwnxyQDS2rkxmMRX" fill="#DCE9FD" height="30" rx="6" stroke="#BBD4FB" stroke-width="1" width="184" x="770" y="176"/>
+      <text data-page-node-id="WfGHILyiNfJUSW6xUHKGIH" fill="#2563EB" font-size="12" text-anchor="middle" x="862" y="195"><!--pnid:YefTwEul0chPEdIe5lPXZ5-->Assessment</text>
+
+      <rect data-page-node-id="Lj5YdblpDrkWTMsfDVxZQ4" fill="#BBD4FB" height="30" rx="6" stroke="#2563EB" stroke-width="1" width="184" x="580" y="212"/>
+      <text data-page-node-id="p3BS6AKbCJTfll561x8qiH" fill="#1E3F9E" font-size="12" font-weight="600" text-anchor="middle" x="672" y="231"><!--pnid:aaikVrqWjq3v7sjHdkSUDk-->Interview</text>
+      <rect data-page-node-id="AKGhZhIL0GtMHQuYWwzjHc" fill="#DCE9FD" height="30" rx="6" stroke="#BBD4FB" stroke-width="1" width="184" x="770" y="212"/>
+      <text data-page-node-id="XSDRNDOBLBQZ4C718KnAUF" fill="#2563EB" font-size="12" text-anchor="middle" x="862" y="231"><!--pnid:Y7WykliWYfprnEK2mox5X5-->Interview</text>
+
+      <rect data-page-node-id="CzxVneJFvDL6YtOE1ow8J9" fill="#BBD4FB" height="30" rx="6" stroke="#2563EB" stroke-width="1" width="184" x="770" y="248"/>
+      <text data-page-node-id="3JUK6kkkoFtMGStGa2JLoM" fill="#1E3F9E" font-size="12" font-weight="600" text-anchor="middle" x="862" y="267"><!--pnid:uR1AgPX9qnyA44V8OQ60XI-->Offer</text>
+
+      <rect data-page-node-id="H35OzOuVlUBjsVQfy9huRv" fill="#E4DCFB" height="30" rx="6" stroke="#D5CBFA" stroke-width="1" width="184" x="10" y="284"/>
+      <text data-page-node-id="X5I2l5oMI1N5pTZtpx0uYD" fill="#4C2FB8" font-size="12" text-anchor="middle" x="102" y="303"><!--pnid:FW9EVoA1dUKCnAEbmQ1MT7-->平台地基（常驻）</text>
+      <rect data-page-node-id="8DfhJGwdPk2G83eSaqlgpT" fill="#F3EFFF" height="30" rx="6" stroke="#D5CBFA" stroke-width="1" width="184" x="200" y="284"/>
+      <text data-page-node-id="E9hoyC4fEOyGWm8m6Wyo9E" fill="#6D4AFF" font-size="12" text-anchor="middle" x="292" y="303"><!--pnid:yMQ0U9xKPvnvIjcZ0otGZI-->平台地基</text>
+      <rect data-page-node-id="CE1bdi5y1OQzHk0lpHoKtl" fill="#F3EFFF" height="30" rx="6" stroke="#D5CBFA" stroke-width="1" width="184" x="390" y="284"/>
+      <text data-page-node-id="0XCjNyo8QDBvMO93cxd7pt" fill="#6D4AFF" font-size="12" text-anchor="middle" x="482" y="303"><!--pnid:ZQyFuiH2TtOD9gPp7CC1XI-->平台地基</text>
+      <rect data-page-node-id="un37rmPEDyfSiGkqGKM35m" fill="#F3EFFF" height="30" rx="6" stroke="#D5CBFA" stroke-width="1" width="184" x="580" y="284"/>
+      <text data-page-node-id="epKeC4lkoq6C60v0I6YWGe" fill="#6D4AFF" font-size="12" text-anchor="middle" x="672" y="303"><!--pnid:uG47m4UPOruIVamxme3C0P-->平台地基</text>
+      <rect data-page-node-id="vN0s9WMK3YSTkTbaYQwDcQ" fill="#F3EFFF" height="30" rx="6" stroke="#D5CBFA" stroke-width="1" width="184" x="770" y="284"/>
+      <text data-page-node-id="BGvdcKcOGfKjxTTFgTq9b4" fill="#6D4AFF" font-size="12" text-anchor="middle" x="862" y="303"><!--pnid:9oLReheW0rZUDE1kH1evQq-->平台地基</text>
+
+      <text data-page-node-id="LCuDmm5fxavwEEPByzQgcu" fill="#8A94A0" font-size="11" x="10" y="344"><!--pnid:HSQaEuIBw20dDQD9YNzjUw-->本阶段新增</text>
+      <text data-page-node-id="HTg7HCi9xyRRknnJLohiYF" fill="#3A4550" font-size="12" x="10" y="364"><!--pnid:eSYYkBtQ7aRyeLXoUvRezq-->平台地基 + 空 Shell</text>
+      <text data-page-node-id="p44Hv19MboNIAMA2xw5L5s" fill="#8A94A0" font-size="11" x="200" y="344"><!--pnid:XaFdwhSeaJoXiJdKmJfVuF-->本阶段新增</text>
+      <text data-page-node-id="YrTQShw5Cwru9G2tDh9igG" fill="#3A4550" font-size="12" x="200" y="364"><!--pnid:4hu4d9yeK0C0xoPqBS0WuF-->JD 子系统</text>
+      <text data-page-node-id="Ga2hR2cVZy38jRYHEhvRMH" fill="#8A94A0" font-size="11" x="390" y="344"><!--pnid:1JpRr1IBXVaopdBsMkqbFu-->本阶段新增</text>
+      <text data-page-node-id="y7EbF7PpBKrDCjXJZZtR2u" fill="#3A4550" font-size="12" x="390" y="364"><!--pnid:YG0LeWEfH3yDABqGUep3Y8-->Screening 子系统</text>
+      <text data-page-node-id="T3CGTeqOFpAbScydMM6dV1" fill="#8A94A0" font-size="11" x="580" y="344"><!--pnid:XgOdikHXjHNondkVOsr4PB-->本阶段新增</text>
+      <text data-page-node-id="GfoiAYmydM901SDlWBuFw9" fill="#3A4550" font-size="12" x="580" y="364"><!--pnid:XSp9xm9j4TWJ7MIReHGvmr-->Assessment · Interview</text>
+      <text data-page-node-id="AvCbucVAmvYS7waHgYg4Kz" fill="#8A94A0" font-size="11" x="770" y="344"><!--pnid:rEZ5fqaCLxtuvxUu8lDN7b-->本阶段新增</text>
+      <text data-page-node-id="KAuCU6HUIz7AQjvQXN9U6G" fill="#3A4550" font-size="12" x="770" y="364"><!--pnid:6888oFGoo3G3Cn4QboCDPt-->Offer + 统一指标</text>
+
+      <text data-page-node-id="OZVpqrjSEEgWdoxwDtDODO" fill="#8A94A0" font-size="11" x="10" y="392"><!--pnid:VmlhADxtHkvQDmoR9awSUb-->已上线子系统改动</text>
+      <text data-page-node-id="1HTvQyiajqe6VetcmuloBn" fill="#8A94A0" font-size="12" x="10" y="412"><!--pnid:YNctlmjEipyFr95P9v9ODR-->—</text>
+      <text data-page-node-id="KDv9yE9GjJcEy4kpZRnsoT" fill="#8A94A0" font-size="11" x="200" y="392"><!--pnid:Tmlgv8swpxYwfvXQuatsKQ-->已上线子系统改动</text>
+      <text data-page-node-id="KOm0CGjfAdBGaaz4JxULTT" fill="#8A94A0" font-size="12" x="200" y="412"><!--pnid:PUmisRlBz6RxbAmbsIhncO-->—（无已上线）</text>
+      <text data-page-node-id="5z7NFLKwODA75tqEmYitAQ" fill="#8A94A0" font-size="11" x="390" y="392"><!--pnid:MCmxd9XOy7Ki0LrDyGdc1V-->已上线子系统改动</text>
+      <text data-page-node-id="eSTSLBnvbR1laoFCPCWIYE" fill="#0F7A4A" font-size="12" font-weight="600" x="390" y="412"><!--pnid:yICdrUM236Y4fhI7aa40tB-->JD：0 行业务代码</text>
+      <text data-page-node-id="5iitEHhbfC2PUW8b8c11bn" fill="#8A94A0" font-size="11" x="580" y="392"><!--pnid:zhFRgGq6i623yY35EgZxN3-->已上线子系统改动</text>
+      <text data-page-node-id="WdaYvd8YICAfaultlJCqwR" fill="#0F7A4A" font-size="12" font-weight="600" x="580" y="412"><!--pnid:cd5asQyUvEwXFLgDtNqDu9-->JD · Screening：0 行</text>
+      <text data-page-node-id="UWieDtjhZmcTzzKcxWXeHH" fill="#8A94A0" font-size="11" x="770" y="392"><!--pnid:GiGT4Veswgl1FxgQMnzOwM-->已上线子系统改动</text>
+      <text data-page-node-id="1bEAxMErdMxuXM8DHuZhpQ" fill="#0F7A4A" font-size="12" font-weight="600" x="770" y="412"><!--pnid:dIDki3Kty7Lb2xQN1SynB0-->前四个：0 行</text>
+
+      <text data-page-node-id="b55WjNLKvJHBou2nFwJdRK" fill="#8A94A0" font-size="11" x="10" y="440"><!--pnid:IrTvSFCAActHZioBdv6wsR-->合并状态</text>
+      <text data-page-node-id="AtRmYUVIJbq7bwufFZAIgY" fill="#5B6773" font-size="12" x="10" y="460"><!--pnid:OxKmIoGAXHbPZJwIZLQhf0-->未开始</text>
+      <text data-page-node-id="inFO2s9MYAYODGjxOQRESf" fill="#8A94A0" font-size="11" x="200" y="440"><!--pnid:2cEYm95O80kZ8sncMfyfsQ-->合并状态</text>
+      <text data-page-node-id="m8sZ5SdtsMwc5Tz44xWxI6" fill="#5B6773" font-size="12" x="200" y="460"><!--pnid:kpgdQIzwiJeeUFuCcOusXc-->单系统运行</text>
+      <text data-page-node-id="YehDAYbCV7B7n6cECCNKwx" fill="#8A94A0" font-size="11" x="390" y="440"><!--pnid:qU2Ng0P1TtLNNDv5b6I67Q-->合并状态</text>
+      <text data-page-node-id="xnWpiQ4oUEq3xLCybypQzV" fill="#B45309" font-size="12" x="390" y="460"><!--pnid:j1rXYbnMS6ReW1zKluXP6L-->① 一二合并（I2 事件打通）</text>
+      <text data-page-node-id="EnfutCtzSsicrPnyRZ4Cou" fill="#8A94A0" font-size="11" x="580" y="440"><!--pnid:rnNG4aZ62BpIoC3FjE6jWq-->合并状态</text>
+      <text data-page-node-id="vhDwZoE9kJRnsHG8nXSY1Z" fill="#B45309" font-size="12" x="580" y="460"><!--pnid:0p99umTpzHD7l7tB3VwuYK-->② 一~四合并（I3 编排打通）</text>
+      <text data-page-node-id="E6xAeKCKSTJFGbVCsApF9f" fill="#8A94A0" font-size="11" x="770" y="440"><!--pnid:mRbfiYwMIVOTRO1BU6GVPP-->合并状态</text>
+      <text data-page-node-id="rZp2Y0RGfbs4Ti8TGsrhBS" fill="#B45309" font-size="12" x="770" y="460"><!--pnid:t17BSEzQ7omZbz7N7BmxKb-->③ 全量合并（I4 统一体验）</text>
+
+      <rect data-page-node-id="ZTYBH508WzbSYA13BsJraZ" fill="#BBD4FB" height="10" rx="2" stroke="#2563EB" stroke-width="1" width="10" x="10" y="476"/>
+      <text data-page-node-id="lQvepokUpe96kJpdroydGB" fill="#5B6773" font-size="11" x="26" y="485"><!--pnid:RWTsj6Kp4530DKzh2ooIJn-->本阶段新增</text>
+      <rect data-page-node-id="GHeGGrzfc7PIrLffjrRgyE" fill="#DCE9FD" height="10" rx="2" stroke="#BBD4FB" stroke-width="1" width="10" x="120" y="476"/>
+      <text data-page-node-id="bXRQ7FOGhXvN7IFpke6Q7O" fill="#5B6773" font-size="11" x="136" y="485"><!--pnid:zYFKTiePAZKHsctNdcpUV9-->持续运行，不改动</text>
+    </svg>
+  </section>
+
+
+  <!--pnid:POpQu6cUwoDLsd7u0b2to9--><!-- 收尾 -->
+  <section data-page-node-id="eUxVAO5OiHIUHG9GEFXtRj">
+    <h2 data-page-node-id="OxTGZQXqWVMD7rGNMBBU5f"><!--pnid:KZbPv4HpsvoQCUoal8YRzJ-->一句话总结</h2>
+    <div data-page-node-id="eoHgBgMJn1CNFFPnjy6SZF" class="key">
+      <p data-page-node-id="h7yyeGHoKLS6gp0ZzrthSV"><b data-page-node-id="DGojGOtiTGaw9YyAC1d3db"><!--pnid:dsltjXWvcaSAtKfoENfSaN-->不是「先拆开，以后再想办法合」，而是「第一天就按合完之后的样子建好插座，子系统一个个插上来」。</b></p>
+      <p data-page-node-id="Y9zWDm5ZSyEGtiU7p2UoFH"><!--pnid:j1Ba8IIiC8jhhpRSxo7lTz-->图 1 是插座通电后的样子，图 2 是插座本身，图 5 是通电顺序。</p>
+    </div>
+    <ul data-page-node-id="ekNCXnZIXBmGP73Mzbx3qV">
+      <li data-page-node-id="1yt9lJpKY6IgVN02dJhKmm"><!--pnid:VQj6QWi9xG4vkfHo4aROPZ-->正式文档：<code data-page-node-id="XHaPBTurTr9FQFiy5xAAgT"><!--pnid:7X53otgsEXje46deDPpWXm-->arch-01-system-context-and-principles.md</code><!--pnid:OwKr81DtqsGbgV6kWreLmV-->（分层、演进阶段、集成成熟度 I0–I4、注册表）</li>
+      <li data-page-node-id="CmDyj0B1nMEnM4hyL2pX7U"><!--pnid:wQWOMI0YN3GMe7oMbgsdVs-->决策记录：<code data-page-node-id="Z0CakCny0DgtgMqVcz81YG"><!--pnid:yObHKztSyIHmMObTIooChO-->arch-07-architecture-decisions.md</code><!--pnid:lZKs4B3e1azKqFCzahHuqx-->（AD-001 ~ AD-009）</li>
+      <li data-page-node-id="9GOL7KMNtGX1BoWqKgkfUY"><!--pnid:CGYT5s7CMSDzVNzeQqDSyr-->既有基线：<code data-page-node-id="oz1lAhGsJtSLXoOGn4VAsG"><!--pnid:jMDogNuwVtvVtpJ4npiSxp-->参考资料/HireOS物理部署架构图.pdf</code><!--pnid:H1G3Ui6gs2MJvGgtOvPSvh-->（HOS-X-PHY-ARCH-001 v1.1）——图 2 是在它基础上的演进</li>
+    </ul>
+  </section>
+
+</div>
+</body>
+</html>

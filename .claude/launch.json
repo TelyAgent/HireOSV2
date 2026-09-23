@@ -1,0 +1,11 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "hireos-jd-front",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["run", "dev", "--prefix", "hireos-jd/hireos-jd-front"],
+      "port": 5175
+    }
+  ]
+}

@@ -1,0 +1,14 @@
+{
+  "name": "hireos-gateway",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Local dev reverse-proxy gateways: one unified port for all frontends, one for all backends, routed by subsystem path prefix.",
+  "scripts": {
+    "frontend": "node frontend-gateway.mjs",
+    "backend": "node backend-gateway.mjs"
+  },
+  "dependencies": {
+    "http-proxy": "^1.18.1"
+  }
+}

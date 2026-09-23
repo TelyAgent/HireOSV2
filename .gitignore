@@ -1,0 +1,24 @@
+# Dependencies / build output (every subsystem)
+**/node_modules
+**/dist
+**/coverage
+**/build
+
+# Env / secrets (every subsystem) -- never commit real values
+**/.env
+**/.env.local
+**/.env.production
+!**/.env.example
+!**/.env.production.example
+
+# Local dev scratch (dev.sh logs/pids, per-subsystem .local storage dirs)
+**/.local
+
+# Deploy secrets
+scripts/deploy/.deploy-hireos-remote.password
+scripts/docker/postgres.env.production
+!scripts/docker/postgres.env.production.example
+
+# OS / editor
+.DS_Store
+*.log

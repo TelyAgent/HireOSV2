@@ -1,0 +1,89 @@
+# Production/staging stack: one exposed port (gateway :80), everything else
+# only reachable over the internal Compose network. Mirrors the path-prefix
+# scheme already validated by the local dev gateway (see PORTS.md "本地统一网关").
+#
+# Before `docker compose up`:
+#   - cp scripts/docker/postgres.env.production.example scripts/docker/postgres.env.production (fill in POSTGRES_PASSWORD)
+#   - for each backend: cp <dir>/.env.production.example <dir>/.env.production (fill in DATABASE_URL password + real secrets)
+services:
+  postgres:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    env_file:
+      - ./scripts/docker/postgres.env.production
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./scripts/docker/postgres-init.sh:/docker-entrypoint-initdb.d/postgres-init.sh:ro
+
+  interview-backend:
+    build: ./hireos-interview/job-Interview-backend
+    restart: unless-stopped
+    env_file:
+      - ./hireos-interview/job-Interview-backend/.env.production
+    depends_on:
+      - postgres
+
+  screening-backend:
+    build: ./hireos-screening/hireos-screening-backend
+    restart: unless-stopped
+    env_file:
+      - ./hireos-screening/hireos-screening-backend/.env.production
+    depends_on:
+      - postgres
+
+  core-record:
+    build: ./hireos-core-record
+    restart: unless-stopped
+    env_file:
+      - ./hireos-core-record/.env.production
+    depends_on:
+      - postgres
+
+  jd-backend:
+    build: ./hireos-jd/hireos-jd-backend
+    restart: unless-stopped
+    env_file:
+      - ./hireos-jd/hireos-jd-backend/.env.production
+    depends_on:
+      - postgres
+
+  written-backend:
+    build: ./hireos-written/hireos-written-backend
+    restart: unless-stopped
+    env_file:
+      - ./hireos-written/hireos-written-backend/.env.production
+
+  interview-frontend:
+    build: ./hireos-interview/job-Interview-front
+    restart: unless-stopped
+
+  screening-frontend:
+    build: ./hireos-screening/hireos-screening-front
+    restart: unless-stopped
+
+  jd-frontend:
+    build: ./hireos-jd/hireos-jd-front
+    restart: unless-stopped
+
+  written-frontend:
+    build: ./hireos-written/hireos-written-front
+    restart: unless-stopped
+
+  gateway:
+    build: ./gateway
+    restart: unless-stopped
+    ports:
+      - "80:80"
+    depends_on:
+      - interview-backend
+      - interview-frontend
+      - screening-backend
+      - screening-frontend
+      - core-record
+      - jd-backend
+      - jd-frontend
+      - written-backend
+      - written-frontend
+
+volumes:
+  postgres_data:

@@ -1,0 +1,98 @@
+<!doctype html>
+<html lang="zh">
+<head>
+<meta charset="utf-8">
+<title>zoom-meeting-demo</title>
+<style>
+  body { font: 14px/1.5 -apple-system, sans-serif; max-width: 760px; margin: 40px auto; padding: 0 16px; color: #111; }
+  h1 { font-size: 18px; }
+  section { border: 1px solid #ddd; border-radius: 8px; padding: 16px; margin-bottom: 16px; }
+  button { padding: 8px 14px; margin-right: 8px; cursor: pointer; }
+  input { padding: 6px; width: 200px; }
+  pre { background: #111; color: #0f0; padding: 12px; height: 320px; overflow-y: auto; font-size: 12px; border-radius: 6px; }
+  .status { font-weight: bold; }
+  a.join { display: inline-block; margin-top: 8px; }
+</style>
+</head>
+<body>
+<h1>zoom-meeting-demo — 最小闭环 RTMS 测试</h1>
+
+<section>
+  <div>Zoom 账号状态：<span id="status" class="status">检查中…</span></div>
+  <button id="connect">1. Connect Zoom</button>
+</section>
+
+<section>
+  <button id="getMeeting">2. 获取/创建测试会议</button>
+  <div id="meetingInfo"></div>
+</section>
+
+<section>
+  <label>Meeting ID：<input id="meetingId" placeholder="从上面复制，或手填"></label>
+  <button id="startRtms">3. Start RTMS</button>
+  <button id="checkMeeting">查询会议状态</button>
+  <div id="meetingStatus"></div>
+</section>
+
+<section>
+  <div>实时日志（webhook 事件 / RTMS 转写会打在这里）：</div>
+  <pre id="log"></pre>
+</section>
+
+<script>
+async function api(path, opts) {
+  const res = await fetch(path, opts);
+  return res.json().catch(() => ({}));
+}
+
+async function refreshStatus() {
+  const s = await api('/api/status');
+  document.getElementById('status').textContent = s.connected
+    ? `已连接（${s.name}）`
+    : s.authorization === 'expired' ? '授权已失效，请重新授权' : '未连接';
+}
+
+document.getElementById('connect').onclick = () => { window.open('/api/oauth/authorize', '_blank'); };
+
+document.getElementById('getMeeting').onclick = async () => {
+  const m = await api('/api/meeting', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' });
+  if (m.error) { document.getElementById('meetingInfo').textContent = '错误：' + m.error; return; }
+  document.getElementById('meetingId').value = m.id;
+  document.getElementById('meetingInfo').innerHTML =
+    `Meeting ID: ${m.id}<br>
+     <a class="join" href="${m.startUrl}" target="_blank">先用这个 start_url 以 host 身份加入会议 →</a><br>
+     <a class="join" href="${m.joinUrl}" target="_blank">另开一个窗口作为普通参会者加入 →</a>`;
+};
+
+document.getElementById('startRtms').onclick = async () => {
+  const meetingId = document.getElementById('meetingId').value.trim();
+  const r = await api('/api/rtms/start', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ meetingId }) });
+  if (r.status === 204 || r.ok) {
+    alert('RTMS 请求已被 Zoom 接受（HTTP 204）。请等待 meeting.rtms_started webhook；如果 20 秒内没有事件，请查看下方日志。');
+  } else {
+    alert('RTMS 请求失败 -> HTTP ' + (r.status ?? '?') + '\n' + (r.body || r.error || ''));
+  }
+};
+
+document.getElementById('checkMeeting').onclick = async () => {
+  const meetingId = document.getElementById('meetingId').value.trim();
+  const r = await api('/api/meeting/status?id=' + encodeURIComponent(meetingId));
+  document.getElementById('meetingStatus').textContent =
+    r.error || ('Zoom meeting status: ' + (r.status || 'unknown') + (r.uuid ? ' | UUID: ' + r.uuid : ''));
+};
+
+let lastLen = 0;
+async function pollLogs() {
+  const { logs } = await api('/api/logs');
+  if (logs.length !== lastLen) {
+    document.getElementById('log').textContent = logs.join('\n');
+    document.getElementById('log').scrollTop = 1e9;
+    lastLen = logs.length;
+  }
+}
+setInterval(pollLogs, 1000);
+refreshStatus();
+pollLogs();
+</script>
+</body>
+</html>
