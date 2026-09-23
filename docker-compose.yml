@@ -2,12 +2,20 @@
 # only reachable over the internal Compose network. Mirrors the path-prefix
 # scheme already validated by the local dev gateway (see PORTS.md "本地统一网关").
 #
+# All services pinned to linux/amd64: the real deploy target is an x86_64
+# jump-host-gated server (see scripts/deploy/deploy.sh), and interview-backend's
+# @zoom/rtms native addon has no linux/arm64 prebuild at all (only linux-x64 and
+# darwin-arm64) -- building natively on an Apple Silicon dev machine without this
+# pin produces an image that crashes on startup with MODULE_NOT_FOUND. Local
+# builds run under Rosetta emulation as a result; slower, but matches prod.
+#
 # Before `docker compose up`:
 #   - cp scripts/docker/postgres.env.production.example scripts/docker/postgres.env.production (fill in POSTGRES_PASSWORD)
 #   - for each backend: cp <dir>/.env.production.example <dir>/.env.production (fill in DATABASE_URL password + real secrets)
 services:
   postgres:
     image: postgres:17-alpine
+    platform: linux/amd64
     restart: unless-stopped
     env_file:
       - ./scripts/docker/postgres.env.production
@@ -17,6 +25,7 @@ services:
 
   interview-backend:
     build: ./hireos-interview/job-Interview-backend
+    platform: linux/amd64
     restart: unless-stopped
     env_file:
       - ./hireos-interview/job-Interview-backend/.env.production
@@ -25,6 +34,7 @@ services:
 
   screening-backend:
     build: ./hireos-screening/hireos-screening-backend
+    platform: linux/amd64
     restart: unless-stopped
     env_file:
       - ./hireos-screening/hireos-screening-backend/.env.production
@@ -33,6 +43,7 @@ services:
 
   core-record:
     build: ./hireos-core-record
+    platform: linux/amd64
     restart: unless-stopped
     env_file:
       - ./hireos-core-record/.env.production
@@ -41,6 +52,7 @@ services:
 
   jd-backend:
     build: ./hireos-jd/hireos-jd-backend
+    platform: linux/amd64
     restart: unless-stopped
     env_file:
       - ./hireos-jd/hireos-jd-backend/.env.production
@@ -49,31 +61,40 @@ services:
 
   written-backend:
     build: ./hireos-written/hireos-written-backend
+    platform: linux/amd64
     restart: unless-stopped
     env_file:
       - ./hireos-written/hireos-written-backend/.env.production
 
   interview-frontend:
     build: ./hireos-interview/job-Interview-front
+    platform: linux/amd64
     restart: unless-stopped
 
   screening-frontend:
     build: ./hireos-screening/hireos-screening-front
+    platform: linux/amd64
     restart: unless-stopped
 
   jd-frontend:
     build: ./hireos-jd/hireos-jd-front
+    platform: linux/amd64
     restart: unless-stopped
 
   written-frontend:
     build: ./hireos-written/hireos-written-front
+    platform: linux/amd64
     restart: unless-stopped
 
   gateway:
     build: ./gateway
+    platform: linux/amd64
     restart: unless-stopped
-    ports:
-      - "80:80"
+    # Host port mapping deliberately lives in docker-compose.override.yml
+    # (local, auto-loaded) / docker-compose.prod.yml (remote, explicit -f),
+    # not here -- Compose concatenates `ports:` across -f files rather than
+    # replacing it, so declaring it on both this file and an override
+    # produces two simultaneous bindings instead of one.
     depends_on:
       - interview-backend
       - interview-frontend

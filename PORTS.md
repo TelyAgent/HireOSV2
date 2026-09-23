@@ -91,15 +91,20 @@ scripts/dev.sh status
 
 根目录 `docker-compose.yml` 把整套系统打包成容器，路径分流方案跟本地网关完全一致，只是把"前端网关 + 后端网关两个端口"合并成了一个：生产环境前端是编译后的静态文件（每个前端自己一个 `nginx:alpine` 容器，内部按 `base` 前缀，比如 `/screening/`，服务静态文件），不再需要 Vite dev server，所以没必要维持两个端口分开处理 HMR/proxy 那套局面。
 
-- `gateway`（`gateway/Dockerfile` + `gateway/nginx.conf`）：唯一对外暴露端口的容器，监听 `:80`，按子系统前缀反代到各前端/后端容器，路由表跟 `本地统一网关` 一节的表格一一对应。约定不变：只剥掉子系统前缀转发，调用方仍要自己带上后端的 `/api`（或 Core Record 的 `/api/v1`）。
+- `gateway`（`gateway/Dockerfile` + `gateway/nginx.conf`）：唯一对外暴露端口的容器，监听 `:80`，按子系统前缀反代到各前端/后端容器，路由表跟 `本地统一网关` 一节的表格一一对应。约定不变：只剥掉子系统前缀转发，调用方仍要自己带上后端的 `/api`（或 Core Record 的 `/api/v1`）。落地页 `/` 的 `root`/`index` 指令要写在 `server` 块顶层，不能只塞进 `location = /` 块里单独设——实测过后者会莫名其妙退回到 nginx 编译期默认的 `/etc/nginx/html`，原因没深究，照 `server` 顶层这个标准写法走就没问题。
 - 5 个后端、4 个前端各自一份 `Dockerfile`（多阶段构建）+ `.dockerignore`（避免把本地 `.env`/`node_modules` 烤进镜像）；4 个 Prisma 后端另有 `docker-entrypoint.sh`（启动前跑 `prisma migrate deploy`）。
+- **所有服务都钉死在 `platform: linux/amd64`**：`job-Interview-backend` 依赖的 `@zoom/rtms`（Zoom RTMS 原生模块）完全没有 `linux/arm64` 的预编译包（只有 `linux-x64` 和 `darwin-arm64`），本地在 Apple Silicon 上不显式指定平台会构建出 arm64 镜像，容器一起来就 `MODULE_NOT_FOUND` 疯狂重启。而真实部署目标是 x86_64 服务器，所以直接把整个 compose 栈钉在 `linux/amd64` 上——本地在 Apple Silicon 上构建会走 Rosetta 模拟、明显更慢，但这样本地验证的架构跟真实部署一致，不用等到远程部署时才踩这个坑。
+- `job-Interview-backend/Dockerfile` 因为这个原生模块，除了平台还需要两处特殊处理：① 基础镜像不能用 `node:24-alpine`（没有对应的 musl 预编译），也不能用 `node:24-slim`（Debian 12 "bookworm"，包括 `bookworm-backports`，都还停留在 `libstdc++6 12.2.0`，缺 `.node` 二进制要求的 `GLIBCXX_3.4.31`——这是 GCC 13 才引入的符号版本），改用了 `node:24-trixie-slim`（Debian 13，自带 GCC 14）才解决；② runtime 阶段额外装了 `openssl`（Prisma 在没有它的 Debian 镜像上会跑不起来查询引擎）。其余 4 个后端都是普通 `node:24-alpine`，没有这些问题。
 - `postgres`：单个 `postgres:17-alpine` 容器，`scripts/docker/postgres-init.sh` 在容器首次启动时建好 4 个库（`hireos_interview`/`hireos_screening`/`hireos_core_record`/`hireos_jd`；`hireos-written` 还没接数据库）。不对外映射端口，只在容器网络内可达。
 - 每个后端的生产环境变量来自 `<dir>/.env.production`（不进 git，`.env.production.example` 是进 git 的脱敏模板）。跟本地开发 `.env` 的关键差异：`HOST=0.0.0.0`（容器内必须监听所有接口）、跨系统地址改成 Compose 服务名（如 `http://core-record:3004/api/v1`）、`DATABASE_URL` 指向 `postgres` 服务。真实密钥（AI/Zoom/Doubao）原样保留，只在运行时通过 `env_file` 注入，不进镜像层、不进 git。
 - 这一轮保留了 `DEV_AUTH_ENABLED=true`（还没有真实鉴权系统）——如果这台服务器会对外网开放或有你之外的人访问，这个假设需要重新评估。
+- `hireos-jd-backend` 目前没有 `/api/health` 路由（`app.module.ts` 里没接 health 模块），不是 bug，只是这个子系统还没补——验证连通性用 `/jd/api/jobs` 之类真实存在的路由。
 
 **已知遗留问题（Docker 化过程中发现，跟容器化本身无关）**：`job-Interview-front` 的 `npm run build`（`tsc -b && vite build`）目前跑不过——`vite.config.ts` 缺 `@types/node`、`StoreContext.tsx` 里中英文 i18n 字典的字面量类型对不上、`Files.tsx` 几处数组类型不匹配、`status.tsx`/`roles.ts` 的类型导入不对齐，这些都是本次会话之前就存在的类型错误，本地开发一直用 `vite` 起 dev server（不走 `tsc`），从没被真正挡住过。这些错误确认都只是类型层面的（`import type`，erased at build time），不影响运行时，所以它的 `Dockerfile` 暂时改成了直接 `npx vite build`（跳过 `tsc -b` 这道门），保证镜像能出，但这不是修复——类型错误还在源码里，应该单独安排时间修。`hireos-screening-front` 也有类似问题（3 处 `message.info` 类型字面量比 `ToastItem.type` 定义窄），这个顺手真修了（加宽了 `ToastItem.type`，补了 `.toast.info` 的样式）。
 
-本地验证：
+**本地已验证通过**（`docker compose build && up -d`，全部 11 个容器稳定运行，无重启循环）：落地页 `/` 200；4 个前端 `/interview/`、`/screening/`、`/jd/`、`/written/` 均 200 text/html；`interview-backend`/`screening-backend`/`written-backend`/`core-record` 的 `/api/health`（Core Record 是 `/api/v1/health`）均 200；`jd-backend` 用 `/jd/api/jobs` 验证 200；`interview-backend`/`screening-backend`/`core-record`/`jd-backend` 的 `prisma migrate deploy` 日志确认全部迁移干净跑完，无报错。验证完 `docker compose down -v` 清理干净。
+
+本地验证步骤：
 
 ```
 cp scripts/docker/postgres.env.production.example scripts/docker/postgres.env.production   # 填 POSTGRES_PASSWORD
@@ -111,8 +116,33 @@ docker compose logs -f <service>
 docker compose down -v   # 清理，连数据卷一起删
 ```
 
-远程部署（经跳板机）：`scripts/deploy/deploy.sh`，复用调研到的跳板机连接模式（复合 SSH 目标 `user@bastionuser@bastionip@targetip` + 端口 + 密钥/密码文件/agent 三级认证），采用"目标机从源码构建"（`git ls-files` 打包上传，不依赖本地 `docker save`）。**这个脚本目前只写好了，没有连过任何真实服务器**——`REMOTE_SSH_DESTINATION` 没有默认值，必须显式指定；`scripts/deploy/deploy.sh check` 是只读诊断（连上去看 docker 版本 + 现有容器，不做任何改动），`deploy` 才会真正上传+起服务。Compose project name 默认 `hireos`，跟服务器上可能已有的其他部署（容器名/compose 项目名）区分开，不会互相影响。
+### 远程部署（经跳板机）—— 已实际部署成功
+
+`scripts/deploy/deploy.sh`，跳板机连接格式经实测确认（见 `JumpServer生产服务器连接说明.md`）：**SSH 的 host 参数是跳板机自己的 IP，登录名是 `-l '跳板机用户@资产SSH用户@资产IP'` 这个复合字符串**——早期草稿把这个搞反过（把四段拼成一个位置参数丢给 ssh，会被当成"直连资产 IP"，不经过跳板机），已改正，不要再退回那种写法。
+
+当前实际部署到的服务器：
+- 跳板机 `34.92.110.140:2222`，资产 `34.94.189.76`（hostname `sdm-front`），资产账号 `ubuntu`（本身有完整 sudo，不需要单独登 `ops`）。
+- 部署目录 `/opt/hireos`（不是最初设想的 `/home/ops/jenkins_job/...`——那个目录的属主 `ops` 权限是 `750`，`ubuntu` 根本穿不进去；`/opt` 是 `755` 全局可穿透，照着已有的 `/opt/telyclaw-backend` 先例走）。
+- 这台机器 80/443 已经被自己的 nginx 占用（服务着 25+ 个其他域名的项目），`8830` 是确认空闲后分配给 HireOS 网关容器的内部端口，但 GCP 防火墙没放行这个端口，外部连不上（容器本身完全正常，`curl localhost:8830` 在机器上是 200）。最终方案是复用现有 nginx 的 `default`（`server_name _`，兜底 server block）加一个 `location /hireos/` 转发到 `127.0.0.1:8830`，不改防火墙、不碰其他站点配置。**对外访问入口是 `http://34.94.189.76/hireos/`**（`/interview/`、`/screening/`、`/jd/`、`/written/`、`/core-record/api/v1/...` 都在这个前缀下面）。
+
+`deploy.sh` 命令：`check`（只读诊断）、`bootstrap`（一次性：装 `docker-compose-plugin`、建目录）、`push-env`（上传 `.env.production` 系列密钥到 `shared/env/`，不走 git/tar）、`deploy`（上传源码 + 远程 build + up -d）、`status`、`logs <service>`。必需的环境变量：`REMOTE_JUMP_USER`/`REMOTE_ASSET_USER`/`REMOTE_ASSET_HOST`/`REMOTE_JUMP_HOST`/`REMOTE_APP_DIR`，没有默认值，必须显式指定。
+
+部署过程中排掉的几个坑（都已经在 `deploy.sh`/compose 文件里修好，不会再犯）：
+1. **内嵌 git 仓库导致打包爆炸到 2.86GB**：`hireos-interview`/`hireos-screening`/`hireos-jd`/`hireos-core-record` 下面的子目录各自带着独立的 `.git`（非正式 submodule），根仓库 `git ls-files` 碰到这种目录只会吐出目录本身一行，`tar` 拿到这一行会不管三七二十一把整个目录（含 `node_modules`）打包进去。`scripts/deploy/deploy.sh` 的 `collect_upload_list()` 现在会动态找出这些内嵌仓库，各自单独跑 `git ls-files`，结果合并。
+2. **`git ls-files` 输出的中文文件名默认转义**：`git ls-files -zco` + `tar --null` 才是安全组合；BSD sed 没有 `-z`，需要 NUL 安全拼接前缀时用 `perl -0`。
+3. **`docker compose` v2 插件"装了没装上"**：老版本 `deploy.sh bootstrap` 的判断逻辑是"`docker-compose`（v1 独立二进制）存在就跳过"，但这台机器只有 v1、没有 v2 插件，导致 `docker compose ...`（v2 语法）全线报错 `unknown shorthand flag: 'f'`。改成只认 v2（`sudo docker compose version`），不认 v1 存在就短路跳过。
+4. **`docker-compose.prod.yml` 覆盖端口没生效**：Compose 对 `ports:` 这类列表字段是**多文件拼接**，不是替换——base 文件写 `80:80`、override 写 `8830:80`，两条会同时生效，`80` 那条因为宿主机已被占用直接把 `up` 拖挂了。改成 base 文件完全不写 `gateway.ports`，本地开发用新增的 `docker-compose.override.yml`（`docker compose` 不带 `-f` 时会自动加载）配 `80:80`，远程用 `docker-compose.prod.yml`（显式 `-f`，不会跟 override.yml 混在一起）配 `8830:80`。
+5. **GCP 防火墙没放行新端口 + 外层 nginx 转发方案引出的一串连环坑**：`8830` 在服务器内部完全正常，但外部连不上（GCP VPC 防火墙没开这个端口），改成复用这台机器已有的 nginx（`/etc/nginx/sites-available/default` 的 `server_name _` 兜底 server block）加一个 `location /hireos/` 转发到内部网关。这一改动牵出三个真问题：
+   - **Vite `base` 是编译时烤进 HTML/JS 的绝对路径**，不是运行时相对路径——多包一层 `/hireos/` 前缀后，原来 `base: '/interview/'` 编译出的资源引用 `/interview/assets/...` 会被浏览器当成"相对域名根目录"解析，完全绕开 `/hireos/` 前缀，404。不能只在 nginx 层加转发规则解决，得让 4 个前端在构建时把 `base` 也烤成带前缀的版本（`vite.config.ts` 改成读 `process.env.VITE_BASE_PATH`，默认值不变，`docker-compose.prod.yml` 给远程构建传 `/hireos/<子系统>/`）。
+   - 三个前端项目（screening/jd/written）第一次因此从没用过 `process.env` 导致 `tsc` 报 `Cannot find name 'process'`——补装 `@types/node` 解决（不是绕过 `tsc`，因为这次是真的类型缺失，不是预存量债务）。
+   - 顺带把 4 个前端的 Dockerfile/nginx.conf 简化成了"服务端扁平目录、前缀无关"（`base` 只影响资源*引用*方式，不影响 `dist/` 自身的物理目录结构），但忘了同步改我们自己 `gateway/nginx.conf` 的转发逻辑——网关还在把 `/interview/` 前缀原样转发给已经变成扁平结构的前端容器，404 被前端自己的 SPA fallback 悄悄兜底成 `200 text/html`（状态码骗人，内容是错的，必须查 `Content-Type` 才能发现）。修复：网关的每个 `location` 都要显式 `rewrite ^/prefix(/.*)$ $1 break;` 剥掉子系统前缀再转发。
+   - 顺带还加了 `resolver 127.0.0.11 valid=10s;` + `proxy_pass` 用变量形式（`set $upstream ...; proxy_pass http://$upstream;`），修复了另一个独立问题：只重建部分服务的增量部署时，网关默认会在启动时把上游容器名解析成 IP 缓存住，重建的容器换了新 IP 但网关不知道，转发会打到（被 Docker 重新分配了那个旧 IP 的）别的容器上去。
+   - **一个不直观的 nginx 坑**：`rewrite ... break;` 之后写的 `set` 指令不会执行（`break` 会中止 rewrite 模块后续所有指令，`set` 也算在内）——`set` 必须写在 `rewrite` **之前**。
+
+**最终对外访问地址**：`http://34.94.189.76/hireos/`（`/interview/`、`/screening/`、`/jd/`、`/written/`、`/core-record/api/v1/...` 都在这个前缀下面）。
 
 ## 已知遗留问题
 
 启动 `hireos-interview-front` 前先确认 `5173` 端口没有被别的进程占着——排查时发现过一个从旧目录 `hireos-screening/resume-screening-front`（该目录已不存在，大概率是改名/重建成了现在的 `hireos-screening-front`）启动、始终没退出的残留 Vite 进程占用着 `5173`。这类残留进程不会自动消失，用 `lsof -iTCP:5173 -sTCP:LISTEN` 揪出 PID 后手动杀掉。
+
+**4 个前端的 Vite dev server 曾经全部 IPv6-only 绑定过一次**：某次本机环境变化后（原因不明，大概率是 `localhost` 的 DNS 解析优先级变了），4 个 `npm run dev` 进程都只监听了 `::1`（IPv6），不监听 `127.0.0.1`（IPv4）——`dev.sh status` 用 `lsof -iTCP:端口` 检查不区分协议族，照样显示"UP"，但本地网关（`gateway/frontend-gateway.mjs`）转发目标写的是字面量 `127.0.0.1`，导致连不上、报 `Bad gateway: upstream not reachable (ECONNREFUSED)`。已经在 4 个前端的 `vite.config.ts` 里把 `server.host` 显式写死成 `'127.0.0.1'`（不再依赖 `'localhost'` 字符串的 DNS 解析结果），重启后解决。如果以后又碰到网关报 `ECONNREFUSED` 但 `dev.sh status` 显示对应服务是 UP，先用 `lsof -iTCP:<端口> -sTCP:LISTEN` 看清楚实际监听的是 IPv4 还是 IPv6。

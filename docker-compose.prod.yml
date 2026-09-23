@@ -1,0 +1,40 @@
+# Override for real-server deploys via scripts/deploy/deploy.sh:
+# - gateway's host port mapping (this box's own nginx already owns 80/443
+#   for other projects; 8830 was confirmed free, and its own VPC firewall
+#   doesn't have that port open externally either -- the box's existing
+#   nginx proxies /hireos/ to it instead, see PORTS.md "远程部署").
+# - each frontend's Vite `base` gets built one level deeper (/hireos/<sub>/)
+#   to match that external /hireos/ prefix -- `base` is baked into every
+#   asset URL at build time, so this can't be fixed by proxy rewriting
+#   alone; see PORTS.md for the full story of why this override exists.
+# Everything else is inherited unchanged from docker-compose.yml (`docker
+# compose -f docker-compose.yml -f docker-compose.prod.yml ...`). Local dev
+# never passes -f, so it never sees this file.
+services:
+  gateway:
+    ports:
+      - "8830:80"
+
+  interview-frontend:
+    build:
+      context: ./hireos-interview/job-Interview-front
+      args:
+        VITE_BASE_PATH: /hireos/interview/
+
+  screening-frontend:
+    build:
+      context: ./hireos-screening/hireos-screening-front
+      args:
+        VITE_BASE_PATH: /hireos/screening/
+
+  jd-frontend:
+    build:
+      context: ./hireos-jd/hireos-jd-front
+      args:
+        VITE_BASE_PATH: /hireos/jd/
+
+  written-frontend:
+    build:
+      context: ./hireos-written/hireos-written-front
+      args:
+        VITE_BASE_PATH: /hireos/written/

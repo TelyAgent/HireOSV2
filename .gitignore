@@ -18,6 +18,7 @@
 scripts/deploy/.deploy-hireos-remote.password
 scripts/docker/postgres.env.production
 !scripts/docker/postgres.env.production.example
+/miyao.txt
 
 # OS / editor
 .DS_Store

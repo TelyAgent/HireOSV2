@@ -5,9 +5,12 @@ import tailwindcss from '@tailwindcss/vite';
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, '.', 'VITE_');
   return {
-    base: '/written/',
+    // Overridable at Docker build time (VITE_BASE_PATH build arg) -- see
+    // PORTS.md "远程部署" for why the real-server deploy needs a deeper prefix.
+    base: process.env.VITE_BASE_PATH || '/written/',
     plugins: [react(), tailwindcss()],
     server: {
+      host: '127.0.0.1',
       port: 5178,
       strictPort: true,
       proxy: {

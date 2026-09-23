@@ -1,0 +1,9 @@
+# Auto-loaded by plain `docker compose ...` (no explicit -f) alongside
+# docker-compose.yml -- this is how local dev's gateway gets its host port.
+# Not used remotely: scripts/deploy/deploy.sh passes explicit -f flags
+# (docker-compose.yml + docker-compose.prod.yml), which makes Compose skip
+# auto-loading this file entirely.
+services:
+  gateway:
+    ports:
+      - "80:80"
