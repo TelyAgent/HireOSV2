@@ -26,6 +26,14 @@ export class PlanItemsService {
   }
 
   async list(identity: Identity, caseId: string) {
+    // Must 404 for a case this workspace doesn't have -- an empty-but-200 response here is
+    // indistinguishable from "this real case just has no plan items yet" to the frontend, which
+    // treats a successful list as authoritative and overwrites its fixture demo plan items with
+    // it (see applyRealPlanItems). Silently returning [] for a fixture-only case id wiped out that
+    // case's demo questions on every visit.
+    const kase = await this.db.case.findFirst({ where: { id: caseId, workspaceId: identity.workspaceId } });
+    if (!kase) throw new NotFoundException({ code: 'CASE_NOT_FOUND' });
+
     const items = await this.db.planItem.findMany({
       where: { caseId, workspaceId: identity.workspaceId },
       orderBy: { createdAt: 'asc' },

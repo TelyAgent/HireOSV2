@@ -8,7 +8,7 @@ import { Icon } from "../components/ui/Icon";
 import { roundsForCase } from "../utils/cases";
 import { isWrittenTestTask, taskCountsFor, writtenTaskJob, writtenTaskStatus, writtenTestTasks, type WrittenTaskStatus } from "../utils/writtenTasks";
 import {
-  PROJECT, INVITATIONS, MAIL, RESULTS, EVALUATIONS, TASKS, CASES, CORE_CANDIDATES, COMPARISONS,
+  PROJECT, INVITATIONS, MAIL, RESULTS, EVALUATIONS, TASKS, CASES, CORE_CANDIDATES, CORE_JOBS, COMPARISONS,
   fmtDateShort, nowISO, type CoreCandidate, type CoreJob, type Task,
 } from "../data/fixtures";
 
@@ -69,7 +69,7 @@ export function TasksPage() {
     { label: "In progress", value: allWritten.filter((tk) => tk.assignee === uid && tk.status === "in_progress").length, sub: "Same filter as list view", link: "/tasks" },
   ];
   const moreMetrics = [
-    { label: "Active projects", value: scoped ? 0 : (PROJECT.status === "active" ? 1 : 0), link: "/assessments" },
+    { label: "Active projects", value: scoped ? 0 : (CORE_JOBS[PROJECT.jobId] && PROJECT.status === "active" ? 1 : 0), link: "/assessments" },
     { label: "Awaiting acceptance", value: scoped ? 0 : Object.values(INVITATIONS).filter((i) => ["sent", "opened"].includes(i.status)).length, link: "/assessments" },
     { label: "Awaiting submission", value: scoped ? 0 : Object.values(INVITATIONS).filter((i) => ["accepted", "started"].includes(i.status)).length, link: "/assessments" },
     { label: "Submission issues", value: scoped ? 0 : new Set(Object.values(MAIL).filter((m) => ["incomplete", "needs_confirmation", "quarantined"].includes(m.classification)).map((m) => m.caseId || m.id)).size, link: "/submissions" },

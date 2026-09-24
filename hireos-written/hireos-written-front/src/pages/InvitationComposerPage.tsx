@@ -48,13 +48,6 @@ export function InvitationComposerPage() {
   function removeRecipient(caseId: string) {
     setRecipients((rows) => rows.filter((r) => r.caseId !== caseId));
   }
-  function addDemoRecipient() {
-    if (recipients.some((r) => r.caseId === "case_priya")) {
-      say(t("Priya Kapoor is already in this batch."));
-      return;
-    }
-    setRecipients((rows) => [...rows, { caseId: "case_priya", name: "Priya Kapoor", email: "priya.kapoor@example.com", isNew: true }]);
-  }
 
   function next() {
     if (step === 0 && recipients.length === 0) {
@@ -137,7 +130,6 @@ export function InvitationComposerPage() {
                 </div>
               ))}
             </div>
-            <Button size="sm" onClick={addDemoRecipient}>{t("+ Add Priya Kapoor (demo, new candidate)")}</Button>
             <div className="tiny" style={{ marginTop: 10 }}>{t("Each recipient must already have a confirmed role link (Core Application) before they can appear here.")}</div>
           </div>
         )}

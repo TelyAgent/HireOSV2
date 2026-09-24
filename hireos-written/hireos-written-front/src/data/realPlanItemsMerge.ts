@@ -6,7 +6,7 @@
  * a real, backend-persisted one.
  */
 import { PLANS, QUESTIONS, type PlanItem, type Question } from "./fixtures";
-import type { RealPlanItem } from "./writtenApi";
+import type { QuestionSnapshot, RealInvitation, RealPlanItem } from "./writtenApi";
 
 function toQuestion(item: RealPlanItem): Question {
   return {
@@ -57,4 +57,50 @@ export function applyRealPlanItems(
   // aliasing them here made every later push apply twice.
   c.planItems = [...ids];
   round.planItemIds = [...ids];
+}
+
+function toOrphanedQuestion(snapshot: QuestionSnapshot): Question {
+  return {
+    id: snapshot.questionId,
+    code: snapshot.code,
+    title: snapshot.title,
+    type: "Written + File",
+    roles: [],
+    competencies: [{ name: snapshot.title.slice(0, 24), fraction: 1 }],
+    difficulty: "Medium",
+    estMinutes: 120,
+    language: "中文",
+    version: 1,
+    status: "published",
+    author: "system",
+    favorite: false,
+    prompt: snapshot.prompt,
+    materials: [],
+    deliverables: [],
+    usageCount: 0,
+    seenByCount: 0,
+  };
+}
+
+/**
+ * A sent Invitation snapshots its questions at send time (see SendToCandidateDrawer) so it never
+ * needs the originating PlanItem to still exist. But before the plan-items persistence fix, a
+ * question generated client-side only (never saved as a real PlanItem) could vanish from `items`
+ * on the next reload while its Invitation/Submission stayed real in the backend -- leaving a
+ * candidate's real submitted answer with no card to show it on. This recovers exactly those:
+ * any invitation question that isn't already covered by a current plan item gets a read-only
+ * synthetic PlanItem so its status/submission is never silently invisible.
+ */
+export function synthesizeOrphanedInvitationItems(caseId: string, realInvitations: RealInvitation[], currentQuestionIds: Set<string>): PlanItem[] {
+  const seen = new Set<string>();
+  const orphaned: PlanItem[] = [];
+  for (const inv of realInvitations) {
+    for (const q of inv.questions) {
+      if (currentQuestionIds.has(q.questionId) || seen.has(q.questionId)) continue;
+      seen.add(q.questionId);
+      QUESTIONS[q.questionId] = toOrphanedQuestion(q);
+      orphaned.push({ id: `orphan_${q.questionId}`, caseId, questionId: q.questionId, kind: "optional", status: inv.status, customPrompt: null });
+    }
+  }
+  return orphaned;
 }

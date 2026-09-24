@@ -1,7 +1,9 @@
 import { randomBytes } from 'node:crypto';
 import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../persistence/prisma.service';
 import type { Identity } from '../auth/workspace.guard';
+import { MailAccountsService } from '../mail-accounts/mail-accounts.service';
 import type { CreateInvitationDto } from './create-invitation.dto';
 import type { SubmitAnswersDto } from './submit-answers.dto';
 
@@ -11,10 +13,14 @@ function generateToken(): string {
 
 @Injectable()
 export class InvitationsService {
-  constructor(private readonly db: PrismaService) {}
+  constructor(
+    private readonly db: PrismaService,
+    private readonly mailAccounts: MailAccountsService,
+    private readonly config: ConfigService,
+  ) {}
 
   async create(identity: Identity, caseId: string, dto: CreateInvitationDto) {
-    const kase = await this.db.case.findFirst({ where: { id: caseId, workspaceId: identity.workspaceId } });
+    const kase = await this.db.case.findFirst({ where: { id: caseId, workspaceId: identity.workspaceId }, include: { candidate: true, job: true } });
     if (!kase) throw new NotFoundException({ code: 'CASE_NOT_FOUND' });
 
     const invitation = await this.db.invitation.create({
@@ -29,10 +35,21 @@ export class InvitationsService {
         disclosurePolicy: dto.disclosurePolicy,
       },
     });
-    return { id: invitation.id, token: invitation.token };
+
+    const appBaseUrl = this.config.get<string>('PUBLIC_APP_BASE_URL', 'http://127.0.0.1:5178/written/').replace(/\/$/, '');
+    const link = `${appBaseUrl}/apply/${invitation.token}`;
+    const subject = `${kase.job.title} · 测评邀请`;
+    const text = `${kase.candidate.name}，您好：\n\n您已被邀请完成「${kase.job.title}」岗位的测评，请点击以下链接查看题目并提交作答：\n${link}\n\n此邮件由系统自动发送。`;
+    const html = `<p>${kase.candidate.name}，您好：</p><p>您已被邀请完成「${kase.job.title}」岗位的测评，请点击以下链接查看题目并提交作答：</p><p><a href="${link}">${link}</a></p><p style="color:#888">此邮件由系统自动发送。</p>`;
+    const result = await this.mailAccounts.sendFromWorkspaceAccount(identity, { to: dto.recipientEmail, subject, text, html });
+
+    return { id: invitation.id, token: invitation.token, emailSent: result.sent, emailError: result.error };
   }
 
   async listForCase(identity: Identity, caseId: string) {
+    const kase = await this.db.case.findFirst({ where: { id: caseId, workspaceId: identity.workspaceId } });
+    if (!kase) throw new NotFoundException({ code: 'CASE_NOT_FOUND' });
+
     const invitations = await this.db.invitation.findMany({
       where: { caseId, workspaceId: identity.workspaceId },
       include: { submission: true },

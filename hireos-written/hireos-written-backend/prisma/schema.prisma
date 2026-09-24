@@ -108,6 +108,29 @@ model Task {
   @@index([workspaceId, status])
 }
 
+// A corporate SMTP account used to actually deliver assessment invitation emails (ported from
+// hireos-screening's "企业邮箱" settings, minus its IMAP/receive half -- this service only ever
+// needs to send, never to import resumes from an inbox). Credentials are an app password, stored
+// in plaintext, matching hireos-screening's existing WorkspaceSetting-backed mailbox precedent.
+model MailAccount {
+  id         String    @id @default(uuid())
+  workspaceId String
+  name       String
+  provider   String
+  email      String
+  password   String
+  smtpHost   String
+  smtpPort   Int
+  smtpSecure Boolean   @default(true)
+  enabled    Boolean   @default(true)
+  status     String    @default("connected")
+  lastError  String?
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+
+  @@unique([workspaceId, email])
+}
+
 // A batch of questions sent to one candidate as a single form, addressed by an unguessable
 // `token` — the public candidate-facing page (no login) resolves the form purely from this token,
 // so `questions` is a frozen snapshot of the plan items' content at send time (matching the

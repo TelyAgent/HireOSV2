@@ -100,15 +100,106 @@ export async function createInvitation(
     durationMin?: number;
     deadline: string;
     disclosurePolicy: "score_and_summary" | "summary_only";
+    recipientEmail: string;
   },
-): Promise<{ id: string; token: string }> {
+): Promise<{ id: string; token: string; emailSent: boolean; emailError?: string }> {
   const response = await fetch(`${BASE}/cases/${encodeURIComponent(caseId)}/invitations`, {
     method: "POST",
     headers: { "content-type": "application/json" },
     body: JSON.stringify(input),
   });
   if (!response.ok) throw new Error(`Request failed (${response.status})`);
-  return response.json() as Promise<{ id: string; token: string }>;
+  return response.json() as Promise<{ id: string; token: string; emailSent: boolean; emailError?: string }>;
+}
+
+export interface MailAccount {
+  id: string;
+  name: string;
+  provider: "gmail" | "outlook" | "qq" | "163" | "126" | "custom";
+  email: string;
+  smtpHost: string;
+  smtpPort: number;
+  smtpSecure: boolean;
+  enabled: boolean;
+  status: string;
+  lastError: string | null;
+  updatedAt: string;
+  hasPassword: boolean;
+}
+
+export type MailAccountInput = {
+  name: string;
+  provider: MailAccount["provider"];
+  email: string;
+  password?: string;
+  smtpHost: string;
+  smtpPort: number;
+  smtpSecure: boolean;
+};
+
+async function throwWithMessage(response: Response): Promise<never> {
+  const body = await response.json().catch(() => null) as { message?: string | string[] } | null;
+  const message = Array.isArray(body?.message) ? body.message.join("; ") : body?.message;
+  throw new Error(message || `Request failed (${response.status})`);
+}
+
+export async function listMailAccounts(): Promise<MailAccount[]> {
+  const response = await fetch(`${BASE}/settings/mail-accounts`);
+  if (!response.ok) throw new Error(`Request failed (${response.status})`);
+  return response.json() as Promise<MailAccount[]>;
+}
+
+export interface MailConnectionInput {
+  email: string;
+  password: string;
+  smtpHost: string;
+  smtpPort: number;
+  smtpSecure: boolean;
+}
+
+export async function testMailAccount(input: MailConnectionInput): Promise<{ status: "ok" | "error"; message?: string }> {
+  const response = await fetch(`${BASE}/settings/mail-accounts/test`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify(input),
+  });
+  if (!response.ok) return throwWithMessage(response);
+  return response.json() as Promise<{ status: "ok" | "error"; message?: string }>;
+}
+
+export async function createMailAccount(input: MailAccountInput & { password: string }): Promise<MailAccount> {
+  const response = await fetch(`${BASE}/settings/mail-accounts`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify(input),
+  });
+  if (!response.ok) return throwWithMessage(response);
+  return response.json() as Promise<MailAccount>;
+}
+
+export async function updateMailAccount(id: string, input: Partial<MailAccountInput>): Promise<MailAccount> {
+  const response = await fetch(`${BASE}/settings/mail-accounts/${encodeURIComponent(id)}`, {
+    method: "PATCH",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify(input),
+  });
+  if (!response.ok) return throwWithMessage(response);
+  return response.json() as Promise<MailAccount>;
+}
+
+export async function deleteMailAccount(id: string): Promise<void> {
+  const response = await fetch(`${BASE}/settings/mail-accounts/${encodeURIComponent(id)}`, { method: "DELETE" });
+  if (!response.ok) throw new Error(`Request failed (${response.status})`);
+}
+
+export async function setMailAccountEnabled(id: string, enabled: boolean): Promise<MailAccount> {
+  const response = await fetch(`${BASE}/settings/mail-accounts/${encodeURIComponent(id)}/enabled`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ enabled }),
+  });
+  if (!response.ok) throw new Error(`Request failed (${response.status})`);
+  return response.json() as Promise<MailAccount>;
 }
 
 export async function listCaseInvitations(caseId: string): Promise<RealInvitation[]> {

@@ -1,5 +1,5 @@
 import { Type } from 'class-transformer';
-import { ArrayMinSize, IsArray, IsIn, IsISO8601, IsInt, IsOptional, IsString, Min, ValidateNested } from 'class-validator';
+import { ArrayMinSize, IsArray, IsEmail, IsIn, IsISO8601, IsInt, IsOptional, IsString, Min, ValidateNested } from 'class-validator';
 
 export class QuestionSnapshotDto {
   @IsString()
@@ -35,4 +35,7 @@ export class CreateInvitationDto {
 
   @IsIn(['score_and_summary', 'summary_only'])
   disclosurePolicy!: 'score_and_summary' | 'summary_only';
+
+  @IsEmail()
+  recipientEmail!: string;
 }

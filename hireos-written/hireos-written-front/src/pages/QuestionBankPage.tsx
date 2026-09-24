@@ -69,7 +69,7 @@ export function QuestionBankPage() {
           </thead>
           <tbody>
             {list.length === 0 ? (
-              <tr><td colSpan={9}><div className="empty">{t("No questions match these filters.")}</div></td></tr>
+              <tr><td colSpan={9}><div className="empty">{t(questions.length === 0 ? "No questions yet." : "No questions match these filters.")}</div></td></tr>
             ) : (
               list.map((qu) => (
                 <tr key={qu.id} className="clickable" onClick={() => navigate(`/questions/${qu.id}`)}>
@@ -93,10 +93,6 @@ export function QuestionBankPage() {
         </table>
       </div>
 
-      <div className="tiny" style={{ marginTop: 12 }}>
-        FIN-003 is an internal follow-up guide (not sendable). FIN-009/010 are concepts — drafting is required before they can be used in an invitation.
-      </div>
-
       <Modal
         open={importOpen}
         onCancel={() => setImportOpen(false)}
@@ -109,7 +105,7 @@ export function QuestionBankPage() {
         </div>
         <div className="field">
           <label>{t("ZIP file")}</label>
-          <input className="input" type="file" disabled placeholder="FIN-011_case_pack.zip" />
+          <input className="input" type="file" disabled />
         </div>
         <div className="tiny" style={{ marginTop: 8 }}>{t("On confirm, this demo will show a parsed preview: 1 prompt, 2 materials, 1 internal answer key. Old candidate submissions found inside a ZIP are never re-exported.")}</div>
       </Modal>

@@ -1,7 +1,7 @@
 import { useNavigate } from "react-router-dom";
 import { useStore } from "../store/StoreContext";
 import { StatusBadge } from "../utils/status";
-import { Button } from "../components/ui/Primitives";
+import { Button, EmptyState } from "../components/ui/Primitives";
 import { CASES, CORE_JOBS, PROJECT, RESULTS } from "../data/fixtures";
 
 export function AssessmentsListPage() {
@@ -22,6 +22,8 @@ export function AssessmentsListPage() {
         </div>
       </div>
 
+      {!job && <EmptyState icon="assignment" title="No assessment projects yet." />}
+      {job && (
       <div className="card card-pad" style={{ cursor: "pointer", marginBottom: 16 }} onClick={() => navigate(`/assessments/${PROJECT.id}`)}>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
           <div>
@@ -40,9 +42,10 @@ export function AssessmentsListPage() {
           <div><div className="tiny">{t("Results to release")}</div><div style={{ fontWeight: 700 }}>{Object.values(RESULTS).filter((r) => r.status === "final_not_released").length}</div></div>
         </div>
       </div>
+      )}
 
-      <h3 style={{ marginBottom: 4 }}>{t("Other open roles at LinX Technology")}</h3>
-      <div className="muted" style={{ marginBottom: 12 }}>{t("Sourced from the org's job description compilation (VietnamWorks + internal records) — not yet piloting the Assessment module.")}</div>
+      {otherJobs.length > 0 && (<>
+      <h3 style={{ marginBottom: 4, marginTop: 16 }}>{t("Other open roles")}</h3>
       <div className="grid-2">
         {otherJobs.map((j) => (
           <div key={j.id} className="card card-pad">
@@ -61,6 +64,7 @@ export function AssessmentsListPage() {
           </div>
         ))}
       </div>
+      </>)}
     </div>
   );
 }

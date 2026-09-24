@@ -20,7 +20,7 @@ import {
   createPlanItem, deletePlanItem, listCaseInvitations, listPlanItems, updatePlanItem,
   type RealInvitation,
 } from "../data/writtenApi";
-import { applyRealPlanItems } from "../data/realPlanItemsMerge";
+import { applyRealPlanItems, synthesizeOrphanedInvitationItems } from "../data/realPlanItemsMerge";
 
 type TabKey = "plan" | "submission" | "evaluation" | "result";
 type QuestionDrawerState = { mode: "add" } | { mode: "edit"; planItem: PlanItem } | null;
@@ -108,16 +108,27 @@ export function PlanPage() {
 
   const cand = CORE_CANDIDATES[c.candidateId];
   const round = c.rounds[0];
-  const items = round.planItemIds.map((id) => PLANS[id]).filter(Boolean);
+  const ownItems = round.planItemIds.map((id) => PLANS[id]).filter(Boolean);
+  // Recovers any sent invitation whose question got orphaned by the plan-items persistence gap
+  // that existed before this fix — see synthesizeOrphanedInvitationItems's own comment. Read-only:
+  // excluded from canSendBatch/add/edit/delete, only shown so a real submitted answer is never
+  // silently invisible.
+  const orphanedItems = synthesizeOrphanedInvitationItems(caseId, realInvitations, new Set(ownItems.map((pi) => pi.questionId)));
+  const items = [...ownItems, ...orphanedItems];
   const primaryItem = items[0] ?? null;
   const app = c.applicationId ? CORE_APPLICATIONS[c.applicationId] : undefined;
   const job = (app && CORE_JOBS[app.jobId]) || CORE_JOBS[PROJECT.jobId];
   const invs = Object.values(INVITATIONS).filter((i) => i.caseId === caseId);
-  const realByToken = new Map(realInvitations.map((r) => [r.token, r]));
+  // The fixture INVITATIONS dict is ephemeral (wiped on every page reload, same as every other
+  // module-object mutation in this app) -- realInvitations is the durable source of truth for a
+  // real case, fetched fresh on every load. A plan item is "already sent" if EITHER says so, so
+  // status survives a reload instead of silently reverting to "not sent" the moment the in-memory
+  // fixture forgets about it.
+  const realInviteForQuestion = (questionId: string) => realInvitations.find((inv) => inv.questions.some((q) => q.questionId === questionId));
   // "Send to candidate" now bundles every not-yet-sent item in one action (it already did this
   // under the hood via SendToCandidateDrawer's `items` prop — this just moves the trigger up to a
   // single section-level button instead of one per question card).
-  const canSendBatch = !!c.applicationId && items.length > 0 && items.some((pi) => !invs.find((inv) => inv.questionIds.includes(pi.questionId)));
+  const canSendBatch = !!c.applicationId && ownItems.length > 0 && ownItems.some((pi) => !realInviteForQuestion(pi.questionId) && !invs.find((inv) => inv.questionIds.includes(pi.questionId)));
   const attempts = Object.values(ATTEMPTS).filter((a) => a.caseId === caseId);
   const primaryAttempt = attempts[0];
 
@@ -149,7 +160,7 @@ export function PlanPage() {
     // PlanItem.kind is "required" | "optional" — the prototype's own runtime data used a third
     // "supplemental" value for a question added after the first, which doesn't fit that union;
     // "optional" is the closest fit (a plan item added on top of the round's first, required one).
-    const kind: PlanItem["kind"] = items.length === 0 ? "required" : "optional";
+    const kind: PlanItem["kind"] = ownItems.length === 0 ? "required" : "optional";
     const q = newQuestion ?? QUESTIONS[questionId];
     try {
       const created = await createPlanItem(caseId, {
@@ -249,7 +260,7 @@ export function PlanPage() {
               key={pi.id}
               pi={pi}
               invitations={invs}
-              realByToken={realByToken}
+              realInvite={realInviteForQuestion(pi.questionId)}
               onDelete={() => deleteQuestion(pi)}
               onEdit={() => setQuestionDrawer({ mode: "edit", planItem: pi })}
               onViewSubmission={() => setActiveTab("submission")}
@@ -293,7 +304,7 @@ export function PlanPage() {
         onClose={() => setSendDrawerOpen(false)}
         caseId={caseId}
         round={round}
-        items={items}
+        items={ownItems}
         onSent={() => {
           setSendDrawerOpen(false);
           listCaseInvitations(caseId).then(setRealInvitations).catch(() => {});
@@ -329,11 +340,11 @@ export function PlanPage() {
 }
 
 function QuestionCard({
-  pi, invitations, realByToken, onDelete, onEdit, onViewSubmission, onViewRealSubmission,
+  pi, invitations, realInvite, onDelete, onEdit, onViewSubmission, onViewRealSubmission,
 }: {
   pi: PlanItem;
   invitations: Invitation[];
-  realByToken: Map<string, RealInvitation>;
+  realInvite: RealInvitation | undefined;
   onDelete: () => void;
   onEdit: () => void;
   onViewSubmission: () => void;
@@ -341,9 +352,11 @@ function QuestionCard({
 }) {
   const { t } = useStore();
   const q = QUESTIONS[pi.questionId];
+  // realInvite (fetched fresh from the backend on every load) is the durable signal; the fixture
+  // INVITATIONS entry is ephemeral and only used as a fallback for fixture-only demo cases that
+  // have no real backend data at all.
   const sentInvite = invitations.find((inv) => inv.questionIds.includes(pi.questionId));
-  const alreadySent = !!sentInvite;
-  const realInvite = sentInvite?.token ? realByToken.get(sentInvite.token) : undefined;
+  const alreadySent = !!realInvite || !!sentInvite;
   const bodyText = pi.customPrompt ?? q.prompt;
 
   return (
@@ -364,9 +377,11 @@ function QuestionCard({
             <Button size="sm" disabled>
               {realInvite?.status === "submitted" ? t("Submitted") : realInvite?.status === "opened" ? t("Opened") : t("Sent")}
             </Button>
-            {sentInvite && (
+            {(sentInvite || realInvite) && (
               <span className="tiny" style={{ color: "var(--text-tertiary)" }}>
-                {sentInvite.mode === "timed" ? `${sentInvite.durationMin} ${t("min timed")}` : t("Deadline only")} · {t("deadline")} {fmtDateShort(sentInvite.deadline)}
+                {(sentInvite?.mode ?? realInvite?.mode) === "timed"
+                  ? `${sentInvite?.durationMin ?? realInvite?.durationMin} ${t("min timed")}`
+                  : t("Deadline only")} · {t("deadline")} {fmtDateShort(sentInvite?.deadline ?? realInvite?.deadline ?? "")}
               </span>
             )}
             <div style={{ flex: 1 }} />

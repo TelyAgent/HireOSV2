@@ -13,13 +13,13 @@ export function ProjectDetailPage() {
   const navigate = useNavigate();
   const [addOpen, setAddOpen] = useState(false);
   const [screeningOpen, setScreeningOpen] = useState(false);
-  const [name, setName] = useState("Riley Stone");
-  const [email, setEmail] = useState("riley.stone@example.com");
+  const [name, setName] = useState("");
+  const [email, setEmail] = useState("");
   const [checked, setChecked] = useState<Set<string>>(new Set());
 
-  if (id !== PROJECT.id) return <div className="banner danger">{t("Project not found.")}</div>;
-
   const job = CORE_JOBS[PROJECT.jobId];
+  if (id !== PROJECT.id || !job) return <div className="banner danger">{t("Project not found.")}</div>;
+
   const cases = Object.values(CASES).filter(Boolean);
   const pool = SCREENING_POOL.filter((p) => p.jobId === PROJECT.jobId);
 
@@ -48,7 +48,7 @@ export function ProjectDetailPage() {
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 12, marginBottom: 4 }}>
         <h1>{PROJECT.name}</h1>
         <div style={{ display: "flex", gap: 8 }}>
-          <Button size="sm" onClick={() => navigate("/comparisons/cmp_1")}>{t("Compare candidates")}</Button>
+          <Button size="sm" onClick={() => navigate("/comparisons")}>{t("Compare candidates")}</Button>
           <Button size="sm" onClick={() => setScreeningOpen(true)}>{t("Select from screened candidates")}</Button>
           <Button size="sm" variant="primary" onClick={() => setAddOpen(true)}>{t("Add candidate")}</Button>
         </div>

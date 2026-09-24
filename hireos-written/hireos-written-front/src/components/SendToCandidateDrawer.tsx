@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { Link } from "react-router-dom";
 import { Drawer } from "antd";
 import { useStore } from "../store/StoreContext";
 import { Button } from "./ui/Primitives";
@@ -41,8 +42,11 @@ export function SendToCandidateDrawer({
   const [durationMin, setDurationMin] = useState(90);
   const [deadline, setDeadline] = useState("");
   const [disclosure, setDisclosure] = useState<"score_and_summary" | "summary_only">("score_and_summary");
+  const [recipientEmail, setRecipientEmail] = useState("");
   const [sending, setSending] = useState(false);
   const [sentLink, setSentLink] = useState<string | null>(null);
+  const [emailSent, setEmailSent] = useState(false);
+  const [emailError, setEmailError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!open) return;
@@ -51,12 +55,19 @@ export function SendToCandidateDrawer({
     setDurationMin(90);
     setDeadline(round.deadlineAt ? round.deadlineAt.slice(0, 16) : "");
     setDisclosure("score_and_summary");
+    setRecipientEmail(cand.email ?? "");
     setSentLink(null);
-  }, [open, round.deadlineAt]);
+    setEmailSent(false);
+    setEmailError(null);
+  }, [open, round.deadlineAt, cand.email]);
 
   function goToPreview() {
     if (!deadline) {
       say(t("Set a deadline first."), { type: "danger" });
+      return;
+    }
+    if (!recipientEmail.trim() || !recipientEmail.includes("@")) {
+      say(t("Enter a valid recipient email first."), { type: "danger" });
       return;
     }
     setStep("preview");
@@ -76,8 +87,11 @@ export function SendToCandidateDrawer({
         durationMin: mode === "timed" ? durationMin : undefined,
         deadline: deadlineIso,
         disclosurePolicy: disclosure,
+        recipientEmail: recipientEmail.trim(),
       });
       token = created.token;
+      setEmailSent(created.emailSent);
+      setEmailError(created.emailError ?? null);
     } catch {
       // Fixture-only demo case (no real backend Case row) -- fall back to a simulated send, same
       // as every other demo-only candidate in this app.
@@ -177,7 +191,23 @@ export function SendToCandidateDrawer({
             ))}
           </div>
 
-          <div className="banner info tiny">{t("From / Reply-To:")} hr@sendinglabs.com {t("(simulated)")}</div>
+          <div className="field" style={{ marginBottom: 16 }}>
+            <label>{t("Recipient email")}</label>
+            <input
+              className="input"
+              type="email"
+              value={recipientEmail}
+              onChange={(e) => setRecipientEmail(e.target.value)}
+              placeholder={t("Candidate's email")}
+            />
+            <div className="tiny" style={{ marginTop: 4, color: "var(--text-tertiary)" }}>
+              {t("Defaults to the email on this candidate's resume — edit if it's wrong or you want to send elsewhere.")}
+            </div>
+          </div>
+
+          <div className="banner info tiny">
+            {t("The email will be sent from the corporate mailbox configured in")} <Link to="/settings">{t("Settings")}</Link>.
+          </div>
         </>
       )}
 
@@ -229,7 +259,14 @@ export function SendToCandidateDrawer({
               </Button>
             </div>
           </div>
-          <div className="banner info tiny">{t("An email containing this link has been sent to")} {cand.email} {t("(simulated)")}.</div>
+          {emailSent ? (
+            <div className="banner success tiny">{t("An email containing this link has been sent to")} {recipientEmail}.</div>
+          ) : (
+            <div className="banner warning tiny">
+              {t("Could not send the email automatically")}{emailError ? `（${emailError}）` : ""}. {t("Copy the link above and send it to the candidate yourself, or")}{" "}
+              <Link to="/settings">{t("connect a mailbox in Settings")}</Link>.
+            </div>
+          )}
         </>
       )}
     </Drawer>
