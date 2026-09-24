@@ -14,7 +14,7 @@ import StarterKit from "@tiptap/starter-kit";
 import TiptapDocument from "@tiptap/extension-document";
 import type { DocBlock } from "../../data/types";
 
-const COMMIT_DEBOUNCE_MS = 400;
+export const COMMIT_DEBOUNCE_MS = 400;
 
 function initialHtml(block: DocBlock): string {
   if (block.kind === "ul") {

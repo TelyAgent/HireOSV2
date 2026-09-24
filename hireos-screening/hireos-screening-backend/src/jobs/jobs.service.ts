@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../persistence/prisma.service';
 import type { Identity } from '../auth/workspace.guard';
 import { createJobSchema, criteriaSchema, importJobSchema, validate, type CriteriaInput } from './contracts';
@@ -16,6 +16,8 @@ const DEFAULT_DIMENSIONS = [
 
 @Injectable()
 export class JobsService {
+  private readonly logger = new Logger(JobsService.name);
+
   constructor(
     private readonly db: PrismaService,
     private readonly coreRecord: CoreRecordClient,
@@ -23,12 +25,83 @@ export class JobsService {
   ) {}
 
   async list(identity: Identity) {
+    await this.syncPublishedJobs(identity);
     const jobs = await this.db.job.findMany({
       where: { workspaceId: identity.workspaceId },
       orderBy: { createdAt: 'desc' },
       include: { criteriaVersions: { orderBy: { version: 'desc' }, take: 1 } },
     });
     return jobs.map((job) => toFrontendJob(job));
+  }
+
+  /**
+   * Jobs published in HireOS JD live in Core Record (status `open`); Screening keeps its own Job
+   * rows (keyed by the Core Record id, like `create` does), so pull in any published job it doesn't
+   * have yet and keep already-mirrored jobs' title (and closures) in step with Core Record. A Core Record
+   * outage only skips the sync — the local list is still returned.
+   */
+  private async syncPublishedJobs(identity: Identity) {
+    let coreJobs: Awaited<ReturnType<CoreRecordClient['listJobs']>>;
+    try {
+      coreJobs = await this.coreRecord.listJobs(identity);
+    } catch (error) {
+      this.logger.warn(`Skipping Core Record job sync: ${error instanceof Error ? error.message : String(error)}`);
+      return;
+    }
+    if (!coreJobs.length) return;
+    const local = await this.db.job.findMany({
+      where: { workspaceId: identity.workspaceId, id: { in: coreJobs.map((job) => job.id) } },
+      select: { id: true, title: true, status: true },
+    });
+    const localById = new Map(local.map((job) => [job.id, job]));
+
+    for (const core of coreJobs) {
+      const existing = localById.get(core.id);
+      if (existing) {
+        // Screening marks its own jobs `open` locally once criteria are confirmed while Core Record
+        // still says `draft`, so only propagate an explicit close from Core Record, never draft/open.
+        const closed = ['paused', 'closed', 'archived'].includes(core.status);
+        const status = closed ? core.status : existing.status;
+        if (existing.title !== core.title || existing.status !== status) {
+          await this.db.job.update({ where: { id: core.id }, data: { title: core.title, status } });
+        }
+        continue;
+      }
+      if (core.status !== 'open') continue;
+
+      // Seed the job's JD text and draft criteria from the JD subsystem's content for this job.
+      let content: RemoteCriteriaProjection | null = null;
+      try {
+        content = await this.criteriaFacade.get(identity, core.id);
+      } catch (error) {
+        this.logger.warn(`No JD content for job ${core.id}: ${error instanceof Error ? error.message : String(error)}`);
+      }
+      await this.db.$transaction(async (tx) => {
+        await tx.job.create({
+          data: {
+            id: core.id,
+            workspaceId: identity.workspaceId,
+            title: core.title,
+            team: core.team || 'Unassigned',
+            location: core.location || 'Unspecified',
+            employmentType: core.employmentType || 'Unspecified',
+            seniority: core.seniority || 'Unspecified',
+            status: core.status,
+            openings: core.openings || 1,
+            jdText: content ? formatJdText(core.title, content) : null,
+          },
+        });
+        await tx.jobCriteriaVersion.create({
+          data: {
+            workspaceId: identity.workspaceId,
+            jobId: core.id,
+            version: 0,
+            requirements: content ? toScreeningRequirements(content.requirements, DEFAULT_DIMENSIONS) : [],
+            dimensions: DEFAULT_DIMENSIONS,
+          },
+        });
+      });
+    }
   }
 
   async get(identity: Identity, id: string) {
@@ -38,7 +111,7 @@ export class JobsService {
     });
     if (!job) throw new NotFoundException({ code: 'NOT_FOUND' });
     const remoteCriteria = await this.criteriaFacade.get(identity, id);
-    return toFrontendJob(job, remoteCriteria || undefined);
+    return toFrontendJob(job, remoteCriteria ? normalizeRemoteCriteria(remoteCriteria, job.criteriaVersions[0]?.dimensions) : undefined);
   }
 
   async create(identity: Identity, raw: unknown) {
@@ -397,6 +470,60 @@ function asArray(value: unknown) {
 // "Move to Interview" for any job unless it (or an explicit title marker) opts in.
 export function jobRequiresAssessment(job: { assessmentRequired: boolean; title: string }): boolean {
   return job.assessmentRequired || job.title.toLowerCase().includes('assessment-required');
+}
+
+function formatJdText(title: string, content: RemoteCriteriaProjection): string {
+  const lines = [title];
+  if (content.roleSummary) lines.push('', content.roleSummary);
+  if (content.responsibilities.length) lines.push('', 'Responsibilities:', ...content.responsibilities.map((item) => `- ${item}`));
+  const labels = content.requirements.map((item) => item.label).filter(Boolean);
+  if (labels.length) lines.push('', 'Requirements:', ...labels.map((label) => `- ${label}`));
+  return lines.join('\n');
+}
+
+/**
+ * JD stores requirements as `{ label, priority: must_have | preferred, kind: general, dimension:
+ * experience }`; Screening's criteria schema wants `nice_to_have`, its own kind enum and one of its
+ * dimension ids — map them into a draft the recruiter reviews and confirms in Screening.
+ */
+function toScreeningRequirements(requirements: unknown[], dimensions: unknown) {
+  const kinds = new Set(['authorization', 'experience', 'skill', 'other']);
+  const dimensionIds = asArray(dimensions)
+    .map((item) => (item as { id?: unknown }).id)
+    .filter((id): id is string => typeof id === 'string');
+  const pickDimension = (preferred: string) =>
+    dimensionIds.includes(preferred) ? preferred : dimensionIds[0] || preferred;
+  return requirements.flatMap((raw, index) => {
+    const item = raw as { id?: unknown; label?: unknown; priority?: unknown; kind?: unknown; hard?: unknown; dimension?: unknown };
+    if (typeof item.label !== 'string' || !item.label.trim()) return [];
+    const kind = typeof item.kind === 'string' && kinds.has(item.kind) ? item.kind : 'experience';
+    const dimension = typeof item.dimension === 'string' && dimensionIds.includes(item.dimension)
+      ? item.dimension
+      : pickDimension(kind === 'skill' ? 'dim-skills' : 'dim-relexp');
+    return [{
+      id: typeof item.id === 'string' && item.id ? item.id : `jd-req-${index}`,
+      label: item.label.trim().slice(0, 500),
+      dimension,
+      priority: item.priority === 'must_have' ? 'must_have' : 'nice_to_have',
+      hard: item.hard === true,
+      kind,
+    }];
+  });
+}
+
+/**
+ * Criteria read back from the JD subsystem may be JD-authored (no scoring dimensions, JD's own
+ * requirement vocabulary) — fall back to this job's local dimensions and map requirements into
+ * Screening's schema so the criteria page can be reviewed and confirmed. Already-valid Screening
+ * criteria pass through unchanged.
+ */
+function normalizeRemoteCriteria(remote: RemoteCriteriaProjection, localDimensions: unknown): RemoteCriteriaProjection {
+  const dimensions = remote.dimensions.length ? remote.dimensions : (asArray(localDimensions) as RemoteCriteriaProjection['dimensions']);
+  return {
+    ...remote,
+    dimensions,
+    requirements: toScreeningRequirements(remote.requirements, dimensions) as RemoteCriteriaProjection['requirements'],
+  };
 }
 
 function toFrontendJob(job: {

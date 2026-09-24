@@ -15,7 +15,7 @@ import { BlueprintDrawer } from "../features/workspace/BlueprintDrawer";
 import { VersionHistoryModal } from "../features/workspace/VersionHistoryModal";
 import { useSubmitForApproval, useActivateVersion } from "../features/workspace/approvalActions";
 import { nowISO } from "../lib/format";
-import { getJob } from "../features/jobs/jobsApi";
+import { getJob, updateJobStatus } from "../features/jobs/jobsApi";
 import { coreJobToLocalJob } from "../features/jobs/jobsMapping";
 import type { Audience } from "../data/types";
 
@@ -74,6 +74,7 @@ export function JobWorkspacePage() {
   // store after a reload — it's real, backend-held data, so fall back to fetching it by id before
   // giving up and showing "Job not found".
   const [remoteChecked, setRemoteChecked] = useState(false);
+  const [publishing, setPublishing] = useState(false);
   useEffect(() => {
     if (job || !id) {
       setRemoteChecked(true);
@@ -143,12 +144,21 @@ export function JobWorkspacePage() {
     return null;
   };
 
-  const publishJob = () => {
+  const publishJob = async () => {
+    setPublishing(true);
+    let updated;
+    try {
+      updated = await updateJobStatus(id, "published");
+    } catch (error) {
+      say(error instanceof Error ? error.message : t("Couldn't publish this job. Please try again."), { type: "error" });
+      return;
+    } finally {
+      setPublishing(false);
+    }
     mutate((draft) => {
       const j = draft.jobs[id];
       if (!j) return;
-      j.hiringStatus = "published";
-      j.updatedAt = nowISO();
+      draft.jobs[id] = coreJobToLocalJob(updated, j);
       (draft.activity[id] = draft.activity[id] || []).unshift({
         at: nowISO(),
         actor: draft.currentUserId,
@@ -207,7 +217,7 @@ export function JobWorkspacePage() {
             </Button>
             {primaryAction()}
             {job.hiringStatus === "draft" && (
-              <Button variant="primary" onClick={publishJob}>
+              <Button variant="primary" disabled={publishing} onClick={() => void publishJob()}>
                 <Icon name="public" />
                 {t("Publish")}
               </Button>

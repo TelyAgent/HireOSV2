@@ -331,7 +331,7 @@ export function GeminiPanel({ ctx }: { ctx: GeminiCtx }) {
       }
       if (!applied) doc.blocks.push(mkBlock(uid("gb"), "p", text));
       doc.revision = (doc.revision || 1) + 1;
-      doc.saveState = "saved";
+      doc.saveState = "dirty";
       (draft.activity[jobId] = draft.activity[jobId] || []).unshift({
         at: nowISO(),
         actor: draft.currentUserId,

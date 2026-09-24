@@ -9,6 +9,7 @@
 import { mkBlock } from "../../data/fixtures/documents";
 import { money, nowISO, uid } from "../../lib/format";
 import type { AppState } from "../../store/types";
+import type { CurrentDraftDto } from "./documentsApi";
 import type { Audience, DocBlock, DocumentDraft, Suggestion } from "../../data/types";
 
 export function docKey(jobId: string, audience: Audience) {
@@ -69,6 +70,40 @@ export function buildDefaultDraft(state: AppState, jobId: string, audience: Audi
     saveState: "saved",
     blocks,
   };
+}
+
+/**
+ * Seeds a never-saved document from the backend's structured JD draft (the content Copilot collected
+ * when the job was created), using the same layout as `buildDefaultDraft`.
+ */
+export function buildDraftFromBackend(title: string, content: CurrentDraftDto, jobId: string, audience: Audience): DocumentDraft {
+  const labels = (priority: string) =>
+    content.requirements.filter((r) => r.priority === priority && r.label).map((r) => r.label as string);
+  const must = labels("must_have");
+  const pref = labels("preferred");
+
+  const blocks: DocBlock[] = [];
+  let n = 1;
+  const bid = () => `b${jobId.slice(-3)}-${audience}-${n++}`;
+
+  blocks.push(mkBlock(bid(), "h2", title));
+  blocks.push(mkBlock(bid(), "p", content.roleSummary || "No role summary on file."));
+  if (content.responsibilities.length) {
+    blocks.push(mkBlock(bid(), "h2", audience === "external" ? "What you’ll do" : "Responsibilities"));
+    blocks.push(mkBlock(bid(), "ul", content.responsibilities));
+  }
+  if (must.length) {
+    blocks.push(mkBlock(bid(), "h2", audience === "external" ? "What we’re looking for" : "Requirements — Must-have"));
+    blocks.push(mkBlock(bid(), "ul", must));
+  }
+  if (audience === "internal" && pref.length) {
+    blocks.push(mkBlock(bid(), "h2", "Preferred"));
+    blocks.push(mkBlock(bid(), "ul", pref));
+  }
+  blocks.push(mkBlock(bid(), "h2", "Compensation"));
+  blocks.push(mkBlock(bid(), "p", money(content.publicCompensation)));
+
+  return { id: `doc-${jobId}-${audience}`, jobId, audience, language: "en", revision: 1, saveState: "saved", blocks };
 }
 
 /** Read-only draft lookup used during render. */

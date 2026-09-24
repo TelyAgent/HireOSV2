@@ -169,7 +169,10 @@ export interface DocumentDraft {
   audience: Audience;
   language: string;
   revision: number;
-  saveState: "saved" | "saving";
+  /** "dirty" = edited locally but not yet saved to the backend (see DocumentTab's Save button). */
+  saveState: "saved" | "saving" | "dirty";
+  /** Backend `JobDocument` revision this copy was loaded from / last saved as; absent until first save. */
+  serverRevision?: number;
   reviewStatus?: string;
   blocks: DocBlock[];
 }

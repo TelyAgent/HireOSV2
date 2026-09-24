@@ -94,6 +94,12 @@ export class CoreRecordClient {
     });
   }
 
+  /** Core Record's job directory — the jobs HireOS JD creates and publishes live here. */
+  async listJobs(identity: Identity): Promise<CoreJob[]> {
+    if (this.mode === 'mock') return [];
+    return this.request<CoreJob[]>('/jobs', identity, { method: 'GET' });
+  }
+
   async createApplication(
     identity: Identity,
     input: { candidateId: string; jobId: string; cycleId?: string; origin?: string; linkReason: string },

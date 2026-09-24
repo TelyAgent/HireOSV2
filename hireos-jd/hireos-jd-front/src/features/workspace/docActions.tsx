@@ -121,7 +121,7 @@ export function useDocActions(jobId: string, audience: Audience) {
           const stored = draft.suggestions[key]?.find((x) => x.id === suggestionId);
           if (stored) stored.status = "accepted";
           doc.revision++;
-          doc.saveState = "saving";
+          doc.saveState = "dirty";
           if (s.requirementRef) {
             const req = draft.requirements[jobId]?.find((r) => r.id === s.requirementRef);
             if (req) {
@@ -137,7 +137,6 @@ export function useDocActions(jobId: string, audience: Audience) {
           });
         });
         say(t("Suggestion accepted — working draft updated (not yet approved)"));
-        setTimeout(() => mutate((draft) => void (ensureDraft(draft, jobId, audience).saveState = "saved")), 500);
       },
 
       rejectSuggestion(suggestionId: string) {

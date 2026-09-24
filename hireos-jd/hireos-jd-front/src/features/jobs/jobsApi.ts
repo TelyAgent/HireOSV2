@@ -46,6 +46,16 @@ export async function getJob(id: string): Promise<CoreJobDto | null> {
   return parseOrThrow<CoreJobDto>(response);
 }
 
+/** Persists the Draft ⇄ Published switch (Core Record status `draft` / `open`). */
+export async function updateJobStatus(id: string, status: "draft" | "published"): Promise<CoreJobDto> {
+  const response = await fetch(`${BASE}/${id}/status`, {
+    method: "PATCH",
+    headers: { "content-type": "application/json", "idempotency-key": `job-status-${id}-${safeRandomUUID()}` },
+    body: JSON.stringify({ status }),
+  });
+  return parseOrThrow<CoreJobDto>(response);
+}
+
 export async function deleteJob(id: string): Promise<void> {
   const response = await fetch(`${BASE}/${id}`, {
     method: "DELETE",

@@ -1,4 +1,4 @@
-import { BadRequestException, Controller, Delete, Get, Headers, Param, Query, Req, UseGuards } from '@nestjs/common';
+import { BadRequestException, Body, Controller, Delete, Get, Headers, Param, Patch, Query, Req, UseGuards } from '@nestjs/common';
 import { WorkspaceGuard, type Identity } from '../auth/workspace.guard';
 import { CoreRecordClient } from '../core/core-record.client';
 
@@ -22,6 +22,31 @@ export class JobsController {
   @Get(':id')
   get(@Req() req: { identity: Identity }, @Param('id') id: string) {
     return this.coreRecord.getJob(req.identity, id);
+  }
+
+  /**
+   * This app's two-state hiring status mapped onto Core Record's job status: "published" → `open`,
+   * "draft" → `draft` (see `coreJobToLocalJob` in the frontend for the reverse mapping).
+   */
+  @Patch(':id/status')
+  updateStatus(
+    @Req() req: { identity: Identity },
+    @Headers() headers: Record<string, string | undefined>,
+    @Param('id') id: string,
+    @Body() body: { status?: unknown },
+  ) {
+    const idempotencyKey = headers['idempotency-key']?.trim();
+    if (!idempotencyKey) throw new BadRequestException({ code: 'IDEMPOTENCY_KEY_REQUIRED' });
+    if (body?.status !== 'published' && body?.status !== 'draft') {
+      throw new BadRequestException({ code: 'INVALID_STATUS', message: 'status must be "published" or "draft".' });
+    }
+    const coreStatus = body.status === 'published' ? 'open' : 'draft';
+    return this.coreRecord.updateJob(
+      req.identity,
+      id,
+      { status: coreStatus, reason: body.status === 'published' ? 'published' : 'unpublished' },
+      idempotencyKey,
+    );
   }
 
   @Delete(':id')

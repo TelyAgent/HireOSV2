@@ -56,6 +56,10 @@ export class CoreRecordClient {
     return this.request<CoreJob>(`/jobs/${jobId}`, identity, 'GET');
   }
 
+  async updateJob(identity: Identity, jobId: string, body: unknown, idempotencyKey: string) {
+    return this.request<CoreJob>(`/jobs/${jobId}`, identity, 'PATCH', body, idempotencyKey);
+  }
+
   async deleteJob(identity: Identity, jobId: string, idempotencyKey: string) {
     return this.request<{ id: string; deleted: boolean }>(`/jobs/${jobId}`, identity, 'DELETE', undefined, idempotencyKey);
   }

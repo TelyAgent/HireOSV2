@@ -5,8 +5,9 @@ import { Button, EmptyState, PageHeader, PersonChip, StatusBadge } from "../comp
 import { CloseButton, ConfirmDialog, ModalBody, ModalFooter, ModalHeader } from "../components/ui/Overlays";
 import { useStore } from "../store/StoreContext";
 import { SAVED_VIEWS } from "../data/fixtures/savedViews";
-import { fmtRelative, nowISO } from "../lib/format";
-import { deleteJob } from "../features/jobs/jobsApi";
+import { fmtRelative } from "../lib/format";
+import { deleteJob, updateJobStatus } from "../features/jobs/jobsApi";
+import { coreJobToLocalJob } from "../features/jobs/jobsMapping";
 import type { AppState } from "../store/types";
 import type { HiringStatus, Job } from "../data/types";
 
@@ -84,17 +85,23 @@ export function JobLibraryPage() {
   const goto = (nextView: ViewKind, nextSaved: string) =>
     navigate(`/jobs?view=${nextView}&savedView=${encodeURIComponent(nextSaved)}`);
 
-  const dropOnBoard = (jobId: string, newStatus: HiringStatus) => {
+  const dropOnBoard = async (jobId: string, newStatus: HiringStatus) => {
     const j = state.jobs[jobId];
-    if (!j) return;
+    if (!j || j.hiringStatus === newStatus) return;
     if (newStatus === "published" && !j.activeRoleVersionRef) {
       say(t("Cannot open — no confirmed requirements yet. Complete and approve requirements first."), { type: "error" });
       return;
     }
+    let updated;
+    try {
+      updated = await updateJobStatus(jobId, newStatus);
+    } catch (error) {
+      say(error instanceof Error ? error.message : t("Couldn't update the job status. Please try again."), { type: "error" });
+      return;
+    }
     mutate((draft) => {
       const target = draft.jobs[jobId];
-      target.hiringStatus = newStatus;
-      target.updatedAt = nowISO();
+      if (target) draft.jobs[jobId] = coreJobToLocalJob(updated, target);
     });
     say(`${t("Moved")} ${j.title} → ${t(newStatus.charAt(0).toUpperCase() + newStatus.slice(1), `hiring_status.${newStatus.charAt(0).toUpperCase() + newStatus.slice(1)}`)}`);
   };
@@ -271,7 +278,7 @@ export function JobLibraryPage() {
                 onDragOver={(e) => e.preventDefault()}
                 onDrop={(e) => {
                   e.preventDefault();
-                  dropOnBoard(e.dataTransfer.getData("text"), col);
+                  void dropOnBoard(e.dataTransfer.getData("text"), col);
                 }}
               >
                 <div className="board-col-head">

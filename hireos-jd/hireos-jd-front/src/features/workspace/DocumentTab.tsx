@@ -1,9 +1,11 @@
 import { Fragment, useEffect, useReducer, useRef, useState, type ReactNode } from "react";
 import type { Editor } from "@tiptap/react";
 import { Icon } from "../../components/ui/Icons";
+import { Button } from "../../components/ui/Primitives";
 import { useStore } from "../../store/StoreContext";
-import { selectDraft, selectSuggestions, selectThreads, pendingSuggestionsFor, ensureDraft, stripHtml } from "./docHelpers";
-import { RichBlockEditor } from "./RichBlockEditor";
+import { selectDraft, selectSuggestions, selectThreads, pendingSuggestionsFor, ensureDraft, stripHtml, docKey, buildDraftFromBackend } from "./docHelpers";
+import { COMMIT_DEBOUNCE_MS, RichBlockEditor } from "./RichBlockEditor";
+import { getCurrentDraft, getJobDocument, saveJobDocument } from "./documentsApi";
 import { SidePanel } from "./SidePanel";
 import { useDocActions } from "./docActions";
 import type { Audience, DocBlock } from "../../data/types";
@@ -27,8 +29,14 @@ interface PendingSel {
 }
 
 export function DocumentTab({ jobId, audience }: { jobId: string; audience: Audience }) {
-  const { state, t, set, mutate } = useStore();
+  const { state, t, set, mutate, say } = useStore();
   const draft = selectDraft(state, jobId, audience);
+  const latestDraft = useRef(draft);
+  latestDraft.current = draft;
+  // Bumped whenever the document is replaced wholesale (loaded from the backend), so the per-block
+  // editors — which only read their content on mount — remount with the new text.
+  const [docEpoch, setDocEpoch] = useState(0);
+  const [loading, setLoading] = useState(true);
   const docRef = useRef<HTMLDivElement>(null);
   const wrapRef = useRef<HTMLDivElement>(null);
   const [pendingSel, setPendingSel] = useState<PendingSel | null>(null);
@@ -40,7 +48,6 @@ export function DocumentTab({ jobId, audience }: { jobId: string; audience: Audi
   const editorsRef = useRef(new Map<string, Editor>());
   const [activeBlockId, setActiveBlockId] = useState<string | null>(null);
   const [, bumpTick] = useReducer((c: number) => c + 1, 0);
-  const saveTimerRef = useRef<number | undefined>(undefined);
   const activeEditor = activeBlockId ? editorsRef.current.get(activeBlockId) : undefined;
   const canFormat = isRichEditable && !!activeEditor;
 
@@ -50,7 +57,91 @@ export function DocumentTab({ jobId, audience }: { jobId: string; audience: Audi
   // (whichever blocks exist for the new jobId/audience naturally (de)register themselves) — this only
   // needs to drop the now-stale "focused block" pointer from the previous document.
   useEffect(() => setActiveBlockId(null), [jobId, audience]);
-  useEffect(() => () => window.clearTimeout(saveTimerRef.current), []);
+
+  // Load the saved document, or — for a job whose document was never saved — seed it from the
+  // structured JD content Copilot stored when the job was created. Unsaved local edits win.
+  useEffect(() => {
+    if (latestDraft.current.saveState === "dirty") {
+      setLoading(false);
+      return;
+    }
+    let cancelled = false;
+    setLoading(true);
+    (async () => {
+      const saved = await getJobDocument(jobId, audience);
+      if (cancelled) return;
+      if (saved) {
+        mutate((d) => {
+          d.drafts[docKey(jobId, audience)] = {
+            ...ensureDraft(d, jobId, audience),
+            blocks: saved.blocks,
+            serverRevision: saved.revision,
+            saveState: "saved",
+          };
+        });
+      } else {
+        const content = await getCurrentDraft(jobId);
+        if (cancelled || !content) return;
+        mutate((d) => {
+          const title = d.jobs[jobId]?.title ?? "";
+          d.drafts[docKey(jobId, audience)] = buildDraftFromBackend(title, content, jobId, audience);
+        });
+      }
+      setDocEpoch((n) => n + 1);
+    })()
+      .catch((error) => console.warn("Failed to load the job document:", error))
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [jobId, audience]);
+
+  const isDirty = draft.saveState === "dirty";
+  const saveDocument = async () => {
+    if (latestDraft.current.saveState === "saving") return;
+    mutate((d) => void (ensureDraft(d, jobId, audience).saveState = "saving"));
+    // Editors commit keystrokes on a short debounce — wait it out so the last edit is included.
+    await new Promise((resolve) => window.setTimeout(resolve, COMMIT_DEBOUNCE_MS + 50));
+    const doc = latestDraft.current;
+    const sentRevision = doc.revision;
+    try {
+      const saved = await saveJobDocument(jobId, audience, doc.blocks, doc.serverRevision);
+      mutate((d) => {
+        const target = ensureDraft(d, jobId, audience);
+        target.serverRevision = saved.revision;
+        // Edits made while the request was in flight stay unsaved.
+        target.saveState = target.revision === sentRevision ? "saved" : "dirty";
+      });
+      say(t("Document saved"), { type: "success" });
+    } catch (error) {
+      mutate((d) => void (ensureDraft(d, jobId, audience).saveState = "dirty"));
+      say(error instanceof Error ? error.message : t("Couldn't save the document. Please try again."), { type: "error" });
+    }
+  };
+
+  // Cmd/Ctrl+S saves; leaving the page with unsaved edits asks first.
+  const saveRef = useRef(saveDocument);
+  saveRef.current = saveDocument;
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "s") {
+        e.preventDefault();
+        if (latestDraft.current.saveState === "dirty") void saveRef.current();
+      }
+    };
+    const onBeforeUnload = (e: BeforeUnloadEvent) => {
+      if (latestDraft.current.saveState === "dirty") e.preventDefault();
+    };
+    window.addEventListener("keydown", onKey);
+    window.addEventListener("beforeunload", onBeforeUnload);
+    return () => {
+      window.removeEventListener("keydown", onKey);
+      window.removeEventListener("beforeunload", onBeforeUnload);
+    };
+  }, []);
 
   const commitBlockText = (blockId: string, text: string | string[]) => {
     mutate((d) => {
@@ -59,12 +150,8 @@ export function DocumentTab({ jobId, audience }: { jobId: string; audience: Audi
       if (!block) return;
       block.text = text;
       doc.revision++;
-      doc.saveState = "saving";
+      if (doc.saveState !== "saving") doc.saveState = "dirty";
     });
-    window.clearTimeout(saveTimerRef.current);
-    saveTimerRef.current = window.setTimeout(() => {
-      mutate((d) => void (ensureDraft(d, jobId, audience).saveState = "saved"));
-    }, 500);
   };
 
   const convertActiveBlockToList = () => {
@@ -76,6 +163,7 @@ export function DocumentTab({ jobId, audience }: { jobId: string; audience: Audi
       block.kind = "ul";
       block.text = [typeof block.text === "string" ? stripHtml(block.text) : ""];
       doc.revision++;
+      doc.saveState = "dirty";
     });
   };
 
@@ -172,10 +260,25 @@ export function DocumentTab({ jobId, audience }: { jobId: string; audience: Audi
           <Icon name="search" />
         </button>
         <div style={{ flex: 1 }} />
-        <span className="jw-save-state">
-          <Icon name={draft.saveState === "saving" ? "sync" : "cloud_done"} />
-          {draft.saveState === "saving" ? t("Saving…") : t("Saved")}
-        </span>
+        {loading ? (
+          <span className="jw-save-state">
+            <Icon name="sync" />
+            {t("Loading…")}
+          </span>
+        ) : isDirty ? (
+          <>
+            <span className="jw-save-state">{t("Unsaved changes")}</span>
+            <Button size="sm" variant="primary" onClick={() => void saveDocument()} title="⌘/Ctrl + S">
+              <Icon name="save" />
+              {t("Save")}
+            </Button>
+          </>
+        ) : (
+          <span className="jw-save-state">
+            <Icon name={draft.saveState === "saving" ? "sync" : "cloud_done"} />
+            {draft.saveState === "saving" ? t("Saving…") : t("Saved")}
+          </span>
+        )}
       </div>
 
       <div className="jw-body">
@@ -194,7 +297,7 @@ export function DocumentTab({ jobId, audience }: { jobId: string; audience: Audi
         </div>
 
         <div className="jw-doc-wrap" ref={wrapRef}>
-          <div className="jw-doc" ref={docRef} onMouseUp={onMouseUp}>
+          <div className="jw-doc" ref={docRef} onMouseUp={onMouseUp} key={docEpoch}>
             {audience === "external" && (
               <div className="info-inline" style={{ marginBottom: 18 }}>
                 {t("Candidate-facing version")} • {t("source")}: {t("role")} v
