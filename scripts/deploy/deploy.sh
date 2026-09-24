@@ -12,28 +12,30 @@
 # *rightmost* `@`, so it ends up dialing the asset IP directly instead of
 # going through the jump host. Do not revert to that form.
 #
-# NOT WIRED TO ANY REAL SERVER BY DEFAULT. REMOTE_ASSET_HOST/REMOTE_JUMP_HOST
-# etc. have no defaults and must be set explicitly.
+# Points at the one real server this has ever been deployed to and verified
+# against (see PORTS.md "远程部署"). Still fully overridable via env vars if
+# a second target ever shows up -- this isn't a hardcoded assumption, it's
+# just no longer making you retype a confirmed destination every time.
 #
 # Usage:
-#   REMOTE_JUMP_USER=jumpuser REMOTE_ASSET_USER=assetuser \
-#   REMOTE_ASSET_HOST=1.2.3.4 REMOTE_JUMP_HOST=5.6.7.8 REMOTE_SSH_PORT=2222 \
-#   REMOTE_APP_DIR=/home/ops/jenkins_job/hireos_prod_job \
-#   scripts/deploy/deploy.sh check       # read-only: ssh in, check docker/compose, list running containers
-#   scripts/deploy/deploy.sh bootstrap   # one-time: install docker-compose-plugin, create REMOTE_APP_DIR + shared/env
-#   scripts/deploy/deploy.sh push-env    # upload local .env.production files into REMOTE_APP_DIR/shared/env (never via git)
-#   scripts/deploy/deploy.sh deploy      # upload source, docker compose build && up -d
-#   scripts/deploy/deploy.sh status      # docker compose ps on the remote release
+#   scripts/deploy/deploy.sh check                # read-only: ssh in, check docker/compose, list running containers
+#   scripts/deploy/deploy.sh bootstrap             # one-time: install docker-compose-plugin, create REMOTE_APP_DIR + shared/env
+#   scripts/deploy/deploy.sh push-env              # upload local .env.production files into REMOTE_APP_DIR/shared/env (never via git)
+#   scripts/deploy/deploy.sh deploy                # upload source, build + (re)start EVERY service
+#   scripts/deploy/deploy.sh deploy jd-frontend    # only build + (re)start jd-frontend (source is still fully re-uploaded, just cheap)
+#   scripts/deploy/deploy.sh deploy jd             # subsystem group: jd-backend + jd-frontend
+#   scripts/deploy/deploy.sh deploy backends       # every *-backend service + core-record
+#   scripts/deploy/deploy.sh status                # docker compose ps on the remote release
 #   scripts/deploy/deploy.sh logs <service>
 set -Eeuo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 
-REMOTE_JUMP_USER="${REMOTE_JUMP_USER:-}"
-REMOTE_ASSET_USER="${REMOTE_ASSET_USER:-}"
-REMOTE_ASSET_HOST="${REMOTE_ASSET_HOST:-}"
-REMOTE_JUMP_HOST="${REMOTE_JUMP_HOST:-}"
+REMOTE_JUMP_USER="${REMOTE_JUMP_USER:-jsunsu}"
+REMOTE_ASSET_USER="${REMOTE_ASSET_USER:-ubuntu}"
+REMOTE_ASSET_HOST="${REMOTE_ASSET_HOST:-34.94.189.76}"
+REMOTE_JUMP_HOST="${REMOTE_JUMP_HOST:-34.92.110.140}"
 REMOTE_SSH_PORT="${REMOTE_SSH_PORT:-2222}"
 REMOTE_PASS="${REMOTE_PASS:-}"
 REMOTE_PASS_FILE="${REMOTE_PASS_FILE:-$SCRIPT_DIR/.deploy-hireos-remote.password}"
@@ -46,6 +48,23 @@ REMOTE_KEY_PATH="${REMOTE_KEY_PATH:-}"
 REMOTE_APP_DIR="${REMOTE_APP_DIR:-/opt/hireos}"
 COMPOSE_PROJECT_NAME="${COMPOSE_PROJECT_NAME:-hireos}"
 COMPOSE_FILES="-f docker-compose.yml -f docker-compose.prod.yml"
+
+# Individual docker-compose.yml service names, and the subsystem/role group
+# aliases `deploy <target>` accepts in place of one -- mirrors scripts/dev.sh's
+# grouping convention for the local orchestrator.
+ALL_SERVICES=(interview-backend interview-frontend screening-backend screening-frontend core-record jd-backend jd-frontend written-backend written-frontend gateway)
+resolve_targets() {
+  case "$1" in
+    interview) echo "interview-backend interview-frontend" ;;
+    screening) echo "screening-backend screening-frontend" ;;
+    jd) echo "jd-backend jd-frontend" ;;
+    written) echo "written-backend written-frontend" ;;
+    backends) echo "interview-backend screening-backend core-record jd-backend written-backend" ;;
+    frontends) echo "interview-frontend screening-frontend jd-frontend written-frontend" ;;
+    all|"") echo "${ALL_SERVICES[*]}" ;;
+    *) echo "$1" ;;
+  esac
+}
 
 fail() { printf '[deploy] ERROR: %s\n' "$*" >&2; exit 1; }
 
@@ -203,6 +222,20 @@ cmd_deploy() {
   command -v git >/dev/null 2>&1 || fail 'git is required to determine what to upload (git ls-files)'
   cd "$ROOT"
   git rev-parse --is-inside-work-tree >/dev/null 2>&1 || fail "$ROOT is not a git repo"
+
+  # Target selection: a bare service name, a subsystem group (interview/
+  # screening/jd/written), a role group (backends/frontends), or nothing/all
+  # for everything. The source upload is always the full tree regardless --
+  # it's a few MB and a few seconds, and keeping one release directory
+  # always fully self-consistent is worth far more than the small time save
+  # of a partial upload. Only the *build + up* step is scoped to the target,
+  # which is where the real time cost (npm ci, tsc, vite build) lives.
+  local targets
+  targets="$(resolve_targets "${1:-all}")"
+  for t in $targets; do
+    [[ " ${ALL_SERVICES[*]} " == *" $t "* ]] || fail "unknown service/group '$t' -- one of: ${ALL_SERVICES[*]} | interview | screening | jd | written | backends | frontends | all"
+  done
+
   local release
   release="$(date +%Y%m%d%H%M%S)"
   local release_dir="$REMOTE_APP_DIR/releases/$release"
@@ -213,7 +246,14 @@ cmd_deploy() {
   # stat the escaped string literally); NUL-separated names avoid that.
   collect_upload_list | tar --null -cf - -T - | ssh_pipe_in "tar -xf - -C '$release_dir'"
 
-  printf '[deploy] linking persisted secrets from %s/shared/env, then building + starting\n' "$REMOTE_APP_DIR"
+  printf '[deploy] linking persisted secrets from %s/shared/env, building + starting: %s\n' "$REMOTE_APP_DIR" "$targets"
+  # Always restart gateway too (unless it's already in the target list, in
+  # which case `up -d` below already gives it a fresh start): it caches
+  # upstream container IPs at boot, so any other service getting recreated
+  # without it leaves gateway proxying to a now-stale/reassigned IP. See
+  # PORTS.md "远程部署" -- this bit us for real, more than once.
+  local restart_gateway_too=1
+  for t in $targets; do [[ "$t" == "gateway" ]] && restart_gateway_too=0; done
   ssh_run "set -Eeuo pipefail
     cd '$release_dir'
     while IFS= read -r rel; do
@@ -225,8 +265,11 @@ cmd_deploy() {
     ln -sf '$REMOTE_APP_DIR/shared/env/scripts_docker_postgres.env.production' scripts/docker/postgres.env.production
     ln -sfn '$release_dir' '$REMOTE_APP_DIR/current'
     cd '$REMOTE_APP_DIR/current'
-    sudo docker compose $COMPOSE_FILES -p '$COMPOSE_PROJECT_NAME' build
-    sudo docker compose $COMPOSE_FILES -p '$COMPOSE_PROJECT_NAME' up -d
+    sudo docker compose $COMPOSE_FILES -p '$COMPOSE_PROJECT_NAME' build $targets
+    sudo docker compose $COMPOSE_FILES -p '$COMPOSE_PROJECT_NAME' up -d $targets
+    if [[ $restart_gateway_too -eq 1 ]]; then
+      sudo docker compose $COMPOSE_FILES -p '$COMPOSE_PROJECT_NAME' restart gateway
+    fi
     sudo docker compose $COMPOSE_FILES -p '$COMPOSE_PROJECT_NAME' ps"
 }
 
@@ -243,23 +286,33 @@ case "${1:-}" in
   check) cmd_check ;;
   bootstrap) cmd_bootstrap ;;
   push-env) cmd_push_env ;;
-  deploy) cmd_deploy ;;
+  deploy) cmd_deploy "${2:-}" ;;
   status) cmd_status ;;
   logs) cmd_logs "${2:-}" ;;
   *)
     cat >&2 <<EOF
-usage: scripts/deploy/deploy.sh <check|bootstrap|push-env|deploy|status|logs> [args]
+usage: scripts/deploy/deploy.sh <check|bootstrap|push-env|deploy|status|logs> [target]
 
-env vars (all required except noted):
-  REMOTE_JUMP_USER     JumpServer login user, e.g. jsunsu
-  REMOTE_ASSET_USER    asset's own SSH user, e.g. ubuntu
-  REMOTE_ASSET_HOST    asset IP
-  REMOTE_JUMP_HOST     jump host's own IP (the real SSH target)
-  REMOTE_SSH_PORT      default 2222
-  REMOTE_KEY_PATH      SSH key auth (preferred over password if set)
-  REMOTE_PASS / REMOTE_PASS_FILE   password auth via sshpass (falls back to $SCRIPT_DIR/.deploy-hireos-remote.password)
-  REMOTE_APP_DIR       default /opt/hireos
-  COMPOSE_PROJECT_NAME default hireos -- keep distinct from any pre-existing stack on the same host
+  deploy               everything (all 5 backends, 4 frontends, gateway)
+  deploy jd            just jd-backend + jd-frontend
+  deploy jd-frontend    just that one service
+  deploy backends      every *-backend service + core-record
+  deploy frontends      every *-frontend service
+  (service names match docker-compose.yml: ${ALL_SERVICES[*]})
+
+  postgres is deliberately not a deployable target here -- it's
+  infrastructure (a stock image, not something this repo builds), and
+  restarting it briefly disrupts every backend at once. Manage it by hand
+  over ssh if you ever actually need to.
+
+Connection defaults (already confirmed working, see PORTS.md "远程部署"):
+  REMOTE_JUMP_USER=$REMOTE_JUMP_USER  REMOTE_ASSET_USER=$REMOTE_ASSET_USER
+  REMOTE_ASSET_HOST=$REMOTE_ASSET_HOST  REMOTE_JUMP_HOST=$REMOTE_JUMP_HOST
+All overridable via env vars of the same name if a second target ever shows up.
+Other env vars: REMOTE_SSH_PORT (default 2222), REMOTE_KEY_PATH (SSH key auth),
+REMOTE_PASS / REMOTE_PASS_FILE (password auth via sshpass, falls back to
+$SCRIPT_DIR/.deploy-hireos-remote.password), REMOTE_APP_DIR (default /opt/hireos),
+COMPOSE_PROJECT_NAME (default hireos).
 EOF
     exit 1
     ;;
