@@ -52,7 +52,8 @@ const server = http.createServer((req, res) => {
   proxy.web(req, res, { target: route.target });
 });
 
-server.listen(PORT, '127.0.0.1', () => {
-  console.log(`[backend-gateway] listening on http://127.0.0.1:${PORT}`);
+const HOST = process.env.BACKEND_GATEWAY_HOST || '127.0.0.1';
+server.listen(PORT, HOST, () => {
+  console.log(`[backend-gateway] listening on http://${HOST}:${PORT}`);
   for (const r of ROUTES) console.log(`  ${r.prefix}/*  ->  ${r.target}/* (prefix stripped)`);
 });

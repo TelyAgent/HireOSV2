@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { useStore } from "../store/StoreContext";
-import { getDuplicateReview, resolveDuplicateReview, retryParse, RESOLUTION_LABEL } from "../data/api/imports";
+import { getDuplicateReview, resolveDuplicateReview, RESOLUTION_LABEL } from "../data/api/imports";
 import type { DuplicateReview, DuplicateResolutionOutcome } from "../data/fixtures/duplicateReviews";
 import { getCandidate, getPerson } from "../data/db";
 import { fmtDateTime } from "../lib/format";
@@ -18,7 +18,6 @@ export function DuplicateDetailPage() {
   const { id = "" } = useParams();
   const { t, state, say } = useStore();
   const [review, setReview] = useState<DuplicateReview | null | undefined>(undefined);
-  const [retrying, setRetrying] = useState(false);
 
   const load = () => getDuplicateReview(id).then(setReview).catch(() => setReview(null));
   useEffect(() => {
@@ -34,14 +33,6 @@ export function DuplicateDetailPage() {
     } else {
       say(t("Duplicate review resolved"), { type: "success" });
     }
-  };
-
-  const handleRetryParse = async () => {
-    setRetrying(true);
-    say(t("Retrying parse…"));
-    await retryParse(id);
-    setRetrying(false);
-    say(t("Still unreadable — try a higher-quality scan or a text-based PDF."), { type: "error" });
   };
 
   if (review === undefined) return null;
@@ -191,11 +182,6 @@ export function DuplicateDetailPage() {
       <div className="page-header" style={{ marginTop: 20 }}>
         <div />
         <div className="actions">
-          {review.kind === "parse_failed" && (
-            <Button variant="secondary" onClick={handleRetryParse} disabled={retrying}>
-              {t("Retry parsing")}
-            </Button>
-          )}
           {review.kind === "exact_file" && (
             <Button variant="primary" onClick={() => resolve("reuse_file")}>
               {t("Use existing file")}

@@ -9,13 +9,16 @@ const BATCH_SIZE = 10;
 const MAX_ATTEMPTS = 10;
 
 /**
- * Delivers ScreeningOutboxEvent rows to the subsystem that needs to know about them.
- * This is the "transport" half of the outbox pattern described in
+ * Delivers ScreeningOutboxEvent rows to whichever subsystem needs to know about them --
+ * despite the class name (kept to avoid an unrelated rename churning this file), it now
+ * routes more than one event type/destination via `targetFor()`: "advanced_to_interview"
+ * goes to hireos-interview, "assessment_requested" goes to hireos-written. This is the
+ * "transport" half of the outbox pattern described in
  * docs/HireOS-Database-Architecture-Decision.md §7/§9 -- plain HTTP today because no
  * real event bus (Redis Streams etc.) is deployed yet. The event envelope this writes
  * (stable ids + a summary) is the same one a real event bus would carry, so swapping
  * the delivery mechanism later never requires changing DecisionsService or the
- * receiving endpoint, only this dispatcher.
+ * receiving endpoints, only this dispatcher.
  *
  * Polling + lease-free retry mirrors the pattern already used by
  * DiscoveryService/ImportsService in this codebase, scaled down: volume here is a
@@ -60,16 +63,16 @@ export class InterviewHandoffDispatcherService implements OnModuleInit, OnModule
   }
 
   private async dispatchOne(event: { id: string; eventType: string; payload: unknown; attempt: number }) {
-    const baseUrl = this.config.get<string>('INTERVIEW_BASE_URL', 'http://127.0.0.1:3001/api').replace(/\/$/, '');
-    const endpoint = this.endpointFor(event.eventType);
-    if (!endpoint) {
+    const target = this.targetFor(event.eventType);
+    if (!target) {
       // No receiver registered for this event type -- not a delivery failure, just
       // nothing subscribes to it (yet). Mark dispatched so it stops being polled.
       await this.db.screeningOutboxEvent.update({ where: { id: event.id }, data: { status: 'dispatched', dispatchedAt: new Date() } });
       return;
     }
+    const baseUrl = this.config.get<string>(target.baseUrlEnvKey, target.baseUrlDefault).replace(/\/$/, '');
     try {
-      const response = await globalThis.fetch(`${baseUrl}${endpoint}`, {
+      const response = await globalThis.fetch(`${baseUrl}${target.endpoint}`, {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify(event.payload),
@@ -87,8 +90,13 @@ export class InterviewHandoffDispatcherService implements OnModuleInit, OnModule
     }
   }
 
-  private endpointFor(eventType: string): string | null {
-    if (eventType === 'candidate.advanced_to_interview') return '/screening-handoff';
+  private targetFor(eventType: string): { baseUrlEnvKey: string; baseUrlDefault: string; endpoint: string } | null {
+    if (eventType === 'candidate.advanced_to_interview') {
+      return { baseUrlEnvKey: 'INTERVIEW_BASE_URL', baseUrlDefault: 'http://127.0.0.1:3001/api', endpoint: '/screening-handoff' };
+    }
+    if (eventType === 'candidate.assessment_requested') {
+      return { baseUrlEnvKey: 'WRITTEN_BASE_URL', baseUrlDefault: 'http://127.0.0.1:3008/api', endpoint: '/intake/screening-handoff' };
+    }
     return null;
   }
 }

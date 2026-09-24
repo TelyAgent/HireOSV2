@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { Link, useNavigate, useParams } from "react-router-dom";
+import { Link, useParams } from "react-router-dom";
 import { useStore } from "../store/StoreContext";
 import {
   addManualRecommendation,
@@ -7,12 +7,15 @@ import {
   deferRecommendation,
   dismissRecommendation,
   getCandidateDetail,
+  type CandidateDetail,
 } from "../data/api/candidates";
 import { runMatchAgain } from "../data/api/library";
-import { db, getJob, getPerson } from "../data/db";
+import { listJobs } from "../data/api/jobs";
+import { getJob, getPerson } from "../data/db";
 import type { Candidate } from "../data/fixtures/candidates";
+import type { Application } from "../data/fixtures/applications";
+import type { Job } from "../data/fixtures/jobs";
 import type { CandidateJobRecommendation } from "../data/fixtures/recommendations";
-import type { JobDiscoveryRun } from "../data/fixtures/jobDiscovery";
 import { fmtDateTime, relTime } from "../lib/format";
 import { confidenceLabel } from "../lib/scoring";
 import { Button, EmptyState, PageHeader } from "../components/ui/Primitives";
@@ -20,10 +23,26 @@ import { Modal } from "../components/ui/Overlays";
 import { Icon } from "../components/ui/Icons";
 import { NoJobState } from "./CandidateProfilePage";
 
-function ChooseAnotherRoleModal({ candidate, onClose, onAdded }: { candidate: Candidate; onClose: () => void; onAdded: () => void }) {
+function ChooseAnotherRoleModal({
+  candidate,
+  recommendations,
+  onClose,
+  onAdded,
+}: {
+  candidate: Candidate;
+  recommendations: CandidateJobRecommendation[];
+  onClose: () => void;
+  onAdded: () => void;
+}) {
   const { t, say } = useStore();
-  const existingRecs = db.recommendations.filter((r) => r.candidateId === candidate.id && r.status !== "dismissed");
-  const openJobs = Object.values(db.jobs).filter((j) => j.status === "open" && !existingRecs.some((r) => r.jobId === j.id));
+  const [jobs, setJobs] = useState<Job[] | null>(null);
+
+  useEffect(() => {
+    listJobs().then(setJobs);
+  }, []);
+
+  const existingRecs = recommendations.filter((r) => r.status !== "dismissed");
+  const openJobs = (jobs ?? []).filter((j) => j.status === "open" && !existingRecs.some((r) => r.jobId === j.id));
 
   const pick = async (jobId: string) => {
     await addManualRecommendation(candidate.id, jobId);
@@ -34,7 +53,9 @@ function ChooseAnotherRoleModal({ candidate, onClose, onAdded }: { candidate: Ca
 
   return (
     <Modal open onClose={onClose} title={t("Choose another role")}>
-      {openJobs.length ? (
+      {jobs === null ? (
+        <p className="tiny">{t("Loading…")}</p>
+      ) : openJobs.length ? (
         openJobs.map((j) => (
           <div className="radio-card" style={{ marginBottom: 8 }} key={j.id} onClick={() => pick(j.id)}>
             <div>
@@ -55,24 +76,32 @@ function ChooseAnotherRoleModal({ candidate, onClose, onAdded }: { candidate: Ca
 function ConfirmLinkModal({
   candidate,
   rec,
+  applications,
   onClose,
   onConfirmed,
 }: {
   candidate: Candidate;
   rec: CandidateJobRecommendation;
+  applications: Application[];
   onClose: () => void;
   onConfirmed: (applicationId: string) => void;
 }) {
   const { t, state, say } = useStore();
   const [reason, setReason] = useState("");
+  const [confirming, setConfirming] = useState(false);
   const job = getJob(rec.jobId)!;
-  const existingApp = db.applications.find((a) => a.candidateId === candidate.id && a.jobId === job.id);
+  const existingApp = applications.find((a) => a.candidateId === candidate.id && a.jobId === job.id);
 
   const confirm = async () => {
-    const app = await confirmJobLink(rec.id, { reason: reason.trim() || undefined, confirmedBy: state.currentUser });
-    onClose();
-    say(t('Linked to role — "Review screening & choose next step" added to My Tasks'), { type: "success" });
-    onConfirmed(app.id);
+    setConfirming(true);
+    try {
+      const app = await confirmJobLink(rec.id, { reason: reason.trim() || undefined, confirmedBy: state.currentUser });
+      onClose();
+      say(t('Linked to role — "Review screening & choose next step" added to My Tasks'), { type: "success" });
+      onConfirmed(app.id);
+    } finally {
+      setConfirming(false);
+    }
   };
 
   return (
@@ -82,10 +111,10 @@ function ConfirmLinkModal({
       title={t("Confirm job link")}
       footer={
         <>
-          <Button variant="secondary" onClick={onClose}>
+          <Button variant="secondary" onClick={onClose} disabled={confirming}>
             {t("Cancel")}
           </Button>
-          <Button variant="primary" onClick={confirm}>
+          <Button variant="primary" onClick={confirm} loading={confirming}>
             {t("Confirm job link")}
           </Button>
         </>
@@ -131,8 +160,7 @@ function ConfirmLinkModal({
 export function JobRecommendationsPage() {
   const { id = "" } = useParams();
   const { t, state, say } = useStore();
-  const navigate = useNavigate();
-  const [detail, setDetail] = useState<{ candidate: Candidate; recommendations: CandidateJobRecommendation[] } | null | undefined>(undefined);
+  const [detail, setDetail] = useState<CandidateDetail | null | undefined>(undefined);
   const [chooseRoleOpen, setChooseRoleOpen] = useState(false);
   const [confirmRec, setConfirmRec] = useState<CandidateJobRecommendation | null>(null);
 
@@ -149,8 +177,7 @@ export function JobRecommendationsPage() {
   if (detail === undefined) return null;
   if (detail === null) return <EmptyState icon="person_off" title={t("Candidate not found")} />;
 
-  const { candidate, recommendations } = detail;
-  const jd: JobDiscoveryRun = db.jobDiscovery[candidate.id] || { status: "not_started", lastRunAt: null, jobsScanned: 0 };
+  const { candidate, recommendations, applications, jobDiscovery: jd } = detail;
 
   const handleMatchAgain = async () => {
     await runMatchAgain(candidate.id);
@@ -198,7 +225,7 @@ export function JobRecommendationsPage() {
       <div className="flex-col gap-16">
         {recommendations.map((rec) => {
           const job = getJob(rec.jobId)!;
-          const app = db.applications.find((a) => a.candidateId === candidate.id && a.jobId === rec.jobId);
+          const app = applications.find((a) => a.candidateId === candidate.id && a.jobId === rec.jobId);
           const roleClosed = job.status !== "open";
           let statusChip: React.ReactNode;
           if (rec.status === "confirmed") statusChip = <span className="badge badge-success">{t("Confirmed — linked to role")}</span>;
@@ -286,13 +313,16 @@ export function JobRecommendationsPage() {
         })}
       </div>
 
-      {chooseRoleOpen && <ChooseAnotherRoleModal candidate={candidate} onClose={() => setChooseRoleOpen(false)} onAdded={load} />}
+      {chooseRoleOpen && (
+        <ChooseAnotherRoleModal candidate={candidate} recommendations={recommendations} onClose={() => setChooseRoleOpen(false)} onAdded={load} />
+      )}
       {confirmRec && (
         <ConfirmLinkModal
           candidate={candidate}
           rec={confirmRec}
+          applications={applications}
           onClose={() => setConfirmRec(null)}
-          onConfirmed={() => navigate(`/candidates/${candidate.id}/jobs`)}
+          onConfirmed={() => load()}
         />
       )}
     </>

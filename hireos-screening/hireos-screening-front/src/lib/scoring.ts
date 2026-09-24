@@ -34,12 +34,6 @@ export function computeAggregate(
 
 export type EligibilityResultStatus = "met" | "not_met" | "unknown" | "conflicting" | "provisionally_met";
 export type EligibilityStatus = "eligible" | "likely_eligible" | "needs_verification" | "not_eligible";
-export function aggregateEligibility(results: { status: EligibilityResultStatus }[]): EligibilityStatus {
-  if (results.some((r) => r.status === "not_met")) return "not_eligible";
-  if (results.some((r) => r.status === "unknown" || r.status === "conflicting")) return "needs_verification";
-  if (results.some((r) => r.status === "provisionally_met")) return "likely_eligible";
-  return "eligible";
-}
 
 /** Confidence display per Patch 1 rule: reuse the overall/coverage engine, no
  * percentages, coverage-gated buckets. */
@@ -56,61 +50,6 @@ export function confidenceLabel(
   return translate(lang, "Limited match signal");
 }
 
-/** Deterministic pseudo-random generator (same candidate+job always yields
- * the same simulated result). */
-export function seededRandom(seedStr: string): () => number {
-  let h = 0;
-  for (let i = 0; i < seedStr.length; i++) h = (h * 31 + seedStr.charCodeAt(i)) | 0;
-  return function next() {
-    h = (h * 1103515245 + 12345) & 0x7fffffff;
-    return h / 0x7fffffff;
-  };
-}
-
-const DIRECTION_STOPWORDS = new Set([
-  "and",
-  "the",
-  "of",
-  "for",
-  "with",
-  "team",
-  "engineer",
-  "engineering",
-  "manager",
-  "lead",
-  "senior",
-  "junior",
-  "staff",
-  "remote",
-  "unassigned",
-]);
-export function extractKeywords(text: string | null | undefined): string[] {
-  return (text || "")
-    .toLowerCase()
-    .split(/[^a-z0-9]+/)
-    .filter((w) => w.length > 2 && !DIRECTION_STOPWORDS.has(w));
-}
-
-/** Direction pre-filter: coarse keyword overlap between job team/title and
- * candidate tags, used to avoid running full multidimensional matching
- * against every job in the library. */
-export function candidateMatchesDirection(
-  candidate: { tags?: string[] },
-  job: { team: string; title: string },
-): boolean {
-  const jobWords = new Set([...extractKeywords(job.team), ...extractKeywords(job.title)]);
-  if (jobWords.size === 0) return true; // job has no usable direction signal — don't silently exclude everyone
-  for (const tag of candidate.tags || []) {
-    for (const w of extractKeywords(tag)) {
-      if (jobWords.has(w)) return true;
-    }
-  }
-  return false;
-}
-
-/** Lightweight eligibility simulation — only checks the one hard-requirement
- * type this prototype can reason about (work authorization) without real
- * resume parsing. Everything else defaults to eligible. */
 /** Inferred AI recommendation badge for a screening evaluation — a display
  * derivation only, never itself an approval/rejection action. Ported
  * verbatim from the prototype's `inferRecommendation`. */
@@ -125,13 +64,4 @@ export function inferRecommendation(
   if (ev.overall >= 80 && ev.eligibilityStatus === "eligible") return "strong_advance";
   if (ev.overall >= 65) return "advance";
   return "review";
-}
-
-export function quickEligibilityCheck(
-  candidate: { workAuth?: { status: string } },
-  job: { requirements?: { hard: boolean; kind: string }[] },
-): EligibilityStatus {
-  const hardAuthReq = (job.requirements || []).some((r) => r.hard && r.kind === "authorization");
-  if (hardAuthReq && candidate.workAuth && candidate.workAuth.status === "unknown") return "needs_verification";
-  return "eligible";
 }

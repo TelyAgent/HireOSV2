@@ -1,6 +1,9 @@
+import { useEffect } from "react";
 import { Navigate, Route, Routes } from "react-router-dom";
 import { AppShell } from "./components/AppShell";
+import { useStore } from "./store/StoreContext";
 import { useOpenTaskCount } from "./features/useOpenTaskCount";
+import { loadRealWrittenTasksIntoFixtures } from "./data/realTasksMerge";
 import { TasksPage } from "./pages/TasksPage";
 import { QuestionBankPage } from "./pages/QuestionBankPage";
 import { QuestionDetailPage } from "./pages/QuestionDetailPage";
@@ -20,10 +23,39 @@ import { ComparisonDetailPage } from "./pages/ComparisonDetailPage";
 import { FilesPage } from "./pages/FilesPage";
 import { SettingsPage } from "./pages/SettingsPage";
 import { AiModelsPage } from "./pages/AiModelsPage";
+import { CandidateApplyPage } from "./pages/CandidateApplyPage";
 
 export default function App() {
   const openTaskCount = useOpenTaskCount();
+  const { state, set } = useStore();
 
+  // Loads real tasks from hireos-written-backend once per session and merges them into the fixture
+  // dicts — every page that reads CASES/CORE_CANDIDATES/CORE_JOBS/TASKS (My Tasks, the candidate detail
+  // page, ...) sees them from here on, same as hireos-jd-front's App-level job load.
+  useEffect(() => {
+    let cancelled = false;
+    loadRealWrittenTasksIntoFixtures()
+      .then(() => {
+        if (cancelled) return;
+        set({ realTasksVersion: state.realTasksVersion + 1 });
+      })
+      .catch((error) => console.warn("Failed to load real written tasks from the backend:", error));
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  return (
+    <Routes>
+      {/* Candidate-facing, no login and no internal HR chrome — kept outside <AppShell>. */}
+      <Route path="/apply/:token" element={<CandidateApplyPage />} />
+      <Route path="/*" element={<ShellRoutes openTaskCount={openTaskCount} />} />
+    </Routes>
+  );
+}
+
+function ShellRoutes({ openTaskCount }: { openTaskCount: number }) {
   return (
     <AppShell openTaskCount={openTaskCount}>
       <Routes>

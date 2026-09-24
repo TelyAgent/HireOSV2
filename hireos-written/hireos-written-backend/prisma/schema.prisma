@@ -1,0 +1,142 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// Deliberately minimal — this service previously had no database at all. This schema exists to
+// receive a screening handoff ("send assessment" decision) and back the real "My Tasks" list; it is
+// NOT a port of the richer prototype data model (Question/Invitation/Attempt/Evaluation/Release —
+// see hireos-written-front/src/data/fixtures.ts), which stays frontend-only fixture data for now.
+// `coreCandidateId`/`coreJobId` are the stable ids from hireos-core-record, used to upsert idempotently
+// on repeated/retried handoff deliveries — same pattern as hireos-interview's screening-handoff intake.
+
+model Candidate {
+  id              String   @id @default(uuid())
+  workspaceId     String
+  coreCandidateId String
+  name            String
+  email           String?
+  phone           String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  cases           Case[]
+
+  @@unique([workspaceId, coreCandidateId])
+}
+
+model Job {
+  id          String   @id @default(uuid())
+  workspaceId String
+  coreJobId   String
+  title       String
+  department  String?
+  location    String?
+  level       String?
+  jdText      String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  cases       Case[]
+
+  @@unique([workspaceId, coreJobId])
+}
+
+// One candidate's written-test case for one job — the handoff's upsert key is (candidate, job), so a
+// repeated "send assessment" decision for the same pairing updates this record instead of duplicating it.
+model Case {
+  id                  String   @id @default(uuid())
+  workspaceId         String
+  candidateId         String
+  jobId               String
+  status              String   @default("linked")
+  coreMaterialId      String?
+  resumeText          String?
+  matchScore          Int?
+  matchRecommendation String?
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+  candidate           Candidate @relation(fields: [candidateId], references: [id], onDelete: Cascade)
+  job                 Job       @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  task                Task?
+  invitations         Invitation[]
+  planItems           PlanItem[]
+
+  @@unique([workspaceId, candidateId, jobId])
+}
+
+// This candidate's assigned copy of a question — whether it came from the (still frontend-only)
+// question bank or was AI-generated, its content is snapshotted here so it survives a page reload
+// instead of living only in the browser's in-memory fixture dicts (see AssessmentQuestionDrawer /
+// PlanPage on the frontend, which used to be the sole source of truth for this).
+model PlanItem {
+  id             String   @id @default(uuid())
+  workspaceId    String
+  caseId         String
+  kind           String   @default("optional")
+  status         String   @default("awaiting_submission")
+  questionCode   String
+  questionTitle  String
+  questionPrompt String
+  customPrompt   String?
+  competencies   Json?
+  deliverables   Json?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  case           Case     @relation(fields: [caseId], references: [id], onDelete: Cascade)
+
+  @@index([workspaceId, caseId])
+}
+
+// A case has at most one task today (only one handoff kind — "assessment requested" — exists yet), so
+// this is a 1:1 rather than the richer multi-task-per-case model the prototype fixtures use.
+model Task {
+  id          String    @id @default(uuid())
+  workspaceId String
+  caseId      String    @unique
+  title       String
+  type        String    @default("invite_pending")
+  status      String    @default("open")
+  assignee    String?
+  dueAt       DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  case        Case      @relation(fields: [caseId], references: [id], onDelete: Cascade)
+
+  @@index([workspaceId, status])
+}
+
+// A batch of questions sent to one candidate as a single form, addressed by an unguessable
+// `token` — the public candidate-facing page (no login) resolves the form purely from this token,
+// so `questions` is a frozen snapshot of the plan items' content at send time (matching the
+// prototype's own rule: "sent invitations always keep the exact version they were sent with").
+model Invitation {
+  id               String      @id @default(uuid())
+  workspaceId      String
+  caseId           String
+  token            String      @unique
+  questions        Json
+  mode             String
+  durationMin      Int?
+  deadline         DateTime?
+  disclosurePolicy String
+  status           String      @default("sent")
+  openedAt         DateTime?
+  startedAt        DateTime?
+  createdAt        DateTime    @default(now())
+  updatedAt        DateTime    @updatedAt
+  case             Case        @relation(fields: [caseId], references: [id], onDelete: Cascade)
+  submission       Submission?
+
+  @@index([workspaceId, caseId])
+}
+
+model Submission {
+  id           String     @id @default(uuid())
+  invitationId String     @unique
+  answers      Json
+  submittedAt  DateTime   @default(now())
+  invitation   Invitation @relation(fields: [invitationId], references: [id], onDelete: Cascade)
+}

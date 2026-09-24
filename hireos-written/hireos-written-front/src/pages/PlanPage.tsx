@@ -1,257 +1,388 @@
-import { useEffect, useMemo, useState } from "react";
-import { useNavigate, useParams } from "react-router-dom";
-import { Drawer } from "antd";
+import { useEffect, useReducer, useState } from "react";
+import { useParams } from "react-router-dom";
+import { Modal } from "antd";
 import { useStore } from "../store/StoreContext";
 import { StatusBadge } from "../utils/status";
-import { Breadcrumbs, Button, Chip, EmptyState } from "../components/ui/Primitives";
-import { currentRoundId } from "../utils/cases";
+import { Breadcrumbs, Button, EmptyState, Tabs } from "../components/ui/Primitives";
+import { Icon } from "../components/ui/Icon";
+import { planPageSelectedTab } from "../utils/planTabState";
+import { AssessmentQuestionDrawer } from "../components/AssessmentQuestionDrawer";
+import { SendToCandidateDrawer } from "../components/SendToCandidateDrawer";
+import { SubmissionDetailContent } from "./SubmissionDetailPage";
+import { EvaluationReviewContent } from "./EvaluationReviewPage";
+import { ReleaseContent } from "./ReleasePage";
 import {
-  ATTEMPTS, CASES, CORE_CANDIDATES, INVITATIONS, PLANS, QUESTIONS, fmtDateShort, nowISO,
-  type PlanItem, type Round,
+  ATTEMPTS, CASES, CORE_APPLICATIONS, CORE_CANDIDATES, CORE_JOBS, INVITATIONS, PLANS, PROJECT, QUESTIONS, fmtDateShort,
+  type Invitation, type PlanItem, type Question,
 } from "../data/fixtures";
-import { getUser } from "../data/users";
-import type { UserId } from "../store/types";
+import { USERS } from "../data/users";
+import {
+  createPlanItem, deletePlanItem, listCaseInvitations, listPlanItems, updatePlanItem,
+  type RealInvitation,
+} from "../data/writtenApi";
+import { applyRealPlanItems } from "../data/realPlanItemsMerge";
 
-type OwnershipKey = "hrOwner" | "hiringManager" | "reviewAssignee";
+type TabKey = "plan" | "submission" | "evaluation" | "result";
+type QuestionDrawerState = { mode: "add" } | { mode: "edit"; planItem: PlanItem } | null;
 
-function roundReleaseReady(rounds: Round[], roundId: string): { ready: boolean; reason?: string } {
-  const round = rounds.find((r) => r.id === roundId);
-  if (!round) return { ready: false, reason: "Round not found." };
-  if (round.releaseCondition === "manual" || round.position === 1) return { ready: true };
-  const prevIds = round.dependsOnRoundIds?.length ? round.dependsOnRoundIds : [rounds[round.position - 2]?.id].filter(Boolean) as string[];
-  const prevRounds = prevIds.map((id) => rounds.find((r) => r.id === id)).filter(Boolean) as Round[];
-  if (prevRounds.length === 0) return { ready: true };
-  if (round.releaseCondition === "after_previous_submission") {
-    const ok = prevRounds.every((r) => ["submitted", "review_pending", "completed"].includes(r.status));
-    return { ready: ok, reason: ok ? undefined : "Previous round hasn't been submitted yet." };
-  }
-  if (round.releaseCondition === "after_previous_review") {
-    const ok = prevRounds.every((r) => r.status === "completed");
-    return { ready: ok, reason: ok ? undefined : "Previous round hasn't finished human review yet." };
-  }
-  return { ready: true };
-}
-
+/**
+ * The candidate detail page — ported from the prototype's pagePlan(caseId), which merged what used to
+ * be four separate routed pages (plan / submission / evaluation / release) into one page with four
+ * tabs, so a reviewer can work through a candidate end to end without losing their place. The three
+ * non-"plan" tabs render the *same* content components the standalone /attempts/:id/submission,
+ * /attempts/:id/review and /results/:id/release routes still use (via their `inline` prop) — those
+ * routes stay intact for anything that links to them directly (e.g. the Submission Inbox).
+ *
+ * All four tab panels are mounted at once and switched with plain `display: none` rather than
+ * conditional rendering, so typing a human score into "Comprehensive evaluation" isn't lost if you
+ * flip over to "Submission" and back — same as the prototype's `panel.hidden = ...` toggling.
+ */
 export function PlanPage() {
   const { id: caseId = "" } = useParams();
-  const { t, say } = useStore();
-  const navigate = useNavigate();
+  const { t, say, state } = useStore();
   const c = CASES[caseId];
 
-  const [ownership, setOwnership] = useState(c?.ownership ?? { hrOwner: null, hiringManager: null, reviewAssignee: null });
-  const [roundMode, setRoundMode] = useState<"single" | "multiple">(c?.roundMode ?? "single");
-  const [rounds, setRounds] = useState<Round[]>(() => c ? c.rounds.map((r) => ({ ...r })) : []);
-  const [selectedRoundId, setSelectedRoundId] = useState<string | undefined>(() => (c ? currentRoundId(caseId) : undefined));
-  const [plans, setPlans] = useState<Record<string, PlanItem>>(PLANS);
-  const [pickerOpen, setPickerOpen] = useState(false);
+  const [activeTab, setActiveTabState] = useState<TabKey>(planPageSelectedTab[caseId] ?? "plan");
+  const setActiveTab = (key: TabKey) => {
+    planPageSelectedTab[caseId] = key;
+    setActiveTabState(key);
+  };
 
+  const [owner, setOwner] = useState<string>(c?.ownership?.hrOwner ?? "");
+  const [deadline, setDeadline] = useState<string>(() => c?.rounds[0]?.deadlineAt ?? "");
+  const [questionDrawer, setQuestionDrawer] = useState<QuestionDrawerState>(null);
+  const [sendDrawerOpen, setSendDrawerOpen] = useState(false);
+  // Question add/edit/delete/send all mutate the shared PLANS/CASES/INVITATIONS module objects
+  // directly (matching how CASES.status, RESULTS, EVALUATIONS and RELEASES are already handled
+  // elsewhere in this port) rather than a local copy, so they survive navigating away and back within
+  // the app — not just staying visible for the current mount. `forceTick` re-renders this component
+  // after a mutation it makes itself, since React has no way to know the module object changed.
+  const [, forceTick] = useReducer((n: number) => n + 1, 0);
+
+  // Real cases (created via a real screening handoff) can hold real Invitations/Submissions in
+  // hireos-written-backend — fetched best-effort so a fixture-only demo case (404) just shows
+  // nothing extra rather than an error. Keyed by token to cross-reference against the
+  // INVITATIONS fixture entry each QuestionCard already resolves for its "already sent" state.
+  const [realInvitations, setRealInvitations] = useState<RealInvitation[]>([]);
+  const [viewingSubmission, setViewingSubmission] = useState<RealInvitation | null>(null);
   useEffect(() => {
-    if (!c) return;
-    setOwnership(c.ownership);
-    setRoundMode(c.roundMode);
-    setRounds(c.rounds.map((r) => ({ ...r })));
-    setSelectedRoundId(currentRoundId(caseId));
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    if (!caseId) return;
+    let cancelled = false;
+    listCaseInvitations(caseId)
+      .then((list) => { if (!cancelled) setRealInvitations(list); })
+      .catch(() => { if (!cancelled) setRealInvitations([]); });
+    return () => {
+      cancelled = true;
+    };
   }, [caseId]);
-  const availableQuestions = useMemo(() => Object.values(QUESTIONS).filter((q) => ["published", "draft_review"].includes(q.status)), []);
+
+  // Real cases can also hold real PlanItems (see plan-items module) -- fetched once per case load
+  // and written into the QUESTIONS/PLANS fixture dicts (see realPlanItemsMerge.ts) so a page reload
+  // no longer loses a candidate's assigned questions the way it used to when this lived only in the
+  // browser's in-memory fixtures. A 404 (fixture-only demo case) leaves the existing fixture plan
+  // items untouched.
+  //
+  // Depends on realTasksVersion too: on a hard page reload, this effect (a descendant of <App>)
+  // fires *before* App's own real-task-loading effect resolves (child effects run before parent
+  // effects within the same mount), so CASES[caseId] can still be empty the first time this runs.
+  // Re-running once realTasksVersion bumps (App's load finished) is what makes this eventually see
+  // the real Case.
+  useEffect(() => {
+    if (!caseId) return;
+    let cancelled = false;
+    listPlanItems(caseId)
+      .then((list) => {
+        if (cancelled) return;
+        const kase = CASES[caseId];
+        if (!kase) return;
+        applyRealPlanItems(caseId, list, kase, kase.rounds[0]);
+        forceTick();
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [caseId, state.realTasksVersion]);
 
   if (!c) return <div className="banner danger">{t("Case not found.")}</div>;
 
   const cand = CORE_CANDIDATES[c.candidateId];
-  const round = rounds.find((r) => r.id === selectedRoundId) ?? rounds[0];
-  const items = round.planItemIds.map((id) => plans[id]).filter(Boolean);
-  const readiness = roundReleaseReady(rounds, round.id);
+  const round = c.rounds[0];
+  const items = round.planItemIds.map((id) => PLANS[id]).filter(Boolean);
+  const primaryItem = items[0] ?? null;
+  const app = c.applicationId ? CORE_APPLICATIONS[c.applicationId] : undefined;
+  const job = (app && CORE_JOBS[app.jobId]) || CORE_JOBS[PROJECT.jobId];
   const invs = Object.values(INVITATIONS).filter((i) => i.caseId === caseId);
-  const canInvite = !!c.applicationId && items.length > 0 && readiness.ready;
+  const realByToken = new Map(realInvitations.map((r) => [r.token, r]));
+  const attempts = Object.values(ATTEMPTS).filter((a) => a.caseId === caseId);
+  const primaryAttempt = attempts[0];
 
-  function updateOwnership(key: OwnershipKey, value: string) {
-    setOwnership((prev) => ({ ...prev, [key]: value || null }));
-    say("Ownership updated.", { type: "success" });
+  const goalQuestion = primaryItem ? QUESTIONS[primaryItem.questionId] : null;
+  const goalCompetencies = goalQuestion ? goalQuestion.competencies.map((cc) => cc.name).join("、") : "";
+  const goalText = goalCompetencies
+    ? `${t("Verify whether the candidate can demonstrate, through this role assessment:")} ${job.title} ${t("role capability —")} ${goalCompetencies}。`
+    : `${t("Verify whether the candidate can demonstrate, through this role assessment:")} ${job.title} ${t("role's core capability and delivery level.")}`;
+
+  function deleteQuestion(pi: PlanItem) {
+    c.planItems = c.planItems.filter((id) => id !== pi.id);
+    round.planItemIds = round.planItemIds.filter((id) => id !== pi.id);
+    delete PLANS[pi.id];
+    forceTick();
+    say(t("Question deleted."), { type: "success" });
+    // Best-effort -- a fixture-only demo case's plan item was never real to begin with, so a 404
+    // here is expected and safely ignored (matches SendToCandidateDrawer's fallback pattern).
+    deletePlanItem(caseId, pi.id).catch(() => {});
   }
-  function updateRound(patch: Partial<Round>) {
-    setRounds((prev) => prev.map((r) => (r.id === round.id ? { ...r, ...patch } : r)));
-  }
-  function addRound() {
-    const pos = rounds.length + 1;
-    const title = `Round ${pos}`;
-    const nr: Round = { id: `round_${caseId}_${pos}`, position: pos, title, planItemIds: [], releaseCondition: "after_previous_review", dependsOnRoundIds: [rounds[rounds.length - 1].id], deadlineAt: null, status: "planned" };
-    setRounds((prev) => [...prev, nr]);
-    setSelectedRoundId(nr.id);
-    setRoundMode("multiple");
-    say(`${title} added — set its release condition and add a test.`, { type: "success" });
-  }
-  function addTest(questionId: string) {
-    // PlanItem.kind is "required" | "optional" — the prototype's own runtime data used a
-    // third "supplemental" value for a round's non-first item, which doesn't fit that union;
+
+  async function handleQuestionConfirm({ questionId, customPrompt, newQuestion }: { questionId: string; customPrompt: string | null; newQuestion?: Question }) {
+    if (questionDrawer?.mode === "edit") {
+      const { planItem } = questionDrawer;
+      PLANS[planItem.id] = { ...planItem, questionId, customPrompt };
+      forceTick();
+      updatePlanItem(caseId, planItem.id, { customPrompt: customPrompt ?? undefined }).catch(() => {});
+      return;
+    }
+    // PlanItem.kind is "required" | "optional" — the prototype's own runtime data used a third
+    // "supplemental" value for a question added after the first, which doesn't fit that union;
     // "optional" is the closest fit (a plan item added on top of the round's first, required one).
     const kind: PlanItem["kind"] = items.length === 0 ? "required" : "optional";
-    const piId = `pi_${caseId}_${round.id.replace(`round_${caseId}_`, "")}_${questionId}`;
-    setPlans((prev) => ({ ...prev, [piId]: { id: piId, caseId, questionId, kind, status: "awaiting_submission" } }));
-    updateRound({ planItemIds: [...round.planItemIds, piId] });
-    setPickerOpen(false);
-    say(`${QUESTIONS[questionId].code} added to ${round.title} as a new plan item.`, { type: "success" });
-  }
-  function openSubmission(inv: (typeof invs)[number]) {
-    const att = Object.values(ATTEMPTS).find((a) => a.caseId === caseId && (inv.questionIds.length === 0 || inv.questionIds.includes(a.questionId)));
-    if (att) navigate(`/attempts/${att.id}/submission`);
-    else say("No submission received yet.");
+    const q = newQuestion ?? QUESTIONS[questionId];
+    try {
+      const created = await createPlanItem(caseId, {
+        kind, questionCode: q.code, questionTitle: q.title, questionPrompt: q.prompt,
+        customPrompt: customPrompt ?? undefined, competencies: q.competencies, deliverables: q.deliverables,
+      });
+      PLANS[created.id] = { id: created.id, caseId, questionId, kind, status: created.status, customPrompt };
+      c.planItems.push(created.id);
+      round.planItemIds.push(created.id);
+    } catch {
+      // Fixture-only demo case -- fall back to a local-only simulated add, same as before.
+      const piId = `pi_${caseId}_${round.id.replace(`round_${caseId}_`, "")}_${questionId}`;
+      PLANS[piId] = { id: piId, caseId, questionId, kind, status: "awaiting_submission", customPrompt };
+      c.planItems.push(piId);
+      round.planItemIds.push(piId);
+    }
+    forceTick();
   }
 
   return (
     <div>
-      <Breadcrumbs items={[{ label: "Assessments", href: "/assessments" }, { label: "Finance Operations Hiring", href: "/assessments/prj_fin" }, { label: cand.name }]} />
+      <Breadcrumbs items={[{ label: "My Tasks", href: "/tasks" }, { label: "Candidate detail" }]} />
       <h1 style={{ marginBottom: 4 }}>{cand.name}{t("'s plan")}</h1>
       <div className="muted" style={{ marginBottom: 16, display: "flex", alignItems: "center", gap: 8 }}>
         {cand.email} · <StatusBadge status={c.status} />
       </div>
 
+      <Tabs
+        value={activeTab}
+        onChange={setActiveTab}
+        options={[
+          { value: "plan", label: "Assessment plan" },
+          { value: "submission", label: "Submission" },
+          { value: "evaluation", label: "Comprehensive evaluation" },
+          { value: "result", label: "Evaluation result" },
+        ]}
+      />
+      <div style={{ marginBottom: 16 }} />
+
       {!c.applicationId && (
         <div className="banner warning" style={{ marginBottom: 16 }}>{t("Confirm the candidate's role link first — invitations for a formal role assessment require a confirmed Application.")}</div>
       )}
 
-      <div className="card card-pad" style={{ marginBottom: 16 }}>
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 8, marginBottom: 10 }}>
-          <b>{t("Ownership")}</b>
-          <span className="tiny">{t("Routes notifications only — not required to act (Startup Team Access)")}</span>
+      <div style={{ display: activeTab === "plan" ? "block" : "none" }}>
+        <div className="card card-pad" style={{ marginBottom: 16 }}>
+          <h4 style={{ marginBottom: 8 }}>{t("Verification goal")}</h4>
+          <div className="tiny" style={{ color: "var(--text-secondary)", lineHeight: 1.6 }}>{goalText}</div>
         </div>
-        <div className="grid-3" style={{ gap: 10 }}>
-          {([["hrOwner", "HR owner"], ["hiringManager", "Hiring manager"], ["reviewAssignee", "Review assignee"]] as const).map(([key, label]) => (
-            <div key={key} className="field">
-              <label>{t(label)}</label>
-              <select className="input" value={ownership[key] ?? ""} onChange={(e) => updateOwnership(key, e.target.value)}>
-                <option value="">{t("— Not set (defaults to initiator) —")}</option>
-                {(["user_john", "user_daniel", "user_morgan", "user_sam"] as UserId[]).map((uid) => {
-                  const u = getUser(uid);
-                  return <option key={uid} value={uid}>{u.name} — {u.role}</option>;
-                })}
-              </select>
-            </div>
-          ))}
-        </div>
-        {!ownership.hrOwner && !ownership.hiringManager && (
-          <div className="tiny" style={{ marginTop: 8, color: "var(--warning)" }}>{t("No HR owner or Hiring manager set — this doesn't block sending; the initiator is the default contact.")}</div>
-        )}
-      </div>
 
-      <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", marginBottom: 12 }}>
-        <b style={{ marginRight: 2 }}>{t("Plan structure")}</b>
-        <Button size="sm" variant={roundMode !== "multiple" ? "primary" : "ghost"} onClick={() => setRoundMode("single")}>{t("Single round")}</Button>
-        <Button size="sm" variant={roundMode === "multiple" ? "primary" : "ghost"} onClick={() => setRoundMode("multiple")}>{t("Multiple rounds")}</Button>
-      </div>
-
-      {roundMode === "multiple" && (
-        <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 12 }}>
-          {rounds.map((r) => {
-            const active = round.id === r.id;
-            return (
-              <div
-                key={r.id}
-                className="chip"
-                style={{ cursor: "pointer", display: "flex", gap: 6, alignItems: "center", ...(active ? { background: "var(--selected-surface)", color: "var(--accent)", borderColor: "transparent" } : {}) }}
-                onClick={() => setSelectedRoundId(r.id)}
-              >
-                {r.title} <StatusBadge status={r.status} />
-              </div>
-            );
-          })}
-          <Button size="sm" variant="ghost" onClick={addRound}>{t("+ Add round")}</Button>
-        </div>
-      )}
-
-      <div className="card card-pad" style={{ marginBottom: 16 }}>
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 8, marginBottom: 8 }}>
-          <b>{round.title}</b>
-          <StatusBadge status={round.status} />
-        </div>
-        <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
-          <div className="field" style={{ minWidth: 220 }}>
-            <label>{t("Release condition")}</label>
-            <select
-              className="input"
-              value={round.releaseCondition}
-              disabled={round.position === 1}
-              title={round.position === 1 ? t("Round 1 has no previous round to depend on.") : undefined}
-              onChange={(e) => { updateRound({ releaseCondition: e.target.value }); say("Release condition updated.", { type: "success" }); }}
-            >
-              <option value="manual">{t("Manual release")}</option>
-              <option value="after_previous_submission">{t("After previous round is submitted")}</option>
-              <option value="after_previous_review">{t("After previous round is reviewed")}</option>
+        <div className="grid-2" style={{ gap: 16, marginBottom: 16 }}>
+          <div className="field">
+            <label>{t("Owner")}</label>
+            <select className="input" value={owner} onChange={(e) => { setOwner(e.target.value); say("Owner updated.", { type: "success" }); }}>
+              <option value="">{t("— Not set (defaults to initiator) —")}</option>
+              {Object.values(USERS).map((u) => (
+                <option key={u.id} value={u.id}>{u.name} · {u.role}</option>
+              ))}
             </select>
           </div>
           <div className="field">
-            <label>{t("Deadline")}</label>
+            <label>{t("Submission deadline")}</label>
             <input
               className="input"
-              type="date"
-              value={round.deadlineAt ? round.deadlineAt.slice(0, 10) : ""}
-              onChange={(e) => { updateRound({ deadlineAt: e.target.value ? new Date(e.target.value + "T23:59:00Z").toISOString() : null }); say("Deadline updated.", { type: "success" }); }}
+              type="datetime-local"
+              value={deadline ? deadline.slice(0, 16) : ""}
+              onChange={(e) => { setDeadline(e.target.value ? new Date(`${e.target.value}:00Z`).toISOString() : ""); say("Deadline updated.", { type: "success" }); }}
             />
           </div>
         </div>
-        {!readiness.ready && (
-          <div className="banner warning" style={{ marginTop: 10 }}>{t("Not ready to release yet —")} {readiness.reason} {t("You can still plan and add tests; sending is blocked until the condition is met.")}</div>
-        )}
-      </div>
 
-      <div className="card" style={{ marginBottom: 16 }}>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 8, marginBottom: 2 }}>
+          <h4 style={{ margin: 0 }}>{t("Assessment questions")}</h4>
+        </div>
+        <div className="tiny" style={{ color: "var(--text-tertiary)", marginBottom: 12 }}>
+          {t("Confirming freezes this into a pending-send version; it is not sent to the candidate immediately.")}
+        </div>
+
         {items.length === 0 ? (
-          <EmptyState icon="assignment" title="No plan items in this round yet. Add a test to get started." />
+          <EmptyState icon="assignment" title='No assessment questions yet. Click "Add assessment question" to get started.' />
         ) : (
-          items.map((pi) => {
-            const q = QUESTIONS[pi.questionId];
-            return (
-              <div key={pi.id} className="task-row">
-                <div className="task-main">
-                  <div className="task-title">{q.code} — {q.title} <Chip>{pi.kind}</Chip></div>
-                  <div className="task-sub">v{q.version} · {q.competencies.map((cc) => `${cc.name} ${Math.round(cc.fraction * 100)}%`).join(", ")}</div>
-                </div>
-                <StatusBadge status={pi.status} />
-              </div>
-            );
-          })
+          items.map((pi) => (
+            <QuestionCard
+              key={pi.id}
+              pi={pi}
+              invitations={invs}
+              realByToken={realByToken}
+              canApply={!!c.applicationId}
+              onDelete={() => deleteQuestion(pi)}
+              onEdit={() => setQuestionDrawer({ mode: "edit", planItem: pi })}
+              onSend={() => setSendDrawerOpen(true)}
+              onViewSubmission={() => setActiveTab("submission")}
+              onViewRealSubmission={setViewingSubmission}
+            />
+          ))
+        )}
+
+        <Button style={{ marginTop: items.length ? 4 : 16, marginBottom: 16 }} onClick={() => setQuestionDrawer({ mode: "add" })}>
+          <Icon name="add" style={{ fontSize: 16, verticalAlign: "text-bottom" }} /> {t("Add assessment question")}
+        </Button>
+      </div>
+
+      <div style={{ display: activeTab === "submission" ? "block" : "none" }}>
+        {primaryAttempt ? (
+          <SubmissionDetailContent attemptId={primaryAttempt.id} inline onGoToEvaluation={() => setActiveTab("evaluation")} />
+        ) : (
+          <EmptyState icon="inbox" title="No submission received yet." />
         )}
       </div>
 
-      <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 16 }}>
-        <Button onClick={() => setPickerOpen(true)}>{t("Add test")}</Button>
-        <Button onClick={() => say("Plan approved — this is the acting employee's own confirmation, no second approver required (Startup Team Access).", { type: "success" })}>{t("Approve plan")}</Button>
-        <Button
-          variant="primary"
-          disabled={!canInvite}
-          title={!c.applicationId ? t("Confirm the candidate's role link first") : items.length === 0 ? t("Add at least one test first") : readiness.reason}
-          onClick={() => navigate(`/invitations/new?cases=${caseId}${roundMode === "multiple" ? `&round=${round.id}` : ""}`)}
-        >
-          {t("Invite candidate")}{roundMode === "multiple" ? ` — ${round.title}` : ""}
-        </Button>
-        <Button variant="ghost" onClick={() => say(`Plan version history (demo): v1 created ${fmtDateShort(nowISO(0))}`)}>{t("History")}</Button>
+      <div style={{ display: activeTab === "evaluation" ? "block" : "none" }}>
+        {primaryAttempt ? (
+          <EvaluationReviewContent attemptId={primaryAttempt.id} inline onViewFinalResult={() => setActiveTab("result")} />
+        ) : (
+          <EmptyState icon="fact_check" title="Waiting for result" />
+        )}
       </div>
 
-      {invs.length > 0 && (
-        <>
-          <h3 style={{ marginBottom: 8 }}>{invs.length > 1 ? t("Invitations") : t("Invitation")}</h3>
-          {invs.map((inv) => (
-            <div key={inv.id} className="card card-pad" style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
-              <div>
-                <b>{inv.mode === "timed" ? `${inv.durationMin} ${t("min timed")}` : t("Deadline only")}</b> · {t("deadline")} {fmtDateShort(inv.deadline)}
-                <div className="tiny"><StatusBadge status={inv.status} /></div>
-              </div>
-              <Button size="sm" variant="ghost" onClick={() => openSubmission(inv)}>{t("View submission →")}</Button>
-            </div>
-          ))}
-        </>
-      )}
+      <div style={{ display: activeTab === "result" ? "block" : "none" }}>
+        <ReleaseContent caseId={caseId} inline onGoToPlan={() => setActiveTab("plan")} />
+      </div>
 
-      <Drawer open={pickerOpen} onClose={() => setPickerOpen(false)} title={t("Add from Question Bank")} width={460}>
-        {availableQuestions.map((q) => (
-          <div key={q.id} className="card card-pad" style={{ display: "flex", alignItems: "center", justifyContent: "space-between", cursor: "pointer", marginBottom: 8 }} onClick={() => addTest(q.id)}>
-            <div>
-              <b>{q.code}</b> — {q.title}
-              <div className="tiny">{q.roles.join(", ")}</div>
+      <AssessmentQuestionDrawer
+        open={!!questionDrawer}
+        onClose={() => setQuestionDrawer(null)}
+        caseId={caseId}
+        jobTitle={job.title}
+        editing={questionDrawer?.mode === "edit" ? { planItem: questionDrawer.planItem, question: QUESTIONS[questionDrawer.planItem.questionId] } : undefined}
+        onConfirm={handleQuestionConfirm}
+      />
+
+      <SendToCandidateDrawer
+        open={sendDrawerOpen}
+        onClose={() => setSendDrawerOpen(false)}
+        caseId={caseId}
+        round={round}
+        items={items}
+        onSent={() => {
+          setSendDrawerOpen(false);
+          listCaseInvitations(caseId).then(setRealInvitations).catch(() => {});
+        }}
+      />
+
+      <Modal
+        open={!!viewingSubmission}
+        onCancel={() => setViewingSubmission(null)}
+        footer={null}
+        title={t("Candidate's submission")}
+        width={560}
+      >
+        {viewingSubmission?.submission?.answers.map((a) => {
+          const q = (viewingSubmission.questions ?? []).find((qq) => qq.questionId === a.questionId);
+          return (
+            <div key={a.questionId} className="card card-pad" style={{ marginBottom: 12 }}>
+              <b>{q ? `${q.code} · ${q.title}` : a.questionId}</b>
+              <div className="tiny" style={{ color: "var(--text-secondary)", lineHeight: 1.6, whiteSpace: "pre-wrap", marginTop: 8 }}>
+                {a.answerText}
+              </div>
             </div>
-            <StatusBadge status={q.status} />
+          );
+        })}
+        {viewingSubmission?.submission && (
+          <div className="tiny" style={{ color: "var(--text-tertiary)" }}>
+            {t("Submitted at")} {fmtDateShort(viewingSubmission.submission.submittedAt)}
           </div>
-        ))}
-      </Drawer>
+        )}
+      </Modal>
+    </div>
+  );
+}
+
+function QuestionCard({
+  pi, invitations, realByToken, canApply, onDelete, onEdit, onSend, onViewSubmission, onViewRealSubmission,
+}: {
+  pi: PlanItem;
+  invitations: Invitation[];
+  realByToken: Map<string, RealInvitation>;
+  canApply: boolean;
+  onDelete: () => void;
+  onEdit: () => void;
+  onSend: () => void;
+  onViewSubmission: () => void;
+  onViewRealSubmission: (inv: RealInvitation) => void;
+}) {
+  const { t } = useStore();
+  const q = QUESTIONS[pi.questionId];
+  const sentInvite = invitations.find((inv) => inv.questionIds.includes(pi.questionId));
+  const alreadySent = !!sentInvite;
+  const realInvite = sentInvite?.token ? realByToken.get(sentInvite.token) : undefined;
+  const bodyText = pi.customPrompt ?? q.prompt;
+  const canSend = canApply && !alreadySent;
+
+  return (
+    <div className="card card-pad" style={{ marginBottom: 12 }}>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 8, marginBottom: 8 }}>
+        <div>
+          <b>{q.code} · {q.title}</b>
+          <div className="tiny" style={{ marginTop: 2 }}>{t("adjustable for this candidate only")}</div>
+        </div>
+        <StatusBadge status={pi.status} />
+      </div>
+      <div className="tiny" style={{ color: "var(--text-secondary)", lineHeight: 1.6, whiteSpace: "pre-wrap", maxHeight: 90, overflow: "auto", marginBottom: 10 }}>
+        {bodyText}
+      </div>
+      <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 10, flexWrap: "wrap" }}>
+        {alreadySent ? (
+          <>
+            <Button size="sm" disabled>
+              {realInvite?.status === "submitted" ? t("Submitted") : realInvite?.status === "opened" ? t("Opened") : t("Sent")}
+            </Button>
+            {sentInvite && (
+              <span className="tiny" style={{ color: "var(--text-tertiary)" }}>
+                {sentInvite.mode === "timed" ? `${sentInvite.durationMin} ${t("min timed")}` : t("Deadline only")} · {t("deadline")} {fmtDateShort(sentInvite.deadline)}
+              </span>
+            )}
+            <div style={{ flex: 1 }} />
+            {realInvite?.submission ? (
+              <Button size="sm" variant="ghost" onClick={() => onViewRealSubmission(realInvite)}>{t("View candidate's reply →")}</Button>
+            ) : (
+              <Button size="sm" variant="ghost" onClick={onViewSubmission}>{t("View submission →")}</Button>
+            )}
+          </>
+        ) : (
+          <>
+            <Button
+              size="sm"
+              variant="primary"
+              disabled={!canSend}
+              title={!canApply ? t("Confirm the candidate's role link first") : undefined}
+              onClick={onSend}
+            >
+              {t("Send to candidate")}
+            </Button>
+            <Button size="sm" variant="ghost" onClick={onEdit}>{t("Edit question")}</Button>
+            <Button size="sm" variant="danger" onClick={onDelete}>{t("Delete question")}</Button>
+          </>
+        )}
+      </div>
     </div>
   );
 }

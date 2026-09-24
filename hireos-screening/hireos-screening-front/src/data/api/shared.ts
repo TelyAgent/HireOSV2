@@ -6,11 +6,6 @@ export class ApiError extends Error {
   }
 }
 
-export function isRealApi(): boolean {
-  const env = (import.meta as ImportMeta & { env?: Record<string, string | undefined> }).env;
-  return env?.VITE_API_MODE === "real";
-}
-
 async function parseResponse(response: Response): Promise<unknown> {
   const contentType = response.headers.get("content-type") || "";
   if (contentType.includes("application/json")) return response.json();
@@ -47,7 +42,7 @@ export async function apiUpload<T>(
   return apiFetch<T>(path, { method: "POST", body: form, headers });
 }
 
-/** Simulated network latency — a real backend later replaces this whole layer. */
+/** Generic sleep helper, e.g. for polling intervals. */
 export function delay(ms = 300): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }

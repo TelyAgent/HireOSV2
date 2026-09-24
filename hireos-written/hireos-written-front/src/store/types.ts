@@ -33,4 +33,10 @@ export interface AppState {
 
   // toast queue
   toasts: ToastItem[];
+
+  // Bumped once real tasks from hireos-written-backend finish loading and get merged into the
+  // CASES/CORE_CANDIDATES/CORE_JOBS/TASKS fixture dicts (see data/realTasksMerge.ts) — those dicts are
+  // plain module objects, not store state, so nothing re-renders when they change on their own; reading
+  // this field is how components that memoize on it know to recompute.
+  realTasksVersion: number;
 }

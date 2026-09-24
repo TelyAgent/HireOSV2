@@ -637,3 +637,7 @@ a:focus-visible, button:focus-visible, [tabindex]:focus-visible, input:focus-vis
 .gm-send-btn:disabled{ opacity:.4; cursor:default; }
 .gm-send-btn .material-icons-o{ font-size:18px; }
 .gemini-hint{ font-size:var(--fs-xs); color:var(--text-tertiary); text-align:center; margin-top:8px; }
+
+/* antd TextArea in the "Paste notes" modal: follow the app's theme variables so it tracks light/dark/deep. */
+.paste-notes.ant-input{ background:var(--surface); color:var(--text); border-color:var(--border-strong); font-size:var(--fs-sm); }
+.paste-notes.ant-input::placeholder{ color:var(--text-tertiary); }

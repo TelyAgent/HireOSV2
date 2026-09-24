@@ -17,6 +17,7 @@ export const initialState: AppState = {
   clockOffsetMin: 0,
 
   toasts: [],
+  realTasksVersion: 0,
 };
 
 export const PREF_KEYS = ["lang", "theme", "accent", "textSize", "sidebarCollapsed", "shellMode", "currentUser"] as const;

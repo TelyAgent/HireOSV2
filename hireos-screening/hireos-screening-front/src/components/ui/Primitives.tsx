@@ -15,18 +15,21 @@ export function Button({
   variant = "secondary",
   size,
   icon,
+  loading,
   className,
   children,
+  disabled,
   ...rest
 }: {
   variant?: ButtonVariant;
   size?: "sm";
   icon?: string;
+  loading?: boolean;
 } & ButtonHTMLAttributes<HTMLButtonElement>) {
   const cls = ["btn", `btn-${variant}`, size === "sm" ? "btn-sm" : "", className].filter(Boolean).join(" ");
   return (
-    <button className={cls} {...rest}>
-      {icon && <Icon name={icon} />}
+    <button className={cls} disabled={disabled || loading} {...rest}>
+      {loading ? <Icon name="progress_activity" className="btn-spinner" /> : icon && <Icon name={icon} />}
       {children}
     </button>
   );

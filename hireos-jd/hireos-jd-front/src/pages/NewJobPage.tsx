@@ -1,5 +1,5 @@
 import { useRef, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { Input } from "antd";
 import { MainInner } from "../components/AppShell";
 import { Icon } from "../components/ui/Icons";
 import { Button, PageHeader } from "../components/ui/Primitives";
@@ -9,7 +9,7 @@ import { createCopilotConversation, uploadCopilotAttachment } from "../features/
 import { useStore } from "../store/StoreContext";
 import type { GeminiMsg } from "../store/types";
 
-export type CreateMode = "upload" | "paste" | "template" | "clone" | "chat";
+export type CreateMode = "upload" | "paste" | "template" | "clone";
 
 /** Shared launcher so Attachments / Templates can reuse the same create flows. */
 export function useStartCreate() {
@@ -77,28 +77,28 @@ export function NewJobPage() {
 
 /* ---------------------------------------------------------------
    Create-flow modals — ported from the prototype's `A.startCreate`.
-   Every path lands on the same demo draft (job-demo-101).
+   Upload and paste both run the backend's AI bulk extraction and hand off
+   to the Copilot panel; template and clone have no backend yet.
    --------------------------------------------------------------- */
 function CreateModal({ mode }: { mode: CreateMode }) {
   const { t, say, state, mutate, closeModal, openDrawer } = useStore();
-  const navigate = useNavigate();
-  const [uploadStatus, setUploadStatus] = useState<"idle" | "uploading" | "error">("idle");
+  const [extractStatus, setExtractStatus] = useState<"idle" | "extracting" | "error">("idle");
   const [uploadFileName, setUploadFileName] = useState("");
-  const [uploadError, setUploadError] = useState("");
+  const [extractError, setExtractError] = useState("");
+  const [pastedNotes, setPastedNotes] = useState("");
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const go = (toastMsg?: string) => {
+  const notAvailable = () => {
     closeModal();
-    if (toastMsg) say(t(toastMsg));
-    navigate("/jobs/job-demo-101");
+    say(t("This feature isn't available yet."));
   };
 
   const createCtx = { mode: "create" as const, jobId: null, audience: "internal" as const, selText: null };
 
-  async function handleFileSelected(file: File) {
-    setUploadStatus("uploading");
-    setUploadFileName(file.name);
-    setUploadError("");
+  /** Runs AI field extraction over `file` in the create-mode Copilot conversation, then opens the panel. */
+  async function extractIntoCopilot(file: File, chatLabel: string) {
+    setExtractStatus("extracting");
+    setExtractError("");
     try {
       const key = chatKey(createCtx);
       let conversationId = state.geminiConversationIds[key];
@@ -112,7 +112,7 @@ function CreateModal({ mode }: { mode: CreateMode }) {
       const result = await uploadCopilotAttachment(conversationId, file);
       const lastReply = result.messages[result.messages.length - 1];
       const newMessages: GeminiMsg[] = [
-        { role: "user", text: `[${t("Uploaded file")}] ${file.name}` },
+        { role: "user", text: chatLabel },
         result.phase === "ready_to_confirm"
           ? { role: "ai", draft: jdFieldsToGeminiDraft(result.fields) }
           : { role: "ai", text: lastReply?.text || "" },
@@ -124,35 +124,23 @@ function CreateModal({ mode }: { mode: CreateMode }) {
       closeModal();
       openDrawer(<GeminiPanel ctx={createCtx} />, { drawerClass: "gemini-drawer-shell", overlayClass: "gemini-overlay" });
     } catch (error) {
-      setUploadStatus("error");
-      setUploadError(error instanceof Error ? error.message : t("Couldn't process this file. Please try again."));
+      setExtractStatus("error");
+      setExtractError(error instanceof Error ? error.message : t("Couldn't process this file. Please try again."));
     }
   }
 
-  if (mode === "chat") {
-    return (
-      <>
-        <ModalHeader title={t("Start a conversation")} />
-        <ModalBody>
-          <div className="field">
-            <label>{t("Describe the role")}</label>
-            <textarea defaultValue={t("We need an HR Lead in Ho Chi Minh City, with agency experience and strong English.")} />
-          </div>
-          <div className="info-inline">
-            <Icon name="auto_awesome" />
-            {t(
-              "Copilot will ask a few clarifying questions and draft a document you can edit directly — nothing becomes a formal requirement until you review and accept it.",
-            )}
-          </div>
-        </ModalBody>
-        <ModalFooter>
-          <CancelButton />
-          <Button variant="primary" onClick={() => go()}>
-            {t("Continue")}
-          </Button>
-        </ModalFooter>
-      </>
-    );
+  function handleFileSelected(file: File) {
+    setUploadFileName(file.name);
+    void extractIntoCopilot(file, `[${t("Uploaded file")}] ${file.name}`);
+  }
+
+  // Pasted notes go through the same bulk-extraction endpoint as an uploaded TXT, so they get the
+  // one-shot "extract every field" treatment rather than the one-question-at-a-time chat intake.
+  function handlePastedNotes() {
+    const text = pastedNotes.trim();
+    if (!text) return;
+    const file = new File([text], "pasted-notes.txt", { type: "text/plain" });
+    void extractIntoCopilot(file, `[${t("Pasted notes")}] ${text.length > 60 ? `${text.slice(0, 60)}…` : text}`);
   }
 
   if (mode === "upload") {
@@ -180,12 +168,12 @@ function CreateModal({ mode }: { mode: CreateMode }) {
               if (file) void handleFileSelected(file);
             }}
           />
-          {uploadStatus !== "idle" && (
+          {extractStatus !== "idle" && (
             <div style={{ marginTop: 14 }}>
               <div className="tiny" style={{ marginBottom: 6 }}>
                 {uploadFileName}
               </div>
-              {uploadStatus === "uploading" && (
+              {extractStatus === "extracting" && (
                 <>
                   <div className="progress-track">
                     <div className="progress-fill" style={{ width: "100%" }} />
@@ -195,9 +183,9 @@ function CreateModal({ mode }: { mode: CreateMode }) {
                   </div>
                 </>
               )}
-              {uploadStatus === "error" && (
+              {extractStatus === "error" && (
                 <div className="tiny" role="alert" style={{ marginTop: 4, color: "var(--danger-text)" }}>
-                  {uploadError}
+                  {extractError}
                 </div>
               )}
             </div>
@@ -248,8 +236,44 @@ function CreateModal({ mode }: { mode: CreateMode }) {
         </ModalBody>
         <ModalFooter>
           <CancelButton />
-          <Button variant="primary" onClick={() => go("Draft created from clone — review before submitting.")}>
+          <Button variant="primary" onClick={notAvailable}>
             {t("Create draft")}
+          </Button>
+        </ModalFooter>
+      </>
+    );
+  }
+
+  if (mode === "paste") {
+    const extracting = extractStatus === "extracting";
+    return (
+      <>
+        <ModalHeader title={t("Paste notes")} />
+        <ModalBody>
+          <Input.TextArea
+            className="paste-notes"
+            placeholder={t("Paste rough notes here...")}
+            autoSize={{ minRows: 8, maxRows: 16 }}
+            autoFocus
+            value={pastedNotes}
+            disabled={extracting}
+            onChange={(e) => setPastedNotes(e.target.value)}
+          />
+          {extracting && (
+            <div className="tiny" style={{ marginTop: 8, color: "var(--success-text)" }}>
+              {t("Generating the job from your notes…")}
+            </div>
+          )}
+          {extractStatus === "error" && (
+            <div className="tiny" role="alert" style={{ marginTop: 8, color: "var(--danger-text)" }}>
+              {extractError}
+            </div>
+          )}
+        </ModalBody>
+        <ModalFooter>
+          <CancelButton />
+          <Button variant="primary" disabled={extracting || !pastedNotes.trim()} onClick={handlePastedNotes}>
+            {extracting ? t("Generating…") : t("Continue")}
           </Button>
         </ModalFooter>
       </>
@@ -258,23 +282,19 @@ function CreateModal({ mode }: { mode: CreateMode }) {
 
   return (
     <>
-      <ModalHeader title={mode === "paste" ? t("Paste notes") : t("Use a template")} />
+      <ModalHeader title={t("Use a template")} />
       <ModalBody>
-        {mode === "paste" ? (
-          <textarea placeholder={t("Paste rough notes here...")} autoFocus />
-        ) : (
-          <div className="field">
-            <label>{t("Template")}</label>
-            <select defaultValue="eng">
-              <option value="eng">Engineering — Backend</option>
-              <option value="people">People Operations — HR Lead</option>
-            </select>
-          </div>
-        )}
+        <div className="field">
+          <label>{t("Template")}</label>
+          <select defaultValue="eng">
+            <option value="eng">Engineering — Backend</option>
+            <option value="people">People Operations — HR Lead</option>
+          </select>
+        </div>
       </ModalBody>
       <ModalFooter>
         <CancelButton />
-        <Button variant="primary" onClick={() => go()}>
+        <Button variant="primary" onClick={notAvailable}>
           {t("Continue")}
         </Button>
       </ModalFooter>

@@ -133,6 +133,39 @@ export class DecisionsService {
           },
         });
       }
+      // "Send assessment" is the same kind of fact for Written Test as "move to interview" is
+      // for Interview — same outbox table, same payload shape, just a different eventType and
+      // downstream consumer (see WrittenHandoffDispatcherService / hireos-written-backend's
+      // /api/intake/screening-handoff, which upserts a Candidate/Job/Case/Task by these ids).
+      if (raw.nextStepTarget === 'send_assessment') {
+        await tx.screeningOutboxEvent.create({
+          data: {
+            workspaceId: identity.workspaceId,
+            eventType: 'candidate.assessment_requested',
+            aggregateId: applicationId,
+            payload: json({
+              coreJobId: application.jobId,
+              coreCandidateId: application.candidateId,
+              jobTitle: application.job.title,
+              jobDepartment: application.job.team || undefined,
+              jobLocation: application.job.location || undefined,
+              jobLevel: application.job.seniority || undefined,
+              jdText: application.job.jdText || undefined,
+              candidateName: application.candidate.displayName,
+              candidateEmail: application.candidate.email || undefined,
+              candidatePhone: application.candidate.phone || undefined,
+              coreMaterialId: application.candidate.resumeVersions[0]?.material.coreMaterialId || undefined,
+              // Written Test's AI question generator needs the actual resume text (unlike
+              // Interview, which only needs a pointer to the file) -- Screening already has it
+              // extracted locally (see MaterialsService.saveUpload), so it rides along in this
+              // one-time handoff rather than requiring Written to fetch it back from Screening.
+              resumeText: application.candidate.resumeVersions[0]?.material.text?.slice(0, 12000) || undefined,
+              matchScore: currentEvaluation?.overallScore != null ? Math.round(currentEvaluation.overallScore) : undefined,
+              matchRecommendation: mapMatchRecommendation(raw.outcome!),
+            }),
+          },
+        });
+      }
       return created;
     });
     const pkg = raw.nextStepTarget === 'send_assessment' || raw.nextStepTarget === 'move_to_interview'

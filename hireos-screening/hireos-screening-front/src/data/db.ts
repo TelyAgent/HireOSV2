@@ -1,64 +1,56 @@
-import { PEOPLE, getPerson, type PersonId } from "./fixtures/people";
-import { JOBS } from "./fixtures/jobs";
-import { CANDIDATES } from "./fixtures/candidates";
-import { RESUME_VERSIONS } from "./fixtures/resumeVersions";
-import { JOB_DISCOVERY } from "./fixtures/jobDiscovery";
-import { RECOMMENDATIONS } from "./fixtures/recommendations";
-import { APPLICATIONS } from "./fixtures/applications";
-import { EVALUATIONS } from "./fixtures/evaluations";
-import { EVIDENCE } from "./fixtures/evidence";
-import { CONCERNS } from "./fixtures/concerns";
-import { VERIFICATION_ITEMS } from "./fixtures/verificationItems";
-import { ASSESSMENTS } from "./fixtures/assessments";
-import { DECISIONS } from "./fixtures/decisions";
-import { COMPARISONS } from "./fixtures/comparisons";
-import { TASKS, type Task } from "./fixtures/tasks";
-import { DUPLICATE_REVIEWS } from "./fixtures/duplicateReviews";
-import { DELIVERIES } from "./fixtures/deliveries";
-import { FILES } from "./fixtures/files";
-import { CONNECTIONS } from "./fixtures/connections";
-import { ACTIVITY } from "./fixtures/activity";
-import { AI_MODELS } from "./fixtures/aiModels";
-import { PREFERENCES } from "./fixtures/preferences";
-import { AUDIT } from "./fixtures/audit";
-import { HUMAN_ASSESSMENTS } from "./fixtures/humanAssessments";
-import { CORPORATE_MAILBOXES } from "./fixtures/corporateMailbox";
+import { getPerson, PEOPLE } from "./fixtures/people";
+import type { Job } from "./fixtures/jobs";
+import type { Candidate } from "./fixtures/candidates";
+import type { ResumeVersion } from "./fixtures/resumeVersions";
+import type { JobDiscoveryRun } from "./fixtures/jobDiscovery";
+import type { CandidateJobRecommendation } from "./fixtures/recommendations";
+import type { Application } from "./fixtures/applications";
+import type { Evaluation } from "./fixtures/evaluations";
+import type { Evidence } from "./fixtures/evidence";
+import type { Concern } from "./fixtures/concerns";
+import type { VerificationItem } from "./fixtures/verificationItems";
+import type { Decision } from "./fixtures/decisions";
+import type { ComparisonSet } from "./fixtures/comparisons";
+import type { Task } from "./fixtures/tasks";
+import type { DuplicateReview } from "./fixtures/duplicateReviews";
+import type { Delivery } from "./fixtures/deliveries";
+import type { FileRecord } from "./fixtures/files";
+import type { Connection } from "./fixtures/connections";
+import type { ActivityEntry } from "./fixtures/activity";
+import type { HumanAssessment } from "./fixtures/humanAssessments";
+import type { CorporateMailbox } from "./fixtures/corporateMailbox";
 
 /**
- * Single in-memory "backend" for the whole app session, mirroring the
- * prototype's `state.db`. Mock API modules (src/data/api/*) mutate these
- * collections directly (push/splice/reassign in place) so every module
- * shares one source of truth for the lifetime of the page session. This is
- * intentionally NOT React state — pages read through feature hooks that call
- * the API layer and hold their own loading/data state; db is the "table"
- * underneath, not the view layer.
+ * Runtime client-side cache for data fetched from the real backend. Every
+ * collection here starts empty — `src/data/api/*` functions populate it as a
+ * side effect of each real fetch (see e.g. `listJobs()`), so pages that read
+ * through `getJob`/`getCandidate`/etc. see data once it's been fetched at
+ * least once elsewhere. Never seed this with fixture/demo data — that's what
+ * caused candidates, jobs, etc. from the old mock layer to show up mixed in
+ * with real records.
  */
 export const db = {
   people: PEOPLE,
-  jobs: JOBS,
-  candidates: CANDIDATES,
-  resumeVersions: RESUME_VERSIONS,
-  jobDiscovery: JOB_DISCOVERY,
-  recommendations: RECOMMENDATIONS,
-  applications: APPLICATIONS,
-  evaluations: EVALUATIONS,
-  evidence: EVIDENCE,
-  concerns: CONCERNS,
-  verificationItems: VERIFICATION_ITEMS,
-  assessments: ASSESSMENTS,
-  decisions: DECISIONS,
-  comparisons: COMPARISONS,
-  tasks: TASKS,
-  duplicateReviews: DUPLICATE_REVIEWS,
-  deliveries: DELIVERIES,
-  files: FILES,
-  connections: CONNECTIONS,
-  activity: ACTIVITY,
-  aiModels: AI_MODELS,
-  preferences: PREFERENCES,
-  audit: AUDIT,
-  humanAssessments: HUMAN_ASSESSMENTS,
-  corporateMailboxes: CORPORATE_MAILBOXES,
+  jobs: {} as Record<string, Job>,
+  candidates: {} as Record<string, Candidate>,
+  resumeVersions: {} as Record<string, ResumeVersion[]>,
+  jobDiscovery: {} as Record<string, JobDiscoveryRun>,
+  recommendations: [] as CandidateJobRecommendation[],
+  applications: [] as Application[],
+  evaluations: {} as Record<string, Evaluation>,
+  evidence: {} as Record<string, Evidence>,
+  concerns: {} as Record<string, Concern[]>,
+  verificationItems: {} as Record<string, VerificationItem>,
+  decisions: {} as Record<string, Decision>,
+  comparisons: {} as Record<string, ComparisonSet>,
+  tasks: [] as Task[],
+  duplicateReviews: {} as Record<string, DuplicateReview>,
+  deliveries: [] as Delivery[],
+  files: [] as FileRecord[],
+  connections: [] as Connection[],
+  activity: [] as ActivityEntry[],
+  humanAssessments: {} as Record<string, HumanAssessment[]>,
+  corporateMailboxes: [] as CorporateMailbox[],
 };
 
 export { getPerson };
@@ -92,10 +84,4 @@ export function getConcerns(applicationId: string) {
 }
 export function getEvidenceById(id: string) {
   return db.evidence[id];
-}
-export function myTasks(userId: PersonId): Task[] {
-  return db.tasks.filter((t) => t.assignee === userId);
-}
-export function queueTasks(): Task[] {
-  return db.tasks.filter((t) => !t.assignee && t.status === "open");
 }

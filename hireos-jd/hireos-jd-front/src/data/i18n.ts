@@ -179,12 +179,6 @@ export const ZH: Record<string, string> = {
   "Clone an existing job": "复制已有职位",
   "Copies role content; HC, dates, approvals and restricted content are never inherited.":
     "仅复制岗位内容；编制、日期、审批状态与受限内容都不会被继承。",
-  "Start a conversation": "开始一段对话",
-  "Describe the role": "描述这个岗位",
-  "We need an HR Lead in Ho Chi Minh City, with agency experience and strong English.":
-    "我们需要一位驻胡志明市的 HR 负责人，有猎头/代理机构经验，英语能力强。",
-  "Copilot will ask a few clarifying questions and draft a document you can edit directly — nothing becomes a formal requirement until you review and accept it.":
-    "Copilot 会先问几个澄清问题，然后生成可直接编辑的文档 — 在你审阅并接受之前，不会形成正式的岗位要求。",
   "Upload source material": "上传原始材料",
   "Drop PDF, DOCX or TXT": "拖入 PDF、DOCX 或 TXT",
   "Or click to browse. Files are checked and read before extraction.": "或点击浏览。文件会先经过检查与读取，然后再抽取内容。",
@@ -203,8 +197,11 @@ export const ZH: Record<string, string> = {
   "Approval & publication state": "审批与发布状态",
   "Restricted content (not copied)": "受限内容（不复制）",
   "Create draft": "创建草稿",
-  "Draft created from clone — review before submitting.": "已从复制创建草稿 — 提交前请先审阅。",
   "Paste rough notes here...": "在此粘贴粗略笔记…",
+  "Pasted notes": "已粘贴笔记",
+  "Generating the job from your notes…": "正在根据笔记生成职位…",
+  "Generating…": "生成中…",
+  "This feature isn't available yet.": "该功能暂未开放。",
 
   /* ---------- job workspace ---------- */
   "Job not found": "未找到该职位",

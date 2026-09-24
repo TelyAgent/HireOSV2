@@ -3,7 +3,6 @@ import { Link, useNavigate, useParams } from "react-router-dom";
 import { useStore } from "../store/StoreContext";
 import { generateReviewOnlyReport, recordDecision, sendDeclineNotice, type NextStepTarget } from "../data/api/decisions";
 import { findTaskForApplication, claimTask } from "../data/api/tasks";
-import { isRealApi } from "../data/api/shared";
 import { db, getApplication, getCandidate, getConcerns, getEvaluation, getJob } from "../data/db";
 import type { Application } from "../data/fixtures/applications";
 import type { DecisionOutcome } from "../data/fixtures/decisions";
@@ -174,7 +173,7 @@ export function DecisionPage() {
   // the task list reflects it without a separate manual step. Best-effort: a
   // missing/already-claimed task or a transient failure never blocks the page.
   useEffect(() => {
-    if (!isRealApi() || !id) return;
+    if (!id) return;
     findTaskForApplication(id)
       .then((task) => {
         if (task && task.status === "open") return claimTask(task.id, state.currentUser);
@@ -190,11 +189,10 @@ export function DecisionPage() {
   const cand = getCandidate(app.candidateId)!;
   const job = getJob(app.jobId)!;
   const ev = getEvaluation(app.id);
-  const assessment = db.assessments[app.id] || { status: "not_administered" as const };
   const aiRec = ev ? (ev.evaluationStatus === "insufficient_evidence" ? "review" : inferRecommendation(ev)) : null;
 
   const requiredAssessment = job.workflowPolicy?.assessmentDisposition === "required";
-  const assessmentMissing = assessment.status !== "completed";
+  const assessmentMissing = app.assessmentStatus !== "completed";
   const needsExceptionUi = target === "interview" && requiredAssessment && assessmentMissing;
 
   const finalize = async (exceptionApproved: boolean) => {
@@ -275,7 +273,7 @@ export function DecisionPage() {
             {t("AI recommendation:")} {aiRec ? <RecommendationBadge outcome={aiRec} /> : "—"}
           </p>
           <p className="tiny">
-            {t("Assessment:")} {assessment.status === "completed" ? t("Completed ({n}/100)").replace("{n}", String(assessment.score)) : t("Not administered")}
+            {t("Assessment:")} {app.assessmentStatus === "completed" ? t("Completed") : t("Not administered")}
           </p>
           <p className="tiny">
             {t("Open concerns:")} {getConcerns(app.id).filter((c) => c.status === "open").length}

@@ -1,12 +1,13 @@
 import { useCallback, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { useStore } from "../store/StoreContext";
-import { listLibraryEntries, runMatchAgain, type LibraryEntry } from "../data/api/library";
+import { deleteCandidate, listLibraryEntries, runMatchAgain, type LibraryEntry } from "../data/api/library";
 import { ApiError } from "../data/api/shared";
 import { getPerson } from "../data/db";
 import { relTime } from "../lib/format";
 import { Icon } from "../components/ui/Icons";
 import { Badge, Button, CandidateAvatar, EmptyState, PageHeader, PersonAvatar } from "../components/ui/Primitives";
+import { ConfirmDialog } from "../components/ui/Overlays";
 
 function MatchStatusBadge({ entry }: { entry: LibraryEntry }) {
   const { t } = useStore();
@@ -36,6 +37,8 @@ export function LibraryPage() {
   const [entries, setEntries] = useState<LibraryEntry[]>([]);
   const [total, setTotal] = useState(0);
   const [matching, setMatching] = useState<string | null>(null);
+  const [deleting, setDeleting] = useState<string | null>(null);
+  const [confirmingDeleteId, setConfirmingDeleteId] = useState<string | null>(null);
 
   const load = useCallback((q: string) => {
     listLibraryEntries(q).then((rows) => {
@@ -61,6 +64,19 @@ export function LibraryPage() {
     }
     setMatching(null);
     load(query);
+  };
+
+  const handleDelete = async (candidateId: string) => {
+    setDeleting(candidateId);
+    try {
+      await deleteCandidate(candidateId);
+      say(t("Candidate removed from the library"), { type: "success" });
+      load(query);
+    } catch {
+      say(t("Could not remove this candidate."), { type: "error" });
+    }
+    setDeleting(null);
+    setConfirmingDeleteId(null);
   };
 
   return (
@@ -142,17 +158,30 @@ export function LibraryPage() {
                   </td>
                   <td className="tiny">{relTime(candidate.lastMatchedAt, state.lang)}</td>
                   <td className="text-right">
-                    <Button
-                      variant="secondary"
-                      size="sm"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleMatchAgain(candidate.id);
-                      }}
-                      disabled={matching === candidate.id || entry.matchStatus === "running"}
-                    >
-                      {entry.matchStatus === "running" ? t("Matching…") : t("Match again")}
-                    </Button>
+                    <span className="flex items-center gap-8" style={{ justifyContent: "flex-end" }}>
+                      <Button
+                        variant="secondary"
+                        size="sm"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleMatchAgain(candidate.id);
+                        }}
+                        disabled={matching === candidate.id || entry.matchStatus === "running"}
+                      >
+                        {entry.matchStatus === "running" ? t("Matching…") : t("Match again")}
+                      </Button>
+                      <Button
+                        variant="danger"
+                        size="sm"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setConfirmingDeleteId(candidate.id);
+                        }}
+                        disabled={deleting === candidate.id}
+                      >
+                        {t("Delete")}
+                      </Button>
+                    </span>
                   </td>
                 </tr>
                 );
@@ -161,6 +190,17 @@ export function LibraryPage() {
           </tbody>
         </table>
       </div>
+      {confirmingDeleteId && (
+        <ConfirmDialog
+          open
+          onClose={() => setConfirmingDeleteId(null)}
+          title={t("Remove candidate")}
+          body={t("This permanently removes the candidate and their resume history from the library. This can't be undone.")}
+          confirmLabel={t("Delete")}
+          danger
+          onConfirm={() => handleDelete(confirmingDeleteId)}
+        />
+      )}
     </>
   );
 }

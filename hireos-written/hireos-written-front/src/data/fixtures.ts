@@ -51,7 +51,8 @@ export const CORE_CANDIDATES: Record<string, CoreCandidate> = {
   core_candidate_d: { id: "core_candidate_d", name: "Taylor Brooks", email: "taylor.brooks@example.com", userId: "user_candidate_d", profileVersion: "v2", profileNote: "Profile updated to v2 after assessment; scoring still references v1 input." },
   core_candidate_devon: { id: "core_candidate_devon", name: "Devon Ruiz", email: "devon.ruiz@example.com", userId: "user_candidate_devon", profileVersion: "v1" },
   core_candidate_harper: { id: "core_candidate_harper", name: "Harper Diaz", email: "harper.diaz@example.com", userId: "user_candidate_harper", profileVersion: "v1" },
-  core_candidate_casey_chan: { id: "core_candidate_casey_chan", name: "Casey Chan", email: "casey.chan@example.com", userId: "user_candidate_casey_chan", profileVersion: "v1", profileNote: "Distinct applicant from Casey Chen (case_c) — verified by email; do not merge." },
+  core_candidate_casey_chan: { id: "core_candidate_casey_chan", name: "Sofia Bianchi", email: "sofia.bianchi@example.com", userId: "user_candidate_casey_chan", profileVersion: "v1" },
+  core_candidate_elena: { id: "core_candidate_elena", name: "Elena Cruz", email: "elena.cruz@example.com", userId: "user_candidate_elena", profileVersion: "v1" },
 };
 
 export const CORE_JOBS: Record<string, CoreJob> = {
@@ -76,6 +77,7 @@ export const CORE_APPLICATIONS: Record<string, CoreApplication> = {
   application_devon: { id: "application_devon", candidateId: "core_candidate_devon", jobId: "core_job_fin", cycleId: "cycle_fin_01", status: "active" },
   application_harper: { id: "application_harper", candidateId: "core_candidate_harper", jobId: "core_job_fin", cycleId: "cycle_fin_01", status: "active" },
   application_casey_chan: { id: "application_casey_chan", candidateId: "core_candidate_casey_chan", jobId: "core_job_fin", cycleId: "cycle_fin_01", status: "active" },
+  application_elena: { id: "application_elena", candidateId: "core_candidate_elena", jobId: "core_job_fin", cycleId: "cycle_fin_01", status: "active" },
 };
 
 export const CORE_FILES: Record<string, CoreFile> = {
@@ -96,7 +98,10 @@ export interface Question {
   difficulty: string; estMinutes: number; language: string; version: number;
   status: "published" | "draft_review" | "internal_only" | "concept";
   author: string; favorite: boolean;
-  prompt: string; materials: string[]; deliverables: string[]; rubricNote: string;
+  prompt: string; materials: string[]; deliverables: string[];
+  /** Every hand-authored bank question has one; an AI-generated question (see AssessmentQuestionDrawer)
+   * doesn't get one at creation time — there's no internal answer key to write until someone reviews it. */
+  rubricNote?: string;
   usageCount: number; seenByCount: number; pendingFractionIssue?: boolean;
 }
 
@@ -159,6 +164,10 @@ export interface Case {
   id: string; candidateId: string; applicationId: string; label: string; planItems: string[]; status: string;
   ownership: { hrOwner: string | null; hiringManager: string | null; reviewAssignee: string | null };
   roundMode: "single" | "multiple"; rounds: Round[];
+  /** Set when an assessment question is added to a case after its result was already released —
+   * flags the candidate's task as needing another look (pending_submission) until the new round
+   * clears. Only ever written by the "add assessment question" drawer. */
+  supplementalPending?: boolean;
 }
 
 export const CASES: Record<string, Case> = {
@@ -171,7 +180,8 @@ export const CASES: Record<string, Case> = {
     { id: "round_case_harper_1", position: 1, title: "Round 1 — FIN-001 (required)", planItemIds: ["pi_harper1"], releaseCondition: "manual", deadlineAt: "2026-09-05T23:59:00Z", status: "completed" },
     { id: "round_case_harper_2", position: 2, title: "Round 2 — FIN-002 (optional follow-up)", planItemIds: ["pi_harper2"], releaseCondition: "after_previous_review", dependsOnRoundIds: ["round_case_harper_1"], deadlineAt: "2026-09-16T23:59:00Z", status: "invited" },
   ] },
-  case_casey_chan: { id: "case_casey_chan", candidateId: "core_candidate_casey_chan", applicationId: "application_casey_chan", label: "Casey Chan — Finance Operations Analyst", planItems: [], status: "linked", ownership: { hrOwner: "user_john", hiringManager: "user_daniel", reviewAssignee: null }, roundMode: "single", rounds: [{ id: "round_case_casey_chan_1", position: 1, title: "Round 1", planItemIds: [], releaseCondition: "manual", deadlineAt: null, status: "planned" }] },
+  case_casey_chan: { id: "case_casey_chan", candidateId: "core_candidate_casey_chan", applicationId: "application_casey_chan", label: "Sofia Bianchi — Finance Operations Analyst", planItems: [], status: "linked", ownership: { hrOwner: "user_john", hiringManager: "user_daniel", reviewAssignee: null }, roundMode: "single", rounds: [{ id: "round_case_casey_chan_1", position: 1, title: "Round 1", planItemIds: [], releaseCondition: "manual", deadlineAt: null, status: "planned" }] },
+  case_elena: { id: "case_elena", candidateId: "core_candidate_elena", applicationId: "application_elena", label: "Elena Cruz — Finance Operations Analyst", planItems: ["pi_elena1"], status: "linked", ownership: { hrOwner: "user_john", hiringManager: "user_daniel", reviewAssignee: null }, roundMode: "single", rounds: [{ id: "round_case_elena_1", position: 1, title: "Round 1", planItemIds: ["pi_elena1"], releaseCondition: "manual", deadlineAt: null, status: "planned" }] },
 };
 
 // ScreeningSelectionContext: candidates Screening already matched/scored for this role,
@@ -183,7 +193,12 @@ export const SCREENING_POOL: ScreeningPoolEntry[] = [
   { candidateId: "screen_cand_marcus", name: "Marcus Webb", email: "marcus.webb@example.com", jobId: "core_job_fin", screeningResultRef: "screening_result_marcus", screeningArtifactRef: "file_screening_marcus_v1", recommendation: "Possible match", screeningScore: 71, screenedAt: "2026-09-09T14:30:00Z" },
 ];
 
-export interface PlanItem { id: string; caseId: string; questionId: string; kind: "required" | "optional"; status: string }
+export interface PlanItem {
+  id: string; caseId: string; questionId: string; kind: "required" | "optional"; status: string;
+  /** Per-candidate override of the question's prompt text — set by the "Edit question" drawer (a
+   * later phase); never changes the shared Question Bank preset. */
+  customPrompt?: string | null;
+}
 export const PLANS: Record<string, PlanItem> = {
   pi_a1: { id: "pi_a1", caseId: "case_a", questionId: "q_fin001", kind: "required", status: "completed" },
   pi_b1: { id: "pi_b1", caseId: "case_b", questionId: "q_fin001", kind: "required", status: "awaiting_submission" },
@@ -192,9 +207,16 @@ export const PLANS: Record<string, PlanItem> = {
   pi_devon1: { id: "pi_devon1", caseId: "case_devon", questionId: "q_fin001", kind: "required", status: "completed" },
   pi_harper1: { id: "pi_harper1", caseId: "case_harper", questionId: "q_fin001", kind: "required", status: "completed" },
   pi_harper2: { id: "pi_harper2", caseId: "case_harper", questionId: "q_fin002", kind: "optional", status: "awaiting_submission" },
+  pi_elena1: { id: "pi_elena1", caseId: "case_elena", questionId: "q_fin001", kind: "required", status: "planned" },
 };
 
-export interface Invitation { id: string; caseId: string; questionIds: string[]; mode: "timed" | "deadline_only"; durationMin?: number; deadline: string; status: string; acceptedAt: string | null; startedAt: string | null; disclosurePolicy: string; note?: string }
+export interface Invitation {
+  id: string; caseId: string; questionIds: string[]; mode: "timed" | "deadline_only"; durationMin?: number; deadline: string;
+  status: string; acceptedAt: string | null; startedAt: string | null; disclosurePolicy: string; note?: string;
+  /** Set only when this invitation was created via hireos-written-backend's real /cases/:id/invitations
+   * endpoint — the public candidate-facing form at /apply/:token is only reachable for these. */
+  token?: string;
+}
 export const INVITATIONS: Record<string, Invitation> = {
   inv_a: { id: "inv_a", caseId: "case_a", questionIds: ["q_fin001"], mode: "timed", durationMin: 90, deadline: "2026-08-20T23:59:00Z", status: "submitted", acceptedAt: "2026-08-14T09:12:00Z", startedAt: "2026-08-14T09:15:00Z", disclosurePolicy: "score_and_summary" },
   inv_b: { id: "inv_b", caseId: "case_b", questionIds: ["q_fin001"], mode: "deadline_only", deadline: "2026-09-18T23:59:00Z", status: "accepted", acceptedAt: "2026-09-08T14:02:00Z", startedAt: null, disclosurePolicy: "score_and_summary" },
@@ -253,7 +275,11 @@ export const RESULTS: Record<string, Result> = {
   result_harper: { id: "result_harper", caseId: "case_harper", evaluationId: "eval_case_harper", overall: 58, status: "published", releaseId: "rel_case_harper" },
 };
 
-export interface Release { id: string; caseId: string; overall: number; showScore: boolean; outcomeText: string; feedbackText: string; nextStepText: string; publishedAt: string }
+export interface Release {
+  id: string; caseId: string; overall: number; showScore: boolean; outcomeText: string; feedbackText: string; nextStepText: string; publishedAt: string;
+  /** Set once "Request revision" is confirmed — mirrors the prototype's release.nextAction. */
+  nextAction?: "revision";
+}
 export const RELEASES: Record<string, Release> = {
   rel_case_devon: { id: "rel_case_devon", caseId: "case_devon", overall: 78, showScore: true, outcomeText: "Strong performance on this assessment.", feedbackText: "Clear structure; full bridge shown to the reconciled bank balance with one gap in the reimbursement follow-up recommendation.", nextStepText: "HR will follow up with next steps.", publishedAt: "2026-08-10T09:00:00Z" },
   rel_case_harper: { id: "rel_case_harper", caseId: "case_harper", overall: 58, showScore: true, outcomeText: "Below the bar for this role on this assessment.", feedbackText: "Reached the correct reconciled balance but missed the duplicate-payment recovery and left one open item out of the accountant email.", nextStepText: "HR will follow up with next steps — an optional FIN-002 case has been sent as an additional data point before a final decision.", publishedAt: "2026-09-04T10:00:00Z" },
@@ -280,13 +306,15 @@ export const MAIL: Record<string, Mail> = {
 
 export interface Task { id: string; title: string; type: string; assignee: string | null; queue?: string; status: string; waitingReason?: string; waitingUntil?: string; dueAt: string; link: string; sourceRef: string }
 export const TASKS: Record<string, Task> = {
-  t1: { id: "t1", title: "Publish Alex Morgan's result", type: "result_release", assignee: "user_john", status: "open", dueAt: "2026-09-11T10:00:00Z", link: "/results/case_a/release", sourceRef: "case_a" },
+  t1: { id: "t1", title: "Publish Alex Morgan's result", type: "result_release", assignee: "user_john", status: "completed", dueAt: "2026-09-11T10:00:00Z", link: "/results/case_a/release", sourceRef: "case_a" },
   t2: { id: "t2", title: "Review Taylor Brooks' AI draft evaluation", type: "evaluation_review", assignee: "user_daniel", status: "open", dueAt: "2026-09-11T15:00:00Z", link: "/attempts/att_d/review", sourceRef: "case_d" },
   t3: { id: "t3", title: "Casey Chen — missing required deliverable", type: "submission_issue", assignee: "user_john", status: "waiting", waitingReason: "Requested missing workbook from candidate", waitingUntil: "2026-09-13T23:59:00Z", dueAt: "2026-09-13T23:59:00Z", link: "/submissions", sourceRef: "case_c" },
   t4: { id: "t4", title: "Publish Private Markets Portfolio NAV & Valuation Case (FIN-008 v2)", type: "reviewer_queue", assignee: null, queue: "question_review", status: "open", dueAt: "2026-09-12T18:00:00Z", link: "/questions/q_fin008", sourceRef: "q_fin008" },
   t5: { id: "t5", title: "Review Finance Operations plan draft", type: "plan_review", assignee: "user_john", status: "in_progress", dueAt: "2026-09-11T18:00:00Z", link: "/assessments/prj_fin", sourceRef: "prj_fin" },
   t6: { id: "t6", title: "Restore delayed Interview handoff delivery", type: "delivery_recovery", assignee: "user_morgan", status: "completed", dueAt: "2026-09-10T12:00:00Z", link: "/deliveries/del_1", sourceRef: "del_1" },
-  t7: { id: "t7", title: "Confirm Casey Chan is not a duplicate of Casey Chen (case_c)", type: "duplicate_check", assignee: "user_john", status: "completed", dueAt: "2026-09-11T07:00:00Z", link: "/assessments/prj_fin", sourceRef: "case_casey_chan" },
+  t7: { id: "t7", title: "Sofia Bianchi — written test not started", type: "test_pending", assignee: "user_john", status: "open", dueAt: "2026-09-18T23:59:00Z", link: "/cases/case_casey_chan/plan", sourceRef: "case_casey_chan" },
+  t8: { id: "t8", title: "Jordan Lee — awaiting written test submission", type: "submission_pending", assignee: "user_john", status: "open", dueAt: "2026-09-18T23:59:00Z", link: "/cases/case_b/plan", sourceRef: "case_b" },
+  t9: { id: "t9", title: "Elena Cruz — plan ready, test not yet sent", type: "invite_pending", assignee: "user_john", status: "open", dueAt: "2026-09-20T23:59:00Z", link: "/cases/case_elena/plan", sourceRef: "case_elena" },
 };
 
 export interface DeliveryStep { label: string; state: "done" | "pending"; at: string | null }
@@ -313,7 +341,7 @@ export const FILE_CONNECTIONS: FileConnection[] = [
 
 export const ACTIVITY: { at: string; text: string }[] = [
   { at: "2026-09-11T07:40:00Z", text: "Daniel Park reviewed Question Bank entry FIN-008 and flagged competency weights for redistribution." },
-  { at: "2026-09-11T07:10:00Z", text: "John confirmed Casey Chan is a distinct applicant from Casey Chen (case_c) — verified by email; records will not be merged." },
+  { at: "2026-09-11T07:10:00Z", text: "John linked Sofia Bianchi to the Finance Operations Analyst role; written test not yet sent." },
   { at: "2026-09-10T16:20:00Z", text: "Submission Inbox received Casey Chen's reply — missing 1 required deliverable." },
   { at: "2026-09-09T19:05:00Z", text: "Taylor Brooks submitted FIN-001 (round 1)." },
   { at: "2026-09-08T14:02:00Z", text: "Jordan Lee accepted invitation (deadline-only)." },

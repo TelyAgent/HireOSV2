@@ -6,7 +6,6 @@ import {
   getImportBatch,
   retryImportItem,
   runImportBatch,
-  simulateSampleBatch,
   type ImportBatch,
   type ImportItemResult,
 } from "../../data/api/imports";
@@ -174,20 +173,13 @@ export function UploadTab({ onChanged }: { onChanged?: () => void }) {
   const startRun = async (files: File[]) => {
     const id = "run-" + Date.now();
     setRuns((prev) => [{ id, fileCount: files.length }, ...prev]);
-    const batch = files.length ? await runImportBatch(files) : await simulateSampleBatch();
+    const batch = await runImportBatch(files);
     await finishRun(id, batch);
   };
 
   const handleFiles = (fileList: FileList | File[]) => {
     const files = Array.from(fileList);
     if (files.length) startRun(files);
-  };
-
-  const handleSample = async () => {
-    const id = "run-" + Date.now();
-    setRuns((prev) => [{ id, fileCount: 6 }, ...prev]);
-    const batch = await simulateSampleBatch();
-    await finishRun(id, batch);
   };
 
   const handleRetryItem = async (runId: string, itemId: string) => {
@@ -260,12 +252,6 @@ export function UploadTab({ onChanged }: { onChanged?: () => void }) {
           }}
         >
           {t("Choose files")}
-        </Button>
-      </div>
-      <div className="flex items-center justify-between" style={{ marginTop: 10 }}>
-        <span className="tiny muted">{t("No real files handy? Use sample data instead.")}</span>
-        <Button variant="secondary" size="sm" icon="science" onClick={handleSample}>
-          {t("Simulate a batch (sample data)")}
         </Button>
       </div>
       {runs.map((run) => (

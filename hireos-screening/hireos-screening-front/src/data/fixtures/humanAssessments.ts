@@ -10,7 +10,3 @@ export interface HumanAssessment {
   by: PersonId;
   at: string;
 }
-
-/** Keyed by applicationId. Empty by default — the prototype seeds this
- * lazily as overrides are saved, so there is no fixture data to port. */
-export const HUMAN_ASSESSMENTS: Record<string, HumanAssessment[]> = {};

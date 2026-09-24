@@ -14,6 +14,9 @@ const STATUS_MAP: Record<string, [BadgeTone, string]> = {
   internal_only: ["neutral", "Internal only"], final_not_released: ["warning", "Final — not released"], awaiting_ack: ["warning", "Awaiting confirmation"],
   released: ["success", "Released"], linked: ["neutral", "Linked — no plan yet"],
   planned: ["neutral", "Planned"], ready_to_release: ["info", "Ready to release"], invited: ["info", "Invited"],
+  written_completed: ["success", "Written completed"], pending_test: ["info", "Pending test"],
+  pending_submission: ["warning", "Pending submission"], test_sent: ["info", "Test sent"],
+  pending_result_review: ["danger", "Pending result review"], waiting_result: ["neutral", "Waiting for result"],
 };
 
 export function StatusBadge({ status }: { status: string }) {
@@ -25,6 +28,7 @@ export function StatusBadge({ status }: { status: string }) {
 const TASK_TYPE_LABEL: Record<string, string> = {
   result_release: "Result release", evaluation_review: "Evaluation review", submission_issue: "Submission issue",
   reviewer_queue: "Reviewer queue", plan_review: "Plan review", delivery_recovery: "Delivery recovery",
+  invite_pending: "Invite pending", test_pending: "Test pending", submission_pending: "Submission pending",
 };
 export function taskTypeSource(type: string): string {
   return TASK_TYPE_LABEL[type] || type;

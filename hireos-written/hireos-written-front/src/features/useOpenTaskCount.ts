@@ -1,11 +1,10 @@
-import { TASKS } from "../data/fixtures";
 import { useStore } from "../store/StoreContext";
+import { taskCountsFor } from "../utils/writtenTasks";
 
 /** "My open tasks" — unique task_id assigned to the current user with status
- * open/in_progress/waiting (mirrors the prototype's taskCountsFor()). */
+ * open/in_progress/waiting, scoped to written-test tasks (mirrors the prototype's
+ * taskCountsFor(), which now filters through writtenTestTasks() rather than all tasks). */
 export function useOpenTaskCount(): number {
   const { state } = useStore();
-  return Object.values(TASKS).filter(
-    (task) => task.assignee === state.currentUser && (task.status === "open" || task.status === "in_progress" || task.status === "waiting"),
-  ).length;
+  return taskCountsFor(state.currentUser).open;
 }

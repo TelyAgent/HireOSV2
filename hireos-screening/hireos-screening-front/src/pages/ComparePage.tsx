@@ -74,10 +74,7 @@ function computeKeyDifferences(job: Job, members: Member[], lang: "en" | "zh"): 
         : `${names} ${insufficient.length > 1 ? "have" : "has"} insufficient evidence for an overall score — this reflects coverage, not a low score.`,
     );
   }
-  const notEvaluated = members.filter((m) => {
-    const a = db.assessments[m.app.id];
-    return !a || a.status !== "completed";
-  });
+  const notEvaluated = members.filter((m) => m.app.assessmentStatus !== "completed");
   if (notEvaluated.length) {
     const names = notEvaluated.map((m) => m.cand.displayName).join(", ");
     diffs.push(
@@ -212,9 +209,8 @@ function CompareMatrix({ job, members, diffOnly, onOpenEvidence }: { job: Job; m
     {
       label: t("Technical assessment (same stage)"),
       render: (m) => {
-        const a = db.assessments[m.app.id];
-        if (!a || a.status !== "completed") return <Badge tone="outline">{t("Not evaluated")}</Badge>;
-        return <Badge tone="success">{a.score}/100</Badge>;
+        if (m.app.assessmentStatus !== "completed") return <Badge tone="outline">{t("Not evaluated")}</Badge>;
+        return <Badge tone="success">{t("Completed")}</Badge>;
       },
     },
     {

@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useReducer, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { Modal, Input } from "antd";
 import { useStore } from "../store/StoreContext";
@@ -10,19 +10,30 @@ import {
 } from "../data/fixtures";
 import type { UserId } from "../store/types";
 
-export function ReleasePage() {
-  const { id: caseId = "" } = useParams();
+/**
+ * Ported from the prototype's pageRelease(caseId, opts). `inline` drops the breadcrumb/title (used
+ * inside the candidate detail page's "Evaluation result" tab); `onGoToPlan` lets the caller switch to
+ * the Plan tab instead of navigating away for "Add supplemental test".
+ *
+ * `result`/`evaluation`/`release` are read fresh from the shared RESULTS/EVALUATIONS/RELEASES module
+ * objects on every render rather than cached in useState — this tab is mounted at the same time as
+ * "Comprehensive evaluation", so when that sibling tab finalizes an evaluation (writing straight into
+ * those same module objects) this one picks the change up on its next render without a page reload.
+ * `forceTick` re-renders this component after a mutation *it* makes itself (publish, request revision).
+ */
+export function ReleaseContent({ caseId, inline = false, onGoToPlan }: { caseId: string; inline?: boolean; onGoToPlan?: () => void }) {
   const { t, say } = useStore();
   const navigate = useNavigate();
+  const [, forceTick] = useReducer((n: number) => n + 1, 0);
 
   const c = CASES[caseId];
-  const result = useMemo(() => Object.values(RESULTS).find((r) => r.caseId === caseId), [caseId]);
-  const [release, setRelease] = useState<Release | undefined>(() => Object.values(RELEASES).find((r) => r.caseId === caseId));
+  const result = Object.values(RESULTS).find((r) => r.caseId === caseId);
+  const release = Object.values(RELEASES).find((r) => r.caseId === caseId);
+
   const [chk1, setChk1] = useState(false);
   const [chk2, setChk2] = useState(false);
   const [revisionOpen, setRevisionOpen] = useState(false);
   const [revisionHint, setRevisionHint] = useState("Please revisit the variance analysis section with more detail on the root cause.");
-  const [nextAction, setNextAction] = useState<string | null>(null);
 
   if (!c || !result) return <EmptyState title="No finalized result for this case yet." />;
 
@@ -36,25 +47,36 @@ export function ReleasePage() {
       say("Both review and disclosure approval are required to publish.", { type: "danger" });
       return;
     }
+    const relId = `rel_${caseId}`;
     const rel: Release = {
-      id: `rel_${caseId}`, caseId, overall: result!.overall, showScore: disclosure === "score_and_summary",
+      id: relId, caseId, overall: result!.overall, showScore: disclosure === "score_and_summary",
       outcomeText: result!.overall >= 65 ? "Strong performance on this assessment." : "This assessment did not meet the bar for this role.",
       feedbackText: "Clear structure; accounting treatment mostly correct with one gap in variance analysis.",
       nextStepText: "HR will follow up with next steps.", publishedAt: new Date().toISOString(),
     };
-    setRelease(rel);
+    RELEASES[relId] = rel;
+    result!.status = "published";
+    result!.releaseId = relId;
+    c.status = "released";
+    forceTick();
     say("Result finalized and published. Candidate portal and notification queued.", { type: "success" });
   }
 
   function requestRevision() {
-    setNextAction("revision");
+    if (release) release.nextAction = "revision";
     setRevisionOpen(false);
+    forceTick();
     say("Revision round 1 created with a new invitation and candidate thread.", { type: "success" });
+  }
+
+  function goToPlan() {
+    if (onGoToPlan) onGoToPlan();
+    else navigate(`/cases/${caseId}/plan`);
   }
 
   return (
     <div>
-      <PageHeader title={`${cand.name} — ${t("Release")}`} crumbs={[{ label: "Assessments", href: "/assessments" }, { label: cand.name }]} />
+      {!inline && <PageHeader title={`${cand.name} — ${t("Release")}`} crumbs={[{ label: "Assessments", href: "/assessments" }, { label: cand.name }]} />}
 
       <div className="two-col">
         <div className="card card-pad">
@@ -104,13 +126,13 @@ export function ReleasePage() {
             <h4 style={{ marginBottom: 8 }}>{t("Next action")}</h4>
             <div className="tiny" style={{ marginBottom: 12 }}>{t("A proposal is prepared first; sending only happens after approval — sorting or comparing candidates never triggers a send.")}</div>
             <div className="flex gap-2 wrap" style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-              <Button disabled={!!nextAction} onClick={() => setRevisionOpen(true)}>{t("Request revision")}</Button>
-              <Button onClick={() => say("Question picker opened (demo).")}>{t("Add supplemental test")}</Button>
+              <Button disabled={!!release.nextAction} onClick={() => setRevisionOpen(true)}>{t("Request revision")}</Button>
+              <Button onClick={goToPlan}>{t("Add supplemental test")}</Button>
               <Button onClick={() => navigate(`/deliveries/del_${caseId}`)}>{t("Prepare Interview handoff")}</Button>
               <Button variant="ghost" onClick={() => say("Case placed on hold (demo).")}>{t("Hold")}</Button>
               <Button variant="ghost" onClick={() => say("Testing closed for this case (demo).")}>{t("Close testing")}</Button>
             </div>
-            {nextAction === "revision" && (
+            {release.nextAction === "revision" && (
               <div className="banner info" style={{ marginTop: 12 }}>
                 {t("Revision round")} 1 {t("requested — candidate has been notified.")}{" "}
                 <a style={{ cursor: "pointer" }} onClick={() => navigate(`/cases/${caseId}/revisions/1`)}>{t("Open revision workspace →")}</a>
@@ -133,4 +155,9 @@ export function ReleasePage() {
       </Modal>
     </div>
   );
+}
+
+export function ReleasePage() {
+  const { id: caseId = "" } = useParams();
+  return <ReleaseContent caseId={caseId} />;
 }

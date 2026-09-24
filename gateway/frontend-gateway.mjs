@@ -71,7 +71,8 @@ server.on('upgrade', (req, socket, head) => {
   proxy.ws(req, socket, head, { target: route.target });
 });
 
-server.listen(PORT, '127.0.0.1', () => {
-  console.log(`[frontend-gateway] listening on http://127.0.0.1:${PORT}`);
+const HOST = process.env.FRONTEND_GATEWAY_HOST || '127.0.0.1';
+server.listen(PORT, HOST, () => {
+  console.log(`[frontend-gateway] listening on http://${HOST}:${PORT}`);
   for (const r of ROUTES) console.log(`  ${r.prefix}/*  ->  ${r.target}${r.prefix}/*`);
 });

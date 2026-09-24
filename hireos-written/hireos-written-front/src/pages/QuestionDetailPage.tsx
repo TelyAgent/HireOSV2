@@ -104,7 +104,9 @@ export function QuestionDetailPage() {
               : `Fractions must sum to 100% (no double-counting). Current sum: ${Math.round(sum * 100)}%${sumOk ? " — OK." : " — will block publish."}`}
           </div>
           <div className="divider" style={{ margin: "16px 0" }} />
-          <div className="tiny"><b>{t("Internal answer key")}</b> {t("(Reviewer only):")} {q.rubricNote}</div>
+          {q.rubricNote && (
+            <div className="tiny"><b>{t("Internal answer key")}</b> {t("(Reviewer only):")} {q.rubricNote}</div>
+          )}
         </div>
       )}
 

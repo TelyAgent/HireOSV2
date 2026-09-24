@@ -1,5 +1,6 @@
 import { StrictMode, Component, type ReactNode, type ErrorInfo } from "react";
 import { createRoot } from "react-dom/client";
+import { ConfigProvider } from "antd";
 import { BrowserRouter } from "react-router-dom";
 import App from "./App";
 import { StoreProvider } from "./store/StoreContext";
@@ -40,12 +41,14 @@ class ErrorBoundary extends Component<{ children: ReactNode }, { error: Error | 
 
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
-    <StoreProvider>
-      <BrowserRouter basename={API_BASE_URL}>
-        <ErrorBoundary>
-          <App />
-        </ErrorBoundary>
-      </BrowserRouter>
-    </StoreProvider>
+    <ConfigProvider theme={{ token: { colorPrimary: "#0d9488", borderRadius: 6, fontFamily: "inherit" } }}>
+      <StoreProvider>
+        <BrowserRouter basename={API_BASE_URL}>
+          <ErrorBoundary>
+            <App />
+          </ErrorBoundary>
+        </BrowserRouter>
+      </StoreProvider>
+    </ConfigProvider>
   </StrictMode>,
 );

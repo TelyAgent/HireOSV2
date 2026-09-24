@@ -386,6 +386,7 @@ export const ZH: Record<string, string> = {
   "This role closed after the recommendation was generated. It can no longer be confirmed — dismiss it or check for a refreshed match.":
     "该职位在生成此推荐后已关闭。无法再确认此推荐 —— 请忽略该推荐，或查看是否有刷新后的匹配。",
   "Choose another role": "选择其他职位",
+  "Loading…": "加载中…",
   "Dismiss recommendation": "忽略该推荐",
   "Confirm job link": "确认职位关联",
   Dismiss: "忽略",
@@ -493,6 +494,7 @@ export const ZH: Record<string, string> = {
   "Run screening": "运行初筛",
   "Screening for": "初筛对象：",
   "Assessment:": "测评：",
+  "Assessment: completed": "测评：已完成",
   "Assessment: not administered": "测评：未安排",
   "Refresh & re-evaluate": "刷新并重新评估",
   "Candidate profile": "候选人档案",
@@ -817,6 +819,11 @@ export const ZH: Record<string, string> = {
   "This removes the saved connection. It doesn't affect anything already synced.": "这只会移除已保存的连接配置，不影响已经同步过的数据。",
   "Corporate mailbox removed": "企业邮箱已移除",
   "Could not remove this mailbox.": "无法移除该邮箱。",
+  "Remove candidate": "移除候选人",
+  "This permanently removes the candidate and their resume history from the library. This can't be undone.":
+    "这将永久删除该候选人及其简历库中的所有历史记录，且无法撤销。",
+  "Candidate removed from the library": "候选人已从简历库移除",
+  "Could not remove this candidate.": "无法移除该候选人。",
   Delete: "删除",
   "Provider:": "服务商：",
   "Inbound:": "收件：",

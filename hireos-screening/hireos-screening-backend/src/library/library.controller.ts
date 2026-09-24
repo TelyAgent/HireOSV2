@@ -1,4 +1,4 @@
-import { Controller, Get, Param, Post, Body, Query, Req, UseGuards } from '@nestjs/common';
+import { Controller, Delete, Get, HttpCode, Param, Post, Body, Query, Req, UseGuards } from '@nestjs/common';
 import { WorkspaceGuard, type Identity } from '../auth/workspace.guard';
 import { CandidatesService } from './candidates.service';
 import { LibraryService } from './library.service';
@@ -24,5 +24,11 @@ export class LibraryController {
   @Get('candidates/:id')
   get(@Req() req: { identity: Identity }, @Param('id') id: string) {
     return this.candidates.get(req.identity, id);
+  }
+
+  @Delete('candidates/:id')
+  @HttpCode(204)
+  remove(@Req() req: { identity: Identity }, @Param('id') id: string) {
+    return this.candidates.remove(req.identity, id);
   }
 }

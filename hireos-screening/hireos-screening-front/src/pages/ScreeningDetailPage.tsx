@@ -286,7 +286,6 @@ export function ScreeningDetailPage() {
   const candidate = getCandidate(application.candidateId)!;
   const job = getJob(application.jobId)!;
   const decision = db.decisions[application.id];
-  const assessment = db.assessments[application.id] || { status: "not_administered" as const };
   const humanAssessments = db.humanAssessments[application.id] || [];
 
   const handleRunScreening = async () => {
@@ -357,7 +356,7 @@ export function ScreeningDetailPage() {
         subtitle={
           <>
             {t("Screening for")} <Link to={`/jobs/${job.id}/screening`}>{job.title}</Link> · {t("Standard")} v{job.criteriaVersion} ·{" "}
-            {assessment.status === "completed" ? `${t("Assessment:")} ${assessment.score}/100` : t("Assessment: not administered")}
+            {application.assessmentStatus === "completed" ? t("Assessment: completed") : t("Assessment: not administered")}
           </>
         }
         crumbs={[{ label: t("Jobs"), href: "/jobs" }, { label: job.title, href: `/jobs/${job.id}/screening` }, { label: candidate.displayName }]}

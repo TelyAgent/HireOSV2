@@ -14,9 +14,7 @@ interface NavGroup { section: string | null; items: NavItem[] }
 const NAV_STANDALONE: NavGroup[] = [
   { section: null, items: [
     { href: "/tasks", label: "My Tasks", ic: "checklist" },
-    { href: "/assessments", label: "Assessments", ic: "work_outline" },
     { href: "/question-bank", label: "Question Bank", ic: "quiz" },
-    { href: "/comparisons", label: "Comparisons", ic: "compare_arrows" },
   ] },
   { section: "Workspace", items: [
     { href: "/files", label: "Files & Integrations", ic: "cloud_upload" },

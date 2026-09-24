@@ -87,6 +87,8 @@ button{ font-family:inherit; }
 /* ---------- Buttons ---------- */
 .btn{ display:inline-flex; align-items:center; gap:6px; font-size:var(--fs-sm); font-weight:500; padding:8px 18px; border-radius:6px; border:1px solid transparent; cursor:pointer; white-space:nowrap; line-height:1.2; transition:background .12s; }
 .btn .material-icons-o{ font-size:18px; }
+.btn .btn-spinner{ animation:spin .8s linear infinite; }
+@keyframes spin{ from{ transform:rotate(0deg);} to{ transform:rotate(360deg);} }
 .btn-primary{ background:var(--accent-600); color:#fff; }
 .btn-primary:hover{ background:var(--accent-700); }
 .btn-primary:disabled{ background:var(--neutral-bg); color:var(--text-tertiary); cursor:not-allowed; }

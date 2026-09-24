@@ -21,5 +21,3 @@ export interface CorporateMailbox {
   lastSyncedAt?: string | null;
   lastSyncMessageCount?: number | null;
 }
-
-export const CORPORATE_MAILBOXES: CorporateMailbox[] = [];

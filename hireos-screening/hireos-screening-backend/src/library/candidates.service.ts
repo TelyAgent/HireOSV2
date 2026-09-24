@@ -93,6 +93,29 @@ export class CandidatesService {
     return this.toFrontendCandidate(candidate.created, candidate.profile ?? undefined);
   }
 
+  async remove(identity: Identity, id: string) {
+    const candidate = await this.db.candidate.findFirst({
+      where: { id, workspaceId: identity.workspaceId },
+      include: { resumeVersions: { select: { materialId: true } } },
+    });
+    if (!candidate) throw new NotFoundException({ code: 'NOT_FOUND' });
+    // Deleting the Candidate only cascades ResumeVersion (the link row) -- Material is a
+    // workspace-wide, hash-deduped store (`Material_workspaceId_hash_key`) that outlives
+    // any one candidate by design, so it's untouched by that cascade. Left behind, its
+    // `hash`/`normalizedTextHash` keeps matching on re-upload and the new file gets
+    // flagged as a duplicate of a candidate that no longer exists. ResumeVersion.materialId
+    // is unique (one material has at most one resume version), so once the candidate (and
+    // its resume versions) are gone, every material here is guaranteed orphaned and safe
+    // to delete outright.
+    const materialIds = [...new Set(candidate.resumeVersions.map((version) => version.materialId))];
+    await this.db.$transaction(async (tx) => {
+      await tx.candidate.delete({ where: { id } });
+      if (materialIds.length > 0) {
+        await tx.material.deleteMany({ where: { id: { in: materialIds } } });
+      }
+    });
+  }
+
   async get(identity: Identity, id: string) {
     const candidate = await this.db.candidate.findFirst({
       where: { id, workspaceId: identity.workspaceId },
