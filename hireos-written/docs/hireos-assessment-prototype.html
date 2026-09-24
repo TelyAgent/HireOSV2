@@ -23,8 +23,8 @@ html { -webkit-text-size-adjust: 100%; }
   --control-h: 34px; --row-h: 48px;
   --appbar-h: 56px; --banner-h: 34px; --sidebar-w: 52px; --sidebar-w-collapsed: 52px;
 
-  --canvas: #eef2f6; --surface: #ffffff; --surface-raised: #ffffff; --surface-alt: #f8fafc;
-  --text-primary: #111827; --text-secondary: #4b5563; --text-tertiary: #9ca3af;
+  --canvas: #eef2f6; --surface: #ffffff; --surface-raised: #ffffff; --surface-alt: #f8fafc; --surface-2: var(--surface-alt);
+  --text-primary: #111827; --text-secondary: #4b5563; --text-tertiary: #9ca3af; --muted: var(--text-secondary); --ink:#111827;
   --border: #e5e7eb; --border-strong: #d1d5db;
   --accent-50:#ccfbf1; --accent-100:#99f6e4; --accent-300:#5eead4; --accent-500:#0d9488; --accent-600:#0d9488; --accent-700:#0f766e;
   --accent: var(--accent-600); --accent-contrast: #ffffff; --accent-hover: var(--accent-700); --selected-surface: #ccfbf1;
@@ -40,7 +40,7 @@ html { -webkit-text-size-adjust: 100%; }
 
 html[data-app-theme="dark"]{
   --canvas:#0f172a; --surface:#1e293b; --surface-raised:#1e293b; --surface-alt:#0f172a;
-  --text-primary:#f8fafc; --text-secondary:#d6deea; --text-tertiary:#aab8ca;
+  --text-primary:#f8fafc; --text-secondary:#d6deea; --text-tertiary:#aab8ca; --muted:var(--text-secondary); --ink:#020617; --selected-surface:#123f39;
   --border:#334155; --border-strong:#475569;
   --accent-50:#123f39; --accent-100:#155e57;
   --success:#6ee7b7; --success-bg:rgba(16,185,129,.18); --success-border:#14532d;
@@ -54,7 +54,7 @@ html[data-app-theme="dark"]{
 }
 html[data-app-theme="deep"]{
   --canvas:#0a0f1f; --surface:#16213a; --surface-raised:#16213a; --surface-alt:#0b1526;
-  --text-primary:#f8fafc; --text-secondary:#d6deea; --text-tertiary:#aab8ca;
+  --text-primary:#f8fafc; --text-secondary:#d6deea; --text-tertiary:#aab8ca; --muted:var(--text-secondary); --ink:#020617; --selected-surface:#123f39;
   --border:#334155; --border-strong:#475569;
   --accent-50:#123f39; --accent-100:#155e57;
   --success:#6ee7b7; --success-bg:rgba(16,185,129,.18); --success-border:#14532d;
@@ -66,16 +66,17 @@ html[data-app-theme="deep"]{
   --focus-ring: 0 0 0 2px var(--surface), 0 0 0 4px rgba(94,234,212,.5);
   --scrim: rgba(0,0,0,.6);
 }
+html[data-app-theme="dark"], html[data-app-theme="deep"]{ color-scheme:dark; }
 
 /* Accent options — success/warning/danger never overridden by accent.
    Note: --accent/--accent-hover/--selected-surface (declared once, above)
    resolve dynamically off --accent-600/700/50, so they follow these overrides. */
 html[data-accent="teal"]{ --accent-50:#ccfbf1; --accent-100:#99f6e4; --accent-300:#5eead4; --accent-500:#0d9488; --accent-600:#0d9488; --accent-700:#0f766e; --selected-surface:#ccfbf1; }
 html[data-accent="teal"][data-app-theme="dark"],
-html[data-accent="teal"][data-app-theme="deep"]{ --accent-50:#0F2B28; --accent-100:#123F39; --accent-700:#99f6e4; }
+html[data-accent="teal"][data-app-theme="deep"]{ --accent-50:#0F2B28; --accent-100:#123F39; --accent-700:#99f6e4; --selected-surface:#0F2B28; }
 html[data-accent="violet"]{ --accent-50:#F0E9FB; --accent-100:#DCCBF5; --accent-300:#AF86E0; --accent-500:#7C4DCF; --accent-600:#6A3FB8; --accent-700:#5A349E; }
 html[data-accent="violet"][data-app-theme="dark"],
-html[data-accent="violet"][data-app-theme="deep"]{ --accent-50:#241A35; --accent-100:#2F2247; --accent-700:#DCCBF5; }
+html[data-accent="violet"][data-app-theme="deep"]{ --accent-50:#241A35; --accent-100:#2F2247; --accent-700:#DCCBF5; --selected-surface:#241A35; }
 
 /* Text size — Small/Medium/Large */
 html[data-text-size="small"]{ --text-base:12px; }
@@ -150,7 +151,36 @@ button{ font-family:inherit; }
 }
 textarea.input{ height:auto; padding:var(--space-3); resize:vertical; }
 .input:focus{ border-color:var(--accent); }
+.input::placeholder{ color:var(--text-tertiary); opacity:1; }
+select.input option{ background:var(--surface); color:var(--text-primary); }
+html[data-app-theme="dark"] .input,
+html[data-app-theme="dark"] select.input,
+html[data-app-theme="dark"] textarea.input{ background:#162338; border-color:#526581; }
+html[data-app-theme="deep"] .input,
+html[data-app-theme="deep"] select.input,
+html[data-app-theme="deep"] textarea.input{ background:#111d34; border-color:#526581; }
+html[data-app-theme="dark"] .input:focus,
+html[data-app-theme="deep"] .input:focus{ border-color:var(--accent-300); }
+html[data-app-theme="dark"] .ai-panel{ background:#253248; border-color:#526581; }
+html[data-app-theme="deep"] .ai-panel{ background:#202d43; border-color:#526581; }
+html[data-app-theme="dark"] select.input,
+html[data-app-theme="deep"] select.input,
+html[data-app-theme="dark"] input,
+html[data-app-theme="deep"] input,
+html[data-app-theme="dark"] textarea,
+html[data-app-theme="deep"] textarea{ color-scheme:dark; }
 .checkbox-row{ display:flex; align-items:center; gap:var(--space-2); }
+
+.segmented-control{ display:inline-flex; gap:2px; padding:3px; background:var(--surface-alt); border:1px solid var(--border); border-radius:12px; }
+.segmented-control .btn{ border:none; background:transparent; color:var(--text-secondary); border-radius:9px; box-shadow:none; }
+.segmented-control .btn:hover{ background:var(--surface); color:var(--text-primary); }
+.segmented-control .btn.primary{ background:var(--surface); color:var(--text-primary); box-shadow:var(--shadow-1); }
+.segmented-control .btn.ai-toggle{ color:var(--accent-700); }
+.segmented-control .btn.ai-toggle.primary{ background:linear-gradient(135deg,var(--accent-500),var(--accent-700)); color:var(--accent-contrast); }
+.ai-panel{ background:var(--surface-alt); border:1px solid var(--border-strong); border-radius:var(--radius-card); padding:16px; }
+.ai-suggest-chip{ display:block; width:100%; text-align:left; padding:10px 12px; border:1px solid var(--border); border-radius:10px; background:var(--surface); cursor:pointer; font-size:12.5px; line-height:1.5; color:var(--text-primary); margin-bottom:8px; transition:border-color .12s ease, background .12s ease; }
+.ai-suggest-chip:hover{ border-color:var(--accent); background:var(--selected-surface); }
+.ai-suggest-chip:last-child{ margin-bottom:0; }
 
 /* Surfaces */
 .card{ background:var(--surface); border:1px solid var(--border); border-radius:var(--radius-card); }
@@ -302,7 +332,7 @@ html[data-app-theme="dark"] .role-pill:hover, html[data-app-theme="deep"] .role-
 
 /* Toast (state-changing confirmations, not fake) — bottom-center, dark chip, matches reference */
 #toastHost{ position:fixed; bottom:24px; left:50%; transform:translateX(-50%); z-index:300; display:flex; flex-direction:column; gap:8px; align-items:center; }
-.toast{ background:var(--text-primary); color:var(--surface); box-shadow:var(--shadow-2); border-radius:12px; padding:12px 16px; font-size:12.5px; display:flex; align-items:center; gap:14px; min-width:280px; max-width:520px; animation:toastIn .16s ease; }
+.toast{ background:var(--text-primary); color:#fff; box-shadow:var(--shadow-2); border-radius:12px; padding:12px 16px; font-size:12.5px; display:flex; align-items:center; gap:14px; min-width:280px; max-width:520px; animation:toastIn .16s ease; }
 html[data-app-theme="dark"] .toast, html[data-app-theme="deep"] .toast{ background:#484C50; }
 .toast.success{ background:#137333; }
 .toast.danger{ background:#C5221F; }
@@ -409,7 +439,8 @@ function freshSeed(){
         user_candidate_riley:{ id:"user_candidate_riley", candidateId:null, verified:false },
         user_candidate_devon:{ id:"user_candidate_devon", candidateId:"core_candidate_devon", verified:true },
         user_candidate_harper:{ id:"user_candidate_harper", candidateId:"core_candidate_harper", verified:true },
-        user_candidate_casey_chan:{ id:"user_candidate_casey_chan", candidateId:"core_candidate_casey_chan", verified:false }
+        user_candidate_casey_chan:{ id:"user_candidate_casey_chan", candidateId:"core_candidate_casey_chan", verified:false },
+        user_candidate_elena:{ id:"user_candidate_elena", candidateId:"core_candidate_elena", verified:true }
       }
     },
     core:{
@@ -420,7 +451,8 @@ function freshSeed(){
         core_candidate_d:{ id:"core_candidate_d", name:"Taylor Brooks", email:"taylor.brooks@example.com", userId:"user_candidate_d", profileVersion:"v2", profileNote:"Profile updated to v2 after assessment; scoring still references v1 input." },
         core_candidate_devon:{ id:"core_candidate_devon", name:"Devon Ruiz", email:"devon.ruiz@example.com", userId:"user_candidate_devon", profileVersion:"v1" },
         core_candidate_harper:{ id:"core_candidate_harper", name:"Harper Diaz", email:"harper.diaz@example.com", userId:"user_candidate_harper", profileVersion:"v1" },
-        core_candidate_casey_chan:{ id:"core_candidate_casey_chan", name:"Casey Chan", email:"casey.chan@example.com", userId:"user_candidate_casey_chan", profileVersion:"v1", profileNote:"Distinct applicant from Casey Chen (case_c) — verified by email; do not merge." },
+        core_candidate_casey_chan:{ id:"core_candidate_casey_chan", name:"Sofia Bianchi", email:"sofia.bianchi@example.com", userId:"user_candidate_casey_chan", profileVersion:"v1" },
+        core_candidate_elena:{ id:"core_candidate_elena", name:"Elena Cruz", email:"elena.cruz@example.com", userId:"user_candidate_elena", profileVersion:"v1" },
         core_candidate_riley:null
       },
       jobs:{
@@ -443,7 +475,8 @@ function freshSeed(){
         application_d:{ id:"application_d", candidateId:"core_candidate_d", jobId:"core_job_fin", cycleId:"cycle_fin_01", status:"active" },
         application_devon:{ id:"application_devon", candidateId:"core_candidate_devon", jobId:"core_job_fin", cycleId:"cycle_fin_01", status:"active" },
         application_harper:{ id:"application_harper", candidateId:"core_candidate_harper", jobId:"core_job_fin", cycleId:"cycle_fin_01", status:"active" },
-        application_casey_chan:{ id:"application_casey_chan", candidateId:"core_candidate_casey_chan", jobId:"core_job_fin", cycleId:"cycle_fin_01", status:"active" }
+        application_casey_chan:{ id:"application_casey_chan", candidateId:"core_candidate_casey_chan", jobId:"core_job_fin", cycleId:"cycle_fin_01", status:"active" },
+        application_elena:{ id:"application_elena", candidateId:"core_candidate_elena", jobId:"core_job_fin", cycleId:"cycle_fin_01", status:"active" }
       },
       files:{
         core_file_001:{ id:"core_file_001", name:"alex_morgan_submission.zip", versions:[{ver:1,status:"ready",size:"2.1 MB",checksum:"a1c9…44f"}] },
@@ -532,9 +565,12 @@ function freshSeed(){
           { id:"round_case_harper_1", position:1, title:"Round 1 — FIN-001 (required)", planItemIds:["pi_harper1"], releaseCondition:"manual", deadlineAt:"2026-09-05T23:59:00Z", status:"completed" },
           { id:"round_case_harper_2", position:2, title:"Round 2 — FIN-002 (optional follow-up)", planItemIds:["pi_harper2"], releaseCondition:"after_previous_review", dependsOnRoundIds:["round_case_harper_1"], deadlineAt:"2026-09-16T23:59:00Z", status:"invited" }
         ] },
-      case_casey_chan:{ id:"case_casey_chan", candidateId:"core_candidate_casey_chan", applicationId:"application_casey_chan", label:"Casey Chan — Finance Operations Analyst", planItems:[], status:"linked",
+      case_casey_chan:{ id:"case_casey_chan", candidateId:"core_candidate_casey_chan", applicationId:"application_casey_chan", label:"Sofia Bianchi — Finance Operations Analyst", planItems:[], status:"linked",
         ownership:{ hrOwner:"user_john", hiringManager:"user_daniel", reviewAssignee:null }, roundMode:"single",
         rounds:[{ id:"round_case_casey_chan_1", position:1, title:"Round 1", planItemIds:[], releaseCondition:"manual", deadlineAt:null, status:"planned" }] },
+      case_elena:{ id:"case_elena", candidateId:"core_candidate_elena", applicationId:"application_elena", label:"Elena Cruz — Finance Operations Analyst", planItems:["pi_elena1"], status:"linked",
+        ownership:{ hrOwner:"user_john", hiringManager:"user_daniel", reviewAssignee:null }, roundMode:"single",
+        rounds:[{ id:"round_case_elena_1", position:1, title:"Round 1", planItemIds:["pi_elena1"], releaseCondition:"manual", deadlineAt:null, status:"planned" }] },
       case_riley:null
     },
     // ScreeningSelectionContext (Interface Spec §13): candidates Screening already matched and
@@ -551,7 +587,8 @@ function freshSeed(){
       pi_d1:{ id:"pi_d1", caseId:"case_d", questionId:"q_fin001", kind:"required", status:"submitted" },
       pi_devon1:{ id:"pi_devon1", caseId:"case_devon", questionId:"q_fin001", kind:"required", status:"completed" },
       pi_harper1:{ id:"pi_harper1", caseId:"case_harper", questionId:"q_fin001", kind:"required", status:"completed" },
-      pi_harper2:{ id:"pi_harper2", caseId:"case_harper", questionId:"q_fin002", kind:"optional", status:"awaiting_submission" }
+      pi_harper2:{ id:"pi_harper2", caseId:"case_harper", questionId:"q_fin002", kind:"optional", status:"awaiting_submission" },
+      pi_elena1:{ id:"pi_elena1", caseId:"case_elena", questionId:"q_fin001", kind:"required", status:"planned" }
     },
     invitations:{
       inv_a:{ id:"inv_a", caseId:"case_a", questionIds:["q_fin001"], mode:"timed", durationMin:90, deadline:"2026-08-20T23:59:00Z", status:"submitted", acceptedAt:"2026-08-14T09:12:00Z", startedAt:"2026-08-14T09:15:00Z", disclosurePolicy:"score_and_summary" },
@@ -622,13 +659,15 @@ function freshSeed(){
       mail_4:{ id:"mail_4", from:"unknown.sender@example.com", subject:"invoice_macro_enabled.xlsm", receivedAt:"2026-09-11T06:40:00Z", authStatus:"failed", threadStatus:"No thread match — quarantined", matchReason:"Sender authentication failed; macro-enabled attachment", classification:"quarantined", caseId:null, attachments:["invoice_macro_enabled.xlsm"] }
     },
     tasks:{
-      t1:{ id:"t1", title:"Publish Alex Morgan's result", type:"result_release", assignee:"user_john", status:"open", dueAt:"2026-09-11T10:00:00Z", link:"#/results/case_a/release", sourceRef:"case_a" },
+      t1:{ id:"t1", title:"Publish Alex Morgan's result", type:"result_release", assignee:"user_john", status:"completed", dueAt:"2026-09-11T10:00:00Z", link:"#/results/case_a/release", sourceRef:"case_a" },
       t2:{ id:"t2", title:"Review Taylor Brooks' AI draft evaluation", type:"evaluation_review", assignee:"user_daniel", status:"open", dueAt:"2026-09-11T15:00:00Z", link:"#/attempts/att_d/review", sourceRef:"case_d" },
       t3:{ id:"t3", title:"Casey Chen — missing required deliverable", type:"submission_issue", assignee:"user_john", status:"waiting", waitingReason:"Requested missing workbook from candidate", waitingUntil:"2026-09-13T23:59:00Z", dueAt:"2026-09-13T23:59:00Z", link:"#/submissions", sourceRef:"case_c" },
       t4:{ id:"t4", title:"Publish Private Markets Portfolio NAV & Valuation Case (FIN-008 v2)", type:"reviewer_queue", assignee:null, queue:"question_review", status:"open", dueAt:"2026-09-12T18:00:00Z", link:"#/questions/q_fin008", sourceRef:"q_fin008" },
       t5:{ id:"t5", title:"Review Finance Operations plan draft", type:"plan_review", assignee:"user_john", status:"in_progress", dueAt:"2026-09-11T18:00:00Z", link:"#/projects/prj_fin", sourceRef:"prj_fin" },
       t6:{ id:"t6", title:"Restore delayed Interview handoff delivery", type:"delivery_recovery", assignee:"user_morgan", status:"completed", dueAt:"2026-09-10T12:00:00Z", link:"#/deliveries/del_1", sourceRef:"del_1" },
-      t7:{ id:"t7", title:"Confirm Casey Chan is not a duplicate of Casey Chen (case_c)", type:"duplicate_check", assignee:"user_john", status:"completed", dueAt:"2026-09-11T07:00:00Z", link:"#/assessments/prj_fin", sourceRef:"case_casey_chan" }
+      t7:{ id:"t7", title:"Sofia Bianchi — written test not started", type:"test_pending", assignee:"user_john", status:"open", dueAt:"2026-09-18T23:59:00Z", link:"#/cases/case_casey_chan/plan", sourceRef:"case_casey_chan" },
+      t8:{ id:"t8", title:"Jordan Lee — awaiting written test submission", type:"submission_pending", assignee:"user_john", status:"open", dueAt:"2026-09-18T23:59:00Z", link:"#/cases/case_b/plan", sourceRef:"case_b" },
+      t9:{ id:"t9", title:"Elena Cruz — plan ready, test not yet sent", type:"invite_pending", assignee:"user_john", status:"open", dueAt:"2026-09-20T23:59:00Z", link:"#/cases/case_elena/plan", sourceRef:"case_elena" }
     },
     deliveries:{
       del_1:{ id:"del_1", caseId:"case_a", target:"Interview", status:"awaiting_ack", timeline:[
@@ -651,7 +690,7 @@ function freshSeed(){
     },
     activity:[
       { at:"2026-09-11T07:40:00Z", text:"Daniel Park reviewed Question Bank entry FIN-008 and flagged competency weights for redistribution." },
-      { at:"2026-09-11T07:10:00Z", text:"John confirmed Casey Chan is a distinct applicant from Casey Chen (case_c) — verified by email; records will not be merged." },
+      { at:"2026-09-11T07:10:00Z", text:"John linked Sofia Bianchi to the Finance Operations Analyst role; written test not yet sent." },
       { at:"2026-09-10T16:20:00Z", text:"Submission Inbox received Casey Chen's reply — missing 1 required deliverable." },
       { at:"2026-09-09T19:05:00Z", text:"Taylor Brooks submitted FIN-001 (round 1)." },
       { at:"2026-09-08T14:02:00Z", text:"Jordan Lee accepted invitation (deadline-only)." },
@@ -701,7 +740,9 @@ function freshSeed(){
   };
 }
 
-const STORAGE_KEY = "hireos_assessment_prototype_v9";
+// Bump the demo storage namespace when the seed shape changes so an older
+// browser session cannot hide newly added candidate task states.
+const STORAGE_KEY = "hireos_assessment_prototype_v11";
 let DB = null;
 try{
   const raw = localStorage.getItem(STORAGE_KEY);
@@ -765,6 +806,7 @@ const I18N_ZH = {
   "Awaiting submission":"待提交", "Submission issues":"提交异常", "Results to release":"待发布结果",
   "Delivery issues":"交付问题", "Unavailable":"不可用", "More statistics":"更多统计", "Tasks":"任务",
   "Assigned to me":"分配给我", "Team Tasks":"团队任务", "Created or followed":"由我创建或关注",
+  "All tasks":"全部任务", "Task list":"任务列表", "Cluster by JD":"按岗位聚合", "Role & project":"岗位与项目", "Link candidate":"关联候选人", "candidates":"位候选人", "Candidate":"候选人", "Round":"轮次", "Job":"岗位", "Task":"任务", "Status":"状态", "Progress":"进度", "Created":"创建时间", "Actions":"操作", "Resume":"简历", "View resume":"简历", "Candidate resume":"候选人简历", "Assessment result":"测评结果", "Target role":"目标岗位", "Professional summary":"职业概述", "Experience":"工作经历", "Core skills":"核心技能", "Education":"教育背景", "Resume preview is linked to the shared candidate record.":"简历预览来自共享候选人档案。", "No result has been returned yet.":"尚未返回测评结果。", "Waiting for input":"等待输入", "Written completed":"已完成", "Pending test":"待测试", "Pending submission":"待提交", "Test sent":"已发送测试", "Pending result review":"待审核结果", "Waiting for result":"等待返回结果", "Invite pending":"待发送邀请",
   "Completed":"已完成", "Nothing here.":"暂无内容。", "No action cards for you right now.":"当前没有需要你处理的事项。",
   "Claim":"认领", "Start":"开始", "Wait":"等待", "Resume":"继续", "Open →":"打开 →", "Due":"截止",
   "Waiting:":"等待原因：", "Source:":"来源：", "Assigned to":"负责人：", "Last handled by":"最近处理人：",
@@ -839,7 +881,7 @@ const I18N_ZH = {
   "Draft a project from this JD":"根据此职位描述创建项目草稿",
 
   "Project not found.":"未找到该项目。",
-  "Compare candidates":"候选人对比", "Select from screened candidates":"从已初筛候选人中选取", "Add candidate":"添加候选人",
+  "Compare candidates":"候选人对比", "Select from screened candidates":"从已初筛候选人中选取", "Add candidate":"添加候选人", "No scored candidates to compare yet.":"暂无已评分的候选人可供对比。",
   "Required case FIN-001 · Optional FIN-002 · Secondary role mapping demo via FIN-004/FIN-008 (Strategic Investment Associate)":
     "必修案例 FIN-001 · 选修 FIN-002 · 次要岗位映射演示：FIN-004/FIN-008（Strategic Investment Associate）",
   "Candidate":"候选人", "Application":"申请", "Plan":"方案", "Score":"分数",
@@ -863,7 +905,7 @@ const I18N_ZH = {
   "Screening:":"初筛结果：", "screened":"初筛于",
   "Create assessment plan":"创建测评方案", "Select at least one candidate first.":"请先至少选择一位候选人。",
 
-  "Case not found.":"未找到该案例。", "'s plan":"的方案",
+  "Case not found.":"未找到该案例。", "'s plan":"的方案", "Candidate detail":"候选人详情", "Assessment plan":"测评计划", "Submission":"提交内容", "Evaluation result":"评估结果", "Overall score":"总分", "No submission received yet.":"尚未收到提交内容。", "No file attached":"未附加文件", "AI draft":"AI 草稿",
   "Confirm the candidate's role link first — invitations for a formal role assessment require a confirmed Application.":
     "请先确认候选人的岗位关联 —— 正式岗位测评邀请需要已确认的申请记录。",
   "Answers uploaded — awaiting candidate submission. The attempt is still in progress and has not been scored; HR owner and Hiring manager were notified.":
@@ -875,6 +917,7 @@ const I18N_ZH = {
     "尚未设置 HR 负责人或用人经理 —— 这不会阻止发送；发起人将作为默认联系人。",
   "Plan structure":"方案结构", "Single round":"单轮次", "Multiple rounds":"多轮次",
   "+ Add round":"+ 添加轮次",
+  "Complete the previous round before adding another round.":"完成上一轮后才能添加新轮次。",
   "Release condition":"发布条件", "Manual release":"手动发布",
   "After previous round is submitted":"上一轮提交后", "After previous round is reviewed":"上一轮评审完成后",
   "Round 1 has no previous round to depend on.":"第 1 轮没有可依赖的上一轮。",
@@ -934,14 +977,33 @@ const I18N_ZH = {
 
   "Attempt not found.":"未找到该次作答。", "round":"第", "Processed":"处理时间",
   "Original archive":"原始压缩包", "Received":"已收到",
-  "Identity & round match":"身份与轮次匹配", "Candidate:":"候选人：", "Round:":"轮次：",
+  "Identity & round match":"身份与轮次匹配", "Candidate:":"候选人：", "Round:":"轮次：", "Deliverable files":"交付物文件", "Comprehensive evaluation":"综合评估",
+  "Assessment setup":"评测设置", "Confirm the verification goal, owner and the candidate's submission deadline.":"确认验证目标、负责人和候选人提交截止时间。",
+  "Verification goal":"验证目标", "Verify whether the candidate can demonstrate, through this role assessment:":"通过岗位评测验证候选人是否体现：",
+  "role capability —":"岗位能力边界 ——", "role's core capability and delivery level.":"岗位所需的核心能力与交付水平。",
+  "Owner":"负责人", "Submission deadline":"提交截止时间", "Test question":"测试题目",
+  "From Question Bank":"从题库选择", "AI-generated":"AI 生成", "— Select a preset question —":"— 选择预设题目 —",
+  "Approved v1; edits below only apply to this candidate's draft and never change the role preset.":"已批准 v1；下方修改仅作用于当前候选人草稿，不会影响岗位预设。",
+  "Test focus":"测试重点", "e.g. Focus on RAG retrieval-quality judgment and Figma-based deliverable production":"例如：侧重 RAG 检索质量判断与 Figma 交付物产出",
+  "Generate question with AI":"AI 生成题目", "Generating…":"生成中…", "Enter a test focus first.":"请先填写测试重点。",
+  "AI has generated the question content.":"AI 已生成题目内容。", "Question content":"题目内容", "Scoring rubric":"评分标准", "Based on":"基于", "adjustable for this candidate only":"仅可为当前候选人调整",
+  "Select a preset question, or generate one with AI, to see its content here.":"选择预设题目，或用 AI 生成后，题目内容会显示在这里。",
+  "Confirming freezes this into a pending-send version; it is not sent to the candidate immediately.":"确认后冻结为待发送版本，不会立即发送给候选人。",
+  "Confirm and send to candidate":"确定并发送给候选人", "Set a test question first":"请先设置测试题目",
+  "Assessment questions":"测评题目", "No assessment questions yet. Click \"Add assessment question\" to get started.":"暂无测评题目，点击「添加测评题目」开始。",
+  "Send to candidate":"发送给候选人", "Edit question":"编辑题目", "Delete question":"删除题目", "Save changes":"保存修改", "Question updated.":"题目已更新。", "Question deleted.":"题目已删除。", "Editing applies only to this candidate's pending assessment version.":"编辑仅作用于当前候选人的待发送测评版本。", "Add assessment question":"添加测评题目", "Generate assessment question":"生成测评题目",
+  "Confirm generate":"确认生成", "Select a preset question first.":"请先选择预设题目。", "Cancel":"取消",
+  "Tell me which capability you'd like to focus on testing.":"请告诉我你想侧重测试哪部分能力。",
+  "Based on this role's requirements, consider focusing on:":"根据该岗位要求，建议你可以重点测试这些能力：",
+  "Written test question and scoring rubric generated.":"笔试题目及评分标准已生成。",
+  "Already sent to this candidate.":"已发送给该候选人。", "Confirm send":"确认发送", "Set a deadline first.":"请先设置截止时间。", "Invitation sent to candidate.":"已发送给候选人。",
   "Task binding: confirmed":"任务绑定：已确认",
   "Go to evaluation →":"前往评估 →",
 
   "No evaluation yet for":"尚无评估：", "Back to Submission Inbox":"返回提交收件箱",
   "This submission is incomplete — resolve the missing deliverable before scoring.":"该提交尚不完整 —— 请先补齐缺失的交付物再评分。",
   "Evidence has not finished processing.":"证据尚未处理完成。",
-  "evaluation":"评估", "Overall (human)":"总分（人工）", "Any missing required criterion → Unknown":"任一必评项缺失 → 未知",
+  "evaluation":"评估", "Overall (human)":"总分（人工）", "Any missing required criterion → Unknown":"任一必评项缺失 → 未知", "Finalizing locks the human scores and creates a result ready for release.":"定稿会锁定人工评分，并生成可发布的评估结果。", "Confirm finalize":"确认定稿", "Final result":"定稿结果", "View final result":"查看定稿结果",
   "Overall (AI)":"总分（AI）", "Draft only, not a hiring probability":"仅为草拟分数，非录用概率",
   "Coverage / Confidence":"覆盖度 / 置信度", "Full":"完整", "Partial":"部分", "Shown separately from score":"与分数分开展示",
   "Criteria":"评分项", "max":"满分", "Human":"人工", "Confidence:":"置信度：", "Coverage:":"覆盖度：",
@@ -970,6 +1032,7 @@ const I18N_ZH = {
     "系统会先准备好方案；只有获批后才会发送 —— 排序或对比候选人本身不会触发发送。",
   "Request revision":"请求修改", "Add supplemental test":"添加补充测试",
   "Prepare Interview handoff":"准备面试交接", "Hold":"暂缓", "Close testing":"结束测评",
+  "On hold":"暂缓", "Testing closed":"结束测评",
   "Revision round":"修改轮次", "requested — candidate has been notified.":"已发起 —— 候选人已收到通知。",
   "Open revision workspace →":"打开修改工作区 →",
   "Feedback shown to candidate":"展示给候选人的反馈", "New deadline":"新截止时间",
@@ -1103,9 +1166,52 @@ function currentRoundId(caseId){
   return (notDone || rounds[rounds.length-1]).id;
 }
 function taskCountsFor(userId){
-  const all = Object.values(DB.tasks).filter(t=>t.assignee===userId);
+  const all = writtenTestTasks().filter(t=>t.assignee===userId);
   const open = all.filter(t=>["open","in_progress","waiting"].includes(t.status)).length;
   return { open, total: all.length };
+}
+function isWrittenTestTask(task){
+  // Written Test tasks always resolve to a candidate Case. Workspace-only tasks
+  // such as plan drafts, question publishing and interview handoff are excluded.
+  return !!(task && task.sourceRef && DB.cases[task.sourceRef]);
+}
+function writtenTestTasks(){ return Object.values(DB.tasks).filter(isWrittenTestTask); }
+function writtenTaskStatus(task){
+  const c = task && task.sourceRef ? DB.cases[task.sourceRef] : null;
+  const invitations = c ? Object.values(DB.invitations).filter(i=>i.caseId===c.id) : [];
+  const latestInvite = invitations[invitations.length-1];
+  const result = c ? Object.values(DB.results).find(r=>r.caseId===c.id) : null;
+  const submitted = !!(latestInvite && latestInvite.status==="submitted") || !!(c && c.rounds && c.rounds.some(r=>r.status==="submitted")) || !!(c && c.status==="submitted");
+  if(c && c.supplementalPending) return "pending_submission";
+  if(task.status === "completed" || (c && ["completed","released"].includes(c.status))) return "written_completed";
+  if(task.type === "evaluation_review" || task.type === "result_release" || (c && ["review_pending","evaluated"].includes(c.status))) return "pending_result_review";
+  if(submitted && !result) return "waiting_result";
+  if((latestInvite && ["accepted","started"].includes(latestInvite.status)) || (c && ["awaiting_submission","started"].includes(c.status))) return "pending_submission";
+  if((latestInvite && ["sent","opened"].includes(latestInvite.status)) || (c && c.status === "invited")) return "test_sent";
+  return "pending_test";
+}
+function openCandidateResume(candidate, job){
+  openDrawer((close)=>{
+    const d=el(`<div class="flex-col" style="height:100%"></div>`);
+    d.appendChild(el(`<div class="overlay-head"><div><h3>${esc(t("Candidate resume"))}</h3><div class="tiny">${esc(candidate.name)}</div></div><div class="icon-btn"><span class="material-icons-o">close</span></div></div>`));
+    qs(".icon-btn",d).onclick=close;
+    const body=el(`<div class="overlay-body flex-col gap-3"></div>`);
+    body.appendChild(el(`<div class="card card-pad"><div class="flex items-center gap-3"><div class="avatar" style="width:48px;height:48px">${esc(candidate.name.split(/\s+/).map(x=>x[0]).join("").slice(0,2))}</div><div><h3>${esc(candidate.name)}</h3><div class="muted">${esc(candidate.email)}</div></div></div></div>`));
+    body.appendChild(el(`<div class="card card-pad"><div class="tiny">${esc(t("Target role"))}</div><b>${esc(job.title)}</b><div class="tiny" style="margin-top:8px">Profile ${esc(candidate.profileVersion||"v1")}</div></div>`));
+    const resumeSections = [
+      {title:"Professional summary", body:`${candidate.name} is being assessed for the ${job.title} role. The structured profile is ready for recruiter and reviewer use.`},
+      {title:"Experience", body:`Relevant experience aligned to ${job.title}; verify detailed employment dates and achievements against the source resume before making a decision.`},
+      {title:"Core skills", body:"Written communication · Problem solving · Role-specific analysis · Stakeholder collaboration"},
+      {title:"Education", body:"Education history is available in the candidate profile record."}
+    ];
+    resumeSections.forEach(section=>body.appendChild(el(`<div class="card card-pad"><h4 style="margin-bottom:6px">${esc(t(section.title))}</h4><div class="muted" style="line-height:1.55">${esc(section.body)}</div></div>`)));
+    const caseEntry=Object.values(DB.cases).find(c=>c.candidateId===candidate.id);
+    const result=caseEntry && Object.values(DB.results).find(r=>r.caseId===caseEntry.id);
+    body.appendChild(el(`<div class="card card-pad"><div class="tiny">${esc(t("Assessment result"))}</div><div style="font-size:28px;font-weight:700;margin-top:6px">${result && result.overall!=null ? esc(result.overall)+" / 100" : esc(t("Waiting for result"))}</div><div class="tiny" style="margin-top:6px">${result ? esc(result.status) : esc(t("No result has been returned yet."))}</div></div>`));
+    if(candidate.profileNote) body.appendChild(el(`<div class="banner info">${esc(candidate.profileNote)}</div>`));
+    body.appendChild(el(`<div class="banner info">${esc(t("Resume preview is linked to the shared candidate record."))}</div>`));
+    d.appendChild(body); return d;
+  },{wide:true});
 }
 function overallLabel(score){ return score==null ? "Unknown" : score; }
 </script>
@@ -1169,9 +1275,7 @@ function render(){
 const NAV_STANDALONE = [
   { section:null, items:[
     { href:"#/tasks", label:"My Tasks", ic:"checklist" },
-    { href:"#/assessments", label:"Assessments", ic:"work_outline" },
-    { href:"#/question-bank", label:"Question Bank", ic:"quiz" },
-    { href:"#/comparisons", label:"Comparisons", ic:"compare_arrows" }
+    { href:"#/question-bank", label:"Question Bank", ic:"quiz" }
   ]},
   { section:"Workspace", items:[
     { href:"#/files", label:"Files & Integrations", ic:"cloud_upload" },
@@ -1393,7 +1497,8 @@ function statusBadge(status){
     awaiting_submission:["neutral","Awaiting submission"], concept:["neutral","Concept"], draft_review:["warning","In review"],
     internal_only:["neutral","Internal only"], final_not_released:["warning","Final — not released"], awaiting_ack:["warning","Awaiting confirmation"],
     released:["success","Released"], linked:["neutral","Linked — no plan yet"],
-    planned:["neutral","Planned"], ready_to_release:["info","Ready to release"], invited:["info","Invited"]
+    planned:["neutral","Planned"], ready_to_release:["info","Ready to release"], invited:["info","Invited"],
+    written_completed:["success","Written completed"], pending_test:["info","Pending test"], pending_submission:["warning","Pending submission"], test_sent:["info","Test sent"], pending_result_review:["danger","Pending result review"], waiting_result:["neutral","Waiting for result"]
   };
   const [kind,label] = map[status] || ["neutral", status];
   return `<span class="badge ${kind}"><span class="dot"></span>${esc(t(label))}</span>`;
@@ -1447,20 +1552,10 @@ function pageMyTasks(){
   const uid = DB.settings.currentUser;
   const user = currentUser();
 
-  wrap.appendChild(el(`<h1 style="margin-bottom:4px">${esc(t("My Work"))}</h1>`));
+  wrap.appendChild(el(`<h1 style="margin-bottom:4px">${esc(t("My Tasks"))}</h1>`));
   wrap.appendChild(el(`<div class="muted" style="margin-bottom:16px">${esc(t("Signed in as"))} ${esc(user.name)} · ${esc(user.role)} · ${esc(DB.identity.workspace.name)}</div>`));
 
-  const cards = myWorkCards();
-  const cardGrid = el(`<div class="grid-4" style="margin-bottom:24px"></div>`);
-  if(cards.length===0){
-    cardGrid.appendChild(el(`<div class="card card-pad empty" style="grid-column:1/-1"><div class="big material-icons-o">task_alt</div>${esc(t("No action cards for you right now."))}</div>`));
-  }
-  cards.forEach(t=> cardGrid.appendChild(actionTaskCard(t)));
-  wrap.appendChild(cardGrid);
-
   // Workspace overview
-  const scopeLabel = user.scope==='restricted' ? t('restricted (see P21)') : t('workspace');
-  wrap.appendChild(el(`<div class="flex items-center justify-between" style="margin-bottom:8px"><h3>${esc(t("Accessible workspace"))}</h3><span class="tiny">${esc(t("As of"))} ${esc(fmtDate(nowISO()))} · ${esc(t("scope:"))} ${esc(scopeLabel)}</span></div>`));
   const metrics = computeWorkspaceMetrics(uid);
   const metricGrid = el(`<div class="grid-4" style="margin-bottom:8px"></div>`);
   metrics.primary.forEach(m=> metricGrid.appendChild(metricCard(m)));
@@ -1475,24 +1570,30 @@ function pageMyTasks(){
   moreWrap.appendChild(moreToggle); moreWrap.appendChild(moreGrid);
   wrap.appendChild(moreWrap);
 
-  // Tabs: task list
-  wrap.appendChild(el(`<h3 style="margin-bottom:8px">${esc(t("Tasks"))}</h3>`));
-  const tabKey = wrap._tabKey || "assigned";
+  // Status filters and table-style task list. The filters describe task state rather than ownership.
   const listHost = el(`<div></div>`);
-  function renderList(key){
-    listHost.innerHTML = "";
-    listHost.appendChild(taskListForTab(key));
-  }
-  const tabs = tabsBar([
-    {key:"assigned",label:t("Assigned to me")},
-    {key:"team",label:t("Team Tasks")},
-    {key:"claim",label:t("Available to claim")},
-    {key:"created",label:t("Created or followed")},
-    {key:"completed",label:t("Completed")}
-  ], "assigned", (key)=>{ qsa(".tab",tabs).forEach(t=>t.classList.remove("active")); renderList(key); tabs.querySelectorAll(".tab").forEach((t,i)=>{ if(["assigned","team","claim","created","completed"][i]===key) t.classList.add("active"); }); });
-  wrap.appendChild(tabs);
-  renderList("assigned");
-  wrap.appendChild(listHost);
+  let activeFilter = "all";
+  let activeView = "list";
+  const filterBar = el(`<div class="flex items-center justify-between wrap gap-3" style="margin-bottom:12px"></div>`);
+  const filters = el(`<div class="flex gap-2 wrap"></div>`);
+  const filterDefs = [
+    {key:"all", label:"All tasks"},
+    {key:"written_completed", label:"Written completed"},
+    {key:"pending_test", label:"Pending test"},
+    {key:"pending_submission", label:"Pending submission"},
+    {key:"pending_result_review", label:"Pending result review"}
+  ];
+  filterDefs.forEach(def=>{
+    const writtenTasks = writtenTestTasks();
+    const count = def.key==="all" ? writtenTasks.length : writtenTasks.filter(x=>writtenTaskStatus(x)===def.key).length;
+    const b = el(`<button class="btn sm ${def.key===activeFilter?'primary':''}" data-filter="${def.key}">${esc(t(def.label))} (${count})</button>`);
+    b.onclick=()=>{ activeFilter=def.key; qsa("button[data-filter]",filters).forEach(x=>x.classList.toggle("primary",x===b)); listHost.innerHTML=""; listHost.appendChild(taskListForTab(def.key, activeView)); };
+    filters.appendChild(b);
+  });
+  const viewToggle = el(`<div class="segmented-control"><button class="btn sm primary" data-view="list">${esc(t("Task list"))}</button><button class="btn sm ghost" data-view="cluster">${esc(t("Cluster by JD"))}</button></div>`);
+  qsa("button[data-view]",viewToggle).forEach(b=>b.onclick=()=>{ activeView=b.dataset.view; qsa("button[data-view]",viewToggle).forEach(x=>x.classList.toggle("primary",x===b)); listHost.innerHTML=""; listHost.appendChild(taskListForTab(activeFilter,activeView)); });
+  filterBar.appendChild(filters); filterBar.appendChild(viewToggle); wrap.appendChild(filterBar);
+  listHost.appendChild(taskListForTab(activeFilter,activeView)); wrap.appendChild(listHost);
 
   return wrap;
 }
@@ -1504,12 +1605,13 @@ function computeWorkspaceMetrics(uid){
   const invitesAwaitingSubmission = Object.values(DB.invitations).filter(i=>["accepted","started"].includes(i.status)).length;
   const submissionIssues = new Set(Object.values(DB.mail).filter(m=>["incomplete","needs_confirmation","quarantined"].includes(m.classification)).map(m=>m.caseId||m.id)).size;
   const resultsToRelease = Object.values(DB.results).filter(r=>r.status==="final_not_released").length;
+  const writtenTasks = writtenTestTasks();
   const counts = taskCountsFor(uid);
   const primary = [
     { label:"My open tasks", value: scoped ? 0 : counts.open, tooltip:"Unique task_id, open/in_progress/waiting", link:"#/tasks" },
-    { label:"Reviews awaiting me", value: scoped?0:Object.values(DB.tasks).filter(t=>t.assignee===uid && ["evaluation_review","result_release"].includes(t.type) && t.status!=="completed").length, link:"#/tasks" },
+    { label:"Reviews awaiting me", value: scoped?0:writtenTasks.filter(t=>t.assignee===uid && ["evaluation_review","result_release"].includes(t.type) && t.status!=="completed").length, link:"#/tasks" },
     { label:"Due today", value: scoped?0:Object.values(DB.tasks).filter(t=>t.assignee===uid && isDueToday(t.dueAt)).length, link:"#/tasks" },
-    { label:"Available to claim", value: Object.values(DB.tasks).filter(t=>!t.assignee && t.status==="open").length, link:"#/tasks" }
+    { label:"In progress", value: writtenTasks.filter(t=>t.assignee===uid && t.status==="in_progress").length, link:"#/tasks" }
   ];
   const more = [
     { label:"Active projects", value: scoped?0:activeProjects, link:"#/assessments" },
@@ -1547,7 +1649,7 @@ function actionTaskCard(tk){
   return card;
 }
 function taskTypeLabel(type){
-  const label = { result_release:"Result release", evaluation_review:"Evaluation review", submission_issue:"Submission issue", reviewer_queue:"Reviewer queue", plan_review:"Plan review", delivery_recovery:"Delivery recovery" }[type] || type;
+  const label = { result_release:"Result release", evaluation_review:"Evaluation review", submission_issue:"Submission issue", reviewer_queue:"Reviewer queue", plan_review:"Plan review", delivery_recovery:"Delivery recovery", invite_pending:"Invite pending" }[type] || type;
   return t(label);
 }
 
@@ -1564,55 +1666,60 @@ function recordTeamAction(t, uid){
   return null;
 }
 
-function taskListForTab(key){
+function writtenTaskJob(task){
+  const c = task.sourceRef && DB.cases[task.sourceRef];
+  const app = c && c.applicationId && DB.core.applications[c.applicationId];
+  const job = app && DB.core.jobs[app.jobId] ? DB.core.jobs[app.jobId] : DB.core.jobs[DB.project.jobId];
+  return job || {id:"written-test",title:t("Written Test"),createdAt:null};
+}
+function appendWrittenTaskRow(card, tk, uid, clusterMode=false){
+  const cand = tk.sourceRef && DB.cases[tk.sourceRef] ? candidateOf(tk.sourceRef) : null;
+  const candidateStatus = writtenTaskStatus(tk);
+  const grid = clusterMode ? "minmax(260px,2.2fr) minmax(170px,1.2fr) 180px minmax(130px,1fr)" : "minmax(260px,2.2fr) minmax(190px,1.4fr) 130px 130px minmax(130px,1fr)";
+  const row = el(`<div style="display:grid;grid-template-columns:${grid};gap:16px;align-items:center;padding:16px;${clusterMode?'padding-left:48px;':''}border-bottom:1px solid var(--border);min-height:72px"></div>`);
+  const job = writtenTaskJob(tk);
+  const identity = cand ? `<div class="flex items-center gap-3"><div class="avatar" style="width:36px;height:36px">${esc(cand.name.split(/\s+/).map(x=>x[0]).join("").slice(0,2))}</div><div><div class="task-title">${esc(cand.name)}</div><div class="task-sub">${esc(job.title)}</div></div></div>` : `<div><div class="task-title">${esc(tk.title)}</div><div class="task-sub">${esc(taskTypeLabel(tk.type))}</div></div>`;
+  const round = cand && DB.cases[tk.sourceRef] ? (roundsForCase(tk.sourceRef).find(r=>r.status!=="completed") || roundsForCase(tk.sourceRef)[0]) : null;
+  const deadline = candidateStatus === "pending_test" ? "" : (tk.dueAt ? fmtDateShort(tk.dueAt) : "");
+  row.innerHTML = `${identity}<div>${statusBadge(candidateStatus)}</div><div class="task-sub" style="font-size:14px">${clusterMode && round ? esc(round.title) : esc(fmtDateShort(tk.createdAt||tk.dueAt))}</div>${clusterMode ? "" : `<div class="task-sub" style="font-size:14px">${esc(deadline)}</div>`}<div></div>`;
+  if(cand){ const resume=el(`<button class="btn sm ghost">${esc(t("View resume"))}</button>`); resume.onclick=e=>{e.stopPropagation();openCandidateResume(cand,job)}; row.lastElementChild.appendChild(resume); }
+  row.onclick=()=>navigate(cand ? "#/cases/"+tk.sourceRef+"/plan" : tk.link); row.style.cursor="pointer"; card.appendChild(row);
+}
+function taskListForTab(key, view="list"){
   const uid = DB.settings.currentUser;
-  let tasks = Object.values(DB.tasks);
-  if(key==="assigned") tasks = tasks.filter(t=>t.assignee===uid && t.status!=="completed");
-  if(key==="team") tasks = tasks.filter(t=>t.assignee && t.assignee!==uid && !["completed","cancelled"].includes(t.status));
-  if(key==="claim") tasks = tasks.filter(t=>!t.assignee && t.status==="open");
-  if(key==="created") tasks = tasks.filter(t=>t.assignee!==uid);
-  if(key==="completed") tasks = tasks.filter(t=>t.status==="completed");
-  const card = el(`<div class="card"></div>`);
-  if(key==="team"){
-    card.appendChild(el(`<div class="banner info" style="margin:12px 12px 0">${esc(t("Startup Team Access: any valid employee can open and directly work these tasks — no claiming or manager approval required. The original assignee stays on record and is notified when you act."))}</div>`));
-  }
+  let tasks = writtenTestTasks();
+  if(key!=="all") tasks = tasks.filter(tk=>writtenTaskStatus(tk)===key);
+  tasks.sort((a,b)=>new Date(a.dueAt||0)-new Date(b.dueAt||0));
+  const card = el(`<div class="card" style="overflow:hidden"></div>`);
   if(tasks.length===0){ card.appendChild(el(`<div class="empty"><div class="big material-icons-o">checklist</div>${esc(t("Nothing here."))}</div>`)); return card; }
-  tasks.forEach(tk=>{
-    const cand = tk.sourceRef && DB.cases[tk.sourceRef] ? candidateOf(tk.sourceRef) : null;
-    const ownerName = (key==="team" && tk.assignee && DB.identity.users[tk.assignee]) ? DB.identity.users[tk.assignee].name : null;
-    const row = el(`<div class="task-row"></div>`);
-    row.innerHTML = `
-      <div class="task-main">
-        <div class="task-title">${esc(tk.title)}</div>
-        <div class="task-sub">${cand?esc(cand.name)+" · ":""}${esc(taskTypeLabel(tk.type))}${ownerName?" · "+esc(t("Assigned to"))+" "+esc(ownerName):""} · ${esc(t("Due"))} ${esc(fmtDateShort(tk.dueAt))}${tk.status==="waiting"?" · "+esc(tk.waitingReason||""):""}${tk.performedBy && DB.identity.users[tk.performedBy] ? " · "+esc(t("Last handled by"))+" "+esc(DB.identity.users[tk.performedBy].name):""}</div>
-      </div>
-      ${statusBadge(tk.status)}
-    `;
-    const actions = el(`<div class="flex gap-2"></div>`);
-    if(key==="claim"){
-      const claimBtn = el(`<button class="btn sm primary">${esc(t("Claim"))}</button>`);
-      claimBtn.onclick = (e)=>{ e.stopPropagation();
-        if(tk.assignee){ toast("This task was claimed by another reviewer.", "warning"); renderList: navigate("#/tasks"); return; }
-        tk.assignee = uid; tk.status="open"; saveDB(); toast("Task claimed.", "success"); navigate("#/tasks");
-      };
-      actions.appendChild(claimBtn);
-    } else if(tk.status==="open" || tk.status==="in_progress"){
-      if(tk.status==="open"){ const startBtn = el(`<button class="btn sm">${esc(t("Start"))}</button>`); startBtn.onclick=(e)=>{ e.stopPropagation(); tk.status="in_progress"; const owner=recordTeamAction(tk,uid); saveDB(); toast(owner?`Started on behalf of ${owner.name}; they've been notified.`:"Task started.","success"); navigate("#/tasks"); }; actions.appendChild(startBtn); }
-      const waitBtn = el(`<button class="btn sm ghost">${esc(t("Wait"))}</button>`);
-      waitBtn.onclick = (e)=>{ e.stopPropagation(); openWaitModal(tk); };
-      actions.appendChild(waitBtn);
-    } else if(tk.status==="waiting"){
-      const resumeBtn = el(`<button class="btn sm">${esc(t("Resume"))}</button>`); resumeBtn.onclick=(e)=>{ e.stopPropagation(); tk.status="in_progress"; tk.waitingReason=null; const owner=recordTeamAction(tk,uid); saveDB(); toast(owner?`Resumed on behalf of ${owner.name}; they've been notified.`:"Task resumed.","success"); navigate("#/tasks"); };
-      actions.appendChild(resumeBtn);
-    }
-    if(tk.assignee && tk.assignee!==uid){ const assignBtn=el(`<button class="btn sm ghost">${esc(t("Assign"))}</button>`); assignBtn.onclick=(e)=>{ e.stopPropagation(); tk.assignee=uid; tk.status='open'; tk.performedBy=uid; saveDB(); toast('Task assigned to you.','success'); navigate('#/tasks'); }; actions.appendChild(assignBtn); }
-    const historyBtn=el(`<button class="btn sm ghost">${esc(t("History"))}</button>`); historyBtn.onclick=(e)=>{ e.stopPropagation(); toast(`Task history: ${tk.performedBy&&DB.identity.users[tk.performedBy]?DB.identity.users[tk.performedBy].name:'No actions recorded yet'}.`,'info'); }; actions.appendChild(historyBtn);
-    const openBtn = el(`<button class="btn sm ghost">${esc(t("Open →"))}</button>`); openBtn.onclick=(e)=>{ e.stopPropagation(); navigate(tk.link); };
-    actions.appendChild(openBtn);
-    row.appendChild(actions);
-    row.style.cursor="pointer";
-    row.onclick = ()=> navigate(tk.link);
-    card.appendChild(row);
+  if(view!=="cluster"){
+    card.appendChild(el(`<div style="display:grid;grid-template-columns:minmax(260px,2.2fr) minmax(190px,1.4fr) 130px 130px minmax(130px,1fr);gap:16px;padding:12px 16px;border-bottom:1px solid var(--border);color:var(--muted);font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.06em"><span>${esc(t("Candidate"))}</span><span>${esc(t("Status"))}</span><span>${esc(t("Created"))}</span><span>${esc(t("Deadline"))}</span><span>${esc(t("Resume"))}</span></div>`));
+    tasks.forEach(tk=>appendWrittenTaskRow(card,tk,uid,false));
+    return card;
+  }
+  const groups = new Map();
+  tasks.forEach(tk=>{ const job=writtenTaskJob(tk); if(!groups.has(job.id)) groups.set(job.id,{job,tasks:[]}); groups.get(job.id).tasks.push(tk); });
+  card.appendChild(el(`<div style="display:grid;grid-template-columns:1fr;gap:16px;padding:12px 32px;color:var(--muted);font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.06em"><span>${esc(t("Role & project"))}</span></div>`));
+  groups.forEach(({job,tasks:groupTasks},index)=>{
+    const section=el(`<div></div>`); const expanded=index===0; const body=el(`<div ${expanded?'':'hidden'}></div>`);
+    const heading=el(`<div style="display:grid;grid-template-columns:36px 1fr 1fr auto;gap:16px;align-items:center;padding:14px 32px;background:var(--surface-2);border-top:1px solid var(--border);border-bottom:1px solid var(--border)"></div>`);
+    const toggle=el(`<button class="btn ghost sm" style="padding:0;width:24px"><span class="material-icons-o">${expanded?'expand_more':'chevron_right'}</span></button>`);
+    const initials=job.title.split(/\s+/).map(x=>x[0]).join("").slice(0,2); heading.appendChild(toggle); heading.appendChild(el(`<div class="flex items-center gap-3"><div class="avatar" style="width:40px;height:40px">${esc(initials)}</div><div><div class="task-title">${esc(job.title)}</div></div></div>`));
+    heading.appendChild(el(`<div style="font-size:15px">${groupTasks.length} ${esc(t("candidates"))}</div>`));
+    const actionsWrap=el(`<div class="flex gap-2" style="flex:none;white-space:nowrap"></div>`);
+    const compare=el(`<button class="btn sm ghost">${esc(t("Compare candidates"))}</button>`);
+    compare.onclick=e=>{
+      e.stopPropagation();
+      const scoredCaseIds = groupTasks.map(tk=>tk.sourceRef).filter(Boolean).filter(cid=>{ const cells=comparableCells(cid); return !!(cells.result || cells.evaluation); });
+      if(scoredCaseIds.length===0){ toast(t("No scored candidates to compare yet."),"warning"); return; }
+      const cmpId="cmp_job_"+job.id; DB.comparisons[cmpId]={id:cmpId,caseIds:scoredCaseIds,mode:"current_summary",createdAt:nowISO(),note:"Comparison created from the written test role cluster."}; saveDB(); navigate("#/comparisons/"+cmpId);
+    };
+    const link=el(`<button class="btn sm ghost">${esc(t("Link candidate"))}</button>`); link.onclick=e=>{e.stopPropagation();openAddCandidateFlow()};
+    actionsWrap.appendChild(compare); actionsWrap.appendChild(link);
+    heading.appendChild(actionsWrap);
+    toggle.onclick=()=>{ body.hidden=!body.hidden; qs(".material-icons-o",toggle).textContent=body.hidden?'chevron_right':'expand_more'; };
+    heading.onclick=e=>{if(!actionsWrap.contains(e.target) && e.target!==toggle && !toggle.contains(e.target)) toggle.click();};
+    section.appendChild(heading); body.appendChild(el(`<div style="display:grid;grid-template-columns:minmax(260px,2.2fr) minmax(170px,1.2fr) 180px minmax(130px,1fr);gap:16px;padding:10px 48px;color:var(--muted);font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.06em"><span>${esc(t("Candidate"))}</span><span>${esc(t("Status"))}</span><span>${esc(t("Round"))}</span><span>${esc(t("Resume"))}</span></div>`)); groupTasks.forEach(tk=>appendWrittenTaskRow(body,tk,uid,true)); section.appendChild(body); card.appendChild(section);
   });
   return card;
 }
@@ -1919,6 +2026,48 @@ function pageBuilder(id){
    PAGE: Assessments (Projects) / Project detail / Plan
    ============================================================ */
 route("/assessments", ()=> pageAssessmentsList());
+
+// Fast path for the common HR action: choose candidates, tests, and send one invite.
+function openQuickAssessmentWizard(){
+  const candidateCases = Object.values(DB.cases).filter(Boolean).filter(c=>c.applicationId);
+  const publishedQuestions = Object.values(DB.questions).filter(q=>q.status === "published");
+  const state = { step:0, caseIds:candidateCases.slice(0,1).map(c=>c.id), questionId:publishedQuestions[0] && publishedQuestions[0].id, mode:"timed", duration:90, deadline:"2026-09-25T23:59:00Z" };
+  openDrawer((close)=>{
+    const d = el(`<div class="flex-col" style="height:100%"></div>`);
+    const head = el(`<div class="overlay-head"><div><h3>${esc(t("Create assessment"))}</h3><div class="tiny">${esc(t("Choose candidates, tests and delivery settings in one flow"))}</div></div><div class="icon-btn"><span class="material-icons-o">close</span></div></div>`);
+    qs(".icon-btn",head).onclick = close; d.appendChild(head);
+    const body = el(`<div class="overlay-body flex-col gap-3"></div>`); d.appendChild(body);
+    const foot = el(`<div class="overlay-foot flex items-center justify-between"><button class="btn ghost" id="quickCancel">${esc(t("Cancel"))}</button><div class="flex gap-2"><button class="btn" id="quickBack">${esc(t("Back"))}</button><button class="btn primary" id="quickNext">${esc(t("Continue"))}</button></div></div>`); d.appendChild(foot);
+    qs("#quickCancel",foot).onclick=close;
+    const render = ()=>{
+      body.innerHTML = `<div class="flex gap-2 wrap" style="margin-bottom:4px">${[t("Candidates"),t("Tests"),t("Timing & submission"),t("Review & send")].map((s,i)=>`<span class="chip" style="${i===state.step?'background:var(--selected-surface);color:var(--accent);border-color:transparent':''}">${i+1}. ${esc(s)}</span>`).join("")}</div>`;
+      if(state.step===0){
+        body.appendChild(el(`<div class="muted">${esc(t("Select one or more candidates for this assessment."))}</div>`));
+        candidateCases.forEach(c=>{ const cand=DB.core.candidates[c.candidateId]; const row=el(`<label class="card card-pad flex items-center gap-3" style="cursor:pointer"><input type="checkbox" ${state.caseIds.includes(c.id)?"checked":""}><div><b>${esc(cand.name)}</b><div class="tiny">${esc(cand.email)} · ${esc(DB.core.jobs[DB.project.jobId].title)}</div></div></label>`); qs("input",row).onchange=e=>{ if(e.target.checked) state.caseIds.push(c.id); else state.caseIds=state.caseIds.filter(id=>id!==c.id); }; body.appendChild(row); });
+      } else if(state.step===1){
+        body.appendChild(el(`<div class="muted">${esc(t("Choose the question pack for this round."))}</div>`));
+        const sel=el(`<select class="input"></select>`); publishedQuestions.forEach(q=>{ const o=el(`<option value="${q.id}">${esc(q.code)} — ${esc(q.title)}</option>`); if(q.id===state.questionId)o.selected=true; sel.appendChild(o); }); sel.onchange=()=>state.questionId=sel.value; body.appendChild(sel);
+        body.appendChild(el(`<div class="banner info">${esc(t("The selected test will be added to each candidate's first round."))}</div>`));
+      } else if(state.step===2){
+        body.appendChild(el(`<div class="field"><label>${esc(t("Submission mode"))}</label><select class="input" id="quickMode"><option value="timed">${esc(t("Timed test"))}</option><option value="deadline_only">${esc(t("Deadline only"))}</option></select></div>`));
+        body.appendChild(el(`<div class="field"><label>${esc(t("Deadline"))}</label><input class="input" id="quickDeadline" type="datetime-local" value="${state.deadline.replace('Z','')}" /></div>`));
+        const mode=qs("#quickMode",body); mode.value=state.mode; mode.onchange=()=>state.mode=mode.value; qs("#quickDeadline",body).onchange=e=>state.deadline=e.target.value;
+      } else {
+        const q=DB.questions[state.questionId]; body.appendChild(el(`<div class="card card-pad"><b>${esc(t("Assessment summary"))}</b><div class="tiny" style="margin-top:8px">${esc(t("Candidates"))}: ${state.caseIds.length} · ${esc(t("Test"))}: ${q?esc(q.code):"—"} · ${esc(t("Mode"))}: ${state.mode==='timed'?esc(t("Timed")):esc(t("Deadline only"))}</div></div>`));
+        body.appendChild(el(`<div class="banner success">${esc(t("Review the details, then send invitations. Each candidate receives an independent invitation and round."))}</div>`));
+      }
+      qs("#quickBack",foot).disabled=state.step===0; qs("#quickNext",foot).textContent=state.step===3?t("Send invitations"):t("Continue");
+    };
+    qs("#quickBack",foot).onclick=()=>{if(state.step>0){state.step--;render();}};
+    qs("#quickNext",foot).onclick=()=>{
+      if(state.step===0 && state.caseIds.length===0){toast(t("Select at least one candidate first."),"warning");return;}
+      if(state.step===1 && !state.questionId){toast(t("Select a test first."),"warning");return;}
+      if(state.step<3){state.step++;render();return;}
+      state.caseIds.forEach(caseId=>{ const c=DB.cases[caseId]; const round=(c.rounds&&c.rounds[0])||{id:"round_"+caseId+"_1",position:1,title:"Round 1",planItemIds:[],status:"planned"}; c.rounds=c.rounds||[round]; if(!c.rounds.includes(round))c.rounds[0]=round; const piId="pi_"+caseId+"_quick_"+state.questionId; if(!DB.plans[piId]){DB.plans[piId]={id:piId,caseId,questionId:state.questionId,kind:"required",status:"awaiting_submission"}; c.planItems.push(piId); round.planItemIds=round.planItemIds||[]; round.planItemIds.push(piId);} const invId="inv_"+caseId+"_quick_"+Date.now(); DB.invitations[invId]={id:invId,caseId,roundId:round.id,questionIds:[state.questionId],mode:state.mode,durationMin:state.mode==='timed'?state.duration:null,deadline:state.deadline,status:"sent",acceptedAt:null,startedAt:null,disclosurePolicy:"score_and_summary",threadRef:"thread_"+invId}; round.status="invited"; c.status="invited"; }); saveDB(); close(); toast(t("Invitations sent and assessment rounds created."),"success"); navigate("#/assessments/"+DB.project.id);
+    };
+    render(); return d;
+  },{wide:true});
+}
 route("/assessments/:id", (p)=> pageProjectDetail(p.id));
 route("/cases/:id/plan", (p)=> pagePlan(p.id));
 
@@ -1930,9 +2079,10 @@ function caseStatusOf(caseId){
 function pageAssessmentsList(){
   const wrap = el(`<div></div>`);
   wrap.appendChild(el(`<div class="flex items-center justify-between" style="margin-bottom:16px"><h1>${esc(t("Assessments"))}</h1>
-    <div class="flex gap-2"><button class="btn sm" id="btnImportProj">${esc(t("Import"))}</button><button class="btn sm primary" id="btnCreateProj">${esc(t("Create project"))}</button></div></div>`));
+    <div class="flex gap-2"><button class="btn sm" id="btnImportProj">${esc(t("Import"))}</button><button class="btn sm" id="btnCreateProj">${esc(t("Create project"))}</button><button class="btn sm primary" id="btnQuickAssessment">${esc(t("Create assessment"))}</button></div></div>`));
   qs("#btnCreateProj",wrap).onclick = ()=> toast("Demo: a target/JD-only project can be drafted with no Job or Application yet.","info");
   qs("#btnImportProj",wrap).onclick = ()=> toast("Demo: import historical assessment summary (approximate, unverified scores only).","info");
+  qs("#btnQuickAssessment",wrap).onclick = ()=> openQuickAssessmentWizard();
 
   const projCard = el(`<div class="card card-pad" style="cursor:pointer;margin-bottom:16px"></div>`);
   const cases = Object.values(DB.cases).filter(Boolean);
@@ -2114,6 +2264,7 @@ function openScreeningSelectionDrawer(){
 }
 
 let planPageSelectedRound = {};
+let planPageSelectedTab = {};
 function roundReleaseReady(caseId, roundId){
   const rounds = roundsForCase(caseId);
   const round = rounds.find(r=>r.id===roundId);
@@ -2138,9 +2289,22 @@ function pagePlan(caseId){
   const c = DB.cases[caseId];
   if(!c){ wrap.appendChild(el(`<div class="banner danger">${esc(t("Case not found."))}</div>`)); return wrap; }
   const cand = DB.core.candidates[c.candidateId];
-  wrap.appendChild(crumbs([{label:t("Assessments"),href:"#/assessments"},{label:DB.project.name,href:"#/assessments/"+DB.project.id},{label:cand.name}]));
+  wrap.appendChild(crumbs([{label:t("My Tasks"),href:"#/tasks"},{label:t("Candidate detail")}]));
   wrap.appendChild(el(`<h1 style="margin-bottom:4px">${esc(cand.name)}${esc(t("'s plan"))}</h1>`));
   wrap.appendChild(el(`<div class="muted" style="margin-bottom:16px">${esc(cand.email)} · ${statusBadge(c.status)}</div>`));
+  let detailPanels = {};
+  const detailTabs = tabsBar([
+    {key:"plan", label:t("Assessment plan")},
+    {key:"submission", label:t("Submission")},
+    {key:"evaluation", label:t("Comprehensive evaluation")},
+    {key:"result", label:t("Evaluation result")}
+  ], planPageSelectedTab[caseId]||"plan", key=>{
+    planPageSelectedTab[caseId] = key;
+    Object.entries(detailPanels).forEach(([name,panel])=>{ panel.hidden = name!==key; });
+    qsa(".tab",detailTabs).forEach((tab,index)=>tab.classList.toggle("active", ["plan","submission","evaluation","result"][index]===key));
+  });
+  detailTabs.style.marginBottom="16px";
+  wrap.appendChild(detailTabs);
 
   if(!c.applicationId){
     wrap.appendChild(el(`<div class="banner warning" style="margin-bottom:16px">${esc(t("Confirm the candidate's role link first — invitations for a formal role assessment require a confirmed Application."))}</div>`));
@@ -2149,136 +2313,129 @@ function pagePlan(caseId){
     wrap.appendChild(el(`<div class="banner info" style="margin-bottom:16px">${esc(t("Answers uploaded — awaiting candidate submission. The attempt is still in progress and has not been scored; HR owner and Hiring manager were notified."))}</div>`));
   }
 
-  // --- AssessmentOwnership: HR owner / Hiring manager / Review assignee ---
-  // These route notifications and default follow-ups only — per Startup Team Access (PRD §14),
-  // they are not access-control gates, and any valid employee can still act on this case.
-  const ownerCard = el(`<div class="card card-pad" style="margin-bottom:16px"></div>`);
-  ownerCard.appendChild(el(`<div class="flex items-center justify-between wrap gap-2" style="margin-bottom:10px"><b>${esc(t("Ownership"))}</b><span class="tiny">${esc(t("Routes notifications only — not required to act (Startup Team Access)"))}</span></div>`));
-  const ownerGrid = el(`<div class="grid-3" style="gap:10px"></div>`);
-  [["hrOwner",t("HR owner")],["hiringManager",t("Hiring manager")],["reviewAssignee",t("Review assignee")]].forEach(([key,label])=>{
-    const field = el(`<div class="field"></div>`);
-    field.appendChild(el(`<label>${esc(label)}</label>`));
-    const sel = el(`<select class="input"></select>`);
-    sel.appendChild(el(`<option value="">${esc(t("— Not set (defaults to initiator) —"))}</option>`));
-    Object.values(DB.identity.users).forEach(u=>{
-      const opt = el(`<option value="${u.id}">${esc(u.name)} — ${esc(u.role)}</option>`);
-      if(c.ownership && c.ownership[key]===u.id) opt.selected=true;
-      sel.appendChild(opt);
-    });
-    sel.onchange = ()=>{ c.ownership = c.ownership || {}; c.ownership[key] = sel.value || null; saveDB(); toast(label+" updated.","success"); };
-    field.appendChild(sel);
-    ownerGrid.appendChild(field);
-  });
-  ownerCard.appendChild(ownerGrid);
-  if(!c.ownership || (!c.ownership.hrOwner && !c.ownership.hiringManager)){
-    ownerCard.appendChild(el(`<div class="tiny" style="margin-top:8px;color:var(--warning)">${esc(t("No HR owner or Hiring manager set — this doesn't block sending; the initiator is the default contact."))}</div>`));
-  }
-  wrap.appendChild(ownerCard);
-
-  // --- Single round / Multiple rounds + Round tabs (PlanRound, Interface Spec §13) ---
   const rounds = roundsForCase(caseId);
-  const modeRow = el(`<div class="flex items-center gap-2 wrap" style="margin-bottom:12px"></div>`);
-  modeRow.appendChild(el(`<b style="margin-right:2px">${esc(t("Plan structure"))}</b>`));
-  const singleBtn = el(`<button class="btn sm ${c.roundMode!=='multiple'?'primary':'ghost'}">${esc(t("Single round"))}</button>`);
-  const multiBtn = el(`<button class="btn sm ${c.roundMode==='multiple'?'primary':'ghost'}">${esc(t("Multiple rounds"))}</button>`);
-  singleBtn.onclick = ()=>{ c.roundMode='single'; saveDB(); navigate("#/cases/"+caseId+"/plan"); };
-  multiBtn.onclick = ()=>{ c.roundMode='multiple'; saveDB(); navigate("#/cases/"+caseId+"/plan"); };
-  modeRow.appendChild(singleBtn); modeRow.appendChild(multiBtn);
-  wrap.appendChild(modeRow);
-
-  if(c.roundMode==='multiple'){
-    const roundTabs = el(`<div class="flex gap-2 wrap" style="margin-bottom:12px"></div>`);
-    rounds.forEach(r=>{
-      const active = (planPageSelectedRound[caseId]||currentRoundId(caseId))===r.id;
-      const pill = el(`<div class="chip" style="cursor:pointer;display:flex;gap:6px;align-items:center;${active?'background:var(--selected-surface);color:var(--accent);border-color:transparent':''}"></div>`);
-      pill.innerHTML = `${esc(r.title)} ${statusBadge(r.status)}`;
-      pill.onclick = ()=>{ planPageSelectedRound[caseId]=r.id; navigate("#/cases/"+caseId+"/plan"); };
-      roundTabs.appendChild(pill);
-    });
-    const addRoundBtn = el(`<button class="btn sm ghost">${esc(t("+ Add round"))}</button>`);
-    addRoundBtn.onclick = ()=>{
-      const pos = rounds.length+1;
-      const roundTitle = DB.settings.lang==="zh" ? "第"+pos+"轮" : "Round "+pos;
-      const nr = { id:"round_"+caseId+"_"+pos, position:pos, title:roundTitle, planItemIds:[], releaseCondition:"after_previous_review", dependsOnRoundIds:[rounds[rounds.length-1].id], deadlineAt:null, status:"planned" };
-      rounds.push(nr); planPageSelectedRound[caseId]=nr.id; saveDB(); toast(roundTitle+(DB.settings.lang==="zh"?" 已添加 —— 请设置发布条件并添加测试。":" added — set its release condition and add a test."),"success"); navigate("#/cases/"+caseId+"/plan");
-    };
-    roundTabs.appendChild(addRoundBtn);
-    wrap.appendChild(roundTabs);
-  }
-
-  const roundId = c.roundMode==='multiple' ? (planPageSelectedRound[caseId] && rounds.find(r=>r.id===planPageSelectedRound[caseId]) ? planPageSelectedRound[caseId] : currentRoundId(caseId)) : rounds[0].id;
-  const round = rounds.find(r=>r.id===roundId);
-
-  // Round-level release condition + deadline
-  const roundSettings = el(`<div class="card card-pad" style="margin-bottom:16px"></div>`);
-  roundSettings.appendChild(el(`<div class="flex items-center justify-between wrap gap-2" style="margin-bottom:8px"><b>${esc(round.title)}</b>${statusBadge(round.status)}</div>`));
-  const settingsRow = el(`<div class="flex items-center gap-3 wrap"></div>`);
-  const condField = el(`<div class="field" style="min-width:220px"></div>`);
-  condField.appendChild(el(`<label>${esc(t("Release condition"))}</label>`));
-  const condSel = el(`<select class="input"></select>`);
-  [["manual",t("Manual release")],["after_previous_submission",t("After previous round is submitted")],["after_previous_review",t("After previous round is reviewed")]].forEach(([v,l])=>{
-    const opt = el(`<option value="${v}">${esc(l)}</option>`); if(round.releaseCondition===v) opt.selected=true; condSel.appendChild(opt);
-  });
-  if(round.position===1){ condSel.disabled = true; condSel.title = t("Round 1 has no previous round to depend on."); }
-  condSel.onchange = ()=>{ round.releaseCondition = condSel.value; saveDB(); toast("Release condition updated.","success"); navigate("#/cases/"+caseId+"/plan"); };
-  condField.appendChild(condSel);
-  settingsRow.appendChild(condField);
-  const deadlineField = el(`<div class="field"></div>`);
-  deadlineField.appendChild(el(`<label>${esc(t("Deadline"))}</label>`));
-  const deadlineInput = el(`<input class="input" type="date" value="${round.deadlineAt ? round.deadlineAt.slice(0,10) : ''}">`);
-  deadlineInput.onchange = ()=>{ round.deadlineAt = deadlineInput.value ? new Date(deadlineInput.value+"T23:59:00Z").toISOString() : null; saveDB(); toast("Deadline updated.","success"); };
-  deadlineField.appendChild(deadlineInput);
-  settingsRow.appendChild(deadlineField);
-  roundSettings.appendChild(settingsRow);
-  const readiness = roundReleaseReady(caseId, round.id);
-  if(!readiness.ready){
-    roundSettings.appendChild(el(`<div class="banner warning" style="margin-top:10px">${esc(t("Not ready to release yet —"))} ${esc(readiness.reason)} ${esc(t("You can still plan and add tests; sending is blocked until the condition is met."))}</div>`));
-  }
-  wrap.appendChild(roundSettings);
-
+  const round = rounds[0];
   const items = planItemsForCase(caseId, round.id);
-  const listCard = el(`<div class="card" style="margin-bottom:16px"></div>`);
-  if(items.length===0){ listCard.appendChild(el(`<div class="empty"><div class="big material-icons-o">assignment</div>${esc(t("No plan items in this round yet. Add a test to get started."))}</div>`)); }
-  items.forEach(pi=>{
-    const q = DB.questions[pi.questionId];
-    const row = el(`<div class="task-row"></div>`);
-    row.innerHTML = `<div class="task-main"><div class="task-title">${esc(q.code)} — ${esc(q.title)} <span class="chip">${pi.kind}</span></div>
-      <div class="task-sub">v${q.version} · ${q.competencies.map(cc=>cc.name+" "+Math.round(cc.fraction*100)+"%").join(", ")}</div></div>
-      ${statusBadge(pi.status)}`;
-    listCard.appendChild(row);
+  const primaryItem = items[0] || null;
+  const app = c.applicationId && DB.core.applications[c.applicationId];
+  const job = (app && DB.core.jobs[app.jobId]) || DB.core.jobs[DB.project.jobId];
+
+  // --- Verification goal (derived, read-only) ---
+  const goalCard = el(`<div class="card card-pad" style="margin-bottom:16px"></div>`);
+  const goalQuestion = primaryItem ? DB.questions[primaryItem.questionId] : null;
+  const goalCompetencies = goalQuestion ? goalQuestion.competencies.map(cc=>cc.name).join("、") : "";
+  const goalText = goalCompetencies
+    ? `${esc(t("Verify whether the candidate can demonstrate, through this role assessment:"))} ${esc(job.title)} ${esc(t("role capability —"))} ${esc(goalCompetencies)}。`
+    : `${esc(t("Verify whether the candidate can demonstrate, through this role assessment:"))} ${esc(job.title)} ${esc(t("role's core capability and delivery level."))}`;
+  goalCard.innerHTML = `<h4 style="margin-bottom:8px">${esc(t("Verification goal"))}</h4><div class="tiny" style="color:var(--text-secondary);line-height:1.6">${goalText}</div>`;
+  wrap.appendChild(goalCard);
+
+  // --- Owner + submission deadline ---
+  const ownerRow = el(`<div class="grid-2" style="gap:16px;margin-bottom:16px"></div>`);
+  const ownerField = el(`<div class="field"></div>`);
+  ownerField.appendChild(el(`<label>${esc(t("Owner"))}</label>`));
+  const ownerSel = el(`<select class="input"></select>`);
+  ownerSel.appendChild(el(`<option value="">${esc(t("— Not set (defaults to initiator) —"))}</option>`));
+  Object.values(DB.identity.users).forEach(u=>{
+    const opt = el(`<option value="${u.id}">${esc(u.name)} · ${esc(u.role)}</option>`);
+    if(c.ownership && c.ownership.hrOwner===u.id) opt.selected=true;
+    ownerSel.appendChild(opt);
   });
-  wrap.appendChild(listCard);
+  ownerSel.onchange = ()=>{ c.ownership = c.ownership || {}; c.ownership.hrOwner = ownerSel.value || null; saveDB(); toast("Owner updated.","success"); };
+  ownerField.appendChild(ownerSel);
+  ownerRow.appendChild(ownerField);
+  const deadlineField = el(`<div class="field"></div>`);
+  deadlineField.appendChild(el(`<label>${esc(t("Submission deadline"))}</label>`));
+  const deadlineInput = el(`<input class="input" type="datetime-local" value="${round.deadlineAt ? round.deadlineAt.slice(0,16) : ''}">`);
+  deadlineInput.onchange = ()=>{ round.deadlineAt = deadlineInput.value ? new Date(deadlineInput.value+":00Z").toISOString() : null; saveDB(); toast("Deadline updated.","success"); };
+  deadlineField.appendChild(deadlineInput);
+  ownerRow.appendChild(deadlineField);
+  wrap.appendChild(ownerRow);
 
-  const actions = el(`<div class="flex gap-2 wrap" style="margin-bottom:16px"></div>`);
-  const addTestBtn = el(`<button class="btn">${esc(t("Add test"))}</button>`);
-  addTestBtn.onclick = ()=> openQuestionPickerDrawer(caseId, round.id);
-  actions.appendChild(addTestBtn);
-  const approveBtn = el(`<button class="btn">${esc(t("Approve plan"))}</button>`);
-  approveBtn.onclick = ()=>{ toast("Plan approved — this is the acting employee's own confirmation, no second approver required (Startup Team Access).","success"); };
-  actions.appendChild(approveBtn);
-  const canInvite = c.applicationId && items.length>0 && readiness.ready;
-  const inviteBtn = el(`<button class="btn primary" ${canInvite?"":"disabled"}>${esc(t("Invite candidate"))}${c.roundMode==='multiple'?" — "+esc(round.title):""}</button>`);
-  inviteBtn.title = !c.applicationId ? t("Confirm the candidate's role link first") : (items.length===0 ? t("Add at least one test first") : (!readiness.ready ? readiness.reason : ""));
-  inviteBtn.onclick = ()=> navigate("#/invitations/new?cases="+caseId+(c.roundMode==='multiple'?"&round="+round.id:""));
-  actions.appendChild(inviteBtn);
-  const historyBtn = el(`<button class="btn ghost">${esc(t("History"))}</button>`);
-  historyBtn.onclick = ()=> toast("Plan version history (demo): v1 created "+fmtDateShort(nowISO()),"info");
-  actions.appendChild(historyBtn);
-  wrap.appendChild(actions);
+  // --- Assessment questions: a list of cards, each created via the "Add assessment question" drawer ---
+  wrap.appendChild(el(`<div class="flex items-center justify-between wrap gap-2" style="margin-bottom:2px"><h4 style="margin:0">${esc(t("Assessment questions"))}</h4></div>`));
+  wrap.appendChild(el(`<div class="tiny" style="color:var(--text-tertiary);margin-bottom:12px">${esc(t("Confirming freezes this into a pending-send version; it is not sent to the candidate immediately."))}</div>`));
 
-  // Existing invitations/results for this case (may bundle multiple rounds in one send)
-  const invs = Object.values(DB.invitations).filter(i=>i.caseId===caseId);
-  if(invs.length){
-    wrap.appendChild(el(`<h3 style="margin-bottom:8px">${invs.length>1?esc(t("Invitations")):esc(t("Invitation"))}</h3>`));
-    invs.forEach(inv=>{
-      const invCard = el(`<div class="card card-pad flex items-center justify-between" style="margin-bottom:8px"></div>`);
-      invCard.innerHTML = `<div><b>${inv.mode==='timed'?inv.durationMin+' '+esc(t("min timed")):esc(t("Deadline only"))}</b>${inv.roundId && DB.cases[caseId].rounds ? " · "+esc((DB.cases[caseId].rounds.find(r=>r.id===inv.roundId)||{}).title||"") : ""} · ${esc(t("deadline"))} ${esc(fmtDateShort(inv.deadline))}<div class="tiny">${statusBadge(inv.status)}</div></div>`;
-      const openLink = el(`<button class="btn sm ghost">${esc(t("View submission →"))}</button>`);
-      openLink.onclick = ()=>{ const questionIds = inv.questionIds||[]; const att = Object.values(DB.attempts).find(a=>a.caseId===caseId && (questionIds.length===0 || questionIds.includes(a.questionId))); if(att) navigate("#/attempts/"+att.id+"/submission"); else toast("No submission received yet.","info"); };
-      invCard.appendChild(openLink);
-      wrap.appendChild(invCard);
+  const questionListCard = el(`<div style="margin-bottom:12px"></div>`);
+  function renderQuestionList(){
+    questionListCard.innerHTML = "";
+    const currentItems = planItemsForCase(caseId, round.id);
+    if(currentItems.length===0){
+      questionListCard.appendChild(el(`<div class="empty card card-pad">${esc(t("No assessment questions yet. Click \"Add assessment question\" to get started."))}</div>`));
+      return;
+    }
+    const existingInv = Object.values(DB.invitations).filter(i=>i.caseId===caseId);
+    currentItems.forEach(pi=>{
+      const q = DB.questions[pi.questionId];
+      const sentInvite = existingInv.find(inv=>(inv.questionIds||[]).includes(pi.questionId) && (!inv.roundId ? round.position===1 : inv.roundId===round.id));
+      const alreadySent = !!sentInvite;
+      const cardEl = el(`<div class="card card-pad" style="margin-bottom:12px"></div>`);
+      const bodyText = pi.customPrompt!=null ? pi.customPrompt : q.prompt;
+      cardEl.innerHTML = `<div class="flex items-center justify-between wrap gap-2" style="margin-bottom:8px"><div><b>${esc(q.code)} · ${esc(q.title)}</b><div class="tiny" style="margin-top:2px">${esc(t("adjustable for this candidate only"))}</div></div>${statusBadge(pi.status)}</div>
+        <div class="tiny" style="color:var(--text-secondary);line-height:1.6;white-space:pre-wrap;max-height:90px;overflow:auto;margin-bottom:10px">${esc(bodyText)}</div>`;
+      const canSend = c.applicationId && !alreadySent;
+      const sendBtn = el(`<button class="btn ${alreadySent?'':'primary'} sm" ${canSend?"":"disabled"}>${alreadySent?esc(t("Sent")):esc(t("Send to candidate"))}</button>`);
+      sendBtn.title = !c.applicationId ? t("Confirm the candidate's role link first") : (alreadySent ? t("Already sent to this candidate.") : "");
+      if(canSend) sendBtn.onclick = ()=> openSendToCandidateDrawer(caseId, round, renderQuestionList);
+      const actions = el(`<div class="flex items-center gap-2" style="margin-top:10px"></div>`);
+      actions.appendChild(sendBtn);
+      if(alreadySent){
+        const inv = sentInvite;
+        const statusText = inv ? `${inv.mode==='timed'?inv.durationMin+' '+t("min timed"):t("Deadline only")} · ${t("deadline")} ${fmtDateShort(inv.deadline)}` : "";
+        if(statusText) actions.appendChild(el(`<span class="tiny" style="color:var(--text-tertiary)">${esc(statusText)}</span>`));
+        actions.appendChild(el(`<div class="grow"></div>`));
+        const viewSubmissionBtn = el(`<button class="btn sm ghost">${esc(t("View submission →"))}</button>`);
+        viewSubmissionBtn.onclick = ()=>{ const att = Object.values(DB.attempts).find(a=>a.caseId===caseId && a.questionId===pi.questionId); if(att) qsa(".tab",detailTabs)[1].click(); else toast("No submission received yet.","info"); };
+        actions.appendChild(viewSubmissionBtn);
+      } else {
+        const editBtn = el(`<button class="btn sm ghost">${esc(t("Edit question"))}</button>`);
+        editBtn.onclick = ()=> openQuestionEditDrawer(caseId, round.id, pi.id, renderQuestionList);
+        actions.appendChild(editBtn);
+        const deleteBtn = el(`<button class="btn sm danger">${esc(t("Delete question"))}</button>`);
+        deleteBtn.onclick = ()=> confirmModal({
+          title:t("Delete question"),
+          bodyHtml:`<div class="tiny">${esc(q.code)} · ${esc(q.title)}</div>`,
+          confirmLabel:t("Delete question"),
+          danger:true,
+          onConfirm:()=>{
+            c.planItems = (c.planItems||[]).filter(id=>id!==pi.id);
+            round.planItemIds = (round.planItemIds||[]).filter(id=>id!==pi.id);
+            delete DB.plans[pi.id];
+            saveDB(); toast(t("Question deleted."),"success"); renderQuestionList();
+          }
+        });
+        actions.appendChild(deleteBtn);
+      }
+      cardEl.appendChild(actions);
+      questionListCard.appendChild(cardEl);
     });
   }
+  renderQuestionList();
+  wrap.appendChild(questionListCard);
+
+  const addQuestionBtn = el(`<button class="btn" style="margin-bottom:16px"><span class="material-icons-o" style="font-size:16px;vertical-align:text-bottom">add</span> ${esc(t("Add assessment question"))}</button>`);
+  addQuestionBtn.onclick = ()=>{
+    const targetRound = round;
+    openQuestionGenerateDrawer(caseId, targetRound.id, ()=>{ renderQuestionList(); });
+  };
+  wrap.appendChild(addQuestionBtn);
+
+
+  const planPanel = el(`<div></div>`);
+  while(wrap.children.length>4) planPanel.appendChild(wrap.children[4]);
+  const submissionPanel = el(`<div hidden></div>`);
+  const attempts = Object.values(DB.attempts).filter(a=>a.caseId===caseId);
+  if(attempts.length) submissionPanel.appendChild(pageSubmissionDetail(attempts[0].id,{inline:true, onGoToEvaluation: ()=> qsa(".tab",detailTabs)[2].click()}));
+  else submissionPanel.appendChild(el(`<div class="empty card card-pad">${esc(t("No submission received yet."))}</div>`));
+  const evaluationPanel = el(`<div hidden></div>`);
+  if(attempts.length) evaluationPanel.appendChild(pageEvaluationReview(attempts[0].id,{inline:true, onViewFinalResult: ()=> qsa(".tab",detailTabs)[3].click()}));
+  else evaluationPanel.appendChild(el(`<div class="empty card card-pad">${esc(t("Waiting for result"))}</div>`));
+  const resultPanel = el(`<div hidden></div>`);
+  resultPanel.appendChild(pageRelease(caseId,{inline:true}));
+  detailPanels={plan:planPanel,submission:submissionPanel,evaluation:evaluationPanel,result:resultPanel};
+  const activeDetailTab = planPageSelectedTab[caseId]||"plan";
+  Object.entries(detailPanels).forEach(([name,panel])=>{ panel.hidden = name!==activeDetailTab; });
+  wrap.appendChild(planPanel); wrap.appendChild(submissionPanel); wrap.appendChild(evaluationPanel); wrap.appendChild(resultPanel);
   return wrap;
 }
 
@@ -2302,6 +2459,9 @@ function openQuestionPickerDrawer(caseId, roundId){
         DB.plans[piId] = { id:piId, caseId, questionId:q.id, kind, status:"awaiting_submission" };
         DB.cases[caseId].planItems.push(piId);
         if(targetRound) targetRound.planItemIds.push(piId);
+        DB.cases[caseId].supplementalPending = true;
+        const relatedTask = Object.values(DB.tasks).find(t=>t.sourceRef===caseId);
+        if(relatedTask) relatedTask.status = "open";
         if(!roundId){ const invId='inv_'+caseId+'_round'+targetRound.position; DB.invitations[invId]=DB.invitations[invId]||{id:invId,caseId,roundId:targetRound.id,questionIds:[q.id],mode:'deadline_only',durationMin:null,deadline:null,status:'sent',acceptedAt:null,startedAt:null,disclosurePolicy:'score_and_summary',threadRef:'thread_'+invId}; targetRound.status='invited'; }
         saveDB(); toast(`${q.code} added to ${targetRound?targetRound.title:"the plan"} as a new plan item with a new invitation.` ,"success");
         close(); navigate("#/cases/"+caseId+"/plan");
@@ -2311,6 +2471,295 @@ function openQuestionPickerDrawer(caseId, roundId){
     d.appendChild(body);
     return d;
   });
+}
+
+function openQuestionEditDrawer(caseId, roundId, planId, onDone){
+  const pi = DB.plans[planId];
+  const q = pi && DB.questions[pi.questionId];
+  if(!pi || !q){ toast(t("Question not found."),"warning"); return; }
+  const c = DB.cases[caseId];
+  const app = c && c.applicationId && DB.core.applications[c.applicationId];
+  const job = (app && DB.core.jobs[app.jobId]) || DB.core.jobs[DB.project.jobId];
+  let mode = "bank";
+  let selectedQuestionId = q.id;
+  let focusBrief = "";
+  let contentDraft = pi.customPrompt!=null ? pi.customPrompt : q.prompt;
+  const roleCompetencyNames = Array.from(new Set(Object.values(DB.questions).filter(x=>!job || x.roles.includes(job.title)).flatMap(x=>(x.competencies||[]).map(cc=>cc.name))));
+  const suggestions = (roleCompetencyNames.length ? roleCompetencyNames.slice(0,3) : [DB.settings.lang==="zh"?"任务理解与方案设计":"Problem framing and solution design",DB.settings.lang==="zh"?"方法论正确性与严谨性":"Methodological rigor and correctness",DB.settings.lang==="zh"?"结果呈现与沟通表达":"Deliverable clarity and communication"]).map(name=>DB.settings.lang==="zh"?`重点测试候选人在「${name}」方面的实际判断与产出能力`:`Focus on the candidate's real-world judgment and output quality in "${name}"`);
+  const buildGenerated = brief => DB.settings.lang==="zh"
+    ? `请基于已确认的岗位信息，围绕以下重点形成一份可执行的工作样本：${brief}。\n\n请在同一交付场景中体现判断与产出能力；信息不足处可提出假设，但须标明假设及其验证方式。`
+    : `Based on the confirmed role information, design an executable work sample focused on: ${brief}.\n\nDemonstrate judgment and deliverable quality within a single delivery scenario; where information is insufficient, state assumptions explicitly along with how they'd be verified.`;
+  openDrawer((close)=>{
+    const d = el(`<div class="flex-col" style="height:100%"></div>`);
+    d.appendChild(el(`<div class="overlay-head"><h3>${esc(t("Edit question"))}</h3><div class="icon-btn"><span class="material-icons-o">close</span></div></div>`));
+    qs(".icon-btn",d).onclick = close;
+    const body = el(`<div class="overlay-body flex-col gap-4"></div>`);
+    const modeRow = el(`<div class="segmented-control"><button class="btn sm primary" id="editModeBank"><span class="material-icons-o" style="font-size:16px">list_alt</span> ${esc(t("From Question Bank"))}</button><button class="btn sm ghost ai-toggle" id="editModeAi"><span class="material-icons-o" style="font-size:16px">auto_awesome</span> ${esc(t("AI-generated"))}</button></div>`);
+    body.appendChild(modeRow);
+    const modeBody = el(`<div></div>`); body.appendChild(modeBody);
+    const field = el(`<div class="field"></div>`);
+    field.appendChild(el(`<label>${esc(t("Question content"))}</label>`));
+    const textarea = el(`<textarea class="input" rows="18" placeholder="${esc(t("Select a preset question, or generate one with AI, to see its content here."))}"></textarea>`);
+    textarea.value = contentDraft;
+    textarea.oninput = e=>{ contentDraft=e.target.value; };
+    field.appendChild(textarea); body.appendChild(field);
+    function drawModeBody(){
+      modeBody.innerHTML = "";
+      if(mode === "bank"){
+        const bankSel = el(`<select class="input"></select>`);
+        bankSel.appendChild(el(`<option value="">${esc(t("— Select a preset question —"))}</option>`));
+        Object.values(DB.questions).filter(x=>x.status==="published" && (!job || x.roles.includes(job.title))).forEach(x=>{
+          const opt = el(`<option value="${x.id}" ${selectedQuestionId===x.id?"selected":""}>${esc(x.code)} · ${esc(x.title)}</option>`);
+          bankSel.appendChild(opt);
+        });
+        bankSel.onchange = ()=>{ selectedQuestionId=bankSel.value; if(selectedQuestionId){ contentDraft=DB.questions[selectedQuestionId].prompt; textarea.value=contentDraft; } };
+        modeBody.appendChild(bankSel);
+        modeBody.appendChild(el(`<div class="tiny" style="margin-top:8px;color:var(--text-tertiary)">${esc(t("Approved v1; edits below only apply to this candidate's draft and never change the role preset."))}</div>`));
+      } else {
+        const aiPanel = el(`<div class="ai-panel flex-col gap-3"></div>`);
+        const focusField = el(`<div class="field"></div>`);
+        focusField.appendChild(el(`<label>${esc(t("Test focus"))}</label>`));
+        const focusInput = el(`<textarea class="input" rows="2" placeholder="${esc(t("Tell me which capability you'd like to focus on testing."))}">${esc(focusBrief)}</textarea>`);
+        focusInput.oninput = e=>{ focusBrief=e.target.value; contentDraft=focusBrief.trim()?buildGenerated(focusBrief.trim()):contentDraft; textarea.value=contentDraft; };
+        focusField.appendChild(focusInput); aiPanel.appendChild(focusField);
+        aiPanel.appendChild(el(`<div class="tiny" style="font-weight:600;color:var(--accent-700)">${esc(t("Based on this role's requirements, consider focusing on:"))}</div>`));
+        const chipsWrap = el(`<div></div>`);
+        suggestions.forEach(s=>{ const chip=el(`<button type="button" class="ai-suggest-chip">${esc(s)}</button>`); chip.onclick=()=>{ focusBrief=s; focusInput.value=s; contentDraft=buildGenerated(s); textarea.value=contentDraft; }; chipsWrap.appendChild(chip); });
+        aiPanel.appendChild(chipsWrap); modeBody.appendChild(aiPanel);
+      }
+    }
+    drawModeBody();
+    qs("#editModeBank",modeRow).onclick=()=>{ mode="bank"; qs("#editModeBank",modeRow).classList.add("primary"); qs("#editModeAi",modeRow).classList.remove("primary"); drawModeBody(); };
+    qs("#editModeAi",modeRow).onclick=()=>{ mode="ai"; qs("#editModeAi",modeRow).classList.add("primary"); qs("#editModeBank",modeRow).classList.remove("primary"); drawModeBody(); };
+    d.appendChild(body);
+    const foot = el(`<div class="overlay-foot flex gap-2 justify-end"></div>`);
+    const cancelBtn = el(`<button class="btn ghost">${esc(t("Cancel"))}</button>`); cancelBtn.onclick = close;
+    const saveBtn = el(`<button class="btn primary">${esc(t("Save changes"))}</button>`);
+    saveBtn.onclick = ()=>{
+      const value = textarea.value.trim();
+      if(!value){ toast(t("Question content"),"warning"); return; }
+      if(mode === "bank" && selectedQuestionId) pi.questionId = selectedQuestionId;
+      pi.customPrompt = value;
+      saveDB(); toast(t("Question updated."),"success");
+      close(); if(onDone) onDone();
+    };
+    foot.appendChild(cancelBtn); foot.appendChild(saveBtn); d.appendChild(foot);
+    return d;
+  },{wide:true});
+}
+
+function openQuestionGenerateDrawer(caseId, roundId, onDone){
+  const c = DB.cases[caseId];
+  const round = roundsForCase(caseId).find(r=>r.id===roundId);
+  const app = c.applicationId && DB.core.applications[c.applicationId];
+  const job = (app && DB.core.jobs[app.jobId]) || DB.core.jobs[DB.project.jobId];
+  let mode = "bank";
+  let selectedQuestionId = "";
+  let focusBrief = "";
+  let contentDraft = "";
+  let generatedCompetencies = null;
+
+  const roleCompetencyNames = Array.from(new Set(Object.values(DB.questions).filter(q=>q.roles.includes(job.title)).flatMap(q=>q.competencies.map(cc=>cc.name))));
+  const suggestions = (roleCompetencyNames.length ? roleCompetencyNames.slice(0,3) : [
+    DB.settings.lang==="zh"?"任务理解与方案设计":"Problem framing and solution design",
+    DB.settings.lang==="zh"?"方法论正确性与严谨性":"Methodological rigor and correctness",
+    DB.settings.lang==="zh"?"结果呈现与沟通表达":"Deliverable clarity and communication"
+  ]).map(name=> ({
+    value: name,
+    label: DB.settings.lang==="zh" ? `重点测试候选人在「${name}」方面的实际判断与产出能力` : `Focus on the candidate's real-world judgment and output quality in "${name}"`
+  }));
+
+  let generatedDeliverables = null;
+  function buildGenerated(brief){
+    generatedCompetencies = [{name:brief.slice(0,24),fraction:0.5},{name:DB.settings.lang==="zh"?"方案落地与产出质量":"Delivery execution and output quality",fraction:0.3},{name:DB.settings.lang==="zh"?"沟通表达与文档产出":"Communication and documentation",fraction:0.2}];
+    const workspace = DB.identity.workspace.name;
+    if(DB.settings.lang==="zh"){
+      generatedDeliverables = ["分析结论文档 (analysis.md)","关键假设与验证方式清单 (assumptions.md)","支撑数据与处理过程 (working_data.md)"];
+      return `以 ${workspace} 正在招聘的「${job.title}」岗位为背景，设计一份约 2 小时可完成的实操工作样本，围绕以下重点考察候选人：${brief}。\n\n背景材料：候选人会收到一份包含近 3 个月业务数据的资料包（合成数据，不涉及真实客户或员工信息），需要在规定时间内独立完成分析与产出，不能仅凭经验空谈。\n\n任务要求：\n1. 结合材料，针对"${brief}"给出具体、可执行、有依据的判断或方案，避免停留在原则性描述。\n2. 明确列出每个关键结论所依据的证据来源（材料中的具体页码/行号/字段），不得凭空断言。\n3. 对信息不足或存在歧义之处提出合理假设，并说明将如何验证该假设。\n4. 产出一份结构清晰、可直接交给业务方或候选人未来上级审阅的文档，而非零散笔记。\n5. 用不超过 300 字总结本次任务的核心结论与下一步建议。\n\n交付物：\n- ${generatedDeliverables.join("\n- ")}\n\n评分将重点关注"${brief}"这一维度的实际判断质量，格式和篇幅不作为主要评分依据。`;
+    }
+    generatedDeliverables = ["Analysis findings (analysis.md)","Assumptions & verification plan (assumptions.md)","Supporting data & workings (working_data.md)"];
+    return `Set against ${workspace}'s open "${job.title}" role, design an executable, roughly 2-hour work sample that focuses on: ${brief}.\n\nBackground materials: the candidate receives a data package covering roughly the last 3 months of activity (synthetic data, no real customer or employee information), to be analyzed and turned into a deliverable independently within the time limit — not answered from general experience alone.\n\nTask requirements:\n1. Using the materials, give a concrete, executable, evidence-based judgment or plan on "${brief}" — avoid staying at the level of general principles.\n2. Explicitly cite the evidence behind each key conclusion (the specific page/row/field in the materials) — no unsupported claims.\n3. Where information is missing or ambiguous, state a reasonable assumption and how it would be verified.\n4. Produce a clearly structured document suitable to hand directly to the business owner or the candidate's future manager, not scattered notes.\n5. Summarize the core conclusion and next steps in 300 words or fewer.\n\nDeliverables:\n- ${generatedDeliverables.join("\n- ")}\n\nScoring will focus on the quality of judgment on "${brief}"; format and length are not primary scoring factors.`;
+  }
+  function rubricLinesFor(competencies){
+    return (competencies||[]).map(cc=> `${esc(cc.name)} — ${Math.round(cc.fraction*100)}%`);
+  }
+
+  openDrawer((close)=>{
+    const d = el(`<div class="flex-col" style="height:100%"></div>`);
+    d.appendChild(el(`<div class="overlay-head"><h3>${esc(t("Generate assessment question"))}</h3><div class="icon-btn"><span class="material-icons-o">close</span></div></div>`));
+    qs(".icon-btn",d).onclick = close;
+    const body = el(`<div class="overlay-body flex-col gap-4"></div>`);
+
+    const modeRow = el(`<div class="segmented-control"><button class="btn sm primary" id="genModeBank"><span class="material-icons-o" style="font-size:16px">list_alt</span> ${esc(t("From Question Bank"))}</button><button class="btn sm ghost ai-toggle" id="genModeAi"><span class="material-icons-o" style="font-size:16px">auto_awesome</span> ${esc(t("AI-generated"))}</button></div>`);
+    body.appendChild(modeRow);
+
+    const modeBody = el(`<div></div>`);
+    body.appendChild(modeBody);
+
+    const contentField = el(`<div class="field"></div>`);
+    contentField.appendChild(el(`<label>${esc(t("Question content"))}</label>`));
+    const contentTextarea = el(`<textarea class="input" rows="14" placeholder="${esc(t("Select a preset question, or generate one with AI, to see its content here."))}"></textarea>`);
+    contentTextarea.oninput = (e)=>{ contentDraft = e.target.value; };
+    contentField.appendChild(contentTextarea);
+    body.appendChild(contentField);
+
+    const rubricField = el(`<div class="field" hidden></div>`);
+    rubricField.appendChild(el(`<label>${esc(t("Scoring rubric"))}</label>`));
+    const rubricDisplay = el(`<div class="card card-pad tiny" style="color:var(--text-secondary);line-height:1.8"></div>`);
+    rubricField.appendChild(rubricDisplay);
+    body.appendChild(rubricField);
+    function refreshRubricDisplay(){
+      if(generatedCompetencies && generatedCompetencies.length){
+        rubricField.hidden = false;
+        rubricDisplay.innerHTML = rubricLinesFor(generatedCompetencies).map(l=>`<div>${l}</div>`).join("");
+      } else {
+        rubricField.hidden = true;
+      }
+    }
+
+    function drawModeBody(){
+      modeBody.innerHTML = "";
+      if(mode==="bank"){
+        const roleQuestions = Object.values(DB.questions).filter(q=>q.status==="published" && q.roles.includes(job.title));
+        const bankSel = el(`<select class="input"></select>`);
+        bankSel.appendChild(el(`<option value="">${esc(t("— Select a preset question —"))}</option>`));
+        roleQuestions.forEach(q=>{
+          const opt = el(`<option value="${q.id}" ${selectedQuestionId===q.id?"selected":""}>${esc(q.code)} · ${esc(q.title)}</option>`);
+          bankSel.appendChild(opt);
+        });
+        bankSel.onchange = ()=>{
+          selectedQuestionId = bankSel.value;
+          generatedCompetencies = null; generatedDeliverables = null;
+          if(selectedQuestionId){ contentDraft = DB.questions[selectedQuestionId].prompt; contentTextarea.value = contentDraft; }
+          refreshRubricDisplay();
+        };
+        modeBody.appendChild(bankSel);
+        modeBody.appendChild(el(`<div class="tiny" style="margin-top:8px;color:var(--text-tertiary)">${esc(t("Approved v1; edits below only apply to this candidate's draft and never change the role preset."))}</div>`));
+      } else {
+        const aiPanel = el(`<div class="ai-panel flex-col gap-3"></div>`);
+        const focusField = el(`<div class="field"></div>`);
+        focusField.appendChild(el(`<label>${esc(t("Test focus"))}</label>`));
+        const focusInput = el(`<textarea class="input" rows="2" placeholder="${esc(t("Tell me which capability you'd like to focus on testing."))}">${esc(focusBrief)}</textarea>`);
+        focusInput.oninput = (e)=>{ focusBrief = e.target.value; if(!focusBrief.trim()){ generatedCompetencies = null; generatedDeliverables = null; } contentDraft = focusBrief.trim() ? buildGenerated(focusBrief.trim()) : ""; contentTextarea.value = contentDraft; refreshRubricDisplay(); };
+        focusField.appendChild(focusInput);
+        aiPanel.appendChild(focusField);
+        aiPanel.appendChild(el(`<div class="tiny" style="font-weight:600;color:var(--accent-700)">${esc(t("Based on this role's requirements, consider focusing on:"))}</div>`));
+        const chipsWrap = el(`<div></div>`);
+        suggestions.forEach(s=>{
+          const chip = el(`<button type="button" class="ai-suggest-chip">${esc(s.label)}</button>`);
+          chip.onclick = ()=>{ focusBrief = s.value; focusInput.value = s.value; contentDraft = buildGenerated(s.value); contentTextarea.value = contentDraft; refreshRubricDisplay(); };
+          chipsWrap.appendChild(chip);
+        });
+        aiPanel.appendChild(chipsWrap);
+        modeBody.appendChild(aiPanel);
+      }
+    }
+    drawModeBody();
+    qs("#genModeBank",modeRow).onclick = ()=>{ mode="bank"; generatedCompetencies=null; generatedDeliverables=null; contentDraft=""; contentTextarea.value=""; refreshRubricDisplay(); qs("#genModeBank",modeRow).classList.add("primary"); qs("#genModeAi",modeRow).classList.remove("primary"); drawModeBody(); };
+    qs("#genModeAi",modeRow).onclick = ()=>{ mode="ai"; generatedCompetencies=null; generatedDeliverables=null; contentDraft=""; contentTextarea.value=""; refreshRubricDisplay(); qs("#genModeAi",modeRow).classList.add("primary"); qs("#genModeBank",modeRow).classList.remove("primary"); drawModeBody(); };
+
+    d.appendChild(body);
+    const foot = el(`<div class="overlay-foot flex gap-2 justify-end"></div>`);
+    const cancelBtn = el(`<button class="btn ghost">${esc(t("Cancel"))}</button>`); cancelBtn.onclick = close;
+    const confirmBtn = el(`<button class="btn primary">${esc(t("Confirm generate"))}</button>`);
+    confirmBtn.onclick = ()=>{
+      if(!contentDraft.trim()){ toast(mode==="bank" ? t("Select a preset question first.") : t("Enter a test focus first."),"warning"); return; }
+      let qId = selectedQuestionId;
+      if(mode==="ai"){
+        qId = "q_ai_"+caseId+"_"+Date.now();
+        DB.questions[qId] = { id:qId, code:"AI-"+qId.slice(-4).toUpperCase(), title:(DB.settings.lang==="zh"?"AI 生成 · ":"AI-generated · ")+focusBrief.trim().slice(0,24), type:"Written + File", roles:[job.title], competencies: generatedCompetencies || [{name:focusBrief.trim().slice(0,20)||"Custom focus", fraction:1}], difficulty:"Medium", estMinutes:120, language:DB.settings.lang==="zh"?"中文":"English", version:1, status:"published", author:DB.settings.currentUser, favorite:false, deliverables: generatedDeliverables || [DB.settings.lang==="zh"?"工作样本产出 (deliverable.md)":"Work sample deliverable (deliverable.md)"], materials:[], usageCount:0, seenByCount:0, prompt:contentDraft };
+      }
+      if(!qId){ toast(t("Select a preset question first."),"warning"); return; }
+      const items = planItemsForCase(caseId, round.id);
+      const piId = "pi_"+caseId+"_"+round.id+"_"+(items.length+1);
+      const customPrompt = contentDraft!==DB.questions[qId].prompt ? contentDraft : null;
+      DB.plans[piId] = { id:piId, caseId, questionId:qId, kind: items.length===0?"required":"supplemental", status:"planned", customPrompt };
+      c.planItems.push(piId); round.planItemIds.push(piId);
+      const existingResult = Object.values(DB.results).find(r=>r.caseId===caseId);
+      if(c.status === "released" || (existingResult && ["published","final_not_released"].includes(existingResult.status))){
+        c.supplementalPending = true;
+        const relatedTask = Object.values(DB.tasks).find(t=>t.sourceRef===caseId);
+        if(relatedTask) relatedTask.status = "open";
+      }
+      saveDB(); toast(mode==="ai" ? t("Written test question and scoring rubric generated.") : t("Assessment question generated."),"success");
+      close(); if(onDone) onDone();
+    };
+    foot.appendChild(cancelBtn); foot.appendChild(confirmBtn);
+    d.appendChild(foot);
+    return d;
+  },{wide:true});
+}
+
+function openSendToCandidateDrawer(caseId, round, onSent){
+  const c = DB.cases[caseId];
+  const cand = candidateOf(caseId);
+  const items = planItemsForCase(caseId, round.id);
+  let mode = "timed";
+  let durationMin = 90;
+  let deadline = round.deadlineAt ? round.deadlineAt.slice(0,16) : "";
+  let disclosure = "score_and_summary";
+
+  openDrawer((close)=>{
+    const d = el(`<div class="flex-col" style="height:100%"></div>`);
+    d.appendChild(el(`<div class="overlay-head"><div><h3>${esc(t("Send to candidate"))}</h3><div class="tiny">${esc(cand.name)} · ${esc(cand.email)}</div></div><div class="icon-btn"><span class="material-icons-o">close</span></div></div>`));
+    qs(".icon-btn",d).onclick = close;
+    const body = el(`<div class="overlay-body flex-col gap-3"></div>`);
+
+    const qCard = el(`<div class="card card-pad"></div>`);
+    qCard.innerHTML = `<h4 style="margin-bottom:8px">${esc(t("Assessment questions"))}</h4>` + items.map(pi=>`<div class="tiny" style="padding:4px 0">${esc(DB.questions[pi.questionId].code)} · ${esc(DB.questions[pi.questionId].title)}</div>`).join("");
+    body.appendChild(qCard);
+
+    const modeField = el(`<div class="field"></div>`);
+    modeField.appendChild(el(`<label>${esc(t("Mode"))}</label>`));
+    const modeRow = el(`<div class="flex gap-2"><button class="btn sm primary" id="sendModeTimed">${esc(t("Timed"))}</button><button class="btn sm ghost" id="sendModeDeadline">${esc(t("Deadline only"))}</button></div>`);
+    modeField.appendChild(modeRow);
+    body.appendChild(modeField);
+
+    const durationField = el(`<div class="field"></div>`);
+    durationField.appendChild(el(`<label>${esc(t("Duration once started (minutes)"))}</label>`));
+    const durationInput = el(`<input class="input" type="number" value="${durationMin}" style="max-width:160px">`);
+    durationInput.oninput = (e)=>{ durationMin = parseInt(e.target.value)||90; };
+    durationField.appendChild(durationInput);
+    body.appendChild(durationField);
+
+    const deadlineField = el(`<div class="field"></div>`);
+    deadlineField.appendChild(el(`<label>${esc(t("Deadline"))}</label>`));
+    const deadlineInput = el(`<input class="input" type="datetime-local" value="${deadline}">`);
+    deadlineInput.oninput = (e)=>{ deadline = e.target.value; };
+    deadlineField.appendChild(deadlineInput);
+    body.appendChild(deadlineField);
+
+    qs("#sendModeTimed",modeRow).onclick = ()=>{ mode="timed"; qs("#sendModeTimed",modeRow).classList.add("primary"); qs("#sendModeDeadline",modeRow).classList.remove("primary"); durationField.hidden=false; };
+    qs("#sendModeDeadline",modeRow).onclick = ()=>{ mode="deadline_only"; qs("#sendModeDeadline",modeRow).classList.add("primary"); qs("#sendModeTimed",modeRow).classList.remove("primary"); durationField.hidden=true; };
+
+    const discField = el(`<div class="field"></div>`);
+    discField.appendChild(el(`<label>${esc(t("Result disclosure"))}</label>`));
+    [["score_and_summary",t("Score + summary")],["summary_only",t("Summary only (no numeric score)")]].forEach(([val,label])=>{
+      const row = el(`<label class="checkbox-row" style="margin-bottom:6px;cursor:pointer"><input type="radio" name="sendDisc" ${disclosure===val?"checked":""}> ${esc(label)}</label>`);
+      qs("input",row).onchange = ()=> disclosure = val;
+      discField.appendChild(row);
+    });
+    body.appendChild(discField);
+
+    body.appendChild(el(`<div class="banner info tiny">${esc(t("From / Reply-To:"))} hr@sendinglabs.com ${esc(t("(simulated)"))}</div>`));
+
+    d.appendChild(body);
+    const foot = el(`<div class="overlay-foot flex gap-2 justify-end"></div>`);
+    const cancelBtn = el(`<button class="btn ghost">${esc(t("Cancel"))}</button>`); cancelBtn.onclick = close;
+    const confirmBtn = el(`<button class="btn primary">${esc(t("Confirm send"))}</button>`);
+    confirmBtn.onclick = ()=>{
+      if(!deadline){ toast(t("Set a deadline first."),"warning"); return; }
+      const invId = "inv_"+caseId+"_"+round.id;
+      DB.invitations[invId] = { id:invId, caseId, roundId:round.id, questionIds:items.map(pi=>pi.questionId), mode, durationMin: mode==="timed"?durationMin:null, deadline:new Date(deadline+":00Z").toISOString(), status:"sent", acceptedAt:null, startedAt:null, disclosurePolicy:disclosure };
+      c.status = "awaiting_acceptance";
+      round.status = "invited";
+      saveDB(); toast(t("Invitation sent to candidate."),"success");
+      close(); if(onSent) onSent();
+    };
+    foot.appendChild(cancelBtn); foot.appendChild(confirmBtn);
+    d.appendChild(foot);
+    return d;
+  },{wide:true});
 }
 </script>
 <script>
@@ -2899,43 +3348,68 @@ function openMailDrawer(m){
   });
 }
 
-function pageSubmissionDetail(attId){
+function pageSubmissionDetail(attId, opts={}){
   const att = DB.attempts[attId];
   const wrap = el(`<div></div>`);
   if(!att){ wrap.appendChild(el(`<div class="banner danger">${esc(t("Attempt not found."))}</div>`)); return wrap; }
   const c = DB.cases[att.caseId]; const cand = DB.core.candidates[c.candidateId];
   const q = DB.questions[att.questionId];
-  wrap.appendChild(crumbs([{label:t("Submission Inbox"),href:"#/submissions"},{label:cand.name}]));
-  wrap.appendChild(el(`<h1 style="margin-bottom:4px">${esc(cand.name)} — ${esc(q.code)} ${DB.settings.lang==="zh"?`第 ${att.round} 轮`:`round ${att.round}`}</h1>`));
+  if(!opts.inline){
+    wrap.appendChild(crumbs([{label:t("Submission Inbox"),href:"#/submissions"},{label:cand.name}]));
+    wrap.appendChild(el(`<h1 style="margin-bottom:4px">${esc(cand.name)} — ${esc(q.code)} ${DB.settings.lang==="zh"?`第 ${att.round} 轮`:`round ${att.round}`}</h1>`));
+  }
   wrap.appendChild(el(`<div class="flex items-center gap-3" style="margin-bottom:16px">${statusBadge(att.status)}<span class="tiny">${esc(t("Received"))} ${esc(fmtDate(att.receivedAt))} · ${esc(t("Processed"))} ${esc(fmtDate(att.processedAt))}</span></div>`));
 
-  const cols = el(`<div class="two-col"></div>`);
-  const left = el(`<div class="card card-pad"></div>`);
+  const archiveCard = el(`<div class="card card-pad" style="margin-bottom:16px"></div>`);
   const file = DB.core.files[att.fileRef];
-  left.innerHTML = `<h4 style="margin-bottom:8px">${esc(t("Original archive"))}</h4>
-    <div class="mono tiny" style="margin-bottom:8px">${esc(file?file.name:"—")} · v${file?file.versions[0].ver:1} · ${file?file.versions[0].size:""} · ${file?file.versions[0].checksum:""}</div>
-    <div class="flex-col gap-1">${(q.deliverables||[]).map(d=>`<div class="flex items-center justify-between" style="padding:6px 0;border-bottom:1px solid var(--border)"><span>${esc(d)}</span>${att.missing&&att.missing.includes(d)?`<span class="badge warning">${esc(t("Missing"))}</span>`:`<span class="badge success">${esc(t("Received"))}</span>`}</div>`).join("")}</div>`;
-  cols.appendChild(left);
+  archiveCard.innerHTML = `<div class="flex items-center justify-between wrap gap-2" style="margin-bottom:2px"><h4 style="margin:0">${esc(t("Original archive"))}</h4>${file?`<button class="btn sm ghost" id="btnDownloadArchive"><span class="material-icons-o" style="font-size:16px">download</span> ${esc(t("Download"))}</button>`:""}</div>
+    <div class="mono tiny" style="color:var(--text-secondary)">${esc(file?file.name:"—")} · v${file?file.versions[0].ver:1} · ${file?file.versions[0].size:""} · ${file?file.versions[0].checksum:""}</div>`;
+  wrap.appendChild(archiveCard);
+  if(file){ qs("#btnDownloadArchive",archiveCard).onclick = ()=> toast("Download simulated (demo) — "+file.name,"info"); }
 
-  const right = el(`<div class="flex-col gap-3"></div>`);
-  const infoCard = el(`<div class="card card-pad"></div>`);
+  const filesCard = el(`<div class="card" style="margin-bottom:16px;overflow:hidden"></div>`);
+  filesCard.appendChild(el(`<div class="card-pad" style="padding-bottom:8px"><h4 style="margin:0">${esc(t("Deliverable files"))}</h4></div>`));
+  const fileGridCols = "minmax(180px,1fr) 100px 110px minmax(150px,auto)";
+  (q.deliverables||[]).forEach(d=>{
+    const match = d.match(/^(.*?)\s*\(([^)]+)\)\s*$/);
+    const label = match ? match[1] : d;
+    const filename = match ? match[2] : null;
+    const missing = !!(att.missing && att.missing.includes(d));
+    const row = el(`<div style="display:grid;grid-template-columns:${fileGridCols};gap:12px;align-items:center;padding:12px 16px;border-top:1px solid var(--border)"></div>`);
+    row.innerHTML = `<div class="flex items-center gap-3" style="min-width:0">
+        <span class="material-icons-o" style="font-size:20px;color:${missing?'var(--text-tertiary)':'var(--accent)'}">${missing?'insert_drive_file':'description'}</span>
+        <div style="min-width:0"><div class="task-title truncate">${esc(filename||label)}</div><div class="tiny truncate">${esc(label)}</div></div>
+      </div>
+      <div class="tiny">${missing?"—":esc(fmtDateShort(att.receivedAt))}</div>
+      <div>${missing?`<span class="badge warning">${esc(t("Missing"))}</span>`:`<span class="badge success">${esc(t("Received"))}</span>`}</div>`;
+    const actions = el(`<div class="flex gap-2"></div>`);
+    if(!missing){
+      const previewBtn = el(`<button class="btn sm ghost">${esc(t("Preview"))}</button>`); previewBtn.onclick = ()=> toast("Preview simulated (demo) — "+(filename||label),"info");
+      const downloadBtn = el(`<button class="btn sm ghost">${esc(t("Download"))}</button>`); downloadBtn.onclick = ()=> toast("Download simulated (demo) — "+(filename||label),"info");
+      actions.appendChild(previewBtn); actions.appendChild(downloadBtn);
+    }
+    row.appendChild(actions);
+    filesCard.appendChild(row);
+  });
+  wrap.appendChild(filesCard);
+
+  const infoCard = el(`<div class="card card-pad" style="margin-bottom:16px"></div>`);
   infoCard.innerHTML = `<h4 style="margin-bottom:8px">${esc(t("Identity & round match"))}</h4>
     <div class="tiny">${esc(t("Candidate:"))} ${esc(cand.name)} (${esc(cand.email)})</div>
     <div class="tiny">${esc(t("Round:"))} ${att.round} · ${esc(t("Task binding: confirmed"))}</div>`;
-  right.appendChild(infoCard);
+  wrap.appendChild(infoCard);
+
   if(att.status==="incomplete"){
     const issueCard = el(`<div class="card card-pad"></div>`);
     issueCard.innerHTML = `<div class="banner warning" style="margin-bottom:8px">${esc(t("Missing"))} ${esc((att.missing||[]).join(", "))}</div>`;
     const btn = el(`<button class="btn">${esc(t("Request missing files"))}</button>`); btn.onclick=()=>toast("Requested missing files from candidate (demo).","info");
     issueCard.appendChild(btn);
-    right.appendChild(issueCard);
+    wrap.appendChild(issueCard);
   } else {
     const goBtn = el(`<button class="btn primary">${esc(t("Go to evaluation →"))}</button>`);
-    goBtn.onclick = ()=> navigate("#/attempts/"+att.id+"/review");
-    right.appendChild(goBtn);
+    goBtn.onclick = opts.onGoToEvaluation ? opts.onGoToEvaluation : (()=> navigate("#/attempts/"+att.id+"/review"));
+    wrap.appendChild(goBtn);
   }
-  cols.appendChild(right);
-  wrap.appendChild(cols);
   return wrap;
 }
 </script>
@@ -2950,7 +3424,7 @@ function computeOverall(criteria, key){
   return Math.round(criteria.reduce((sum,c)=> sum + (c[key]/c.max)*(c.max), 0));
 }
 
-function pageEvaluationReview(attId){
+function pageEvaluationReview(attId, opts={}){
   const att = DB.attempts[attId];
   const wrap = el(`<div></div>`);
   if(!att){ wrap.appendChild(el(`<div class="banner danger">${esc(t("Attempt not found."))}</div>`)); return wrap; }
@@ -3010,15 +3484,7 @@ function pageEvaluationReview(attId){
   });
   wrap.appendChild(critCard);
 
-  const actions = el(`<div class="flex gap-2 wrap"></div>`);
-  const acceptAllBtn = el(`<button class="btn">${esc(t("Accept all AI scores"))}</button>`);
-  acceptAllBtn.onclick = ()=>{ evaluation.criteria.forEach(c=>{ c.human=c.ai; c.overridden=false; }); saveDB(); navigate("#/attempts/"+attId+"/review"); };
-  actions.appendChild(acceptAllBtn);
-  const retryAiBtn = el(`<button class="btn ghost">${esc(t("Re-run AI (demo)"))}</button>`);
-  retryAiBtn.onclick = ()=> toast("AI re-run queued (demo) — no change to already-finalized scores.","info");
-  actions.appendChild(retryAiBtn);
-  const finalizeBtn = el(`<button class="btn primary">${esc(t("Finalize evaluation"))}</button>`);
-  finalizeBtn.onclick = ()=>{
+  const commitFinalize = (closeDrawer=null)=>{
     if(evaluation.criteria.some(c=>c.human==null)){ toast("Set a human score for every criterion before finalizing.","warning"); return; }
     if(evaluation.criteria.some(c=>c.overridden && !c.overrideReason)){ toast("Add an override reason for every changed score.","warning"); return; }
     evaluation.status = "final"; evaluation.finalizedBy = DB.settings.currentUser; evaluation.finalizedAt = nowISO();
@@ -3028,10 +3494,45 @@ function pageEvaluationReview(attId){
     if(relatedTask) relatedTask.status = "completed";
     const releaseTaskId = "t_release_"+caseId;
     DB.tasks[releaseTaskId] = { id:releaseTaskId, title:"Publish "+cand.name+"'s result", type:"result_release", assignee:"user_john", status:"open", dueAt:nowISO(), link:"#/results/"+caseId+"/release", sourceRef:caseId };
-    saveDB(); toast("Evaluation finalized. Overall: "+overall,"success");
-    navigate("#/results/"+caseId+"/release");
+    saveDB();
+    if(closeDrawer){ closeDrawer(); toast("Evaluation finalized. Overall: "+overall,"success"); render(); }
+    else { toast("Evaluation finalized. Overall: "+overall,"success"); navigate("#/results/"+caseId+"/release"); }
   };
-  actions.appendChild(finalizeBtn);
+  const actions = el(`<div class="flex gap-2 wrap"></div>`);
+  const acceptAllBtn = el(`<button class="btn">${esc(t("Accept all AI scores"))}</button>`);
+  acceptAllBtn.onclick = ()=>{ evaluation.criteria.forEach(c=>{ c.human=c.ai; c.overridden=false; }); saveDB(); toast("All AI scores accepted.","success"); render(); };
+  actions.appendChild(acceptAllBtn);
+  const retryAiBtn = el(`<button class="btn ghost">${esc(t("Re-run AI (demo)"))}</button>`);
+  retryAiBtn.onclick = ()=>{
+    if(evaluation.status==="final"){ toast("Already finalized — AI re-run is disabled.","info"); return; }
+    evaluation.criteria.forEach(c=>{ const delta = Math.round((Math.random()*6)-3); c.ai = Math.max(0, Math.min(c.max, c.ai+delta)); });
+    saveDB(); toast("AI re-run complete — AI scores refreshed.","success"); render();
+  };
+  actions.appendChild(retryAiBtn);
+  const openReleaseDrawer = ()=>openDrawer((close)=>{
+    const d=el(`<div class="flex-col" style="height:100%"></div>`);
+    d.appendChild(el(`<div class="overlay-head"><div><h3>${esc(t("Final result"))}</h3><div class="tiny">${esc(cand.name)} · ${esc(q.code)}</div></div><div class="icon-btn"><span class="material-icons-o">close</span></div></div>`));
+    qs(".icon-btn",d).onclick=close;
+    const body=el(`<div class="overlay-body"></div>`); body.appendChild(pageRelease(caseId)); d.appendChild(body);
+    return d;
+  },{wide:true});
+  const isFinalized = evaluation.status === "final" || !!Object.values(DB.results).find(r=>r.caseId===caseId && ["final_not_released","published"].includes(r.status));
+  const finalizeBtn = el(`<button class="btn primary">${esc(t(isFinalized ? "View final result" : "Finalize evaluation"))}</button>`);
+  finalizeBtn.onclick = ()=>{
+    if(isFinalized){ if(opts.onViewFinalResult){ opts.onViewFinalResult(); } else { openReleaseDrawer(); } return; }
+    if(!opts.inline){ commitFinalize(); return; }
+    openDrawer((close)=>{
+      const d=el(`<div class="flex-col" style="height:100%"></div>`);
+      d.appendChild(el(`<div class="overlay-head"><div><h3>${esc(t("Finalize evaluation"))}</h3><div class="tiny">${esc(cand.name)} · ${esc(q.code)}</div></div><div class="icon-btn"><span class="material-icons-o">close</span></div></div>`));
+      qs(".icon-btn",d).onclick=close;
+      const body=el(`<div class="overlay-body"></div>`);
+      body.appendChild(pageRelease(caseId));
+      d.appendChild(body);
+      const foot=el(`<div class="overlay-foot flex gap-2 justify-end"><button class="btn ghost" id="cancelFinalize">${esc(t("Cancel"))}</button><button class="btn primary" id="confirmFinalize">${esc(t("Confirm finalize"))}</button></div>`);
+      qs("#cancelFinalize",foot).onclick=close; qs("#confirmFinalize",foot).onclick=()=>commitFinalize(close); d.appendChild(foot); return d;
+    },{wide:true});
+  };
+  if(!opts.hideFinalize) actions.appendChild(finalizeBtn);
   wrap.appendChild(actions);
   return wrap;
 }
@@ -3044,17 +3545,19 @@ route("/results/:id/release", (p)=> pageRelease(p.id));
 route("/cases/:id/revisions/:round", (p)=> pageRevision(p.id, p.round));
 route("/deliveries/:id", (p)=> pageDelivery(p.id));
 
-function pageRelease(caseId){
+function pageRelease(caseId, opts={}){
   const wrap = el(`<div></div>`);
   const c = DB.cases[caseId]; const cand = candidateOf(caseId);
   const result = Object.values(DB.results).find(r=>r.caseId===caseId);
-  if(!c || !result){ wrap.appendChild(el(`<div class="banner danger">${esc(t("No finalized result for this case yet."))}</div>`)); return wrap; }
+  if(!c || !result){ wrap.appendChild(el(`<div class="empty card card-pad">${esc(t("No finalized result for this case yet."))}</div>`)); return wrap; }
   const evaluation = DB.evaluations[result.evaluationId];
   const release = Object.values(DB.releases).find(r=>r.caseId===caseId);
   const inv = Object.values(DB.invitations).find(i=>i.caseId===caseId);
 
-  wrap.appendChild(crumbs([{label:t("Assessments"),href:"#/assessments"},{label:cand.name}]));
-  wrap.appendChild(el(`<h1 style="margin-bottom:16px">${esc(cand.name)} — ${esc(t("Release"))}</h1>`));
+  if(!opts.inline){
+    wrap.appendChild(crumbs([{label:t("Assessments"),href:"#/assessments"},{label:cand.name}]));
+    wrap.appendChild(el(`<h1 style="margin-bottom:16px">${esc(cand.name)} — ${esc(t("Release"))}</h1>`));
+  }
 
   const cols = el(`<div class="two-col"></div>`);
   const left = el(`<div class="card card-pad"></div>`);
@@ -3110,12 +3613,11 @@ function pageRelease(caseId){
     const revBtn = el(`<button class="btn ${release.nextAction==='revision'?'':''}">${esc(t("Request revision"))}</button>`);
     revBtn.disabled = !!release.nextAction;
     revBtn.onclick = ()=> openRevisionRequestModal(caseId, release);
-    const suppBtn = el(`<button class="btn">${esc(t("Add supplemental test"))}</button>`); suppBtn.onclick = ()=> openQuestionPickerDrawer(caseId);
+    const suppBtn = el(`<button class="btn">${esc(t("Add supplemental test"))}</button>`); suppBtn.onclick = ()=>{ planPageSelectedTab[caseId]="plan"; saveDB(); navigate("#/cases/"+caseId+"/plan"); };
     const interviewBtn = el(`<button class="btn">${esc(t("Prepare Interview handoff"))}</button>`); interviewBtn.onclick = ()=> openHandoffPrep(caseId);
     const holdBtn = el(`<button class="btn ghost">${esc(t("Hold"))}</button>`); holdBtn.onclick = ()=> toast("Case placed on hold (demo).","info");
     const closeBtn = el(`<button class="btn ghost">${esc(t("Close testing"))}</button>`); closeBtn.onclick = ()=> toast("Testing closed for this case (demo).","info");
-    const pivotBtn = el(`<button class="btn ghost">${esc(t("Propose cross-role pivot"))}</button>`); pivotBtn.onclick = ()=>{ release.nextAction='pivot'; release.pivotProposal={createdAt:nowISO(),status:'draft',targetRole:'Finance Director'}; saveDB(); toast("Cross-role pivot proposal prepared for review.","success"); navigate("#/results/"+caseId+"/release"); };
-    [revBtn,suppBtn,interviewBtn,holdBtn,closeBtn,pivotBtn].forEach(b=>btnRow.appendChild(b));
+    [revBtn,suppBtn,interviewBtn,holdBtn,closeBtn].forEach(b=>btnRow.appendChild(b));
     nextCard.appendChild(btnRow);
     if(release.nextAction==="revision") nextCard.appendChild(el(`<div class="banner info" style="margin-top:12px">${esc(t("Revision round"))} ${release.revisionRound} ${esc(t("requested — candidate has been notified."))} <a style="cursor:pointer" id="goRev">${esc(t("Open revision workspace →"))}</a></div>`));
     wrap.appendChild(nextCard);
@@ -3217,8 +3719,16 @@ function openHandoffPrep(caseId){
     ] };
     saveDB();
   }
+  openDrawer((close)=>{
+    const drawer = el(`<div class="flex-col" style="height:100%"></div>`);
+    drawer.appendChild(el(`<div class="overlay-head"><div><h3>${esc(t("Prepare Interview handoff"))}</h3><div class="tiny">${esc(cand.name)}</div></div><div class="icon-btn"><span class="material-icons-o">close</span></div></div>`));
+    qs(".icon-btn",drawer).onclick = close;
+    const body = el(`<div class="overlay-body"></div>`);
+    body.appendChild(pageDelivery(delId,{inDrawer:true}));
+    drawer.appendChild(body);
+    return drawer;
+  },{wide:true});
   toast("Interview handoff package prepared for "+cand.name+".","success");
-  navigate("#/deliveries/"+delId);
 }
 
 function pageDelivery(delId){
@@ -3289,6 +3799,7 @@ function pageComparisonDetail(id){
   const cmp = DB.comparisons[id];
   const wrap = el(`<div></div>`);
   if(!cmp){ wrap.appendChild(el(`<div class="banner danger">${esc(t("Comparison not found."))}</div>`)); return wrap; }
+  wrap.appendChild(crumbs([{label:t("My Tasks"),href:"#/tasks"},{label:t("Compare")}]));
   wrap.appendChild(el(`<div class="flex items-center justify-between wrap gap-3" style="margin-bottom:4px"><h1>${esc(t("Compare"))}</h1>
     <div class="flex gap-2"><button class="btn sm" id="btnRefresh">${esc(t("Refresh"))}</button><button class="btn sm" id="btnExport">${esc(t("Export"))}</button></div></div>`));
   qs("#btnRefresh",wrap).onclick = ()=>{ cmp.createdAt = nowISO(); saveDB(); toast("New snapshot created; previous version retained.","info"); navigate("#/comparisons/"+id); };
