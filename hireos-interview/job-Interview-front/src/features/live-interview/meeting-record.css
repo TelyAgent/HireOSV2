@@ -1,0 +1,14 @@
+.meeting-record .record-tabs { display: flex; border-bottom: 1px solid var(--line); }
+.meeting-record .record-tabs button { flex: 1; height: 38px; border: 0; border-bottom: 2px solid transparent; background: transparent; color: var(--ink-2); font-size: 12px; font-weight: 600; cursor: pointer; }
+.meeting-record .record-tabs button[aria-selected="true"] { border-bottom-color: var(--brand); color: var(--brand); }
+.meeting-record textarea { box-sizing: border-box; width: 100%; height: 160px; border: 1px solid var(--line-strong); border-radius: 10px; padding: 10px 12px; color: var(--ink); background: var(--surface); font: inherit; resize: vertical; font-size: 12.5px; line-height: 1.55; }
+.meeting-record .live-side-content button { border: 1px solid var(--line-strong); border-radius: 6px; padding: 6px 10px; color: var(--brand); background: var(--surface); cursor: pointer; font-size: 12px; }
+.meeting-record button:disabled { opacity: .5; cursor: not-allowed; }
+.meeting-record p,.meeting-record .record-status { font-size: 11.5px; line-height: 1.6; color: var(--ink-2); overflow-wrap: anywhere; margin: 8px 0; }
+.meeting-record .record-error { color: var(--bad); font-size: 12px; overflow-wrap: anywhere; }
+.meeting-record .record-conflict { margin-top: 12px; display: grid; gap: 8px; }
+.meeting-record .side-eyebrow { font-family: 'IBM Plex Mono', monospace; font-size: 10.5px; font-weight: 600; letter-spacing: .05em; color: var(--ink-3); }
+.meeting-record .transcript-row { display: grid; grid-template-columns: 54px minmax(0, 1fr); gap: 8px; margin-top: 12px; font-size: 12px; line-height: 1.55; }
+.meeting-record .ai-suggestion-card { width: 100%; padding: 14px 16px; border: 1px solid var(--line); border-radius: 11px; background: var(--surface-2); color: var(--ink); font-size: 12px; line-height: 1.5; text-align: left; cursor: pointer; }
+.meeting-record .ai-suggestion-card:hover { border-color: var(--brand); }
+.meeting-record .record-empty { margin-top: 9px; padding: 11px; border: 1px dashed var(--line-strong); border-radius: 10px; font-size: 12px; color: var(--ink-3); }

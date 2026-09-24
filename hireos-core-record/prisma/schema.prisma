@@ -1,0 +1,247 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Candidate {
+  id              String   @id @default(uuid())
+  workspaceId     String
+  displayName     String
+  email           String?
+  phone           String?
+  identityStatus  String   @default("provisional")
+  ownerId         String
+  status          String   @default("active")
+  retentionPolicy String   @default("standard-24mo")
+  version         Int      @default(1)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  applications    Application[]
+  materials       Material[]
+  statusHistory   CandidateStatusHistory[]
+
+  @@index([workspaceId, createdAt])
+  @@index([workspaceId, email])
+}
+
+model CandidateStatusHistory {
+  id          String   @id @default(uuid())
+  workspaceId String
+  candidateId String
+  fromStatus  String?
+  toStatus    String
+  reason      String
+  actorId     String
+  createdAt   DateTime @default(now())
+  candidate   Candidate @relation(fields: [candidateId], references: [id], onDelete: Cascade)
+
+  @@index([workspaceId, candidateId, createdAt])
+}
+
+model Job {
+  id             String   @id @default(uuid())
+  workspaceId    String
+  title          String
+  team           String?
+  location       String?
+  employmentType String?
+  seniority      String?
+  status         String   @default("draft")
+  openings       Int      @default(1)
+  createdBy      String
+  version        Int      @default(1)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  applications   Application[]
+  statusHistory  JobStatusHistory[]
+  roleVersions   RoleDefinitionVersion[]
+  snapshots      JobRequirementSnapshot[]
+
+  @@index([workspaceId, status, createdAt])
+}
+
+model RoleDefinitionVersion {
+  id                    String   @id @default(uuid())
+  workspaceId           String
+  jobId                 String
+  versionNo             Int
+  origin                String   @default("jd_module")
+  status                String   @default("draft")
+  roleSummary           String?
+  responsibilities      Json
+  requirements          Json
+  dimensions            Json
+  evaluationReadiness   String   @default("needs_configuration")
+  hiringContext         Json?
+  successCriteria       Json?
+  internalCompensation  Json?
+  publicCompensation    Json?
+  sourceRefs            Json
+  confirmationRef       Json?
+  confirmedBy           String?
+  confirmedAt           DateTime?
+  contentHash           String
+  createdBy             String
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+  job                   Job      @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  snapshots             JobRequirementSnapshot[]
+
+  @@unique([workspaceId, jobId, versionNo])
+  @@index([workspaceId, jobId, status])
+}
+
+model JobRequirementSnapshot {
+  id                   String   @id @default(uuid())
+  workspaceId          String
+  jobId                String
+  roleVersionId        String
+  status               String   @default("confirmed")
+  audience             String
+  purpose              String
+  consumerModule       String?
+  profileProjection    Json
+  jdText               String?
+  policyRefs           Json
+  confirmationRef      Json?
+  sourceHash           String
+  projectionHash       String
+  projectionSchema     String
+  createdBy             String
+  createdAt             DateTime @default(now())
+  job                  Job                  @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  roleVersion          RoleDefinitionVersion @relation(fields: [roleVersionId], references: [id], onDelete: Cascade)
+
+  @@unique([workspaceId, roleVersionId, purpose, consumerModule])
+  @@index([workspaceId, jobId, status])
+}
+
+model JobStatusHistory {
+  id          String   @id @default(uuid())
+  workspaceId String
+  jobId       String
+  fromStatus  String?
+  toStatus    String
+  reason      String
+  actorId     String
+  createdAt   DateTime @default(now())
+  job         Job      @relation(fields: [jobId], references: [id], onDelete: Cascade)
+
+  @@index([workspaceId, jobId, createdAt])
+}
+
+model Application {
+  id          String   @id @default(uuid())
+  workspaceId String
+  candidateId String
+  jobId       String
+  cycleId     String   @default("cycle-1")
+  status      String   @default("active")
+  origin      String   @default("sourced")
+  linkReason  String
+  linkedAt    DateTime @default(now())
+  linkedBy    String
+  version     Int      @default(1)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  candidate   Candidate @relation(fields: [candidateId], references: [id], onDelete: Restrict)
+  job         Job       @relation(fields: [jobId], references: [id], onDelete: Restrict)
+  statusHistory ApplicationStatusHistory[]
+
+  @@unique([workspaceId, candidateId, jobId, cycleId])
+  @@index([workspaceId, jobId, status])
+  @@index([workspaceId, candidateId, status])
+}
+
+model ApplicationStatusHistory {
+  id            String   @id @default(uuid())
+  workspaceId   String
+  applicationId String
+  fromStatus    String?
+  toStatus      String
+  reason        String
+  actorId       String
+  createdAt     DateTime @default(now())
+  application   Application @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+
+  @@index([workspaceId, applicationId, createdAt])
+}
+
+model Material {
+  id             String   @id @default(uuid())
+  workspaceId    String
+  name           String
+  mime           String
+  size           Int
+  hash           String
+  storageKey     String
+  readStatus     String   @default("pending")
+  securityStatus String   @default("not_scanned")
+  version        Int      @default(1)
+  candidateId    String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  candidate      Candidate? @relation(fields: [candidateId], references: [id], onDelete: SetNull)
+
+  @@unique([workspaceId, hash])
+  @@index([workspaceId, createdAt])
+  @@index([workspaceId, candidateId])
+}
+
+model IdempotencyKey {
+  id             String   @id @default(uuid())
+  workspaceId    String
+  operation      String
+  key            String
+  requestHash    String
+  responseStatus Int
+  responseBody   Json
+  createdAt      DateTime @default(now())
+  expiresAt      DateTime?
+
+  @@unique([workspaceId, operation, key])
+  @@index([workspaceId, createdAt])
+}
+
+model AuditRecord {
+  id            String   @id @default(uuid())
+  workspaceId   String
+  actorId       String
+  action        String
+  objectType    String
+  objectId      String
+  beforeVersion Int?
+  afterVersion  Int?
+  reason        String?
+  requestId     String?
+  correlationId String?
+  sourceService String   @default("core-record")
+  payload       Json
+  createdAt     DateTime @default(now())
+
+  @@index([workspaceId, createdAt])
+  @@index([workspaceId, objectType, objectId])
+}
+
+model OutboxEvent {
+  id              String   @id @default(uuid())
+  workspaceId     String
+  eventType       String
+  schemaVersion   String   @default("1.0")
+  aggregateType   String
+  aggregateId     String
+  aggregateVersion Int
+  correlationId   String?
+  payload         Json
+  status          String   @default("pending")
+  attempts        Int      @default(0)
+  publishedAt     DateTime?
+  createdAt       DateTime @default(now())
+
+  @@index([workspaceId, status, createdAt])
+  @@index([workspaceId, aggregateType, aggregateId])
+}

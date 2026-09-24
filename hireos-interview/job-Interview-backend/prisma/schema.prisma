@@ -1,0 +1,410 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// A person who can be assigned as the owner / lead interviewer of a plan round.
+// Standalone directory entry for now — not linked to Account & System Configuration's
+// membership records yet, since that module doesn't exist in this prototype.
+model Interviewer {
+  id          String   @id @default(uuid())
+  workspaceId String
+  name        String
+  title       String?
+  email       String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  rounds      InterviewRound[]
+  @@index([workspaceId, createdAt])
+}
+
+// A Job never originates in Interview: its identity (title/department/location/level)
+// is Core Record's Job, attached via ScreeningHandoffService (a Screening decision) or
+// JobsService.attach (a recruiter picking an existing JD from the JD subsystem). jdText
+// is a synced, human-readable snapshot of that external JD content -- kept locally (not
+// fetched live on every read) because RubricService's capability-card generation needs a
+// stable, versioned text to hash and diff against (jdVersion bumps only when the synced
+// text actually changes, exactly like the old review()'s jdVersion bump did).
+model Job {
+  id             String   @id @default(uuid())
+  workspaceId    String
+  createdBy      String
+  // Core Record's Job id. Always set for any Job reachable from current code paths;
+  // nullable only because a handful of pre-migration rows predate this field.
+  coreJobId      String?  @unique
+  title          String
+  department     String?
+  location       String?
+  level          String?
+  // Synced from Core Record's Job.status (see CoreRecordClient.getJob / mapRecruitingStatus)
+  // on every attach/hand-off -- Interview has no recruiting-status workflow of its own.
+  recruitingStatus String @default("unknown")
+  jdText         String
+  jdVersion      Int      @default(1)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  materials      JobMaterial[]
+  parseJobs      ParseJob[]
+  revisions      Revision[]
+  tasks          InterviewTask[]
+  rubricVersions RubricVersion[]
+  @@index([workspaceId, createdAt])
+}
+
+// Candidate identity, kept separate from Job/Task so the same person can be matched
+// against multiple JDs without duplicating their profile.
+model Candidate {
+  id              String   @id @default(uuid())
+  workspaceId     String
+  // Core Record's Candidate id, set only for candidates that arrived via a Screening
+  // hand-off. Null for candidates created locally from an uploaded résumé.
+  coreCandidateId String?  @unique
+  name            String
+  email           String?
+  phone           String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  resumes     Resume[]
+  tasks       InterviewTask[]
+  @@index([workspaceId, createdAt])
+}
+
+// A résumé file, layered on top of the generic Material (file/text/segments/readStatus).
+// A candidate can have more than one résumé version over time.
+model Resume {
+  id          String    @id @default(uuid())
+  workspaceId String
+  candidateId String
+  materialId  String    @unique
+  parsedAt    DateTime?
+  createdAt   DateTime  @default(now())
+  candidate   Candidate @relation(fields: [candidateId], references: [id], onDelete: Cascade)
+  material    Material  @relation(fields: [materialId], references: [id])
+  parseJobs   ParseJob[]
+  tasks       InterviewTask[]
+  @@index([workspaceId, candidateId])
+}
+
+// The Application: one Job + one Candidate is one unique interview task. This is the
+// row everything else (sessions, revisions, task-specific materials) hangs off of.
+model InterviewTask {
+  id                   String    @id @default(uuid())
+  workspaceId          String
+  createdBy            String
+  jobId                String
+  candidateId          String
+  resumeId             String?
+  status               String    @default("draft")
+  version              Int       @default(1)
+  reviewed             Boolean   @default(false)
+  matchScore           Int?      // 0-100, handed off from Resume Screening
+  matchRecommendation  String?   // strong_match | match | weak_match
+  screeningHandedOffAt DateTime?
+  // Decision & Next Steps. `decisionConclusion` is the AI-drafted narrative materialized
+  // from a `decision_summary` ParseJob (grounded in the task's real card scores — see
+  // rubric/decision-contracts.ts); `decision` is the human's final call, never the AI's.
+  decision             String?   // continue_next_round | hold | request_more_evidence | do_not_proceed | recommend_offer
+  decisionAt           DateTime?
+  decisionConclusion   String?
+  decisionSuggested    String?   // what the AI draft suggested, kept for comparison
+  decisionSourceJobId  String?   // which ParseJob's draft is materialized above
+  // Evaluation Package: HR / Hiring Manager sign-off, independent of `decision` and of each
+  // other. `offerState` is a local handoff record only — no real Offer module exists in this
+  // codebase to call, so "sent" is this state machine's own terminal state, not a live ack.
+  hrConfirmedBy        String?
+  hrConfirmedAt        DateTime?
+  hmConfirmedBy        String?
+  hmConfirmedAt        DateTime?
+  offerState           String    @default("none") // none | sent
+  offerSentAt          DateTime?
+  createdAt            DateTime  @default(now())
+  updatedAt            DateTime  @updatedAt
+  job                  Job       @relation(fields: [jobId], references: [id])
+  candidate            Candidate @relation(fields: [candidateId], references: [id])
+  resume               Resume?   @relation(fields: [resumeId], references: [id])
+  materials            TaskMaterial[]
+  parseJobs            ParseJob[]
+  revisions            Revision[]
+  interviewSessions    InterviewSession[]
+  rounds               InterviewRound[]
+  @@unique([jobId, candidateId])
+  @@index([workspaceId, createdAt])
+  @@index([jobId])
+  @@index([candidateId])
+}
+
+// One round of a task's interview plan. Every task gets two generic rounds created for
+// it automatically (see TasksService); users can add more from there.
+model InterviewRound {
+  id            String   @id @default(uuid())
+  workspaceId   String
+  taskId        String
+  sequence      Int
+  name          String
+  format        String
+  duration      Int
+  competencies  String   // comma-separated; each becomes a tag in the UI
+  questions     Int
+  mandatory     Int
+  notes         String
+  status        String   @default("Planned") // Planned | completed
+  version       Int      @default(1)
+  interviewerId String?
+  scheduledAt   DateTime?
+  timezone      String?
+  meetingLink   String?
+  // Zoom RTMS live-transcript connection state for this round's meeting; "idle" until
+  // Zoom's meeting.rtms_started webhook fires. See RtmsService.
+  transcriptStatus String @default("idle") // idle | connecting | live | ended | error
+  transcriptError  String?
+  // Set by "Complete session & review" on Live Interview — distinct from `status`
+  // ("Planned" is a plan-time label; this is "did the interview actually happen").
+  completedAt   DateTime?
+  recommendation String? // strong_advance | advance | hold | do_not_advance | request_info
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  task          InterviewTask @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  interviewer   Interviewer?  @relation(fields: [interviewerId], references: [id])
+  transcript    TranscriptLine[]
+  scores        CardScore[]
+  parseJobs     ParseJob[]
+  @@unique([taskId, sequence])
+  @@index([taskId])
+}
+
+// One reviewer's score for one capability card in one round — every round can score every
+// card independently (a card may end up scored more than once, once per round it comes up
+// in); Debrief takes the latest across a task's rounds when it needs one number per card.
+model CardScore {
+  id          String   @id @default(uuid())
+  workspaceId String
+  roundId     String
+  cardId      String
+  score       Int?     // 1-5; null = explicitly marked Unknown rather than scored
+  note        String   @default("")
+  // AI-drafted score, grounded in the round's real transcript — see RoundScoresService and
+  // the `round_scores` AiService extraction type. Never overwrites `score`/`note`; a human
+  // decides whether to adopt it. `aiQuote` must be a verbatim excerpt of a real
+  // TranscriptLine (aiQuoteSegmentId), enforced the same way as every other AI citation.
+  aiScore          Int?
+  aiRationale      String?
+  aiQuoteSegmentId String?
+  aiQuote          String?
+  aiGeneratedAt    DateTime?
+  // Which ParseJob's result populated the AI fields above — lets materialization tell
+  // "already applied this job's result" from "human edited score/note since", the same
+  // idempotency pattern RubricVersion.sourceParseJobId uses.
+  aiSourceParseJobId String?
+  updatedAt   DateTime @updatedAt
+  round       InterviewRound  @relation(fields: [roundId], references: [id], onDelete: Cascade)
+  card        CapabilityCard  @relation(fields: [cardId], references: [id], onDelete: Cascade)
+  @@unique([roundId, cardId])
+  @@index([cardId])
+}
+
+// One line of a round's live Zoom transcript, streamed in via RTMS (see RtmsService).
+// Ordered by `createdAt`; `speaker` is Zoom's reported participant name for that utterance.
+model TranscriptLine {
+  id          String   @id @default(uuid())
+  workspaceId String
+  roundId     String
+  speaker     String
+  text        String
+  createdAt   DateTime @default(now())
+  round       InterviewRound @relation(fields: [roundId], references: [id], onDelete: Cascade)
+  @@index([roundId, createdAt])
+}
+
+// Requirements & Rubric: a JD-level baseline, generated once per Job (see the Capability
+// Verification Cards addendum). Owned entirely by the `rubric` module — everything else
+// (intake, plan, brief) only ever reads a confirmed version, never writes into it.
+// `versionNumber` is the human-facing "Rubric v1/v2..."; `version` is the optimistic-lock
+// counter bumped on every edit/confirm, same split as Job.jdVersion vs Job.version.
+model RubricVersion {
+  id               String    @id @default(uuid())
+  workspaceId      String
+  jobId            String
+  versionNumber    Int
+  status           String    @default("draft") // draft | confirmed
+  version          Int       @default(1)
+  sourceParseJobId String?
+  confirmedBy      String?
+  confirmedAt      DateTime?
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+  job              Job       @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  cards            CapabilityCard[]
+  questions        InterviewQuestion[]
+  @@unique([jobId, versionNumber])
+  @@index([workspaceId, jobId])
+}
+
+model CapabilityCard {
+  id                 String   @id @default(uuid())
+  workspaceId        String
+  rubricVersionId    String
+  requirement        String
+  responsibilityType String   // lead | collaborate | support
+  cardPriority       String   // P0 | P1 | P2
+  competencyTags     String   // comma-separated, same convention as InterviewRound.competencies
+  expectedEvidence   String
+  levelAnchors       Json     // { l1..l5: string }
+  weight             Int
+  sourceRefs         Json     // [{ segmentId, quote }]
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+  rubricVersion      RubricVersion @relation(fields: [rubricVersionId], references: [id], onDelete: Cascade)
+  question           InterviewQuestion?
+  scores             CardScore[]
+  @@index([rubricVersionId])
+}
+
+// Interview Brief: a STAR (Situation/Task/Action/Result) follow-up set generated once per
+// confirmed capability card — see the `brief` module. One row per card (not per round):
+// with no candidate resume matching yet (a later phase), a round-level split has nothing
+// real to key off, so the Brief page shows the whole confirmed card set and lets the
+// interviewer judge which cards fit the round in front of them.
+model InterviewQuestion {
+  id               String   @id @default(uuid())
+  workspaceId      String
+  rubricVersionId  String
+  cardId           String   @unique
+  situationPrompt  String
+  taskPrompt       String
+  actionPrompt     String
+  resultPrompt     String
+  mandatory        Boolean  @default(false)
+  sourceParseJobId String?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+  rubricVersion    RubricVersion  @relation(fields: [rubricVersionId], references: [id], onDelete: Cascade)
+  card             CapabilityCard @relation(fields: [cardId], references: [id], onDelete: Cascade)
+  @@index([rubricVersionId])
+  @@index([sourceParseJobId])
+}
+
+// The raw file itself is Core Record's Material master (see docs/HireOS-Database-
+// Architecture-Decision.md §4.1) -- coreMaterialId is that reference, and Core Record's
+// /materials/:id/content is now the only place the original bytes are actually stored
+// and servable (storageKey/local disk write dropped: nothing here ever read that file
+// back -- extraction runs once against the in-memory upload buffer, and no download
+// route ever served it). This row stays local because text/segments are Interview's
+// own extraction output (a business-specific derivative, not the file identity), and
+// everything downstream (Resume, JobMaterial, TaskMaterial, ParseJob) keys off this
+// local id, not Core Record's.
+model Material {
+  id             String   @id @default(uuid())
+  workspaceId    String
+  // Nullable only because rows created before this migration predate it.
+  coreMaterialId String?  @unique
+  name           String
+  mime           String
+  size           Int
+  hash           String
+  text           String
+  segments       Json
+  readStatus     String
+  errorCode      String?
+  createdAt      DateTime @default(now())
+  jobs           JobMaterial[]
+  tasks          TaskMaterial[]
+  resume         Resume?
+  @@index([workspaceId, hash])
+}
+
+model JobMaterial {
+  jobId      String
+  materialId String
+  kind       String
+  job        Job      @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  material   Material @relation(fields: [materialId], references: [id])
+  @@id([jobId, materialId])
+}
+
+model TaskMaterial {
+  taskId     String
+  materialId String
+  kind       String
+  task       InterviewTask @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  material   Material      @relation(fields: [materialId], references: [id])
+  @@id([taskId, materialId])
+}
+
+// One shared parse queue for JD, requirements and résumé extraction. Exactly one of
+// jobId/resumeId/taskId is set per row, matching who owns that piece of content.
+model ParseJob {
+  id            String   @id @default(uuid())
+  workspaceId   String
+  jobId         String?
+  resumeId      String?
+  taskId        String?
+  roundId       String?
+  type          String
+  materialId    String?
+  inputVersion  Int
+  input         Json
+  status        String   @default("queued")
+  attempt       Int      @default(0)
+  leaseToken    String?
+  leaseUntil    DateTime?
+  nextRunAt     DateTime @default(now())
+  errorCode     String?
+  result        Json?
+  model         String?
+  promptVersion String   @default("intake-v1")
+  usage         Json?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  job           Job?           @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  resume        Resume?        @relation(fields: [resumeId], references: [id], onDelete: Cascade)
+  task          InterviewTask? @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  round         InterviewRound? @relation(fields: [roundId], references: [id], onDelete: Cascade)
+  @@index([status, nextRunAt])
+  @@index([jobId, inputVersion])
+  @@index([resumeId, inputVersion])
+  @@index([roundId, inputVersion])
+}
+
+// Audit trail, similarly polymorphic: a JD edit records against jobId, a task-level
+// decision/edit records against taskId.
+model Revision {
+  id        String   @id @default(uuid())
+  jobId     String?
+  taskId    String?
+  actorId   String
+  version   Int
+  payload   Json
+  createdAt DateTime @default(now())
+  job       Job?           @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  task      InterviewTask? @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  @@unique([jobId, version])
+  @@unique([taskId, version])
+}
+
+model InterviewSession {
+  id          String @id @default(uuid())
+  workspaceId String
+  taskId      String
+  createdBy   String
+  round       Int
+  createdAt   DateTime @default(now())
+  task        InterviewTask @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  notes       RecordNote[]
+  @@unique([taskId, round, createdBy])
+  @@index([workspaceId, createdBy])
+}
+
+model RecordNote {
+  id        String @id @default(uuid())
+  sessionId String
+  authorId  String
+  content   String @default("")
+  version   Int @default(0)
+  updatedAt DateTime @updatedAt
+  session   InterviewSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  @@unique([sessionId, authorId])
+}
