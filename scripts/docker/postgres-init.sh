@@ -5,7 +5,7 @@
 # own `prisma migrate deploy` on first boot, not here.
 set -e
 
-for db in hireos_interview hireos_screening hireos_core_record hireos_jd; do
+for db in hireos_interview hireos_screening hireos_core_record hireos_jd hireos_written; do
   psql -v ON_ERROR_STOP=1 --username "$POSTGRES_USER" <<-EOSQL
     CREATE DATABASE "$db";
 EOSQL
