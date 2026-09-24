@@ -42,7 +42,6 @@ export type PublicationStatus =
   | "outcome_unknown"
   | "withdrawal_pending"
   | "withdrawn";
-export type TaskStatus = "open" | "in_progress" | "waiting" | "completed" | "cancelled";
 export type Priority = "low" | "normal" | "high" | "urgent";
 export type ConnectionStatus = "not_connected" | "connected" | "paused" | "disconnected" | "authorization_required";
 export type FileConsumption = "unassigned" | "pending" | "accepted" | "needs_review" | "rejected" | "failed";
@@ -349,21 +348,6 @@ export interface UsageRow {
 export interface ModelActivityItem {
   at: string;
   text: string;
-}
-
-export interface HumanTask {
-  id: string;
-  jobId: string | null;
-  type: string;
-  title: string;
-  assignee: PersonId | null;
-  queue?: string | null;
-  status: TaskStatus;
-  priority: Priority;
-  dueAt: string | null;
-  createdAt: string;
-  completedAt?: string | null;
-  waitingReason?: string | null;
 }
 
 export interface Template {

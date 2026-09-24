@@ -61,19 +61,6 @@ const BADGE_MAP: Record<string, Record<string, [string, Tone]>> = {
     withdrawal_pending: ["Withdrawal pending", "warning"],
     withdrawn: ["Withdrawn", "neutral"],
   },
-  task_status: {
-    open: ["Open", "info"],
-    in_progress: ["In progress", "info"],
-    waiting: ["Waiting", "warning"],
-    completed: ["Completed", "success"],
-    cancelled: ["Cancelled", "neutral"],
-  },
-  priority: {
-    low: ["Low", "neutral"],
-    normal: ["Normal", "neutral"],
-    high: ["High", "warning"],
-    urgent: ["Urgent", "danger"],
-  },
   connection_status: {
     not_connected: ["Not connected", "neutral"],
     connected: ["Connected", "success"],
@@ -102,10 +89,6 @@ export function StatusBadge({ kind, value }: { kind: keyof typeof BADGE_MAP | st
   // Statuses share words across kinds ("Open" the hiring status vs. the task
   // status), so the translation key is namespaced by kind.
   return <Badge tone={entry[1]}>{t(entry[0], `${kind}.${entry[0]}`)}</Badge>;
-}
-
-export function PriorityBadge({ value }: { value?: string | null }) {
-  return <StatusBadge kind="priority" value={value} />;
 }
 
 /* ---------------------------------------------------------------

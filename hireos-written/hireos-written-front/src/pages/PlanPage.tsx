@@ -114,6 +114,10 @@ export function PlanPage() {
   const job = (app && CORE_JOBS[app.jobId]) || CORE_JOBS[PROJECT.jobId];
   const invs = Object.values(INVITATIONS).filter((i) => i.caseId === caseId);
   const realByToken = new Map(realInvitations.map((r) => [r.token, r]));
+  // "Send to candidate" now bundles every not-yet-sent item in one action (it already did this
+  // under the hood via SendToCandidateDrawer's `items` prop — this just moves the trigger up to a
+  // single section-level button instead of one per question card).
+  const canSendBatch = !!c.applicationId && items.length > 0 && items.some((pi) => !invs.find((inv) => inv.questionIds.includes(pi.questionId)));
   const attempts = Object.values(ATTEMPTS).filter((a) => a.caseId === caseId);
   const primaryAttempt = attempts[0];
 
@@ -218,6 +222,20 @@ export function PlanPage() {
 
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 8, marginBottom: 2 }}>
           <h4 style={{ margin: 0 }}>{t("Assessment questions")}</h4>
+          <div style={{ display: "flex", gap: 8, flex: "none" }}>
+            <Button size="sm" onClick={() => setQuestionDrawer({ mode: "add" })}>
+              <Icon name="add" style={{ fontSize: 16, verticalAlign: "text-bottom" }} /> {t("Add assessment question")}
+            </Button>
+            <Button
+              size="sm"
+              variant="primary"
+              disabled={!canSendBatch}
+              title={!c.applicationId ? t("Confirm the candidate's role link first") : undefined}
+              onClick={() => setSendDrawerOpen(true)}
+            >
+              {t("Send to candidate")}
+            </Button>
+          </div>
         </div>
         <div className="tiny" style={{ color: "var(--text-tertiary)", marginBottom: 12 }}>
           {t("Confirming freezes this into a pending-send version; it is not sent to the candidate immediately.")}
@@ -232,19 +250,13 @@ export function PlanPage() {
               pi={pi}
               invitations={invs}
               realByToken={realByToken}
-              canApply={!!c.applicationId}
               onDelete={() => deleteQuestion(pi)}
               onEdit={() => setQuestionDrawer({ mode: "edit", planItem: pi })}
-              onSend={() => setSendDrawerOpen(true)}
               onViewSubmission={() => setActiveTab("submission")}
               onViewRealSubmission={setViewingSubmission}
             />
           ))
         )}
-
-        <Button style={{ marginTop: items.length ? 4 : 16, marginBottom: 16 }} onClick={() => setQuestionDrawer({ mode: "add" })}>
-          <Icon name="add" style={{ fontSize: 16, verticalAlign: "text-bottom" }} /> {t("Add assessment question")}
-        </Button>
       </div>
 
       <div style={{ display: activeTab === "submission" ? "block" : "none" }}>
@@ -317,15 +329,13 @@ export function PlanPage() {
 }
 
 function QuestionCard({
-  pi, invitations, realByToken, canApply, onDelete, onEdit, onSend, onViewSubmission, onViewRealSubmission,
+  pi, invitations, realByToken, onDelete, onEdit, onViewSubmission, onViewRealSubmission,
 }: {
   pi: PlanItem;
   invitations: Invitation[];
   realByToken: Map<string, RealInvitation>;
-  canApply: boolean;
   onDelete: () => void;
   onEdit: () => void;
-  onSend: () => void;
   onViewSubmission: () => void;
   onViewRealSubmission: (inv: RealInvitation) => void;
 }) {
@@ -335,7 +345,6 @@ function QuestionCard({
   const alreadySent = !!sentInvite;
   const realInvite = sentInvite?.token ? realByToken.get(sentInvite.token) : undefined;
   const bodyText = pi.customPrompt ?? q.prompt;
-  const canSend = canApply && !alreadySent;
 
   return (
     <div className="card card-pad" style={{ marginBottom: 12 }}>
@@ -369,15 +378,6 @@ function QuestionCard({
           </>
         ) : (
           <>
-            <Button
-              size="sm"
-              variant="primary"
-              disabled={!canSend}
-              title={!canApply ? t("Confirm the candidate's role link first") : undefined}
-              onClick={onSend}
-            >
-              {t("Send to candidate")}
-            </Button>
             <Button size="sm" variant="ghost" onClick={onEdit}>{t("Edit question")}</Button>
             <Button size="sm" variant="danger" onClick={onDelete}>{t("Delete question")}</Button>
           </>

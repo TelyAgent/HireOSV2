@@ -40,19 +40,6 @@ const NAV_WORKSPACE: NavItem[] = [
   { to: "/settings/preferences", icon: "tune", label: "Settings", isActive: (p) => p.startsWith("/settings") },
 ];
 
-export function WorkspaceBanner() {
-  const { t } = useStore();
-  return (
-    <div className="workspace-banner">
-      <strong>HireOS Workspace</strong>
-      <span className="workspace-note">
-        {t("Prototype data only · External sends, real emails, and model calls are simulated.")}
-      </span>
-      <span className="workspace-state">{t("Resume Screening")}</span>
-    </div>
-  );
-}
-
 export function TopBar({ openTaskCount }: { openTaskCount: number }) {
   const { state, t, toggleLang, toggleAppearance, toggleRoleSwitcher, person } = useStore();
   const langLabel = state.lang === "en" ? "中 / EN" : "EN / 中";
@@ -255,7 +242,6 @@ export function AppShell({ children, openTaskCount = 0 }: { children: ReactNode;
 
   return (
     <div id="app">
-      <WorkspaceBanner />
       <TopBar openTaskCount={openTaskCount} />
       <div className="shell">
         <SideNav openTaskCount={openTaskCount} />

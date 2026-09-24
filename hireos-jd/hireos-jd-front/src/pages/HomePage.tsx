@@ -10,10 +10,6 @@ export function HomePage() {
   const navigate = useNavigate();
   const u = state.currentUserId;
 
-  const myTasks = state.tasks.filter((x) => x.assignee === u && ["open", "in_progress", "waiting"].includes(x.status));
-  const myApprovals = state.tasks.filter(
-    (x) => x.assignee === u && x.type === "Review / approve JD" && ["open", "in_progress"].includes(x.status),
-  );
   const wsJobs = Object.values(state.jobs);
   const myOpenJobs = wsJobs.filter(
     (j) => (j.owner === u || j.hiringManager === u || j.recruiter === u) && j.hiringStatus === "published",
@@ -43,14 +39,6 @@ export function HomePage() {
       <div className="section-block">
         <div className="section-title">{t("My work")}</div>
         <div className="stat-row">
-          <div className="stat-card" onClick={() => navigate("/tasks")}>
-            <div className={`num${myTasks.length === 0 ? " zero" : ""}`}>{myTasks.length}</div>
-            <div className="lbl">{t("My unfinished tasks")}</div>
-          </div>
-          <div className="stat-card" onClick={() => navigate("/tasks")}>
-            <div className={`num${myApprovals.length === 0 ? " zero" : ""}`}>{myApprovals.length}</div>
-            <div className="lbl">{t("Approvals awaiting me")}</div>
-          </div>
           <div className="stat-card" onClick={() => navigate("/jobs?view=table&savedView=My%20Jobs")}>
             <div className={`num${myOpenJobs.length === 0 ? " zero" : ""}`}>{myOpenJobs.length}</div>
             <div className="lbl">{t("My open jobs")}</div>

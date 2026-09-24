@@ -4,7 +4,7 @@ import { Icon } from "../components/ui/Icons";
 import { Button, EmptyState, PageHeader, PersonChip, StatusBadge } from "../components/ui/Primitives";
 import { CloseButton, ConfirmDialog, ModalBody, ModalFooter, ModalHeader } from "../components/ui/Overlays";
 import { useStore } from "../store/StoreContext";
-import { SAVED_VIEWS } from "../data/fixtures/tasks";
+import { SAVED_VIEWS } from "../data/fixtures/savedViews";
 import { fmtRelative, nowISO } from "../lib/format";
 import { deleteJob } from "../features/jobs/jobsApi";
 import type { AppState } from "../store/types";

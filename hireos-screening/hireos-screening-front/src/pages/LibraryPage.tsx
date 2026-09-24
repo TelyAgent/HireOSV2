@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { useStore } from "../store/StoreContext";
 import { deleteCandidate, listLibraryEntries, runMatchAgain, type LibraryEntry } from "../data/api/library";
 import { ApiError } from "../data/api/shared";
@@ -33,6 +33,7 @@ function MatchStatusBadge({ entry }: { entry: LibraryEntry }) {
 
 export function LibraryPage() {
   const { t, state, say } = useStore();
+  const navigate = useNavigate();
   const [query, setQuery] = useState("");
   const [entries, setEntries] = useState<LibraryEntry[]>([]);
   const [total, setTotal] = useState(0);
@@ -130,7 +131,7 @@ export function LibraryPage() {
               entries.map((entry) => {
                 const { candidate, latestSource } = entry;
                 return (
-                <tr key={candidate.id} className="clickable">
+                <tr key={candidate.id} className="clickable" onClick={() => navigate(`/candidates/${candidate.id}`)}>
                   <td>
                     <Link to={`/candidates/${candidate.id}`} className="flex items-center gap-10" style={{ color: "inherit", textDecoration: "none" }}>
                       <CandidateAvatar id={candidate.id} name={candidate.displayName} />
@@ -166,9 +167,9 @@ export function LibraryPage() {
                           e.stopPropagation();
                           handleMatchAgain(candidate.id);
                         }}
-                        disabled={matching === candidate.id || entry.matchStatus === "running"}
+                        loading={matching === candidate.id || entry.matchStatus === "running"}
                       >
-                        {entry.matchStatus === "running" ? t("Matching…") : t("Match again")}
+                        {t("Match again")}
                       </Button>
                       <Button
                         variant="danger"

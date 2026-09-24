@@ -1,13 +1,17 @@
-import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
+import { ConflictException, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../persistence/prisma.service';
 import type { Identity } from '../auth/workspace.guard';
 import { CoreRecordClient } from '../core-record/core-record.client';
+import { ScreeningService } from '../screening/screening.service';
 
 @Injectable()
 export class LinkingService {
+  private readonly logger = new Logger(LinkingService.name);
+
   constructor(
     private readonly db: PrismaService,
     private readonly coreRecord: CoreRecordClient,
+    private readonly screening: ScreeningService,
   ) {}
 
   async confirmRecommendation(identity: Identity, recommendationId: string, reason?: string) {
@@ -129,6 +133,16 @@ export class LinkingService {
         },
       });
       return created;
+    });
+    // Confirming a link means "screen this candidate for this role" -- kick screening off
+    // immediately instead of making the recruiter open the application and click "Run
+    // screening" themselves. Fire-and-forget after the transaction commits: this calls the
+    // AI evaluator, which is slow and can fail (rate limits, timeouts) -- none of that
+    // should roll back or block the confirm-link response the recruiter is waiting on. The
+    // application still starts out in "not_started" screeningStatus either way; if this
+    // fails, the recruiter sees the normal "Run screening" empty state and can retry by hand.
+    void this.screening.run(identity, application.id, 'initial').catch((error) => {
+      this.logger.warn(`Auto-screen after link confirm failed for application ${application.id}: ${error instanceof Error ? error.message : error}`);
     });
     return toFrontendApplication(application);
   }

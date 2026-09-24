@@ -102,8 +102,6 @@ export const ZH: Record<string, string> = {
   "Here's what needs your attention at Sending Labs.": "以下是 Sending Labs 需要你关注的事项。",
   "New job": "新建职位",
   "My work": "我的工作",
-  "My unfinished tasks": "我未完成的任务",
-  "Approvals awaiting me": "等我审批的事项",
   "My open jobs": "我在招的职位",
   "Workspace overview": "工作区概览",
   "as of": "截至",
@@ -199,6 +197,7 @@ export const ZH: Record<string, string> = {
   "Create draft": "创建草稿",
   "Paste rough notes here...": "在此粘贴粗略笔记…",
   "Pasted notes": "已粘贴笔记",
+  "Assigned to the job.": "已关联到职位。",
   "Generating the job from your notes…": "正在根据笔记生成职位…",
   "Generating…": "生成中…",
   "This feature isn't available yet.": "该功能暂未开放。",
@@ -509,12 +508,6 @@ export const ZH: Record<string, string> = {
   "External JD": "对外 JD",
 
   /* ---------- my tasks ---------- */
-  "My Tasks": "我的任务",
-  "Completion gaps, conflicts, approvals, impact reviews and recovery — all in one queue.":
-    "补全缺口、冲突处理、审批、影响评估与失败恢复 — 集中在一个队列中。",
-  "Assigned to me": "分配给我",
-  "Available to claim": "可认领",
-  "Created or followed": "我创建或关注的",
   Completed: "已完成",
   "Nothing here": "这里没有内容",
   "No unassigned tasks are waiting to be claimed right now.": "当前没有待认领的未分配任务。",
@@ -547,12 +540,6 @@ export const ZH: Record<string, string> = {
   "Reassigning does not grant new data access.": "转派不会授予新的数据访问权限。",
   Created_label: "创建于",
   /* task type labels */
-  "Resolve conflict": "解决冲突",
-  "Review imported material": "审阅导入材料",
-  "Review / approve JD": "审阅 / 批准 JD",
-  "Review public JD": "审阅对外 JD",
-  "Review downstream impact": "审阅下游影响",
-  "Recover failed operation": "恢复失败操作",
 
   /* ---------- templates ---------- */
   Templates: "模板",
@@ -575,8 +562,6 @@ export const ZH: Record<string, string> = {
   Unassigned_group: "未分配",
   Assigned: "已分配",
   "Assign to job": "分配到职位",
-  "Assigned — a task was created to confirm requirements from this material.":
-    "已分配 — 已创建一项任务，用于从该材料中确认岗位要求。",
   "Preview not available in this prototype — shows file metadata only.": "本原型不支持预览 — 仅显示文件元数据。",
   "Preparing download…": "正在准备下载…",
   Upload_source: "上传",
@@ -812,16 +797,7 @@ export const ZH: Record<string, string> = {
   "publication_status.Withdrawal pending": "下架处理中",
   "publication_status.Withdrawn": "已下架",
 
-  "task_status.Open": "待处理",
-  "task_status.In progress": "进行中",
-  "task_status.Waiting": "等待中",
-  "task_status.Completed": "已完成",
-  "task_status.Cancelled": "已取消",
 
-  "priority.Low": "低",
-  "priority.Normal": "普通",
-  "priority.High": "高",
-  "priority.Urgent": "紧急",
 
   "connection_status.Not connected": "未连接",
   "connection_status.Connected": "已连接",

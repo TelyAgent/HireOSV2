@@ -287,58 +287,6 @@ export function SideNav() {
   );
 }
 
-export function WorkspaceBanner() {
-  const { state, t } = useStore();
-  if (state.screen === "live") return null;
-  return (
-    <div
-      style={{
-        height: 34,
-        flex: "none",
-        display: "flex",
-        alignItems: "center",
-        gap: 10,
-        padding: "0 16px",
-        background: "#111827",
-        color: "#ffffff",
-      }}
-    >
-      <div
-        role="heading"
-        aria-level={1}
-        style={{ fontSize: 12, fontWeight: 600 }}
-      >
-        {t.workspaceTitle}
-      </div>
-      <div style={{ fontSize: 11.5, color: "rgba(255,255,255,.6)" }}>
-        {t.unverified}
-      </div>
-      <div style={{ flex: 1 }} />
-      <button
-        onClick={() => {
-          const { say } = useStore();
-          say(
-            state.lang === "zh"
-              ? "分享功能不在当前演示范围内。"
-              : "Share is not part of this demo.",
-          );
-        }}
-        style={{
-          height: 22,
-          padding: "0 10px",
-          border: "1px solid rgba(255,255,255,.38)",
-          borderRadius: 7,
-          background: "transparent",
-          color: "#ffffff",
-          fontSize: 11.5,
-          cursor: "pointer",
-        }}
-      >
-        {t.share}
-      </button>
-    </div>
-  );
-}
 
 export function AppShell({ children }: { children: React.ReactNode }) {
   const { state } = useStore();
@@ -477,7 +425,6 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       data-text-size={state.textSize}
       style={{ ...rootStyle, ...cssVars }}
     >
-      <WorkspaceBanner />
       <TopBar />
       <div style={{ flex: 1, minHeight: 0, display: "flex" }}>
         <SideNav />

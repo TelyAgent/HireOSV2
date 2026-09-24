@@ -6,7 +6,6 @@ import type {
   Connection,
   DocumentDraft,
   FileItem,
-  HumanTask,
   Job,
   OpActivity,
   PersonId,
@@ -91,7 +90,6 @@ export interface AppState {
   approvals: Record<string, Approval>;
   publications: Record<string, Publication[]>;
   activity: Record<string, ActivityItem[]>;
-  tasks: HumanTask[];
   files: FileItem[];
   connections: Connection[];
   opActivity: OpActivity[];

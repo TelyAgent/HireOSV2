@@ -8,5 +8,6 @@ import { AiScreeningEvaluatorService } from './ai-screening-evaluator.service';
 @Module({
   controllers: [ScreeningController],
   providers: [PrismaService, WorkspaceGuard, ScreeningService, AiScreeningEvaluatorService],
+  exports: [ScreeningService],
 })
 export class ScreeningModule {}

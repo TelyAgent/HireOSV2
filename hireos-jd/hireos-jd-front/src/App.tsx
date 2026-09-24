@@ -2,7 +2,6 @@ import { useEffect } from "react";
 import { Navigate, Route, Routes } from "react-router-dom";
 import { AppShell } from "./components/AppShell";
 import { HomePage } from "./pages/HomePage";
-import { TasksPage } from "./pages/TasksPage";
 import { JobLibraryPage } from "./pages/JobLibraryPage";
 import { NewJobPage } from "./pages/NewJobPage";
 import { JobWorkspacePage } from "./pages/JobWorkspacePage";
@@ -41,7 +40,6 @@ export default function App() {
       <Routes>
         <Route path="/" element={<Navigate to="/home" replace />} />
         <Route path="/home" element={<HomePage />} />
-        <Route path="/tasks" element={<TasksPage />} />
         <Route path="/jobs" element={<JobLibraryPage />} />
         <Route path="/jobs/new" element={<NewJobPage />} />
         <Route path="/jobs/:id" element={<JobWorkspacePage />} />

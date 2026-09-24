@@ -5,7 +5,7 @@ import { Button, EmptyState, PageHeader, StatusBadge } from "../components/ui/Pr
 import { CancelButton, CloseButton, ConfirmDialog, ModalBody, ModalFooter, ModalHeader } from "../components/ui/Overlays";
 import { useStore } from "../store/StoreContext";
 import { getPerson } from "../data/fixtures/people";
-import { daysFromNow, fmtDateTime, fmtRelative, nowISO, uid } from "../lib/format";
+import { fmtDateTime, fmtRelative, nowISO, uid } from "../lib/format";
 import { useStartCreate } from "./NewJobPage";
 import type { FileItem } from "../data/types";
 
@@ -159,23 +159,9 @@ function AssignFileModal({ fileId }: { fileId: string }) {
       if (!f) return;
       f.jobId = jobId;
       f.consumption = "pending";
-      draft.tasks = [
-        ...draft.tasks,
-        {
-          id: uid("task"),
-          jobId,
-          type: "Review imported material",
-          title: `Review imported material: ${f.name}`,
-          assignee: draft.currentUserId,
-          status: "open",
-          priority: "normal",
-          dueAt: daysFromNow(3, 17),
-          createdAt: nowISO(),
-        },
-      ];
     });
     closeModal();
-    say(t("Assigned — a task was created to confirm requirements from this material."));
+    say(t("Assigned to the job."));
   };
 
   return (

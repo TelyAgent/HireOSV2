@@ -5,7 +5,6 @@ import { Icon } from "./ui/Icons";
 import { Button, StatusBadge, ToastStack } from "./ui/Primitives";
 import { CloseButton, ModalBody, ModalFooter, ModalHeader, OverlayHost } from "./ui/Overlays";
 import { PEOPLE } from "../data/fixtures/people";
-import { useUnresolvedTaskCount } from "../features/tasks/useUnresolvedTaskCount";
 import type { Accent, TextSize, ThemeMode } from "../store/types";
 
 /* ---------------------------------------------------------------
@@ -16,11 +15,9 @@ interface NavItem {
   icon: string;
   label: string;
   match: string;
-  showCount?: boolean;
 }
 const NAV_PRIMARY: NavItem[] = [
   { to: "/home", icon: "home", label: "Home", match: "/home" },
-  { to: "/tasks", icon: "checklist", label: "My Tasks", match: "/tasks", showCount: true },
   { to: "/jobs", icon: "work", label: "Job Library", match: "/jobs" },
   { to: "/templates", icon: "dashboard_customize", label: "Templates", match: "/templates" },
 ];
@@ -37,7 +34,6 @@ export function MainInner({ variant, children }: { variant?: "wide" | "flush"; c
 function TopBar() {
   const { state, t, toggleLang, openModal, person } = useStore();
   const navigate = useNavigate();
-  const openTaskCount = useUnresolvedTaskCount();
   const langLabel = state.lang === "en" ? "中 / EN" : "EN / 中";
 
   return (
@@ -75,10 +71,6 @@ function TopBar() {
         >
           <Icon name="palette" />
         </button>
-        <button className="icon-btn" title={t("Notifications")} aria-label={t("Notifications")} onClick={() => navigate("/tasks")}>
-          <Icon name="notifications" />
-          {openTaskCount > 0 && <span className="dot" />}
-        </button>
         <button
           className="icon-btn"
           title={t("Demo tools")}
@@ -111,7 +103,7 @@ function TopBar() {
   );
 }
 
-function NavLinkItem({ item, count }: { item: NavItem; count?: number }) {
+function NavLinkItem({ item }: { item: NavItem }) {
   const { pathname } = useLocation();
   const { t } = useStore();
   const active = pathname === item.match || pathname.startsWith(item.match + "/");
@@ -126,7 +118,6 @@ function NavLinkItem({ item, count }: { item: NavItem; count?: number }) {
     >
       <Icon name={item.icon} />
       <span className="nav-label">{label}</span>
-      {count != null && count > 0 && <span className="badge-count">{count}</span>}
     </Link>
   );
 }
@@ -134,13 +125,12 @@ function NavLinkItem({ item, count }: { item: NavItem; count?: number }) {
 function SideNav() {
   const { state, t, toggleSidenav } = useStore();
   const collapsed = state.sidenavCollapsed;
-  const openTaskCount = useUnresolvedTaskCount();
   const toggleLabel = collapsed ? t("Expand navigation") : t("Collapse navigation");
   return (
     <nav className={`sidenav${collapsed ? " collapsed" : ""}`} aria-label="Primary">
       <div className="sidenav-section">
         {NAV_PRIMARY.map((item) => (
-          <NavLinkItem key={item.to} item={item} count={item.showCount ? openTaskCount : undefined} />
+          <NavLinkItem key={item.to} item={item} />
         ))}
       </div>
       <div className="sidenav-section">

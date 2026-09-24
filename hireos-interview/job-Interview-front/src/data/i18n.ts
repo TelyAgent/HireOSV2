@@ -5,7 +5,6 @@ export type Lang = "en" | "zh";
 
 export const LANG = {
   en: {
-    unverified: "Content is user-generated and unverified.",
     share: "Share",
     hireosCommand: "HireOS Command",
     interview: "Interview",
@@ -323,7 +322,6 @@ export const LANG = {
     navDebrief: "Debrief",
     navDecision: "Decision & Next Steps",
     navPackage: "Evaluation Package",
-    workspaceTitle: "HireOS Interview Workspace",
     searchAria: "Search projects and candidates",
     primaryNav: "Primary navigation",
     sideHome: "Interview Home",
@@ -381,7 +379,6 @@ export const LANG = {
     backToRecordAction: "Back to record",
   },
   zh: {
-    unverified: "内容由用户生成，未经验证。",
     share: "分享",
     hireosCommand: "HireOS Command",
     interview: "面试",
@@ -690,7 +687,6 @@ export const LANG = {
     navDebrief: "汇总评估",
     navDecision: "决定与后续步骤",
     navPackage: "评估包",
-    workspaceTitle: "HireOS 面试工作区",
     searchAria: "搜索项目和候选人",
     primaryNav: "主导航",
     sideHome: "面试主页",

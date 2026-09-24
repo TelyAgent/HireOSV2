@@ -4,7 +4,7 @@ import { Icon } from "../components/ui/Icons";
 import { Button, EmptyState, PersonChip, StatusBadge } from "../components/ui/Primitives";
 import { useStore } from "../store/StoreContext";
 import { PEOPLE, getPerson } from "../data/fixtures/people";
-import { SAVED_VIEWS } from "../data/fixtures/tasks";
+import { SAVED_VIEWS } from "../data/fixtures/savedViews";
 import { MODELS, MODEL_ACTIVITY, MODEL_EVALS, TASK_POLICIES, USAGE_ROWS } from "../data/fixtures/aiModels";
 import { daysAgo, fmtDateTime, fmtRelative, hoursAgo } from "../lib/format";
 

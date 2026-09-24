@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { Link, useParams } from "react-router-dom";
+import { Link, useNavigate, useParams } from "react-router-dom";
 import { useStore } from "../store/StoreContext";
 import { getCandidateDetail, correctProfile, type CandidateDetail } from "../data/api/candidates";
 import { runMatchAgain } from "../data/api/library";
@@ -157,6 +157,7 @@ function CorrectProfileModal({ candidate, onClose, onSaved }: { candidate: Candi
 
 export function CandidateProfilePage() {
   const { id = "" } = useParams();
+  const navigate = useNavigate();
   const { t, state, say } = useStore();
   const [detail, setDetail] = useState<CandidateDetail | null | undefined>(undefined);
   const [showCorrect, setShowCorrect] = useState(false);
@@ -205,20 +206,21 @@ export function CandidateProfilePage() {
   }
 
   const { candidate, resumeVersions, applications, recommendations, jobDiscovery: jd } = detail;
-  const pendingRecs = recommendations.filter((r) => r.status === "proposed");
   const versions = [...resumeVersions].sort((a, b) => b.version - a.version);
   const owner = getPerson(candidate.owner);
-  const relationshipEntries: { key: string; jobTitle: string; team: string; status: React.ReactNode; when: string; action: React.ReactNode }[] = [
+  const relationshipEntries: { key: string; jobTitle: string; team: string; status: React.ReactNode; when: string; route: string; action: React.ReactNode }[] = [
     ...applications.map((a) => {
       const job = getJob(a.jobId);
+      const route = `/applications/${a.id}`;
       return {
         key: a.id,
         jobTitle: job?.title || "—",
         team: job?.team || "—",
         status: <span className="badge badge-success">{t("Linked")}</span>,
         when: `${fmtDate(a.linkedAt, state.lang)} ${t("by")} ${getPerson(a.linkedBy)?.name}`,
+        route,
         action: (
-          <Link className="btn btn-sm btn-secondary" to={`/applications/${a.id}`}>
+          <Link className="btn btn-sm btn-secondary" to={route}>
             {t("Open screening")}
           </Link>
         ),
@@ -228,6 +230,7 @@ export function CandidateProfilePage() {
       .filter((r) => r.status !== "confirmed")
       .map((r) => {
         const job = getJob(r.jobId);
+        const route = `/candidates/${candidate.id}/jobs`;
         const statusBadge =
           r.status === "proposed" ? (
             <span className="badge badge-info">{t("Pending recommendation")}</span>
@@ -245,8 +248,9 @@ export function CandidateProfilePage() {
             </>
           ),
           when: `${t("Proposed")} ${relTime(r.createdAt, state.lang)}`,
+          route,
           action: (
-            <Link className="btn btn-sm btn-secondary" to={`/candidates/${candidate.id}/jobs`}>
+            <Link className="btn btn-sm btn-secondary" to={route}>
               {t("Review", "Review (action)")}
             </Link>
           ),
@@ -284,11 +288,6 @@ export function CandidateProfilePage() {
             <Button variant="secondary" icon="travel_explore" onClick={handleMatchAgain} disabled={matching || jd.isMatching}>
               {jd.isMatching ? t("Matching…") : t("Match again")}
             </Button>
-            <Link className="btn btn-primary" to={`/candidates/${candidate.id}/jobs`}>
-              <Icon name="work_outline" />
-              {t("Job recommendations")}
-              {pendingRecs.length > 0 && <span className="badge-count">{pendingRecs.length}</span>}
-            </Link>
           </>
         }
       />
@@ -398,7 +397,7 @@ export function CandidateProfilePage() {
                 </thead>
                 <tbody>
                   {relationshipEntries.map((row) => (
-                    <tr key={row.key}>
+                    <tr key={row.key} className="clickable" onClick={() => navigate(row.route)}>
                       <td>{row.jobTitle}</td>
                       <td>{row.team}</td>
                       <td>{row.status}</td>

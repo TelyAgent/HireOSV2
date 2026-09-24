@@ -130,7 +130,6 @@ button{ font-family:inherit; }
 .icon-btn{ width:36px; height:36px; border-radius:50%; border:none; background:transparent; color:var(--text-secondary); display:flex; align-items:center; justify-content:center; cursor:pointer; position:relative; overflow:hidden; font-size:0; flex:0 0 auto; }
 .icon-btn .material-icons-o{ font-size:20px; }
 .icon-btn:hover{ background:var(--surface-alt); }
-.icon-btn .dot{ position:absolute; top:6px; right:6px; width:8px; height:8px; border-radius:50%; background:var(--danger-text); border:2px solid var(--surface); }
 
 .role-pill{ display:flex; align-items:center; gap:8px; border:1px solid var(--border); border-radius:20px; padding:5px 12px 5px 6px; cursor:pointer; background:var(--surface); font-size:var(--fs-sm); color:var(--text); }
 .role-pill:hover{ background:var(--surface-alt); }
@@ -150,11 +149,8 @@ button{ font-family:inherit; }
 .nav-item:hover{ background:var(--surface-alt); text-decoration:none; }
 .nav-item.active{ background:var(--accent-100); color:var(--accent-700); font-weight:600; }
 .nav-item .material-icons-o{ font-size:19px; color:inherit; opacity:.85; flex:0 0 auto; }
-.nav-item .badge-count{ margin-left:auto; background:var(--neutral-bg); color:var(--neutral-text); font-size:var(--fs-xs); padding:1px 7px; border-radius:10px; font-weight:600; }
-.nav-item.active .badge-count{ background:var(--accent-600); color:var(--text-on-accent); }
 .sidenav.collapsed .nav-item{ justify-content:center; padding:9px; }
 .sidenav.collapsed .nav-item .nav-label{ display:none; }
-.sidenav.collapsed .nav-item .badge-count{ position:absolute; top:2px; right:2px; min-width:8px; width:8px; height:8px; padding:0; border-radius:50%; font-size:0; }
 .sidenav-toggle{ display:flex; align-items:center; gap:12px; width:100%; margin-top:auto; padding:9px 12px; border:0; border-top:1px solid var(--border); border-radius:0; background:none; color:var(--text-secondary); font-size:var(--fs-sm); font-family:inherit; cursor:pointer; }
 .sidenav-toggle:hover{ background:var(--surface-alt); }
 .sidenav-toggle .material-icons-o{ font-size:19px; flex:0 0 auto; }

@@ -79,8 +79,6 @@ export const ZH: Record<string, string> = {
   'This switches which person\'s "My Tasks" and permissions the prototype shows. It does not represent real authentication.':
     '切换后将展示该角色对应的"我的任务"与权限视图，不代表真实身份验证。',
   "Switched to": "已切换到",
-  "Prototype data only · External sends, real emails, and model calls are simulated.":
-    "原型数据仅供演示 · 外发操作、真实邮件与模型调用均为模拟。",
   "Search candidates, jobs, tasks...": "搜索候选人、职位、任务…",
   "Resume Screening": "简历筛选",
 
