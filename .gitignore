@@ -21,6 +21,9 @@ scripts/docker/postgres.env.production
 !scripts/docker/postgres.env.production.example
 /miyao.txt
 
+# Claude Code runtime state (session-local, not project source)
+/.claude/
+
 # OS / editor
 .DS_Store
 *.log

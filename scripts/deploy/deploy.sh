@@ -173,13 +173,25 @@ collect_upload_list() {
     nested_git_dirs+=("$(dirname "$d")")
   done < <(find . -mindepth 2 -maxdepth 3 -name .git -print0)
 
+  # macOS ships bash 3.2 (last GPLv2 release Apple will bundle), where
+  # `"${arr[@]}"` on a *zero-length* array under `set -u` throws "unbound
+  # variable" -- fixed in bash 4.4+, but this script has to run correctly
+  # on the stock `/bin/bash` too. Guard every expansion of these arrays
+  # with a length check instead of expanding directly.
   local exclude_args=()
   local d
-  for d in "${nested_git_dirs[@]}"; do
-    exclude_args+=(":(exclude)${d#./}")
-  done
-  git ls-files -zco --exclude-standard -- . "${exclude_args[@]}"
+  if [[ ${#nested_git_dirs[@]} -gt 0 ]]; then
+    for d in "${nested_git_dirs[@]}"; do
+      exclude_args+=(":(exclude)${d#./}")
+    done
+  fi
+  if [[ ${#exclude_args[@]} -gt 0 ]]; then
+    git ls-files -zco --exclude-standard -- . "${exclude_args[@]}"
+  else
+    git ls-files -zco --exclude-standard -- .
+  fi
 
+  [[ ${#nested_git_dirs[@]} -gt 0 ]] || return 0
   for d in "${nested_git_dirs[@]}"; do
     # NUL-safe prefixing -- BSD sed (macOS) has no -z/--null, so this uses
     # perl -0 instead of `sed -z`, which silently produced nothing here.
