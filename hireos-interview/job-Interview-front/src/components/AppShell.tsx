@@ -410,12 +410,14 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
   const isHome = state.screen === "home";
   const isFiles = state.screen === "files";
+  const isLive = state.screen === "live";
   const isProject = !isHome && !isFiles;
 
   const mainAreaStyle: React.CSSProperties = {
     flex: 1,
     minWidth: 0,
-    overflow: "auto",
+    minHeight: 0,
+    overflow: isLive ? "hidden" : "auto",
     backgroundColor: mainBg,
   };
 

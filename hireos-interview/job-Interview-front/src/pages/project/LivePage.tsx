@@ -53,7 +53,7 @@ export function LivePage() {
     return () => { window.removeEventListener('beforeunload', unload); document.removeEventListener('click', navigation, true); };
   }, [active, dirty, copy]);
 
-  return <div ref={root} style={{ display: 'flex', flexDirection: 'column', gap: 16, minWidth: 0 }}>
+  return <div ref={root} className="live-page">
     <div style={{ display: 'flex', alignItems: 'center', gap: 14, minHeight: 44, padding: '0 14px', flexWrap: 'wrap' }}>
       <button onClick={() => {
         if ((active || dirty) && !window.confirm(copy.confirmLeave + '\n' + copy.draft)) return;
@@ -64,6 +64,8 @@ export function LivePage() {
         <div style={{ marginTop: 2, fontSize: 10.5, color: 'var(--ink-3)' }}>{copy.subtitle}</div>
       </div>
       <span style={{ fontSize: 11.5, color: 'var(--ink-3)' }}>{copy.recording}</span>
+      {completeError && <span style={{ fontSize: 11.5, color: 'var(--bad)' }}>{completeError}</span>}
+      <button disabled={!roundId || completing} onClick={() => void complete()} className="live-complete-button">{completing ? (zh ? '提交中…' : 'Completing…') : copy.complete}</button>
     </div>
     <div className="live-shell">
       <div className="live-main">
@@ -73,10 +75,6 @@ export function LivePage() {
         <LiveQuestionPanel />
       </div>
       <MeetingRecordPanel lang={state.lang} dirty={dirty} onDirty={setDirty} taskId={state.currentTaskId} round={round} roundId={roundId} />
-    </div>
-    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 10 }}>
-      {completeError && <span style={{ fontSize: 11.5, color: 'var(--bad)' }}>{completeError}</span>}
-      <button disabled={!roundId || completing} onClick={() => void complete()} style={{ minHeight: 36, padding: '0 15px', border: '1px solid var(--brand)', borderRadius: 9, color: 'var(--brand-ink)', background: 'var(--brand)', cursor: !roundId || completing ? 'not-allowed' : 'pointer', opacity: !roundId || completing ? 0.6 : 1 }}>{completing ? (zh ? '提交中…' : 'Completing…') : copy.complete}</button>
     </div>
   </div>;
 }

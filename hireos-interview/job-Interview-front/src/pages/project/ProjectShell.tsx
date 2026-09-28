@@ -56,8 +56,10 @@ export function ProjectShell({ children }: { children: React.ReactNode }) {
     <div
       style={{
         width: "100%",
-        minHeight: "100%",
-        padding: isLive ? "8px 22px 16px" : "22px 32px 60px",
+        height: isLive ? "100%" : undefined,
+        minHeight: isLive ? 0 : "100%",
+        overflow: isLive ? "hidden" : undefined,
+        padding: isLive ? "8px 22px" : "22px 32px 60px",
         display: "flex",
         flexDirection: "column",
         gap: isLive ? 10 : 16,

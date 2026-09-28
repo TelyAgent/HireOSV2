@@ -29,6 +29,11 @@ body,
   -webkit-font-smoothing: antialiased;
 }
 
+html,
+body {
+  overflow: hidden;
+}
+
 body {
   background: var(--bg, #eef2f6);
 }
@@ -73,11 +78,35 @@ textarea::placeholder {
 }
 
 /* Live interview specific */
+.live-page {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  min-width: 0;
+  height: 100%;
+  min-height: 0;
+  overflow: hidden;
+}
+.live-complete-button {
+  min-height: 34px;
+  padding: 0 15px;
+  border: 1px solid var(--brand);
+  border-radius: 8px;
+  color: var(--brand-ink);
+  background: var(--brand);
+  cursor: pointer;
+  white-space: nowrap;
+}
+.live-complete-button:disabled {
+  cursor: not-allowed;
+  opacity: .6;
+}
 .live-shell {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(320px, 360px);
   gap: 16px;
-  align-items: stretch;
+  align-items: start;
+  overflow: hidden;
   min-height: 0;
   flex: 1;
 }
@@ -87,6 +116,17 @@ textarea::placeholder {
   gap: 12px;
   min-width: 0;
   min-height: 0;
+  overflow: hidden;
+}
+.live-side-panel {
+  align-self: start;
+  height: 100%;
+  min-height: 0;
+  overflow: hidden;
+}
+.live-side-content {
+  height: calc(100% - 39px);
+  overflow: auto;
 }
 .live-video-stage {
   position: relative;
@@ -205,7 +245,8 @@ textarea::placeholder {
     min-height: 380px;
   }
   .live-side-panel {
-    min-height: 440px;
+    height: 440px;
+    min-height: 0;
   }
 }
 @media (max-width: 720px) {
