@@ -2,7 +2,7 @@ import { useNavigate, useSearchParams } from "react-router-dom";
 import { MainInner } from "../components/AppShell";
 import { Icon } from "../components/ui/Icons";
 import { Button, EmptyState, PageHeader, PersonChip, StatusBadge } from "../components/ui/Primitives";
-import { CloseButton, ConfirmDialog, ModalBody, ModalFooter, ModalHeader } from "../components/ui/Overlays";
+import { ConfirmDialog } from "../components/ui/Overlays";
 import { useStore } from "../store/StoreContext";
 import { SAVED_VIEWS } from "../data/fixtures/savedViews";
 import { fmtRelative } from "../lib/format";
@@ -134,16 +134,10 @@ export function JobLibraryPage() {
         title={t("Job Library")}
         subtitle={t("Every requisition at Sending Labs, in one place.")}
         actions={
-          <>
-            <Button onClick={() => openModal(<SemanticSearchModal />)}>
-              <Icon name="travel_explore" />
-              {t("Semantic search")}
-            </Button>
-            <Button variant="primary" onClick={() => navigate("/jobs/new")}>
-              <Icon name="add" />
-              {t("New job")}
-            </Button>
-          </>
+          <Button variant="primary" onClick={() => navigate("/jobs/new")}>
+            <Icon name="add" />
+            {t("New job")}
+          </Button>
         }
       />
 
@@ -341,42 +335,5 @@ function OrganizationView({ jobs }: { jobs: Job[] }) {
         </details>
       ))}
     </div>
-  );
-}
-
-function SemanticSearchModal() {
-  const { t, closeModal } = useStore();
-  const navigate = useNavigate();
-  return (
-    <>
-      <ModalHeader title={t("Semantic search")} />
-      <ModalBody>
-        <div className="field">
-          <input type="text" defaultValue={t("Roles in Vietnam that need finance experience")} autoFocus />
-        </div>
-        <div className="info-inline">
-          <Icon name="info" />
-          {t("Interpreted as: location = Vietnam AND requirements mention “finance”. Restricted-field matches are never shown in results.")}
-        </div>
-        <div className="card" style={{ marginTop: 12 }}>
-          <div className="list-row">
-            <span style={{ flex: 1 }}>HR Lead — Ho Chi Minh City</span>
-            <span className="badge badge-neutral">{t("Draft", "hiring_status.Draft")}</span>
-          </div>
-        </div>
-      </ModalBody>
-      <ModalFooter>
-        <CloseButton />
-        <Button
-          variant="primary"
-          onClick={() => {
-            closeModal();
-            navigate("/jobs/job-demo-101");
-          }}
-        >
-          {t("Open result")}
-        </Button>
-      </ModalFooter>
-    </>
   );
 }
