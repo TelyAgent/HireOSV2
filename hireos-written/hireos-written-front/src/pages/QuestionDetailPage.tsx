@@ -3,12 +3,10 @@ import { useNavigate, useParams } from "react-router-dom";
 import { Drawer } from "antd";
 import { useStore } from "../store/StoreContext";
 import { StatusBadge } from "../utils/status";
-import { Badge, Breadcrumbs, Button, Chip, EmptyState, Tabs } from "../components/ui/Primitives";
+import { Breadcrumbs, Button, Chip, Tabs } from "../components/ui/Primitives";
 import { QUESTIONS } from "../data/fixtures";
-import { getUser } from "../data/users";
-import type { UserId } from "../store/types";
 
-type TabKey = "prompt" | "materials" | "rubric" | "usage" | "versions";
+type TabKey = "prompt" | "rubric" | "usage";
 
 export function QuestionDetailPage() {
   const { id = "" } = useParams();
@@ -47,10 +45,8 @@ export function QuestionDetailPage() {
         onChange={setTab}
         options={[
           { value: "prompt", label: "Prompt" },
-          { value: "materials", label: "Materials" },
           { value: "rubric", label: "Rubric" },
           { value: "usage", label: "Usage" },
-          { value: "versions", label: "Versions" },
         ]}
       />
 
@@ -64,27 +60,6 @@ export function QuestionDetailPage() {
             <ul style={{ margin: 0, paddingLeft: 20 }}>{q.deliverables.map((d) => <li key={d}>{d}</li>)}</ul>
           ) : (
             <span className="muted">{t("None specified")}</span>
-          )}
-        </div>
-      )}
-
-      {tab === "materials" && (
-        <div className="card card-pad">
-          {q.materials.length === 0 ? (
-            <EmptyState title="No materials attached." />
-          ) : (
-            <>
-              <h4 style={{ marginBottom: 8 }}>{t("Candidate-visible materials")}</h4>
-              {q.materials.map((m) => (
-                <div key={m} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "8px 0", borderBottom: "1px solid var(--border)" }}>
-                  <span style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                    <span className="material-icons-o" style={{ fontSize: 16, color: "var(--text-tertiary)" }}>attach_file</span>
-                    {m}
-                  </span>
-                  <Button size="sm" variant="ghost">{t("Preview")}</Button>
-                </div>
-              ))}
-            </>
           )}
         </div>
       )}
@@ -118,19 +93,6 @@ export function QuestionDetailPage() {
             <div className="metric"><div className="label">{t("Role mappings")}</div><div className="value">{q.roles.length}</div></div>
           </div>
           <div className="tiny" style={{ marginTop: 12 }}>{t("Mapped roles:")} {q.roles.map((r) => <Chip key={r}>{r}</Chip>)}</div>
-        </div>
-      )}
-
-      {tab === "versions" && (
-        <div className="card card-pad">
-          {Array.from({ length: q.version }, (_, i) => q.version - i).map((v) => (
-            <div key={v} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "8px 0", borderBottom: "1px solid var(--border)" }}>
-              <div><b>v{v}</b> {v === q.version && <Badge tone="info">{t("Current")}</Badge>}</div>
-              <div className="tiny">
-                {v === q.version ? getUser(q.author as UserId)?.name || "—" : t("Earlier revision")} · {v === q.version ? t("Published") : t("Superseded")}
-              </div>
-            </div>
-          ))}
         </div>
       )}
 

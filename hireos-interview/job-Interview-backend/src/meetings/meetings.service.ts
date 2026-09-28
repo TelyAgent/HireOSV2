@@ -45,6 +45,6 @@ export class MeetingsService {
     const encode = (value: object) => Buffer.from(JSON.stringify(value)).toString('base64url');
     const payload = `${encode({ alg: 'HS256', typ: 'JWT' })}.${encode({ appKey: clientId, mn: meetingNumber, role, iat, exp, tokenExp: exp })}`;
     const signature = `${payload}.${createHmac('sha256', secret).update(payload).digest('base64url')}`;
-    return { meetingNumber, password, displayName, signature, expiresAt: exp };
+    return { meetingNumber, password, displayName, signature, sdkKey: clientId, expiresAt: exp };
   }
 }

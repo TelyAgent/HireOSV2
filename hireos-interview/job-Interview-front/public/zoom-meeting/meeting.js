@@ -75,9 +75,9 @@
       client.on('connection-change', connectionChanged);
       resize = new ResizeObserver(() => { if (!disposed) client.updateVideoOptions(videoOptions()); });
       resize.observe(document.documentElement);
-      const { meetingNumber, password, displayName, signature, zak } = event.data.config;
+      const { meetingNumber, password, displayName, signature, sdkKey, zak } = event.data.config;
       stage = 'join';
-      await client.join({ meetingNumber, password, userName: displayName, signature, ...(zak ? { zak } : {}) });
+      await client.join({ sdkKey, meetingNumber, password, userName: displayName, signature, ...(zak ? { zak } : {}) });
     } catch (error) {
       if (!disposed) failure(error);
       close();

@@ -8,12 +8,8 @@ import { fmtRelative, nowISO } from "../lib/format";
 export function HomePage() {
   const { state, t, set, person } = useStore();
   const navigate = useNavigate();
-  const u = state.currentUserId;
 
   const wsJobs = Object.values(state.jobs);
-  const myOpenJobs = wsJobs.filter(
-    (j) => (j.owner === u || j.hiringManager === u || j.recruiter === u) && j.hiringStatus === "published",
-  );
   const hiringNow = wsJobs.filter((j) => j.hiringStatus === "published");
   const pendingApproval = wsJobs.filter((j) => j.approvalStatus === "pending");
   const recentJobs = wsJobs
@@ -35,16 +31,6 @@ export function HomePage() {
           </Button>
         }
       />
-
-      <div className="section-block">
-        <div className="section-title">{t("My work")}</div>
-        <div className="stat-row">
-          <div className="stat-card" onClick={() => navigate("/jobs?view=table&savedView=My%20Jobs")}>
-            <div className={`num${myOpenJobs.length === 0 ? " zero" : ""}`}>{myOpenJobs.length}</div>
-            <div className="lbl">{t("My open jobs")}</div>
-          </div>
-        </div>
-      </div>
 
       <div className="section-block">
         <div className="flex items-center justify-between" style={{ marginBottom: 8 }}>
