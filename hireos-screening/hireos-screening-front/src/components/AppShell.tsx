@@ -51,10 +51,6 @@ export function TopBar({ openTaskCount }: { openTaskCount: number }) {
         <span className="brand-sep" aria-hidden="true">/</span>
         <span className="brand-context">{t("Resume Screening")}</span>
       </div>
-      <div className="topbar-search">
-        <Icon name="search" size={18} />
-        <input type="text" placeholder={t("Search candidates, jobs, tasks...")} aria-label={t("Search")} />
-      </div>
       <div className="topbar-actions">
         <Link to="/tasks" className="icon-btn" title={t("Notifications")} aria-label={t("Notifications")}>
           <Icon name="notifications_none" />

@@ -44,14 +44,6 @@ function TopBar() {
           HireOS Command<small>{t("JD Management")}</small>
         </div>
       </div>
-      <div className="topbar-search">
-        <Icon name="search" size={18} />
-        <input
-          type="text"
-          placeholder={t("Search jobs, requirements, tasks... (e.g. Roles in Vietnam that need finance experience)")}
-          aria-label={t("Search")}
-        />
-      </div>
       <div className="topbar-actions">
         <Button
           variant="secondary"

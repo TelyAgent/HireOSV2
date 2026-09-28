@@ -59,27 +59,6 @@ export function TopBar() {
       <div style={{ fontSize: 13, color: "var(--ink-3)" }}>/</div>
       <div style={{ fontSize: 13, fontWeight: 600 }}>{t.interview}</div>
 
-      <input
-        aria-label={t.searchAria}
-        value={state.searchQuery}
-        onChange={(e) =>
-          useStore().set({ searchQuery: e.target.value, homeFilter: "All projects" })
-        }
-        placeholder={t.searchPlaceholder}
-        className="global-search"
-        style={{
-          flex: "none",
-          width: 220,
-          height: 32,
-          borderRadius: 9,
-          background: "var(--surface-2)",
-          border: "1px solid var(--line)",
-          padding: "0 11px",
-          fontSize: 12.5,
-          color: "var(--ink)",
-        }}
-      />
-
       <div style={{ flex: 1 }} />
 
       <button

@@ -82,10 +82,6 @@ export function AppShell({ openTaskCount, children }: { openTaskCount: number; c
           <button className="icon-btn" type="button" title={t("Toggle navigation")} aria-label={t("Toggle navigation")} onClick={toggleSidebar}>
             <Icon name="menu" />
           </button>
-          <button className="topbar-search" type="button" title={t("Search")} aria-label={t("Search")}>
-            <Icon name="search" style={{ fontSize: 18 }} />
-            <span>{t("Search projects, candidates...")}</span>
-          </button>
           <div style={{ flex: 1 }} />
           <button className="lang-switch" type="button" title={t("Language")} aria-label={t("Language")} onClick={toggleLang}>
             <span className={state.lang === "en" ? "on" : ""}>EN</span>
