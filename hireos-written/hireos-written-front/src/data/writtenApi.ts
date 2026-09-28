@@ -52,7 +52,6 @@ export async function fetchCaseAiContext(caseId: string): Promise<CaseAiContext 
 export interface GeneratedQuestion {
   prompt: string;
   competencies: { name: string; fraction: number }[];
-  deliverables: string[];
 }
 
 export async function generateAiQuestion(input: {
@@ -76,6 +75,13 @@ export interface QuestionSnapshot {
   code: string;
   title: string;
   prompt: string;
+  competencies?: { name: string; fraction: number }[];
+}
+
+export interface RealEvaluation {
+  overall: number;
+  summary: string;
+  criteria: { name: string; max: number; score: number; evidence: string }[];
 }
 
 export interface RealInvitation {
@@ -87,7 +93,7 @@ export interface RealInvitation {
   deadline: string | null;
   status: string;
   createdAt: string;
-  submission: { answers: { questionId: string; answerText: string }[]; submittedAt: string } | null;
+  submission: { answers: { questionId: string; answerText: string }[]; submittedAt: string; evaluation: RealEvaluation | null } | null;
 }
 
 /** Only cases created via a real screening handoff can hold a real invitation — callers should

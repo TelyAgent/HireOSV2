@@ -25,7 +25,7 @@ export function AssessmentQuestionDrawer({
   const [selectedQuestionId, setSelectedQuestionId] = useState("");
   const [focusBrief, setFocusBrief] = useState("");
   const [contentDraft, setContentDraft] = useState("");
-  const [generated, setGenerated] = useState<{ competencies: Competency[]; deliverables: string[] } | null>(null);
+  const [generated, setGenerated] = useState<{ competencies: Competency[] } | null>(null);
   const [aiLoading, setAiLoading] = useState(false);
   const [caseContext, setCaseContext] = useState<CaseAiContext | null>(null);
 
@@ -87,7 +87,7 @@ export function AssessmentQuestionDrawer({
         lang: zh ? "zh" : "en",
       });
       setContentDraft(result.prompt);
-      setGenerated({ competencies: result.competencies, deliverables: result.deliverables });
+      setGenerated({ competencies: result.competencies });
     } catch {
       say(t("AI generation failed. Please try again."), { type: "danger" });
     } finally {
@@ -124,7 +124,7 @@ export function AssessmentQuestionDrawer({
         id: qId,
         code: `AI-${qId.slice(-4).toUpperCase()}`,
         title: `${zh ? "AI 生成 · " : "AI-generated · "}${focusBrief.trim().slice(0, 24)}`,
-        type: "Written + File",
+        type: "Written",
         roles: [jobTitle],
         competencies: generated?.competencies ?? [{ name: focusBrief.trim().slice(0, 20) || "Custom focus", fraction: 1 }],
         difficulty: "Medium",
@@ -134,7 +134,7 @@ export function AssessmentQuestionDrawer({
         status: "published",
         author: state.currentUser,
         favorite: false,
-        deliverables: generated?.deliverables ?? [zh ? "工作样本产出 (deliverable.md)" : "Work sample deliverable (deliverable.md)"],
+        deliverables: [],
         materials: [],
         usageCount: 0,
         seenByCount: 0,

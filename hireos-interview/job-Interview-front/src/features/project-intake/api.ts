@@ -88,6 +88,13 @@ export type RoundScoresState = {
   generation: { id: string; status: 'queued' | 'parsing' | 'needs_review' | 'failed'; errorCode: string | null } | null;
   entries: CardScoreEntry[];
 };
+// GET /rounds/:id/summary — AI summary of the round's transcript, queued automatically by
+// "Complete session & review" (null if the round had no transcript and none was requested).
+export type SummaryPoint = { point: string; segmentId: string; quote: string };
+export type RoundSummary = { overview: string; highlights: SummaryPoint[]; concerns: SummaryPoint[]; followUps: string[] };
+export type RoundSummaryState = {
+  generation: { id: string; status: 'queued' | 'parsing' | 'needs_review' | 'failed'; errorCode: string | null; createdAt: string; result: RoundSummary | null } | null;
+};
 // GET /tasks/:id/decision — the human's final call plus the AI-drafted conclusion that
 // "Continue to decision" generates (see backend TasksService.generateDecisionDraft).
 export type Decision = 'continue_next_round' | 'hold' | 'request_more_evidence' | 'do_not_proceed' | 'recommend_offer';
@@ -98,13 +105,24 @@ export type DecisionState = {
 };
 // GET /tasks/:id/debrief — aggregate roll-up across the task's rounds, taking each card's
 // most recently updated score (see backend TasksService.debrief).
+// `ai` is the cross-round AI draft for the card ("Continue to debrief" queues it — see
+// backend TasksService.generateDebriefDraft); headline numbers only ever count human scores.
+export type DebriefCard = {
+  id: string; requirement: string; cardPriority: CardPriority; weight: number;
+  score: number | null; note: string; round: { sequence: number; name: string } | null;
+  ai: { score: number | null; rationale: string; quote: string | null } | null;
+};
 export type DebriefSummary = {
+  bar: number;
   totalCards: number; scoredCount: number;
   mustHaveTotal: number; mustHaveMet: number;
   evaluatedWeightPct: number;
   overall: 'pass' | 'fail' | null;
   unknownCards: { id: string; requirement: string }[];
-  cards: { id: string; requirement: string; cardPriority: CardPriority; weight: number; score: number | null }[];
+  cards: DebriefCard[];
+  mismatches: { cardId: string; requirement: string; human: number; ai: number }[];
+  unresolved: string[];
+  generation: { id: string; status: 'queued' | 'parsing' | 'needs_review' | 'failed'; errorCode: string | null } | null;
 };
 
 // GET /tasks/:id/package — the Evaluation Package: decision + debrief roll-up + evidence

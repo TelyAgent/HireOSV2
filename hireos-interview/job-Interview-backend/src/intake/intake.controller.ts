@@ -66,10 +66,16 @@ export class IntakeController {
   generateAiScores(@Req() req: { identity: Identity }, @Param('id') id: string) { return this.rounds.generateAiScores(req.identity, id); }
   @Patch('rounds/:id/recommendation')
   setRoundRecommendation(@Req() req: { identity: Identity }, @Param('id') id: string, @Body() body: unknown) { return this.rounds.setRecommendation(req.identity, id, body); }
+  @Get('rounds/:id/summary')
+  roundSummary(@Req() req: { identity: Identity }, @Param('id') id: string) { return this.rounds.summary(req.identity.workspaceId, id); }
+  @Post('rounds/:id/summary')
+  generateRoundSummary(@Req() req: { identity: Identity }, @Param('id') id: string) { return this.rounds.generateSummary(req.identity, id); }
   @Post('rounds/:id/complete')
   completeRound(@Req() req: { identity: Identity }, @Param('id') id: string) { return this.rounds.complete(req.identity, id); }
   @Get('tasks/:id/debrief')
   taskDebrief(@Req() req: { identity: Identity }, @Param('id') id: string) { return this.tasks.debrief(req.identity.workspaceId, id); }
+  @Post('tasks/:id/debrief-draft')
+  generateDebriefDraft(@Req() req: { identity: Identity }, @Param('id') id: string) { return this.tasks.generateDebriefDraft(req.identity, id); }
   @Get('tasks/:id/decision')
   taskDecision(@Req() req: { identity: Identity }, @Param('id') id: string) { return this.tasks.decision(req.identity.workspaceId, id); }
   @Post('tasks/:id/decision-draft')

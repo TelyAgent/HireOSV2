@@ -8,7 +8,7 @@ import { Icon } from "../components/ui/Icon";
 import { planPageSelectedTab } from "../utils/planTabState";
 import { AssessmentQuestionDrawer } from "../components/AssessmentQuestionDrawer";
 import { SendToCandidateDrawer } from "../components/SendToCandidateDrawer";
-import { SubmissionDetailContent } from "./SubmissionDetailPage";
+import { SubmissionDetailContent, RealSubmissionContent } from "./SubmissionDetailPage";
 import { EvaluationReviewContent } from "./EvaluationReviewPage";
 import { ReleaseContent } from "./ReleasePage";
 import {
@@ -20,7 +20,7 @@ import {
   createPlanItem, deletePlanItem, listCaseInvitations, listPlanItems, updatePlanItem,
   type RealInvitation,
 } from "../data/writtenApi";
-import { applyRealPlanItems, synthesizeOrphanedInvitationItems } from "../data/realPlanItemsMerge";
+import { applyRealEvaluation, applyRealPlanItems, synthesizeOrphanedInvitationItems } from "../data/realPlanItemsMerge";
 
 type TabKey = "plan" | "submission" | "evaluation" | "result";
 type QuestionDrawerState = { mode: "add" } | { mode: "edit"; planItem: PlanItem } | null;
@@ -129,8 +129,15 @@ export function PlanPage() {
   // under the hood via SendToCandidateDrawer's `items` prop — this just moves the trigger up to a
   // single section-level button instead of one per question card).
   const canSendBatch = !!c.applicationId && ownItems.length > 0 && ownItems.some((pi) => !realInviteForQuestion(pi.questionId) && !invs.find((inv) => inv.questionIds.includes(pi.questionId)));
+  // A real submission (with or without its AI auto-evaluation) is written into ATTEMPTS/EVALUATIONS
+  // in the exact shape SubmissionDetailContent/EvaluationReviewContent already expect — see
+  // applyRealEvaluation's own comment for why this reuses those components unchanged.
+  const realSubmittedInvite = realInvitations.find((inv) => inv.submission);
+  const realAttemptId = realSubmittedInvite?.submission
+    ? applyRealEvaluation(caseId, realSubmittedInvite.questions[0]?.questionId ?? "", realSubmittedInvite.submission)
+    : null;
   const attempts = Object.values(ATTEMPTS).filter((a) => a.caseId === caseId);
-  const primaryAttempt = attempts[0];
+  const primaryAttempt = (realAttemptId && ATTEMPTS[realAttemptId]) || attempts[0];
 
   const goalQuestion = primaryItem ? QUESTIONS[primaryItem.questionId] : null;
   const goalCompetencies = goalQuestion ? goalQuestion.competencies.map((cc) => cc.name).join("、") : "";
@@ -271,7 +278,14 @@ export function PlanPage() {
       </div>
 
       <div style={{ display: activeTab === "submission" ? "block" : "none" }}>
-        {primaryAttempt ? (
+        {realSubmittedInvite?.submission ? (
+          <RealSubmissionContent
+            questions={realSubmittedInvite.questions}
+            answers={realSubmittedInvite.submission.answers}
+            submittedAt={realSubmittedInvite.submission.submittedAt}
+            onGoToEvaluation={() => setActiveTab("evaluation")}
+          />
+        ) : primaryAttempt ? (
           <SubmissionDetailContent attemptId={primaryAttempt.id} inline onGoToEvaluation={() => setActiveTab("evaluation")} />
         ) : (
           <EmptyState icon="inbox" title="No submission received yet." />

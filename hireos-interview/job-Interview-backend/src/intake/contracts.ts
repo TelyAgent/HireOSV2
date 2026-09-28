@@ -89,7 +89,8 @@ export const setDecisionSchema = z.object({ decision: decisionSchema.nullable() 
 export const confirmPackageSchema = z.object({ role: z.enum(['hr', 'hm']), confirmed: z.boolean() }).strict();
 
 export type Segment = { id: string; text: string; page?: number };
-// `cards` is only used by the `round_scores` extraction type (see rubric/score-contracts.ts)
+// `cards` is only used by the `round_scores` and `debrief_scores` extraction types (see
+// rubric/score-contracts.ts, rubric/debrief-contracts.ts)
 // — the capability cards being scored against, alongside the segments (transcript lines)
 // carrying the evidence. Every other extraction type ignores it.
 export type ParseInput = { segments: Segment[]; sourceId: string; cards?: { id: string; requirement: string; cardPriority: string; levelAnchors: unknown }[] };

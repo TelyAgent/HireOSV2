@@ -1,5 +1,13 @@
 import { Type } from 'class-transformer';
-import { ArrayMinSize, IsArray, IsEmail, IsIn, IsISO8601, IsInt, IsOptional, IsString, Min, ValidateNested } from 'class-validator';
+import { ArrayMinSize, IsArray, IsEmail, IsIn, IsISO8601, IsInt, IsNumber, IsOptional, IsString, Min, ValidateNested } from 'class-validator';
+
+class CompetencySnapshotDto {
+  @IsString()
+  name!: string;
+
+  @IsNumber()
+  fraction!: number;
+}
 
 export class QuestionSnapshotDto {
   @IsString()
@@ -13,6 +21,16 @@ export class QuestionSnapshotDto {
 
   @IsString()
   prompt!: string;
+
+  // Carried along so the auto-evaluator (see AiEvaluatorService) can score against the exact same
+  // weighted rubric the question was designed with, without depending on the originating PlanItem
+  // still existing by the time the candidate replies (see PlanPage's orphaned-invitation recovery
+  // for why that assumption doesn't always hold).
+  @IsOptional()
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => CompetencySnapshotDto)
+  competencies?: CompetencySnapshotDto[];
 }
 
 export class CreateInvitationDto {

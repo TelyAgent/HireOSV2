@@ -81,7 +81,7 @@ export function SendToCandidateDrawer({
       const created = await createInvitation(caseId, {
         questions: items.map((pi) => {
           const q = QUESTIONS[pi.questionId];
-          return { questionId: pi.questionId, code: q.code, title: q.title, prompt: pi.customPrompt ?? q.prompt };
+          return { questionId: pi.questionId, code: q.code, title: q.title, prompt: pi.customPrompt ?? q.prompt, competencies: q.competencies };
         }),
         mode,
         durationMin: mode === "timed" ? durationMin : undefined,

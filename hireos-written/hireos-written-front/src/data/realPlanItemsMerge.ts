@@ -5,15 +5,15 @@
  * send-to-candidate preview, ...) keeps working unchanged whether the item is fixture demo data or
  * a real, backend-persisted one.
  */
-import { PLANS, QUESTIONS, type PlanItem, type Question } from "./fixtures";
-import type { QuestionSnapshot, RealInvitation, RealPlanItem } from "./writtenApi";
+import { ATTEMPTS, EVALUATIONS, PLANS, QUESTIONS, type Attempt, type Criterion, type Evaluation, type PlanItem, type Question } from "./fixtures";
+import type { QuestionSnapshot, RealEvaluation, RealInvitation, RealPlanItem } from "./writtenApi";
 
 function toQuestion(item: RealPlanItem): Question {
   return {
     id: `q_real_${item.id}`,
     code: item.questionCode,
     title: item.questionTitle,
-    type: "Written + File",
+    type: "Written",
     roles: [],
     competencies: item.competencies?.length ? item.competencies : [{ name: item.questionTitle.slice(0, 24), fraction: 1 }],
     difficulty: "Medium",
@@ -64,7 +64,7 @@ function toOrphanedQuestion(snapshot: QuestionSnapshot): Question {
     id: snapshot.questionId,
     code: snapshot.code,
     title: snapshot.title,
-    type: "Written + File",
+    type: "Written",
     roles: [],
     competencies: [{ name: snapshot.title.slice(0, 24), fraction: 1 }],
     difficulty: "Medium",
@@ -103,4 +103,39 @@ export function synthesizeOrphanedInvitationItems(caseId: string, realInvitation
     }
   }
   return orphaned;
+}
+
+function toCriterion(c: RealEvaluation["criteria"][number]): Criterion {
+  return { name: c.name, max: c.max, ai: c.score, human: null, confidence: "Medium", coverage: "Full", evidence: c.evidence, source: "AI evaluation" };
+}
+
+/**
+ * Writes a real, AI-auto-generated evaluation (see AiEvaluatorService, run right after the
+ * candidate submits) into the ATTEMPTS/EVALUATIONS fixture dicts in exactly the shape
+ * EvaluationReviewContent already expects (Criterion.ai/human/confidence/...) -- reviewers get the
+ * existing accept/override/finalize workflow for free, same component, unchanged, whether the
+ * criteria came from fixture demo data or a real AI pass over a real candidate's real answer.
+ * Returns the synthetic attemptId to pass into <EvaluationReviewContent attemptId=... />, or null if
+ * this submission has no evaluation yet (AI wasn't configured, or the auto-eval attempt failed --
+ * left for a human to score from the raw answers shown on the Submission tab).
+ */
+export function applyRealEvaluation(
+  caseId: string,
+  questionId: string,
+  submission: { submittedAt: string; evaluation: RealEvaluation | null },
+): string | null {
+  const attemptId = `att_real_${caseId}`;
+  const attempt: Attempt = {
+    id: attemptId, caseId, questionId, round: 1, status: "submitted",
+    submittedAt: submission.submittedAt, fileRef: "", receivedAt: submission.submittedAt, processedAt: submission.submittedAt,
+  };
+  ATTEMPTS[attemptId] = attempt;
+
+  if (!submission.evaluation) return attemptId;
+  const evaluation: Evaluation = {
+    id: `eval_${caseId}`, attemptId, status: "ai_draft", finalizedBy: null, finalizedAt: null,
+    criteria: submission.evaluation.criteria.map(toCriterion),
+  };
+  EVALUATIONS[evaluation.id] = evaluation;
+  return attemptId;
 }

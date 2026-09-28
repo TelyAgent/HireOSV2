@@ -4,6 +4,8 @@ import { z } from 'zod';
 import { extractionSchema, type ParseInput } from './contracts';
 import { cardGenerationSchema, CARD_GENERATION_SYSTEM_PROMPT, collectCardRefs } from '../rubric/contracts';
 import { roundScoreGenerationSchema, ROUND_SCORE_SYSTEM_PROMPT, collectRoundScoreRefs } from '../rubric/score-contracts';
+import { roundSummaryGenerationSchema, ROUND_SUMMARY_SYSTEM_PROMPT, collectRoundSummaryRefs, repairSummaryRefs } from '../rubric/summary-contracts';
+import { debriefGenerationSchema, DEBRIEF_DRAFT_SYSTEM_PROMPT, collectDebriefRefs, repairDebriefRefs } from '../rubric/debrief-contracts';
 import { decisionGenerationSchema, DECISION_SUMMARY_SYSTEM_PROMPT, collectDecisionRefs } from '../rubric/decision-contracts';
 import { questionGenerationSchema, QUESTION_GENERATION_SYSTEM_PROMPT, collectQuestionRefs } from '../brief/contracts';
 
@@ -21,6 +23,12 @@ type ExtractionConfig<T = unknown> = {
   // field extraction; override the shared HIREOS_AI_TIMEOUT_SECONDS default per type
   // rather than raising it globally for every caller.
   timeoutSeconds?: number;
+  // Types whose output is a list of independently cited entries (round_summary points,
+  // debrief_scores cards): one bad citation means that one entry is unsupported, not that
+  // the whole result is. Types that set this repair or drop just the offending entries
+  // instead of failing — `resolve` returns the segmentId the quote verifiably comes from, or null.
+  // Types without it (scores, cards, decisions) keep the all-or-nothing rule.
+  repairRefs?: (parsed: T, resolve: (ref: SourceRef) => string | null) => T;
 };
 
 const RESUME_EXTRACTION_PROMPT =
@@ -46,6 +54,8 @@ const EXTRACTION_TYPES: Record<string, ExtractionConfig<any>> = {
   capability_cards: { schema: cardGenerationSchema, systemPrompt: CARD_GENERATION_SYSTEM_PROMPT, collectRefs: collectCardRefs, timeoutSeconds: 240 },
   brief_questions: { schema: questionGenerationSchema, systemPrompt: QUESTION_GENERATION_SYSTEM_PROMPT, collectRefs: collectQuestionRefs, timeoutSeconds: 240 },
   round_scores: { schema: roundScoreGenerationSchema, systemPrompt: ROUND_SCORE_SYSTEM_PROMPT, collectRefs: collectRoundScoreRefs, timeoutSeconds: 240 },
+  round_summary: { schema: roundSummaryGenerationSchema, systemPrompt: ROUND_SUMMARY_SYSTEM_PROMPT, collectRefs: collectRoundSummaryRefs, repairRefs: repairSummaryRefs, timeoutSeconds: 240 },
+  debrief_scores: { schema: debriefGenerationSchema, systemPrompt: DEBRIEF_DRAFT_SYSTEM_PROMPT, collectRefs: collectDebriefRefs, repairRefs: repairDebriefRefs, timeoutSeconds: 240 },
   decision_summary: { schema: decisionGenerationSchema, systemPrompt: DECISION_SUMMARY_SYSTEM_PROMPT, collectRefs: collectDecisionRefs, timeoutSeconds: 240 },
 };
 
@@ -108,8 +118,21 @@ export class AiService {
       const lines = quote.split('\n').map(normalize).filter(Boolean);
       return lines.length > 0 && lines.every((line) => segment.includes(line));
     };
-    const badRefs = refs.filter((r) => !input.segments.some((s) => s.id === r.segmentId && quoteMatches(s.text, r.quote)));
-    if (badRefs.length) {
+    const isValid = (r: SourceRef) => input.segments.some((s) => s.id === r.segmentId && quoteMatches(s.text, r.quote));
+    const badRefs = refs.filter((r) => !isValid(r));
+    if (badRefs.length && extractionConfig.repairRefs) {
+      // Models regularly quote the right words under a mangled or neighbouring segmentId.
+      // The quote itself is what's verified, so re-attribute it when exactly one segment
+      // contains it verbatim; anything else is unsupported and dropped.
+      const resolve = (r: SourceRef) => {
+        if (isValid(r)) return r.segmentId;
+        const owners = input.segments.filter((s) => quoteMatches(s.text, r.quote));
+        return owners.length === 1 ? owners[0].id : null;
+      };
+      const dropped = badRefs.filter((r) => resolve(r) == null);
+      Logger.warn(`[AiService] type=${type} sourceId=${input.sourceId}: re-attributed ${badRefs.length - dropped.length}, dropped ${dropped.length} uncited point(s) ${JSON.stringify(dropped)}`);
+      result = extractionConfig.repairRefs(result, resolve);
+    } else if (badRefs.length) {
       Logger.warn(`[AiService] AI_SOURCE_INVALID for type=${type} sourceId=${input.sourceId}: unmatched citations=${JSON.stringify(badRefs)}`);
       throw new ParseFailure('AI_SOURCE_INVALID');
     }

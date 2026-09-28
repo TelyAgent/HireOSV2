@@ -4,6 +4,7 @@ import { PrismaService } from '../persistence/prisma.service';
 import { ZoomHostService } from '../meetings/zoom-host.service';
 import { createRoundSchema, updateRoundSchema, scheduleRoundSchema, setCardScoreSchema, setRecommendationSchema, validate, type ParseInput } from './contracts';
 import { advanceTaskStatus } from './task-status';
+import { mergeTranscriptLines } from '../rubric/summary-contracts';
 import type { Identity } from './workspace.guard';
 
 const ROUND_SELECT = {
@@ -213,7 +214,38 @@ export class RoundsService {
     if (!existing) throw new NotFoundException({ code: 'NOT_FOUND' });
     const updated = await this.db.interviewRound.update({ where: { id: roundId }, data: { status: 'completed', completedAt: new Date() }, select: ROUND_SELECT });
     await this.zoomHost.endMeeting(identity, roundId).catch(() => {});
+    // Summarize the transcript for Review. A round with no transcript simply gets no summary;
+    // Review can still trigger one later once lines exist.
+    await this.generateSummary(identity, roundId).catch((error) => {
+      if (!(error instanceof BadRequestException)) throw error;
+    });
     return updated;
+  }
+
+  /** Latest AI transcript summary for this round (see rubric/summary-contracts.ts) — the
+   * job's status plus its result once finished; `generation: null` if none was ever queued. */
+  async summary(workspaceId: string, roundId: string) {
+    const round = await this.db.interviewRound.findFirst({ where: { id: roundId, workspaceId }, select: { id: true } });
+    if (!round) throw new NotFoundException({ code: 'NOT_FOUND' });
+    const job = await this.db.parseJob.findFirst({ where: { workspaceId, roundId, type: 'round_summary' }, orderBy: { inputVersion: 'desc' },
+      select: { id: true, status: true, errorCode: true, result: true, createdAt: true } });
+    if (!job) return { generation: null };
+    return { generation: { id: job.id, status: job.status, errorCode: job.errorCode, createdAt: job.createdAt, result: job.status === 'needs_review' ? job.result : null } };
+  }
+
+  /** Queues an AI summary of the round's real transcript — requires the transcript to exist. */
+  async generateSummary(identity: Identity, roundId: string) {
+    const round = await this.db.interviewRound.findFirst({ where: { id: roundId, workspaceId: identity.workspaceId }, select: { id: true } });
+    if (!round) throw new NotFoundException({ code: 'NOT_FOUND' });
+    const lines = await this.db.transcriptLine.findMany({ where: { roundId }, orderBy: { createdAt: 'asc' }, select: { id: true, speaker: true, text: true } });
+    if (!lines.length) throw new BadRequestException({ code: 'NO_TRANSCRIPT' });
+    const existingCount = await this.db.parseJob.count({ where: { workspaceId: identity.workspaceId, roundId, type: 'round_summary' } });
+    const input: ParseInput = { sourceId: roundId, segments: mergeTranscriptLines(lines) };
+    const job = await this.db.parseJob.create({ data: {
+      workspaceId: identity.workspaceId, roundId, type: 'round_summary', inputVersion: existingCount + 1,
+      input: input as unknown as Prisma.InputJsonValue,
+    } });
+    return { id: job.id, status: job.status };
   }
 
   private async getTask(workspaceId: string, taskId: string) {

@@ -246,6 +246,7 @@ export const ZH: Record<string, string> = {
   "Could not remove this mailbox.": "移除该邮箱失败。", "Could not update this mailbox.": "更新该邮箱失败。",
   "Enabled": "已启用", "Provider:": "服务商：", "Status:": "状态：", "Connection error": "连接异常",
   "Used to send real assessment invitation emails to candidates from this mailbox address.": "将使用该邮箱地址向候选人发送真实的测评邀请邮件。",
+  "Question": "题目", "(No answer provided)": "（未作答）",
   "Loading…": "加载中…", "This link is invalid or has expired.": "该链接无效或已失效。",
   "Thank you — your submission has been received.": "感谢提交，我们已收到您的作答内容。",
   "The hiring team will review your answers and follow up with next steps.": "招聘团队将审阅您的作答内容，并与您沟通后续安排。",

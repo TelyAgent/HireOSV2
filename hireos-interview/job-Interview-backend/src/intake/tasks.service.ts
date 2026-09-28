@@ -5,7 +5,12 @@ import { attachTaskMaterialSchema, confirmPackageSchema, createTaskSchema, revie
 import { CandidatesService } from './candidates.service';
 import { RoundsService } from './rounds.service';
 import { advanceTaskStatus } from './task-status';
+import { mergeTranscriptLines } from '../rubric/summary-contracts';
 import type { Identity } from './workspace.guard';
+
+// A card "meets the bar" at this human score or above — the single threshold Review and
+// Debrief both use (capability cards carry no per-card required level yet).
+const DEBRIEF_BAR = 3;
 
 @Injectable()
 export class TasksService {
@@ -100,36 +105,91 @@ export class TasksService {
 
   /** Debrief roll-up: the job's confirmed capability cards, each paired with its latest
    * human score across any of this task's rounds (a card scored in more than one round
-   * takes the most recently updated score — see CardScore). */
+   * takes the most recently updated score — see CardScore), set beside the AI cross-round
+   * draft score for the same card (see generateDebriefDraft). Headline numbers only ever
+   * count human scores; the AI draft feeds the disagreement list, never the result. */
   async debrief(workspaceId: string, taskId: string) {
     const task = await this.db.interviewTask.findFirst({ where: { id: taskId, workspaceId }, select: { jobId: true } });
     if (!task) throw new NotFoundException({ code: 'NOT_FOUND' });
     const rubric = await this.db.rubricVersion.findFirst({
       where: { workspaceId, jobId: task.jobId, status: 'confirmed' }, orderBy: { versionNumber: 'desc' },
-      select: { cards: { select: { id: true, requirement: true, cardPriority: true, weight: true } } },
+      select: { cards: { orderBy: { createdAt: 'asc' }, select: { id: true, requirement: true, cardPriority: true, weight: true } } },
     });
     const cards = rubric?.cards ?? [];
-    const rounds = await this.db.interviewRound.findMany({ where: { taskId, workspaceId }, select: { id: true } });
-    const roundIds = rounds.map((r) => r.id);
-    const scores = roundIds.length && cards.length
-      ? await this.db.cardScore.findMany({ where: { roundId: { in: roundIds }, cardId: { in: cards.map((c) => c.id) } }, orderBy: { updatedAt: 'desc' }, select: { cardId: true, score: true } })
+    const rounds = await this.db.interviewRound.findMany({ where: { taskId, workspaceId }, select: { id: true, sequence: true, name: true } });
+    const roundById = new Map(rounds.map((r) => [r.id, r]));
+    const scores = rounds.length && cards.length
+      ? await this.db.cardScore.findMany({ where: { roundId: { in: rounds.map((r) => r.id) }, cardId: { in: cards.map((c) => c.id) }, score: { not: null } }, orderBy: { updatedAt: 'desc' }, select: { cardId: true, roundId: true, score: true, note: true } })
       : [];
-    const latestByCard = new Map<string, number | null>();
-    for (const s of scores) if (!latestByCard.has(s.cardId)) latestByCard.set(s.cardId, s.score);
+    const latestByCard = new Map<string, (typeof scores)[number]>();
+    for (const s of scores) if (!latestByCard.has(s.cardId)) latestByCard.set(s.cardId, s);
+    const humanScore = (cardId: string) => latestByCard.get(cardId)?.score ?? null;
+
+    const job = await this.db.parseJob.findFirst({ where: { workspaceId, taskId, type: 'debrief_scores' }, orderBy: { inputVersion: 'desc' },
+      select: { id: true, status: true, errorCode: true, result: true } });
+    const draft = job?.status === 'needs_review'
+      ? job.result as unknown as { cards: { cardId: string; score: number | null; rationale: string; quote: string | null }[]; unresolved: string[] }
+      : null;
+    const aiByCard = new Map((draft?.cards ?? []).map((c) => [c.cardId, c]));
+
     const mustHaves = cards.filter((c) => c.cardPriority === 'P0');
-    const mustMet = mustHaves.filter((c) => { const value = latestByCard.get(c.id); return value != null && value >= 3; });
-    const scoredCount = cards.filter((c) => latestByCard.get(c.id) != null).length;
+    const mustMet = mustHaves.filter((c) => { const value = humanScore(c.id); return value != null && value >= DEBRIEF_BAR; });
     const totalWeight = cards.reduce((sum, c) => sum + c.weight, 0);
-    const evaluatedWeight = cards.reduce((sum, c) => (latestByCard.get(c.id) != null ? sum + c.weight : sum), 0);
-    const unknownCards = cards.filter((c) => latestByCard.get(c.id) == null);
+    const evaluatedWeight = cards.reduce((sum, c) => (humanScore(c.id) != null ? sum + c.weight : sum), 0);
+    const unknownCards = cards.filter((c) => humanScore(c.id) == null);
+    const rows = cards.map((c) => {
+      const human = latestByCard.get(c.id);
+      const round = human ? roundById.get(human.roundId) : undefined;
+      const ai = aiByCard.get(c.id);
+      return {
+        id: c.id, requirement: c.requirement, cardPriority: c.cardPriority, weight: c.weight,
+        score: human?.score ?? null, note: human?.note ?? '', round: round ? { sequence: round.sequence, name: round.name } : null,
+        ai: ai ? { score: ai.score, rationale: ai.rationale, quote: ai.quote } : null,
+      };
+    });
     return {
-      totalCards: cards.length, scoredCount,
+      bar: DEBRIEF_BAR,
+      totalCards: cards.length, scoredCount: cards.length - unknownCards.length,
       mustHaveTotal: mustHaves.length, mustHaveMet: mustMet.length,
       evaluatedWeightPct: totalWeight ? Math.round((evaluatedWeight / totalWeight) * 100) : 0,
       overall: cards.length > 0 && unknownCards.length === 0 ? (mustMet.length === mustHaves.length ? 'pass' : 'fail') : null,
       unknownCards: unknownCards.map((c) => ({ id: c.id, requirement: c.requirement })),
-      cards: cards.map((c) => ({ id: c.id, requirement: c.requirement, cardPriority: c.cardPriority, weight: c.weight, score: latestByCard.get(c.id) ?? null })),
+      cards: rows,
+      // PRD INT-10: every card where the AI draft and the recorded human score are 2+ levels apart.
+      mismatches: rows.filter((r) => r.score != null && r.ai?.score != null && Math.abs(r.score - r.ai.score) >= 2)
+        .map((r) => ({ cardId: r.id, requirement: r.requirement, human: r.score!, ai: r.ai!.score! })),
+      unresolved: draft?.unresolved ?? [],
+      generation: job ? { id: job.id, status: job.status, errorCode: job.errorCode } : null,
     };
+  }
+
+  /** Queues the AI cross-round draft — one score per confirmed capability card, read from
+   * every round's real transcript together. Triggered by "Continue to debrief" once every
+   * round is complete. Reuses the latest job when its input is unchanged, so moving back
+   * and forth between Review and Debrief doesn't re-run the model for nothing. */
+  async generateDebriefDraft(identity: Identity, taskId: string) {
+    const task = await this.db.interviewTask.findFirst({ where: { id: taskId, workspaceId: identity.workspaceId }, select: { jobId: true } });
+    if (!task) throw new NotFoundException({ code: 'NOT_FOUND' });
+    const rounds = await this.db.interviewRound.findMany({ where: { taskId, workspaceId: identity.workspaceId }, orderBy: { sequence: 'asc' }, select: { id: true, sequence: true, name: true, status: true } });
+    if (!rounds.length || rounds.some((r) => r.status !== 'completed')) throw new BadRequestException({ code: 'ROUNDS_NOT_COMPLETED' });
+    const rubric = await this.db.rubricVersion.findFirst({
+      where: { workspaceId: identity.workspaceId, jobId: task.jobId, status: 'confirmed' }, orderBy: { versionNumber: 'desc' },
+      select: { cards: { orderBy: { createdAt: 'asc' }, select: { id: true, requirement: true, cardPriority: true, levelAnchors: true } } },
+    });
+    const cards = rubric?.cards ?? [];
+    if (!cards.length) throw new BadRequestException({ code: 'NO_CONFIRMED_RUBRIC' });
+    const lines = await this.db.transcriptLine.findMany({ where: { roundId: { in: rounds.map((r) => r.id) } }, orderBy: { createdAt: 'asc' }, select: { id: true, roundId: true, speaker: true, text: true } });
+    if (!lines.length) throw new BadRequestException({ code: 'NO_TRANSCRIPT' });
+    const segments = rounds.flatMap((r) => mergeTranscriptLines(lines.filter((l) => l.roundId === r.id), `[第 ${r.sequence} 轮（${r.name}）] `));
+    const input: ParseInput = { sourceId: taskId, segments, cards };
+    const latest = await this.db.parseJob.findFirst({ where: { workspaceId: identity.workspaceId, taskId, type: 'debrief_scores' }, orderBy: { inputVersion: 'desc' },
+      select: { id: true, status: true, input: true, inputVersion: true } });
+    if (latest && latest.status !== 'failed' && JSON.stringify(latest.input) === JSON.stringify(input)) return { id: latest.id, status: latest.status };
+    const job = await this.db.parseJob.create({ data: {
+      workspaceId: identity.workspaceId, taskId, type: 'debrief_scores', inputVersion: (latest?.inputVersion ?? 0) + 1,
+      input: input as unknown as Prisma.InputJsonValue,
+    } });
+    return { id: job.id, status: job.status };
   }
 
   /** One segment per capability card: the requirement plus how it actually scored across

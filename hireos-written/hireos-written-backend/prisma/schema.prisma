@@ -161,5 +161,11 @@ model Submission {
   invitationId String     @unique
   answers      Json
   submittedAt  DateTime   @default(now())
+  // Auto-generated once, right after the candidate submits (see InvitationsService.submit) --
+  // { overall, criteria: [{name, max, score, evidence}], summary }. A reviewer's human overrides
+  // stay entirely on the frontend's fixture Evaluation/Criterion objects for now (this column is
+  // never rewritten after the initial AI pass), same as this app's other "AI draft, human review"
+  // fixtures elsewhere (e.g. the AI-generated question rubric).
+  evaluation   Json?
   invitation   Invitation @relation(fields: [invitationId], references: [id], onDelete: Cascade)
 }

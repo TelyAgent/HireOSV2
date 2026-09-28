@@ -4,6 +4,47 @@ import { StatusBadge } from "../utils/status";
 import { Breadcrumbs, Button, EmptyState } from "../components/ui/Primitives";
 import { Icon } from "../components/ui/Icon";
 import { ATTEMPTS, CASES, CORE_CANDIDATES, CORE_FILES, QUESTIONS, fmtDate, fmtDateShort } from "../data/fixtures";
+import type { QuestionSnapshot } from "../data/writtenApi";
+
+/**
+ * The real-submission counterpart to SubmissionDetailContent below — that component is built around
+ * the prototype's "candidate uploads a ZIP of files" model (original archive, deliverable files list),
+ * which doesn't fit this app's actual public form (plain text answers per question, no files). Rather
+ * than force a fake "download archive" UI onto something that has no archive, this renders the real
+ * question/answer pairs directly. Used by PlanPage's "Submission" tab whenever a case has a real
+ * backend Invitation with a Submission attached.
+ */
+export function RealSubmissionContent({
+  questions, answers, submittedAt, onGoToEvaluation,
+}: {
+  questions: QuestionSnapshot[];
+  answers: { questionId: string; answerText: string }[];
+  submittedAt: string;
+  onGoToEvaluation: () => void;
+}) {
+  const { t } = useStore();
+  return (
+    <div>
+      <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 16 }}>
+        <StatusBadge status="submitted" />
+        <span className="tiny">{t("Received")} {fmtDate(submittedAt)}</span>
+      </div>
+      {questions.map((q) => {
+        const answer = answers.find((a) => a.questionId === q.questionId);
+        return (
+          <div key={q.questionId} className="card card-pad" style={{ marginBottom: 16 }}>
+            <b>{q.code} · {q.title}</b>
+            <div className="tiny" style={{ color: "var(--text-tertiary)", marginTop: 10, marginBottom: 4 }}>{t("Question")}</div>
+            <div className="tiny" style={{ whiteSpace: "pre-wrap", color: "var(--text-secondary)", maxHeight: 160, overflow: "auto", marginBottom: 12 }}>{q.prompt}</div>
+            <div className="tiny" style={{ color: "var(--text-tertiary)", marginBottom: 4 }}>{t("Candidate's answer")}</div>
+            <div style={{ whiteSpace: "pre-wrap", lineHeight: 1.6 }}>{answer?.answerText || t("(No answer provided)")}</div>
+          </div>
+        );
+      })}
+      <Button variant="primary" onClick={onGoToEvaluation}>{t("Go to evaluation →")}</Button>
+    </div>
+  );
+}
 
 /**
  * Ported from the prototype's pageSubmissionDetail(attId, opts) — `inline` drops the breadcrumb/title

@@ -1,10 +1,11 @@
 import { randomBytes } from 'node:crypto';
-import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
+import { ConflictException, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../persistence/prisma.service';
 import type { Identity } from '../auth/workspace.guard';
 import { MailAccountsService } from '../mail-accounts/mail-accounts.service';
-import type { CreateInvitationDto } from './create-invitation.dto';
+import { AiEvaluatorService } from '../ai/ai-evaluator.service';
+import type { CreateInvitationDto, QuestionSnapshotDto } from './create-invitation.dto';
 import type { SubmitAnswersDto } from './submit-answers.dto';
 
 function generateToken(): string {
@@ -13,10 +14,13 @@ function generateToken(): string {
 
 @Injectable()
 export class InvitationsService {
+  private readonly logger = new Logger(InvitationsService.name);
+
   constructor(
     private readonly db: PrismaService,
     private readonly mailAccounts: MailAccountsService,
     private readonly config: ConfigService,
+    private readonly evaluator: AiEvaluatorService,
   ) {}
 
   async create(identity: Identity, caseId: string, dto: CreateInvitationDto) {
@@ -65,7 +69,7 @@ export class InvitationsService {
       status: inv.status,
       createdAt: inv.createdAt.toISOString(),
       submission: inv.submission
-        ? { answers: inv.submission.answers, submittedAt: inv.submission.submittedAt.toISOString() }
+        ? { answers: inv.submission.answers, submittedAt: inv.submission.submittedAt.toISOString(), evaluation: inv.submission.evaluation }
         : null,
     }));
   }
@@ -100,12 +104,25 @@ export class InvitationsService {
     if (!invitation) throw new NotFoundException({ code: 'INVITATION_NOT_FOUND' });
     if (invitation.submission) throw new ConflictException({ code: 'ALREADY_SUBMITTED' });
 
-    await this.db.$transaction([
+    const [submission] = await this.db.$transaction([
       this.db.submission.create({
         data: { invitationId: invitation.id, answers: dto.answers as unknown as object },
       }),
       this.db.invitation.update({ where: { id: invitation.id }, data: { status: 'submitted' } }),
     ]);
+
+    // Best-effort, right after the candidate's real answer lands -- never blocks the submission
+    // itself (a candidate's reply must be accepted regardless of whether the AI is configured or
+    // available). Failures are logged and simply leave `evaluation` null for a human to score by
+    // hand later, same fallback shape the AI question generator already uses elsewhere.
+    try {
+      const questions = invitation.questions as unknown as QuestionSnapshotDto[];
+      const result = await this.evaluator.evaluate({ questions, answers: dto.answers });
+      await this.db.submission.update({ where: { id: submission.id }, data: { evaluation: result as unknown as object } });
+    } catch (error) {
+      this.logger.warn(`Auto-evaluation failed for invitation ${invitation.id}: ${error instanceof Error ? error.message : error}`);
+    }
+
     return { status: 'submitted' };
   }
 }

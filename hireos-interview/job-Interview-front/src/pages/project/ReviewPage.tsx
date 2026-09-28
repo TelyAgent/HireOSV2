@@ -1,8 +1,9 @@
 import { useEffect, useState } from "react";
 import { useStore } from "../../store/StoreContext";
 import { Pill, toneBg, toneFg, type Tone } from "../../utils/status";
-import { api, type CardScoreEntry, type Recommendation, type Round, type RoundScoresState } from "../../features/project-intake/api";
+import { api, type CardScoreEntry, type Recommendation, type Round, type RoundScoresState, type RoundSummaryState } from "../../features/project-intake/api";
 import { useRounds } from "../../features/project-intake/useRounds";
+import { SummaryPoints } from "../../components/SummaryPoints";
 
 const REC_OPTIONS: { value: Recommendation; label: (t: ReturnType<typeof useStore>["t"]) => string; tone: Tone }[] = [
   { value: "strong_advance", label: (t) => t.recStrongAdvance, tone: "ok" },
@@ -100,6 +101,77 @@ function ScoreCard({ roundId, entry, t, zh, onSaved }: { roundId: string; entry:
   );
 }
 
+function TranscriptSummary({ roundId, zh }: { roundId: string; zh: boolean }) {
+  const [state, setState] = useState<RoundSummaryState["generation"] | undefined>(undefined);
+  const [error, setError] = useState("");
+  const [triggering, setTriggering] = useState(false);
+  const [pollKey, setPollKey] = useState(0);
+
+  useEffect(() => {
+    let stopped = false; let timer: ReturnType<typeof setTimeout>;
+    setError("");
+    const poll = async () => {
+      try {
+        const value = await api<RoundSummaryState>(`/rounds/${roundId}/summary`);
+        if (stopped) return;
+        setState(value.generation);
+        if (value.generation && (value.generation.status === "queued" || value.generation.status === "parsing")) timer = setTimeout(poll, 3000);
+      } catch (e) { if (!stopped) setError(e instanceof Error ? e.message : "REQUEST_FAILED"); }
+    };
+    void poll();
+    return () => { stopped = true; clearTimeout(timer); };
+  }, [roundId, pollKey]);
+
+  const generate = async () => {
+    setTriggering(true); setError("");
+    try {
+      await api(`/rounds/${roundId}/summary`, { method: "POST" });
+      setPollKey((k) => k + 1);
+    } catch (e) {
+      const code = e instanceof Error ? e.message : "REQUEST_FAILED";
+      setError(code === "NO_TRANSCRIPT" ? (zh ? "本轮没有转写内容，无法生成总结。" : "This round has no transcript — nothing to summarize.") : code);
+    } finally { setTriggering(false); }
+  };
+
+  const busy = state?.status === "queued" || state?.status === "parsing";
+  const result = state?.result;
+  return (
+    <div style={{ padding: "15px 17px", border: "1px solid var(--line)", borderRadius: 14, background: "var(--surface)" }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+        <div style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: 10.5, letterSpacing: ".05em", color: "var(--ai)", fontWeight: 700 }}>{zh ? "面试转写总结" : "TRANSCRIPT SUMMARY"}</div>
+        <div style={{ flex: 1 }} />
+        {state !== undefined && (
+          <button disabled={triggering || busy} onClick={() => void generate()}
+            style={{ height: 26, padding: "0 10px", border: "1px solid var(--ai)", borderRadius: 7, background: "var(--surface)", color: "var(--ai)", fontSize: 11, cursor: triggering || busy ? "not-allowed" : "pointer" }}>
+            {busy ? (zh ? "总结生成中…" : "Summarizing…") : state ? (zh ? "重新生成总结" : "Regenerate summary") : (zh ? "生成总结" : "Generate summary")}
+          </button>
+        )}
+      </div>
+      {state === undefined && !error && <div style={{ marginTop: 8, fontSize: 12.5, color: "var(--ink-3)" }}>{zh ? "加载中…" : "Loading…"}</div>}
+      {state === null && <div style={{ marginTop: 8, fontSize: 12.5, color: "var(--ink-3)" }}>{zh ? "暂无总结。本轮完成时若没有转写内容，则不会自动生成。" : "No summary yet — none is generated automatically when a round completes without a transcript."}</div>}
+      {busy && <div style={{ marginTop: 8, fontSize: 12.5, color: "var(--ink-3)" }}>{zh ? "AI 正在根据转写内容生成总结…" : "AI is summarizing the transcript…"}</div>}
+      {state?.status === "failed" && <div role="alert" style={{ marginTop: 8, fontSize: 12.5, color: "var(--bad)" }}>{zh ? `总结生成失败：${state.errorCode}` : `Summary failed: ${state.errorCode}`}</div>}
+      {error && <div role="alert" style={{ marginTop: 8, fontSize: 12.5, color: "var(--bad)" }}>{error}</div>}
+      {result && (
+        <>
+          <div style={{ marginTop: 10, fontSize: 13, lineHeight: 1.6, color: "var(--ink)", whiteSpace: "pre-wrap" }}>{result.overview}</div>
+          <SummaryPoints title={zh ? "亮点" : "Highlights"} points={result.highlights} tone="ok" />
+          <SummaryPoints title={zh ? "疑虑" : "Concerns"} points={result.concerns} tone="warn" />
+          {result.followUps.length > 0 && (
+            <div style={{ marginTop: 12 }}>
+              <div style={{ fontSize: 12, fontWeight: 700, color: "var(--ink-2)" }}>{zh ? "后续待追问" : "Follow-ups"}</div>
+              <ul style={{ margin: "6px 0 0", paddingLeft: 18, display: "grid", gap: 4 }}>
+                {result.followUps.map((f, i) => <li key={i} style={{ fontSize: 12.5, lineHeight: 1.55, color: "var(--ink)" }}>{f}</li>)}
+              </ul>
+            </div>
+          )}
+          <div style={{ marginTop: 10, fontSize: 10.5, color: "var(--ink-3)" }}>{zh ? "AI 生成，仅供参考；引用均来自真实转写。" : "AI-generated for reference; every quote comes from the real transcript."}</div>
+        </>
+      )}
+    </div>
+  );
+}
+
 export function ReviewPage() {
   const { state, set, t } = useStore();
   const zh = state.lang === "zh";
@@ -163,6 +235,17 @@ export function ReviewPage() {
 
   const genBusy = generation?.status === "queued" || generation?.status === "parsing";
 
+  // Kicks off the cross-round AI draft scores on the way to Debrief. Navigation never waits on
+  // it succeeding — Debrief shows the generation state and can retry on its own.
+  const [continuing, setContinuing] = useState(false);
+  const continueToDebrief = async () => {
+    if (!state.currentTaskId) return;
+    setContinuing(true);
+    try { await api(`/tasks/${state.currentTaskId}/debrief-draft`, { method: "POST" }); }
+    catch { /* surfaced on Debrief */ }
+    finally { setContinuing(false); set({ screen: "debrief" }); }
+  };
+
   return (
     <>
       <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
@@ -188,6 +271,8 @@ export function ReviewPage() {
       {loadError && <div role="alert" style={{ padding: "12px 15px", border: "1px solid var(--bad)", borderRadius: 12, background: "var(--bad-soft)", color: "var(--bad)", fontSize: 12.5 }}>{loadError}</div>}
       {triggerError && <div role="alert" style={{ padding: "12px 15px", border: "1px solid var(--bad)", borderRadius: 12, background: "var(--bad-soft)", color: "var(--bad)", fontSize: 12.5 }}>{triggerError}</div>}
       {generation?.status === "failed" && <div role="alert" style={{ padding: "12px 15px", border: "1px solid var(--bad)", borderRadius: 12, background: "var(--bad-soft)", color: "var(--bad)", fontSize: 12.5 }}>{zh ? `AI 评分生成失败：${generation.errorCode}` : `AI score generation failed: ${generation.errorCode}`}</div>}
+
+      {round && started && <TranscriptSummary key={round.id} roundId={round.id} zh={zh} />}
 
       {round && started && (
         <div style={{ padding: "15px 17px", border: "1px solid var(--line)", borderRadius: 14, background: "var(--surface)" }}>
@@ -217,7 +302,7 @@ export function ReviewPage() {
         <div style={{ flex: 1 }} />
         <button onClick={() => set({ screen: "live" })} style={{ height: 34, padding: "0 12px", border: "1px solid transparent", borderRadius: 11, background: "transparent", color: "var(--ink-2)", fontSize: 12.5, cursor: "pointer" }}>{t.backToRecord}</button>
         {allRoundsDone
-          ? <button onClick={() => set({ screen: "debrief" })} style={{ height: 34, padding: "0 15px", border: "1px solid var(--brand)", borderRadius: 11, background: "var(--brand)", color: "var(--brand-ink)", fontSize: 12.5, fontWeight: 600, cursor: "pointer" }}>{t.continueToDebrief}</button>
+          ? <button disabled={continuing} onClick={() => void continueToDebrief()} style={{ height: 34, padding: "0 15px", border: "1px solid var(--brand)", borderRadius: 11, background: "var(--brand)", color: "var(--brand-ink)", fontSize: 12.5, fontWeight: 600, cursor: continuing ? "not-allowed" : "pointer", opacity: continuing ? 0.6 : 1 }}>{continuing ? (zh ? "正在准备汇总…" : "Preparing debrief…") : t.continueToDebrief}</button>
           : <span style={{ fontSize: 11.5, color: "var(--ink-3)" }}>{zh ? "所有轮次的面试都完成后，这里才会出现「继续到汇总评估」。" : "“Continue to debrief” appears here once every round is completed."}</span>}
       </div>
     </>
