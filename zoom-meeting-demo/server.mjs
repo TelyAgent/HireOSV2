@@ -83,6 +83,20 @@ function verifyWebhookSignature(body, req) {
   return expectedBuffer.length === receivedBuffer.length && timingSafeEqual(expectedBuffer, receivedBuffer);
 }
 
+async function readJsonBody(req) {
+  const raw = await new Promise((resolve, reject) => {
+    let body = '';
+    req.on('data', chunk => { body += chunk; });
+    req.on('end', () => resolve(body));
+    req.on('error', reject);
+  });
+  try {
+    return raw ? JSON.parse(raw) : {};
+  } catch {
+    return { __invalidJson: true, __raw: String(raw).slice(0, 500) };
+  }
+}
+
 function handleWebhookBody(body, req, res) {
   log(
     'WEBHOOK',
@@ -91,6 +105,13 @@ function handleWebhookBody(body, req, res) {
     `timestamp=${req.headers['x-zm-request-timestamp'] ? 'present' : 'missing'}`,
     'ua=' + (req.headers['user-agent'] || '-'),
   );
+
+  if (body?.__invalidJson) {
+    log('-> rejected webhook: invalid JSON', body.__raw);
+    res.writeHead(400, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ error: 'invalid JSON' }));
+    return;
+  }
 
   if (body?.event === 'endpoint.url_validation') {
     const plainToken = body.payload?.plainToken;
@@ -139,13 +160,15 @@ function handleWebhookBody(body, req, res) {
   client.onLeave((reason) => { clients.delete(payload.rtms_stream_id); log('left:', reason ?? '(no reason)'); });
   try {
     client.setTranscriptParams({ enableLid: true });
-    log('client.join() returned', client.join(payload));
+    log('client.join() returned', client.join({
+      ...payload,
+      client: env.ZM_RTMS_CLIENT,
+      secret: env.ZM_RTMS_SECRET,
+    }));
   } catch (error) {
     log('client.join() threw', error instanceof Error ? error.message : error);
   }
 }
-
-const webhookHandler = rtms.createWebhookHandler(handleWebhookBody, WEBHOOK_PATH);
 
 // ---- static file serving for the tiny frontend ----
 const MIME = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css' };
@@ -163,7 +186,11 @@ async function serveStatic(req, res) {
 const server = createServer(async (req, res) => {
   const url = new URL(req.url, `http://${req.headers.host}`);
 
-  if (req.method === 'POST' && url.pathname === WEBHOOK_PATH) return webhookHandler(req, res);
+  if (req.method === 'POST' && url.pathname === WEBHOOK_PATH) {
+    log('WEBHOOK_INGRESS', req.method, req.url, 'content-type=' + (req.headers['content-type'] || '-'));
+    const body = await readJsonBody(req).catch((error) => ({ __invalidJson: true, __raw: error instanceof Error ? error.message : String(error) }));
+    return handleWebhookBody(body, req, res);
+  }
 
   if (url.pathname === '/api/oauth/authorize') {
     if (!env.ZM_RTMS_CLIENT || !OAUTH_REDIRECT) return json(res, 400, { error: 'ZM_RTMS_CLIENT / ZOOM_OAUTH_REDIRECT_URI missing in .env' });
@@ -344,6 +371,18 @@ const server = createServer(async (req, res) => {
   }
 
   if (url.pathname === '/api/logs') return json(res, 200, { logs });
+
+  if (req.method === 'POST') {
+    const body = await readJsonBody(req).catch((error) => ({ __invalidJson: true, __raw: error instanceof Error ? error.message : String(error) }));
+    log('UNKNOWN_POST_INGRESS', req.method, req.url, {
+      host: req.headers.host || null,
+      contentType: req.headers['content-type'] || null,
+      userAgent: req.headers['user-agent'] || null,
+      event: body?.event || null,
+      bodyKeys: body && typeof body === 'object' ? Object.keys(body).slice(0, 20) : [],
+    });
+    return json(res, 404, { error: 'unknown POST path' });
+  }
 
   return serveStatic(req, res);
 });

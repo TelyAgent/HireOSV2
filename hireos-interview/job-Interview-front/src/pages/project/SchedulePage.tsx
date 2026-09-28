@@ -289,7 +289,7 @@ export function SchedulePage() {
                     </div>
                   ) : r.meetingLink && isZoomLink(r.meetingLink) ? (
                     <button
-                      onClick={() => set({ liveJoinRound: { roundId: r.id, topic: `HireOS Interview — ${r.name}` }, screen: "live" })}
+                      onClick={() => set({ liveJoinRound: { roundId: r.id, topic: `HireOS Interview — ${r.name}` }, roundView: r.sequence === 2 ? "r2" : "r1", screen: "live" })}
                       className="inline-flex h-[22px] cursor-pointer items-center rounded-md border-0 bg-[var(--brand-soft)] px-2 text-[11.5px] text-[var(--brand)] underline"
                     >
                       📹 {t.joinMeetingLabel}

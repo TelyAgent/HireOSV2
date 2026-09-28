@@ -5,6 +5,8 @@ import rtms from '@zoom/rtms';
 import { PrismaService } from '../persistence/prisma.service';
 import { ZoomHostService } from './zoom-host.service';
 
+const RTMS_TRANSCRIPT_CHINESE_SIMPLIFIED = 4;
+
 // Bridges Zoom RTMS (Realtime Media Streams) to a round's live transcript. One `rtms.Client`
 // per active stream, keyed by `rtms_stream_id` (mirrors the SDK's own quickstart pattern —
 // a stream id is unique per meeting.rtms_started session, letting multiple rounds stream
@@ -49,11 +51,21 @@ export class RtmsService {
           this.logger.warn(`RTMS start skipped for meeting ${meetingId}: RTMS client id is empty`);
           break;
         }
-        // Follow Zoom's documented meeting-level start request exactly. The access
-        // token identifies the host/participant to stream; passing a host_id from
-        // meeting.started is unnecessary and can refer to a different identifier
-        // namespace than participant_user_id.
-        const settings = { client_id: authorizedClientId };
+        let participantUserId = '';
+        try {
+          const profileResponse = await fetch('https://api.zoom.us/v2/users/me', {
+            headers: { Authorization: `Bearer ${token}` },
+            signal: AbortSignal.timeout(15000),
+          });
+          const profile = await profileResponse.json().catch(() => ({}));
+          if (profileResponse.ok && typeof profile?.id === 'string') participantUserId = profile.id;
+        } catch (error) {
+          this.logger.warn(`RTMS start could not resolve participant_user_id for meeting ${meetingId}: ${error instanceof Error ? error.message : error}`);
+        }
+        // Zoom accepts a start request with only client_id, but in practice matching the
+        // OAuth account to the live host participant avoids a half-open stream where join
+        // confirms yet no transcript media arrives.
+        const settings = { client_id: authorizedClientId, ...(participantUserId ? { participant_user_id: participantUserId } : {}) };
         const response = await fetch(`https://api.zoom.us/v2/live_meetings/${meetingId}/rtms_app/status`, {
           method: 'PATCH',
           headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
@@ -81,7 +93,7 @@ export class RtmsService {
     // try again, instead of the meeting staying unstreamable for its whole duration.
     this.startRequested.delete(meetingId);
     const round = await this.db.interviewRound.findUnique({ where: { id: roundId }, select: { transcriptStatus: true } }).catch(() => null);
-    if (round?.transcriptStatus === 'idle') await this.markStreamError(roundId, 'RTMS_START_FAILED');
+    if (round && ['idle', 'connecting'].includes(round.transcriptStatus)) await this.markStreamError(roundId, 'RTMS_START_FAILED');
   }
 
   private async markStreamError(roundId: string, error: string) {
@@ -168,6 +180,22 @@ export class RtmsService {
     const streamId = source.rtms_stream_id;
     if (typeof event === 'string' && event.includes('rtms_stopped')) {
       if (streamId) { this.clients.get(streamId)?.leave(); this.clients.delete(streamId); }
+      const meetingUuid = String(source.meeting_uuid ?? inner.meeting_uuid ?? object.meeting_uuid ?? object.uuid ?? '');
+      let meetingId = String(source.id ?? source.meeting_id ?? inner.meeting_id ?? object.id ?? '');
+      if (!meetingId && meetingUuid) meetingId = await this.resolveMeetingId(meetingUuid);
+      if (meetingId) {
+        this.startRequested.delete(meetingId);
+        const round = await this.db.interviewRound.findFirst({
+          where: { meetingLink: { contains: `/j/${meetingId}` } },
+          select: { id: true },
+        });
+        if (round) {
+          await this.db.interviewRound.update({
+            where: { id: round.id },
+            data: { transcriptStatus: 'ended', transcriptError: null },
+          }).catch((error) => this.logger.warn(`Failed to mark RTMS ended for round ${round.id}: ${error instanceof Error ? error.message : error}`));
+        }
+      }
       return;
     }
     // Standard meeting events (meeting.started, meeting.ended, …) carry BOTH the numeric
@@ -210,16 +238,37 @@ export class RtmsService {
       ? await this.db.interviewRound.findFirst({ where: { meetingLink: { contains: `/j/${meetingId}` } }, select: { id: true, workspaceId: true } })
       : null;
     if (!round) { this.logger.warn(`rtms_started: no round matched (meetingId="${meetingId}", uuid="${meetingUuid}"). Raw payload: ${JSON.stringify(inner)}`); return; }
+    const rtmsClient = this.config.get<string>('ZM_RTMS_CLIENT')?.trim();
+    const rtmsSecret = this.config.get<string>('ZM_RTMS_SECRET')?.trim();
+    if (!rtmsClient || !rtmsSecret) {
+      this.logger.error(`RTMS join skipped for round ${round.id}: RTMS client credentials are incomplete`);
+      await this.markStreamError(round.id, 'RTMS_CREDENTIALS_REQUIRED');
+      return;
+    }
     await this.db.interviewRound.update({ where: { id: round.id }, data: { transcriptStatus: 'connecting', transcriptError: null } });
     const client = new rtms.Client();
     this.clients.set(streamId, client);
+    let audioLogged = false;
+    let speakerLogged = false;
+    client.onAudioData((_data: unknown, size: number, _timestamp: number, metadata: { userName?: string }) => {
+      if (audioLogged) return;
+      audioLogged = true;
+      this.logger.log(`RTMS audio received for round ${round.id}: ${metadata?.userName || 'Speaker'} (${size} bytes)`);
+    });
+    client.onActiveSpeakerEvent((_timestamp: number, _userId: number, userName: string) => {
+      if (speakerLogged) return;
+      speakerLogged = true;
+      this.logger.log(`RTMS active speaker for round ${round.id}: ${userName || 'Speaker'}`);
+    });
     client.onTranscriptData((data: unknown, _size: number, _timestamp: number, metadata: { userName?: string }) => {
       const text = Buffer.isBuffer(data) ? data.toString('utf8') : String(data);
       if (!text.trim()) return;
+      this.logger.log(`RTMS transcript for round ${round.id}: ${metadata?.userName || 'Speaker'} (${text.length} chars)`);
       void this.db.transcriptLine.create({ data: { workspaceId: round.workspaceId, roundId: round.id, speaker: metadata?.userName || 'Speaker', text } })
         .catch((error) => this.logger.error(`Failed to store transcript line for round ${round.id}: ${error instanceof Error ? error.message : error}`));
     });
     client.onJoinConfirm(() => {
+      this.logger.log(`RTMS join confirmed for round ${round.id}`);
       void this.db.interviewRound.update({ where: { id: round.id }, data: { transcriptStatus: 'live' } }).catch(() => {});
     });
     client.onLeave((reason: unknown) => {
@@ -230,15 +279,20 @@ export class RtmsService {
       // The callback alone does not request transcript media from the RTMS SDK.
       // Explicitly enable transcript delivery before joining the stream.
       const transcriptConfigured = (client as unknown as {
-        setTranscriptParams: (params: { enableLid: boolean }) => boolean;
-      }).setTranscriptParams({ enableLid: true });
+        setTranscriptParams: (params: { srcLanguage: number; enableLid: boolean }) => boolean;
+      }).setTranscriptParams({
+        // @zoom/rtms exposes this as TranscriptLanguage.CHINESE_SIMPLIFIED, but
+        // the package's default export type omits that constant.
+        srcLanguage: RTMS_TRANSCRIPT_CHINESE_SIMPLIFIED,
+        enableLid: false,
+      });
       if (!transcriptConfigured) {
         this.logger.error(`RTMS transcript configuration rejected for round ${round.id}`);
         this.clients.delete(streamId);
         await this.markStreamError(round.id, 'TRANSCRIPT_CONFIG_FAILED');
         return;
       }
-      const joined = client.join(source as any);
+      const joined = client.join({ ...(source as any), client: rtmsClient, secret: rtmsSecret });
       if (!joined) {
         this.logger.error(`RTMS join returned false for round ${round.id}`);
         this.clients.delete(streamId);

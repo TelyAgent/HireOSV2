@@ -15,10 +15,6 @@ export function LivePage() {
   const [active, setActive] = useState(false);
   const [dirty, setDirty] = useState(false);
   const { task } = useTask(state.currentTaskId);
-  const round = state.roundView === 'r2' ? 2 : 1;
-  const currentRound = task?.rounds.find((r) => r.sequence === round);
-  const roundId = currentRound?.id ?? null;
-  const isCompleted = currentRound?.status === 'completed';
   const [completing, setCompleting] = useState(false);
   const [completeError, setCompleteError] = useState('');
   const complete = async () => {
@@ -36,6 +32,12 @@ export function LivePage() {
   // must not keep re-triggering an auto-join from a stale value.
   const [joinRound] = useState(state.liveJoinRound);
   useEffect(() => { if (state.liveJoinRound) set({ liveJoinRound: null }); }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  const selectedRound = joinRound?.roundId
+    ? task?.rounds.find((r) => r.id === joinRound.roundId)
+    : task?.rounds.find((r) => r.sequence === (state.roundView === 'r2' ? 2 : 1));
+  const round = selectedRound?.sequence ?? (state.roundView === 'r2' ? 2 : 1);
+  const roundId = selectedRound?.id ?? null;
+  const isCompleted = selectedRound?.status === 'completed';
 
   useEffect(() => {
     if (!active && !dirty) return;

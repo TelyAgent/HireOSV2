@@ -33,8 +33,8 @@ export class MeetingsService {
   }
 
   private sign(meetingNumber: string, password: string, displayName: string, role: 0 | 1) {
-    const clientId = this.config.get<string>('ZOOM_MEETING_SDK_CLIENT_ID');
-    const secret = this.config.get<string>('ZOOM_MEETING_SDK_CLIENT_SECRET');
+    const clientId = this.config.get<string>('ZOOM_MEETING_SDK_CLIENT_ID') || this.config.get<string>('ZM_RTMS_CLIENT');
+    const secret = this.config.get<string>('ZOOM_MEETING_SDK_CLIENT_SECRET') || this.config.get<string>('ZM_RTMS_SECRET');
     if (!clientId || !secret) throw new ServiceUnavailableException({ code: 'ZOOM_NOT_CONFIGURED' });
     const now = Math.floor(Date.now() / 1000);
     this.issued = this.issued.filter(time => time > now - 60);
