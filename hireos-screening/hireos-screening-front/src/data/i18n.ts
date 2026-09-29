@@ -561,6 +561,11 @@ export const ZH: Record<string, string> = {
   "Human override saved — AI score unchanged": "人工修改已保存 —— AI 评分保持不变",
   "Running AI-assisted screening…": "正在运行 AI 辅助初筛…",
   "Screening complete": "初筛已完成",
+  "Screening failed — please try again": "初筛失败，请重试",
+  "Linked, screening in progress.": "已关联，初筛进行中。",
+  "Screening in progress": "初筛进行中",
+  "AI-assisted screening is running against the confirmed role criteria. Results will appear here automatically.":
+    "正在根据已确认的职位标准运行 AI 辅助初筛，完成后结果会自动显示在这里。",
   "Refreshing evaluation with latest inputs…": "正在使用最新输入重新评估…",
   "Evaluation refreshed — new snapshot created, prior result kept in history":
     "评估已刷新 —— 已创建新快照，此前的结果保留在历史记录中",

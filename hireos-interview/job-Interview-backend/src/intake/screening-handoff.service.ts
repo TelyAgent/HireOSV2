@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { screeningHandoffSchema, validate } from './contracts';
 import { PrismaService } from '../persistence/prisma.service';
 import { MaterialsService } from './materials.service';
@@ -6,6 +6,8 @@ import type { Identity } from './workspace.guard';
 
 @Injectable()
 export class ScreeningHandoffService {
+  private readonly logger = new Logger(ScreeningHandoffService.name);
+
   constructor(
     private readonly db: PrismaService,
     private readonly materials: MaterialsService,
@@ -65,15 +67,25 @@ export class ScreeningHandoffService {
     // Pulls the résumé Screening already has (via Core Record) instead of leaving the
     // task with no résumé until someone manually re-uploads one -- see
     // materials.service.ts's fromCoreMaterial for the extraction/idempotency details.
+    //
+    // Best-effort: this hand-off is what actually creates the InterviewTask below, so a
+    // résumé Core Record can't currently serve (network hiccup, or a file that's genuinely
+    // gone -- see the docker-compose volume fix around 2026-09-29 for why that could happen)
+    // must never block task creation. The candidate still needs to show up for interview
+    // even with no résumé attached yet; it can be re-fetched or re-uploaded by hand later.
     let resumeId: string | undefined;
     if (input.coreMaterialId) {
-      const material = await this.materials.fromCoreMaterial(identity, input.coreMaterialId);
-      const resume = await this.db.resume.upsert({
-        where: { materialId: material.id },
-        update: {},
-        create: { workspaceId: identity.workspaceId, candidateId: candidate.id, materialId: material.id },
-      });
-      resumeId = resume.id;
+      try {
+        const material = await this.materials.fromCoreMaterial(identity, input.coreMaterialId);
+        const resume = await this.db.resume.upsert({
+          where: { materialId: material.id },
+          update: {},
+          create: { workspaceId: identity.workspaceId, candidateId: candidate.id, materialId: material.id },
+        });
+        resumeId = resume.id;
+      } catch (error) {
+        this.logger.warn(`Could not fetch résumé ${input.coreMaterialId} for candidate ${candidate.id} -- creating the task without it: ${error instanceof Error ? error.message : error}`);
+      }
     }
 
     const task = await this.db.interviewTask.upsert({

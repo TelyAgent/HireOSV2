@@ -49,6 +49,16 @@ services:
       - ./hireos-core-record/.env.production
     depends_on:
       - postgres
+    volumes:
+      # Every uploaded material (résumés, etc.) is written to local disk under STORAGE_DIR
+      # (materials.service.ts, default .local/materials -> /app/.local/materials given this
+      # image's WORKDIR). Without a named volume here, that disk is the container's own
+      # ephemeral layer -- every recreate (redeploy, `docker compose up -d --build`, host
+      # reboot) wipes every uploaded file while the DB row still claims readStatus:
+      # 'available', so any consumer that later tries to actually read the file (e.g.
+      # Interview pulling a résumé via a screening hand-off) gets ENOENT. This was the real
+      # root cause the one time that actually surfaced (see git history around 2026-09-29).
+      - core_record_materials:/app/.local/materials
 
   jd-backend:
     build: ./hireos-jd/hireos-jd-backend
@@ -108,3 +118,4 @@ services:
 
 volumes:
   postgres_data:
+  core_record_materials:

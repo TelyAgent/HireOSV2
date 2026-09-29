@@ -34,6 +34,13 @@ type NormalizedRequirementResult = {
 
 @Injectable()
 export class ScreeningService {
+  // Screening runs currently in progress, keyed by application id. Confirming a link
+  // auto-starts a run in the background (see LinkingService), and the AI evaluator is
+  // slow, so a recruiter who opens the application and clicks "Run screening" meanwhile
+  // would start a second run that races the first for the same version number. A new
+  // request for an application that is already running joins the in-flight run instead.
+  private readonly inFlight = new Map<string, Promise<unknown>>();
+
   constructor(
     private readonly db: PrismaService,
     private readonly aiEvaluator: AiScreeningEvaluatorService,
@@ -46,7 +53,7 @@ export class ScreeningService {
       where: { workspaceId: identity.workspaceId, applicationId, status: 'approved' },
       orderBy: { createdAt: 'desc' },
     });
-    return this.serializeDetail(application, evaluation, decision);
+    return { ...this.serializeDetail(application, evaluation, decision), screeningInProgress: this.inFlight.has(applicationId) };
   }
 
   async listEvaluations(identity: Identity, applicationId: string) {
@@ -61,6 +68,11 @@ export class ScreeningService {
 
   async run(identity: Identity, applicationId: string, purpose: string) {
     const application = await this.findApplication(identity, applicationId);
+    return this.singleFlight(applicationId, () => this.runFor(identity, application, purpose));
+  }
+
+  private async runFor(identity: Identity, application: ApplicationInput, purpose: string) {
+    const applicationId = application.id;
     const input = await this.loadInputs(identity.workspaceId, applicationId);
     if (input.job.criteriaStatus !== 'confirmed' || !input.criteria) {
       throw new ConflictException({ code: 'CRITERIA_NOT_CONFIRMED' });
@@ -83,6 +95,10 @@ export class ScreeningService {
       include: { application: true },
     });
     if (!previous) throw new NotFoundException({ code: 'NOT_FOUND' });
+    return this.singleFlight(previous.applicationId, () => this.refreshFrom(identity, previous));
+  }
+
+  private async refreshFrom(identity: Identity, previous: { applicationId: string; version: number; application: ApplicationInput }) {
     const input = await this.loadInputs(identity.workspaceId, previous.applicationId);
     if (input.job.criteriaStatus !== 'confirmed' || !input.criteria) {
       throw new ConflictException({ code: 'CRITERIA_NOT_CONFIRMED' });
@@ -374,6 +390,14 @@ export class ScreeningService {
       return { ...created, dimensionScores: scores, evidenceItems: allEvidenceItems, verificationItems, concerns, humanAssessments: [] };
     });
     return serializeEvaluation(evaluation);
+  }
+
+  private singleFlight<T>(applicationId: string, start: () => Promise<T>): Promise<T> {
+    const pending = this.inFlight.get(applicationId);
+    if (pending) return pending as Promise<T>;
+    const run = start().finally(() => this.inFlight.delete(applicationId));
+    this.inFlight.set(applicationId, run);
+    return run;
   }
 
   private async currentEvaluation(workspaceId: string, applicationId: string) {

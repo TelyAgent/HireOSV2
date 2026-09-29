@@ -279,6 +279,15 @@ export function ScreeningDetailPage() {
     load();
   }, [load]);
 
+  // Confirming a link starts screening in the background, so the page can open before
+  // that run finishes -- keep polling until the result lands.
+  const inProgress = !!detail && !detail.evaluation && !!detail.screeningInProgress;
+  useEffect(() => {
+    if (!inProgress) return;
+    const timer = window.setInterval(load, 3000);
+    return () => window.clearInterval(timer);
+  }, [inProgress, load]);
+
   if (detail === undefined) return null;
   if (detail === null) return <EmptyState icon="search_off" title={t("Application not found")} />;
 
@@ -291,16 +300,26 @@ export function ScreeningDetailPage() {
   const handleRunScreening = async () => {
     setRunning(true);
     say(t("Running AI-assisted screening…"));
-    await runScreening(application.id);
-    setRunning(false);
-    say(t("Screening complete"), { type: "success" });
-    load();
+    try {
+      await runScreening(application.id);
+      say(t("Screening complete"), { type: "success" });
+    } catch {
+      say(t("Screening failed — please try again"), { type: "error" });
+    } finally {
+      setRunning(false);
+      load();
+    }
   };
   const handleRefresh = async () => {
     say(t("Refreshing evaluation with latest inputs…"));
-    await refreshEvaluation(application.id);
-    say(t("Evaluation refreshed — new snapshot created, prior result kept in history"), { type: "success" });
-    load();
+    try {
+      await refreshEvaluation(application.id);
+      say(t("Evaluation refreshed — new snapshot created, prior result kept in history"), { type: "success" });
+    } catch {
+      say(t("Screening failed — please try again"), { type: "error" });
+    } finally {
+      load();
+    }
   };
   const handleResolveConcern = async (concernId: string, outcome: ConcernStatus) => {
     await resolveConcern(application.id, concernId, outcome as "dismissed" | "confirmed" | "accepted_risk");
@@ -327,18 +346,24 @@ export function ScreeningDetailPage() {
       <>
         <PageHeader
           title={`${candidate.displayName} — ${job.title}`}
-          subtitle={t("Linked, screening not yet run.")}
+          subtitle={inProgress || running ? t("Linked, screening in progress.") : t("Linked, screening not yet run.")}
           crumbs={[{ label: t("Jobs"), href: "/jobs" }, { label: job.title, href: `/jobs/${job.id}/screening` }, { label: candidate.displayName }]}
         />
         <div className="card">
           <EmptyState
-            icon="fact_check"
-            title={t("Screening has not run for this application yet")}
-            body={t("Run AI-assisted screening against the confirmed role criteria, or complete a manual evaluation.")}
+            icon={inProgress || running ? "hourglass_top" : "fact_check"}
+            title={inProgress || running ? t("Screening in progress") : t("Screening has not run for this application yet")}
+            body={
+              inProgress || running
+                ? t("AI-assisted screening is running against the confirmed role criteria. Results will appear here automatically.")
+                : t("Run AI-assisted screening against the confirmed role criteria, or complete a manual evaluation.")
+            }
             actions={
-              <Button variant="primary" onClick={handleRunScreening} disabled={running}>
-                {t("Run screening")}
-              </Button>
+              inProgress || running ? undefined : (
+                <Button variant="primary" onClick={handleRunScreening}>
+                  {t("Run screening")}
+                </Button>
+              )
             }
           />
         </div>

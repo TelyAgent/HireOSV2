@@ -14,6 +14,8 @@ export interface ApplicationDetail {
   verificationItems: VerificationItem[];
   humanAssessments: HumanAssessment[];
   decision: (typeof db.decisions)[string] | null;
+  /** A screening run for this application is still in progress on the server. */
+  screeningInProgress?: boolean;
 }
 
 export async function getApplicationDetail(id: string): Promise<ApplicationDetail> {
