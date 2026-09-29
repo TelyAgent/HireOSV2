@@ -24,6 +24,9 @@ export class RtmsService {
   // Meetings we have already asked Zoom to stream, so a repeat meeting.started (or a
   // re-delivered webhook) cannot fire a second start request for the same meeting.
   private readonly startRequested = new Set<string>();
+  // Bumped by every requestStream call for a meeting; an older retry loop that sees a newer
+  // generation stops quietly, so a superseded attempt can't mark the round failed.
+  private readonly startGeneration = new Map<string, number>();
 
   constructor(private readonly config: ConfigService, private readonly db: PrismaService, private readonly zoomHost: ZoomHostService) {}
 
@@ -32,14 +35,21 @@ export class RtmsService {
   // setting no code of ours can reach. Asking Zoom's own start API the moment a round's
   // meeting begins gets the same result without depending on that toggle: Zoom replies by
   // pushing meeting.rtms_started, which the rtms_started branch below then joins.
-  private async requestStream(meetingId: string, roundId: string) {
-    if (this.startRequested.has(meetingId)) return;
+  private async requestStream(meetingId: string, roundId: string, force = false) {
+    // `force` = the host has just joined (startRound). meeting.started usually arrives before the
+    // host's Meeting SDK session is ready, so its retries can still be running into 3000 at that
+    // moment; the host-joined request must not be swallowed by them, so it supersedes them.
+    if (this.startRequested.has(meetingId) && !force) return;
     this.startRequested.add(meetingId);
+    const generation = (this.startGeneration.get(meetingId) ?? 0) + 1;
+    this.startGeneration.set(meetingId, generation);
+    const superseded = () => this.startGeneration.get(meetingId) !== generation;
     // "Meeting has not started" (3000) is transient — meeting.started can beat the point at
     // which Zoom will accept a stream request — so retry it a couple of times before giving
     // up. A 403 (13262, the app is not on the account's allow-list) or any other 4xx is
     // configuration and will not heal on retry, so those stop immediately.
     for (let attempt = 1; attempt <= 3; attempt++) {
+      if (superseded()) return;
       try {
         const token = await this.zoomHost.anyAccessToken();
         if (!token) { this.logger.warn(`RTMS start skipped for meeting ${meetingId}: no connected Zoom account`); break; }
@@ -78,6 +88,7 @@ export class RtmsService {
         if (response.ok) { this.logger.log(`RTMS start accepted for meeting ${meetingId}; awaiting meeting.rtms_started`); return; }
         const body = await response.text().catch(() => '');
         this.logger.warn(`RTMS start rejected for meeting ${meetingId} (${response.status}, attempt ${attempt}/3): ${body.slice(0, 400)}`);
+        if (superseded()) return;
         const retryable = response.status >= 500 || /"code"\s*:\s*3000\b/.test(body);
         if (!retryable) {
           const providerCode = body.match(/"code"\s*:\s*(\d+)/)?.[1];
@@ -89,6 +100,7 @@ export class RtmsService {
       }
       if (attempt < 3) await new Promise((resolve) => setTimeout(resolve, attempt * 5000));
     }
+    if (superseded()) return;
     // Nothing worked: drop the marker so a later meeting.started for this same meeting can
     // try again, instead of the meeting staying unstreamable for its whole duration.
     this.startRequested.delete(meetingId);
@@ -125,7 +137,7 @@ export class RtmsService {
       where: { id: round.id },
       data: { transcriptStatus: 'connecting', transcriptError: null },
     });
-    void this.requestStream(match[1], round.id);
+    void this.requestStream(match[1], round.id, true);
     return { requested: true, meetingId: match[1], status: 'connecting' };
   }
 

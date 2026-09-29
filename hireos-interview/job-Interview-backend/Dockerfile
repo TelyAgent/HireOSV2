@@ -18,7 +18,12 @@ RUN npm run build
 FROM node:24-trixie-slim AS runtime
 WORKDIR /app
 ENV NODE_ENV=production
-RUN apt-get update && apt-get install -y --no-install-recommends openssl && rm -rf /var/lib/apt/lists/*
+# ca-certificates: @zoom/rtms's native client verifies Zoom's media servers against the system
+# CA bundle (/etc/ssl/certs/ca-certificates.crt), not Node's bundled one -- without it the RTMS
+# signaling join succeeds but the media connection never comes up, and Zoom stops the stream
+# after 60s with no transcript. /app/logs: the same native client writes its own log files there.
+RUN apt-get update && apt-get install -y --no-install-recommends openssl ca-certificates && rm -rf /var/lib/apt/lists/* \
+  && mkdir -p /app/logs
 COPY package*.json ./
 RUN npm ci --omit=dev
 COPY --from=build /app/dist ./dist

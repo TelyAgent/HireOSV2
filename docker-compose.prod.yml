@@ -7,33 +7,67 @@
 #   to match that external /hireos/ prefix -- `base` is baked into every
 #   asset URL at build time, so this can't be fixed by proxy rewriting
 #   alone; see PORTS.md for the full story of why this override exists.
+# - every service logs to local json-file instead of the host's global
+#   default: that box's /etc/docker/daemon.json sets `log-driver: loki`, and
+#   when the Loki endpoint is unreachable a container stop/restart blocks on
+#   flushing logs to it -- on 2026-09-28 that hung a gateway restart and took
+#   all of HireOS to 502. Local json-file (size-capped) has no such dependency.
 # Everything else is inherited unchanged from docker-compose.yml (`docker
 # compose -f docker-compose.yml -f docker-compose.prod.yml ...`). Local dev
 # never passes -f, so it never sees this file.
+x-logging: &local-logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "3"
+
 services:
+  postgres:
+    logging: *local-logging
+
+  interview-backend:
+    logging: *local-logging
+
+  screening-backend:
+    logging: *local-logging
+
+  core-record:
+    logging: *local-logging
+
+  jd-backend:
+    logging: *local-logging
+
+  written-backend:
+    logging: *local-logging
+
   gateway:
+    logging: *local-logging
     ports:
       - "8830:80"
 
   interview-frontend:
+    logging: *local-logging
     build:
       context: ./hireos-interview/job-Interview-front
       args:
         VITE_BASE_PATH: /hireos/interview/
 
   screening-frontend:
+    logging: *local-logging
     build:
       context: ./hireos-screening/hireos-screening-front
       args:
         VITE_BASE_PATH: /hireos/screening/
 
   jd-frontend:
+    logging: *local-logging
     build:
       context: ./hireos-jd/hireos-jd-front
       args:
         VITE_BASE_PATH: /hireos/jd/
 
   written-frontend:
+    logging: *local-logging
     build:
       context: ./hireos-written/hireos-written-front
       args:
