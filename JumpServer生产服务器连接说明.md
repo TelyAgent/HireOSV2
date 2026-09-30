@@ -2,7 +2,7 @@
 
 本文记录如何通过 JumpServer 连接 `watch.sding.me` 当前所在的生产服务器。
 
-> 安全要求：本文和 Git 仓库中不得保存明文密码。当前本机密码来源为桌面 `ssr.rtf`，只允许在本机运行时读取；不得复制到本文、Git、终端输出、截图或聊天记录。
+> 安全要求：本文和 Git 仓库中不得保存明文密码。HireOS 的 JumpServer 密码来源为本机 `scripts/deploy/.deploy-hireos-remote.password`（桌面 `ssr.rtf` 是第 3–5 节另一台资产的密码），只允许在本机运行时读取；不得复制到本文、Git、终端输出、截图或聊天记录。
 
 ## 1. 连接信息
 
@@ -11,12 +11,42 @@
 | JumpServer 域名 | `jumpserver-ssh.sding.me` |
 | JumpServer 公网 IP | `34.92.110.140` |
 | JumpServer 端口 | `2222` |
-| JumpServer 用户 | `jusunsu` |
+| JumpServer 用户 | `jsunsu`（注意不是 `jusunsu`） |
 | 生产资产 IP | `34.94.189.76` |
-| JumpServer 资产名 | `SDM-Front` |
+| JumpServer 资产名 | `SDM-Front`（主机名 `sdm-front`） |
 | 资产 SSH 用户 | `ubuntu` |
-| 项目目录 | `/Users/qmk/work/HireOS` |
-| 秘钥 ｜  `/Users/qmk/work/HireOS/miyao.txt`
+| JumpServer 密码文件 | `scripts/deploy/.deploy-hireos-remote.password`（已 gitignore，勿提交） |
+| 本地项目目录 | `/Users/qmk/work/HireOS` |
+| 服务器部署目录 | `/opt/hireos`（Compose 项目名 `hireos`） |
+
+> 本表是 HireOS 实际部署所用的连接信息，与 `scripts/deploy/deploy.sh` 一致（2026-09-30 验证可连）。下文第 3–5 节的 `frankzhang` / `34.94.245.30` 是另一台资产（`off-web/sdktest`）的历史记录，连 HireOS 时不要照抄。
+
+### 1.1 HireOS 直连命令（已验证）
+
+与部署脚本相同的连接方式，在本地项目根目录执行：
+
+```bash
+SSHPASS="$(<scripts/deploy/.deploy-hireos-remote.password)" \
+sshpass -e ssh \
+  -p 2222 \
+  -o StrictHostKeyChecking=yes \
+  -o PreferredAuthentications=password \
+  -o PubkeyAuthentication=no \
+  -o NumberOfPasswordPrompts=1 \
+  -l 'jsunsu@ubuntu@34.94.189.76' \
+  34.92.110.140 '<远程命令>'
+```
+
+也可以直接用 `scripts/deploy/deploy.sh check`（只读检查）。
+
+常用只读查询：
+
+```bash
+# HireOS 容器
+sudo docker ps --format '{{.Names}}\t{{.Status}}' | grep hireos
+# 数据库：容器 hireos-postgres-1，用户 hireos；库 hireos_screening / hireos_interview / hireos_jd / hireos_written / hireos_core_record
+sudo docker exec -i hireos-postgres-1 psql -U hireos -d hireos_screening -c 'select 1'
+```
 
 ## 2. 确认真实 DNS 解析
 

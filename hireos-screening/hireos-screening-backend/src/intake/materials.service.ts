@@ -48,13 +48,46 @@ export class MaterialsService {
     const coreMaterial = await this.coreRecord.uploadMaterial(identity, { buffer: file.buffer, originalname: originalName, mimetype: file.mimetype });
     const existing = await this.db.material.findFirst({
       where: coreMaterial ? { coreMaterialId: coreMaterial.id } : { workspaceId: identity.workspaceId, hash },
-      select: { id: true, name: true, size: true, hash: true, readStatus: true, errorCode: true },
+      select: { id: true, name: true, size: true, hash: true, readStatus: true, securityStatus: true, errorCode: true, updatedAt: true },
     });
-    if (existing) return { kind: 'exact_file' as const, material: existing };
+    if (existing) {
+      // A file that was quarantined or failed extraction never produced a candidate, so it
+      // is not a real duplicate -- re-running it against the current scanner/extractor lets
+      // a re-upload recover (e.g. after a scanner false positive) instead of being skipped
+      // as "same file" forever.
+      if (existing.securityStatus !== 'quarantined' && existing.readStatus === 'available') {
+        return { kind: 'exact_file' as const, material: existing };
+      }
+      const analysis = await this.analyze(file, originalName);
+      // Conditional on the row being unchanged since we read it: if two re-uploads race,
+      // only one of them re-processes the file and the other is a plain duplicate.
+      const { count } = await this.db.material.updateMany({
+        where: { id: existing.id, updatedAt: existing.updatedAt },
+        data: { name: originalName.slice(0, 255), sourceType, ...analysis },
+      });
+      if (!count) return { kind: 'exact_file' as const, material: existing };
+      const material = await this.db.material.findUniqueOrThrow({ where: { id: existing.id } });
+      return { kind: 'created' as const, material };
+    }
 
-    // Every new file is scanned before extraction ever touches its bytes. A quarantined
-    // file is still recorded (for audit) but never parsed, so its text can never leak
-    // into a candidate profile.
+    const material = await this.db.material.create({
+      data: {
+        workspaceId: identity.workspaceId,
+        coreMaterialId: coreMaterial?.id,
+        name: originalName.slice(0, 255),
+        size: file.size,
+        hash,
+        sourceType,
+        ...(await this.analyze(file, originalName)),
+      },
+    });
+    return { kind: 'created' as const, material };
+  }
+
+  // Every file is scanned before extraction ever touches its bytes. A quarantined file is
+  // still recorded (for audit) but never parsed, so its text can never leak into a
+  // candidate profile.
+  private async analyze(file: MulterFile, originalName: string) {
     const scan = this.securityScan.scan(file.buffer, file.mimetype, originalName);
     const parsed = scan.status === 'quarantined'
       ? { mime: file.mimetype, text: '', segments: [] as Segment[], errorCode: scan.reason ?? 'SECURITY_QUARANTINED' }
@@ -65,25 +98,16 @@ export class MaterialsService {
       ? createHash('sha256').update(normalizedText).digest('hex')
       : null;
 
-    const material = await this.db.material.create({
-      data: {
-        workspaceId: identity.workspaceId,
-        coreMaterialId: coreMaterial?.id,
-        name: originalName.slice(0, 255),
-        mime: parsed.mime,
-        size: file.size,
-        hash,
-        normalizedTextHash,
-        text: parsed.text,
-        segments: parsed.segments,
-        readStatus: scan.status === 'quarantined' ? 'blocked' : parsed.errorCode ? 'failed' : 'available',
-        securityStatus: scan.status,
-        extractionStatus: scan.status === 'quarantined' ? 'blocked' : parsed.errorCode ? 'failed' : 'available',
-        sourceType,
-        errorCode: parsed.errorCode,
-      },
-    });
-    return { kind: 'created' as const, material };
+    return {
+      mime: parsed.mime,
+      normalizedTextHash,
+      text: parsed.text,
+      segments: parsed.segments,
+      readStatus: scan.status === 'quarantined' ? 'blocked' : parsed.errorCode ? 'failed' : 'available',
+      securityStatus: scan.status,
+      extractionStatus: scan.status === 'quarantined' ? 'blocked' : parsed.errorCode ? 'failed' : 'available',
+      errorCode: parsed.errorCode ?? null,
+    };
   }
 
   async get(workspaceId: string, id: string) {

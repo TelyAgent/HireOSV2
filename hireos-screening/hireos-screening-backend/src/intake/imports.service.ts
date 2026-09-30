@@ -227,7 +227,7 @@ export class ImportsService implements OnModuleInit, OnModuleDestroy {
       at: item.createdAt.toISOString(),
       label: item.fileName,
       source: item.batch.createdBy === 'local-screening-user' ? 'Manual upload' : item.batch.createdBy,
-      status: item.status === 'completed' ? 'Processed' : item.status === 'needs_review' ? 'Needs review' : 'Pending',
+      status: intakeStatusLabel(item),
       stage: item.stage,
       errorCode: item.errorCode ?? undefined,
       candidateId: item.candidateId ?? undefined,
@@ -750,4 +750,23 @@ export function normalizeName(fileName: string) {
 export function displayNameFromFileName(fileName: string) {
   const normalized = normalizeName(fileName);
   return normalized.replace(/\b\w/g, (letter) => letter.toUpperCase()).slice(0, 200) || 'Unnamed candidate';
+}
+
+// The unified intake shows why an item stopped, not just "Pending" -- a quarantined or
+// duplicate file otherwise looks identical to one still being processed.
+function intakeStatusLabel(item: { status: string; stage: string; outcome: string | null }) {
+  switch (item.status) {
+    case 'completed':
+      return 'Processed';
+    case 'needs_review':
+      return 'Needs review';
+    case 'duplicate':
+      return 'Duplicate file';
+    case 'failed':
+      if (item.stage === 'quarantined') return 'Quarantined';
+      if (item.outcome === 'parse_failed') return 'Parse failed';
+      return 'Failed';
+    default:
+      return 'Pending';
+  }
 }

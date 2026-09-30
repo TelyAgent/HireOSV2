@@ -214,7 +214,7 @@ table.data-table{ width:100%; border-collapse:collapse; font-size:var(--fs-sm); 
 
 /* ---------- Empty / error states ---------- */
 .empty-state{ text-align:center; padding:56px 24px; color:var(--text-secondary); }
-.empty-state .material-icons-o{ font-size:44px; color:var(--text-tertiary); margin-bottom:10px; }
+.empty-state > .material-icons-o{ font-size:44px; color:var(--text-tertiary); margin-bottom:10px; }
 .empty-state h3{ font-size:var(--fs-lg); font-weight:500; color:var(--text); margin:0 0 6px; }
 .empty-state p{ font-size:var(--fs-sm); max-width:440px; margin:0 auto 16px; }
 .empty-state .actions{ display:flex; gap:10px; justify-content:center; flex-wrap:wrap; }

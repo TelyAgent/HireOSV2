@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { z } from 'zod';
+import { cappedString } from '../shared/ai-schema';
 import { AiCallError, callAiForJson, isAiConfigured } from '../shared/ai-json-client';
 
 const MAX_RESUME_CHARS = 8000;
@@ -26,18 +27,18 @@ const AiMatchResultSchema = z.object({
   overallScore: z.number().min(0).max(100),
   coverage: z.number().min(0).max(1),
   confidence: z.number().min(0).max(1),
-  rationale: z.string().min(1).max(2000),
+  rationale: z.string().min(1).pipe(cappedString(2000)),
   dimensionScores: z.array(z.object({
     dimensionId: z.string(),
     score: z.number().min(0).max(100),
-    rationale: z.string().max(600),
+    rationale: cappedString(600),
   })),
   requirementFindings: z.array(z.object({
     requirementId: z.string(),
     met: z.boolean(),
-    evidence: z.string().max(600),
+    evidence: cappedString(600),
   })),
-  gaps: z.array(z.string().max(300)),
+  gaps: z.array(cappedString(300)),
 });
 export type AiMatchResult = z.infer<typeof AiMatchResultSchema>;
 

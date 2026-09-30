@@ -7,6 +7,7 @@ import {
   deferRecommendation,
   dismissRecommendation,
   getCandidateDetail,
+  reparseCandidate,
   type CandidateDetail,
 } from "../data/api/candidates";
 import { runMatchAgain } from "../data/api/library";
@@ -21,7 +22,7 @@ import { confidenceLabel } from "../lib/scoring";
 import { Button, EmptyState, PageHeader } from "../components/ui/Primitives";
 import { Modal } from "../components/ui/Overlays";
 import { Icon } from "../components/ui/Icons";
-import { NoJobState } from "./CandidateProfilePage";
+import { NoJobState, latestParseStatus } from "./CandidateProfilePage";
 
 function ChooseAnotherRoleModal({
   candidate,
@@ -183,6 +184,10 @@ export function JobRecommendationsPage() {
     await runMatchAgain(candidate.id);
     load();
   };
+  const handleReparse = async () => {
+    await reparseCandidate(candidate.id);
+    load();
+  };
 
   const handleAction = async (rec: CandidateJobRecommendation, action: "defer" | "dismiss") => {
     if (action === "dismiss") {
@@ -204,7 +209,14 @@ export function JobRecommendationsPage() {
           crumbs={[{ label: t("Resume Library"), href: "/library" }, { label: candidate.displayName, href: `/candidates/${candidate.id}` }, { label: t("Job recommendations") }]}
         />
         <div className="card">
-          <NoJobState candidate={candidate} jd={jd} onMatchAgain={handleMatchAgain} onCorrect={() => {}} />
+          <NoJobState
+            candidate={candidate}
+            jd={jd}
+            parseStatus={latestParseStatus(detail.resumeVersions)}
+            onMatchAgain={handleMatchAgain}
+            onCorrect={() => {}}
+            onReparse={handleReparse}
+          />
         </div>
       </>
     );

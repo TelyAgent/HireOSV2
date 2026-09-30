@@ -17,6 +17,11 @@ export class ProfilesController {
     return this.profiles.correct(req.identity, id, body);
   }
 
+  @Post('candidates/:id/reparse')
+  reparse(@Req() req: { identity: Identity }, @Param('id') id: string) {
+    return this.profiles.reparseCandidate(req.identity, id);
+  }
+
   @Get('processing-jobs/:id')
   getJob(@Req() req: { identity: Identity }, @Param('id') id: string) {
     return this.profiles.getJob(req.identity, id);

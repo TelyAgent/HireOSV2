@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { useStore } from "../store/StoreContext";
-import { getCandidateDetail, correctProfile, type CandidateDetail } from "../data/api/candidates";
+import { getCandidateDetail, correctProfile, reparseCandidate, type CandidateDetail } from "../data/api/candidates";
 import { runMatchAgain } from "../data/api/library";
 import { ApiError } from "../data/api/shared";
 import { db, getJob, getPerson } from "../data/db";
@@ -14,14 +14,49 @@ import { Modal } from "../components/ui/Overlays";
 
 const MATCH_POLL_INTERVAL_MS = 3000;
 const MATCH_POLL_TIMEOUT_MS = 90_000;
+const PARSE_POLL_INTERVAL_MS = 3000;
 
 const REC_STATUS_TONE: Record<string, string> = {
   dismissed: "badge-outline",
   deferred: "badge-neutral",
 };
 
-export function NoJobState({ jd, onMatchAgain, onCorrect }: { candidate: Candidate; jd: JobDiscoveryRun; onMatchAgain: () => void; onCorrect: () => void }) {
+export function latestParseStatus(resumeVersions: CandidateDetail["resumeVersions"]) {
+  return [...resumeVersions].sort((a, b) => b.version - a.version)[0]?.parseStatus;
+}
+
+export function NoJobState({
+  jd,
+  parseStatus,
+  onMatchAgain,
+  onCorrect,
+  onReparse,
+}: {
+  candidate: Candidate;
+  jd: JobDiscoveryRun;
+  parseStatus?: string;
+  onMatchAgain: () => void;
+  onCorrect: () => void;
+  onReparse: () => void;
+}) {
   const { t } = useStore();
+  // Matching reads the parsed profile, so without one a run can only end as "insufficient
+  // data" -- point at the parse instead of offering a match button that can't work.
+  if (parseStatus === "pending")
+    return <EmptyState icon="hourglass_top" title={t("Waiting for resume parsing")} body={t("Roles will be matched automatically once the resume has been parsed.")} />;
+  if (parseStatus === "failed")
+    return (
+      <EmptyState
+        icon="error_outline"
+        title={t("Can't match roles yet")}
+        body={t("The resume couldn't be parsed, so there is no profile to match against. Parse it again first.")}
+        actions={
+          <Button variant="primary" icon="refresh" onClick={onReparse}>
+            {t("Parse again")}
+          </Button>
+        }
+      />
+    );
   if (jd.status === "running")
     return <EmptyState icon="travel_explore" title={t("Searching for matching roles…")} body={t("AI matching is running in the background — this can take up to a minute.")} />;
   if (jd.status === "no_open_jobs")
@@ -190,6 +225,16 @@ export function CandidateProfilePage() {
     return () => window.clearInterval(timer);
   }, [detail?.jobDiscovery.isMatching, load]);
 
+  // The profile fields stay blank until the resume parse finishes (it runs in the
+  // background and retries on transient AI failures) -- poll so they fill in by themselves.
+  const parseStatus = detail ? latestParseStatus(detail.resumeVersions) : undefined;
+  useEffect(() => {
+    if (parseStatus !== "pending") return;
+    const timer = window.setInterval(load, PARSE_POLL_INTERVAL_MS);
+    return () => window.clearInterval(timer);
+  }, [parseStatus, load]);
+  const [reparsing, setReparsing] = useState(false);
+
   if (detail === undefined) return null;
   if (detail === null) {
     return (
@@ -258,6 +303,17 @@ export function CandidateProfilePage() {
       }),
   ];
 
+  const handleReparse = async () => {
+    setReparsing(true);
+    try {
+      await reparseCandidate(candidate.id);
+    } catch {
+      say(t("Could not restart resume parsing."), { type: "error" });
+    }
+    setReparsing(false);
+    load();
+  };
+
   const handleMatchAgain = async () => {
     if (jd.isMatching) return;
     setMatching(true);
@@ -285,12 +341,32 @@ export function CandidateProfilePage() {
             <Button variant="secondary" icon="edit" onClick={() => setShowCorrect(true)}>
               {t("Correct profile")}
             </Button>
-            <Button variant="secondary" icon="travel_explore" onClick={handleMatchAgain} disabled={matching || jd.isMatching}>
+            <Button variant="secondary" icon="travel_explore" onClick={handleMatchAgain} disabled={matching || jd.isMatching || parseStatus === "pending" || parseStatus === "failed"}>
               {jd.isMatching ? t("Matching…") : t("Match again")}
             </Button>
           </>
         }
       />
+
+      {(parseStatus === "pending" || parseStatus === "failed") && (
+        <div className="card card-pad flex items-center justify-between gap-12 flex-wrap" style={{ marginBottom: 16 }}>
+          <div className="flex items-center gap-8">
+            <span className={`badge ${parseStatus === "failed" ? "badge-warning" : "badge-info"}`}>
+              {parseStatus === "failed" ? t("Resume parsing failed") : t("Parsing resume…")}
+            </span>
+            <span className="tiny">
+              {parseStatus === "failed"
+                ? t("Profile details could not be extracted from this resume. Try parsing it again.")
+                : t("Profile details will appear here once the resume has been parsed.")}
+            </span>
+          </div>
+          {parseStatus === "failed" && (
+            <Button variant="secondary" size="sm" icon="refresh" onClick={handleReparse} disabled={reparsing}>
+              {t("Parse again")}
+            </Button>
+          )}
+        </div>
+      )}
 
       <div className="two-col">
         <div className="col-list flex-col gap-16">
@@ -408,7 +484,14 @@ export function CandidateProfilePage() {
                 </tbody>
               </table>
             ) : (
-              <NoJobState candidate={candidate} jd={jd} onMatchAgain={handleMatchAgain} onCorrect={() => setShowCorrect(true)} />
+              <NoJobState
+                candidate={candidate}
+                jd={jd}
+                parseStatus={parseStatus}
+                onMatchAgain={handleMatchAgain}
+                onCorrect={() => setShowCorrect(true)}
+                onReparse={handleReparse}
+              />
             )}
           </div>
 

@@ -29,6 +29,11 @@ function toJobDiscovery(matching: RawMatchingStatus): JobDiscoveryRun & { isMatc
   };
 }
 
+/** Requeues the candidate's latest resume parse if it failed. */
+export async function reparseCandidate(candidateId: string): Promise<void> {
+  await apiFetch(`/candidates/${candidateId}/reparse`, { method: "POST" });
+}
+
 export async function getCandidateDetail(id: string): Promise<CandidateDetail> {
   const [detail] = await Promise.all([
     apiFetch<{

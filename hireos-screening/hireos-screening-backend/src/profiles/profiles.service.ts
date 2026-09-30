@@ -8,6 +8,16 @@ import { ProfileParserService } from './profile-parser.service';
 import { AiProfileParserService } from './ai-profile-parser.service';
 import { DiscoveryService } from '../discovery/discovery.service';
 
+// A parse is one AI call (HIREOS_AI_TIMEOUT_SECONDS, 60s by default) plus a few writes, so
+// the lease comfortably outlasts it. A job still "running" past its lease means the
+// process died mid-parse (e.g. a deploy restarted the container) and is picked up again.
+const LEASE_MS = 5 * 60_000;
+// Transient AI failures (timeouts, rate limits, a malformed reply) are retried with a
+// growing delay before the job is left failed for a human to retry.
+const MAX_ATTEMPTS = 3;
+const RETRY_BASE_DELAY_MS = 30_000;
+const NON_RETRYABLE_ERRORS = new Set(['SOURCE_MATERIAL_NOT_READY', 'AI_NOT_CONFIGURED']);
+
 @Injectable()
 export class ProfilesService implements OnModuleInit, OnModuleDestroy {
   private timer?: ReturnType<typeof globalThis.setInterval>;
@@ -152,30 +162,56 @@ export class ProfilesService implements OnModuleInit, OnModuleDestroy {
     if (job.status !== 'failed') {
       throw new BadRequestException({ code: 'JOB_NOT_RETRYABLE', status: job.status });
     }
-    const retried = await this.db.processingJob.update({
-      where: { id: job.id },
-      data: { status: 'queued', nextRunAt: new Date(), errorCode: null, leaseToken: null, leaseUntil: null },
+    return serializeJob(await this.requeue(job));
+  }
+
+  // "Re-parse" from the candidate page: requeues the candidate's latest resume parse if it
+  // failed. A parse that is still queued/running is left alone.
+  async reparseCandidate(identity: Identity, candidateId: string) {
+    const job = await this.db.processingJob.findFirst({
+      where: { workspaceId: identity.workspaceId, candidateId, type: 'resume_parse' },
+      orderBy: { createdAt: 'desc' },
     });
-    return serializeJob(retried);
+    if (!job) throw new NotFoundException({ code: 'NOT_FOUND' });
+    if (job.status !== 'failed') return serializeJob(job);
+    return serializeJob(await this.requeue(job));
+  }
+
+  private async requeue(job: { id: string; resumeVersionId: string | null }) {
+    return this.db.$transaction(async (tx) => {
+      if (job.resumeVersionId) {
+        await tx.resumeVersion.updateMany({
+          where: { id: job.resumeVersionId, parseStatus: 'failed' },
+          data: { parseStatus: 'pending' },
+        });
+      }
+      return tx.processingJob.update({
+        where: { id: job.id },
+        data: { status: 'queued', attempt: 0, nextRunAt: new Date(), errorCode: null, leaseToken: null, leaseUntil: null },
+      });
+    });
   }
 
   private async processQueued() {
     if (this.running) return;
     this.running = true;
     try {
+      const now = new Date();
+      const claimable: Prisma.ProcessingJobWhereInput = {
+        OR: [
+          { status: 'queued', nextRunAt: { lte: now } },
+          { status: 'running', leaseUntil: { lt: now } },
+        ],
+      };
       const job = await this.db.processingJob.findFirst({
-        where: {
-          type: 'resume_parse',
-          status: 'queued',
-          nextRunAt: { lte: new Date() },
-        },
+        where: { type: 'resume_parse', ...claimable },
         orderBy: { createdAt: 'asc' },
       });
       if (!job) return;
       const leaseToken = randomUUID();
       const claimed = await this.db.processingJob.updateMany({
-        where: { id: job.id, status: 'queued' },
-        data: { status: 'running', attempt: { increment: 1 }, leaseToken, leaseUntil: new Date(Date.now() + 60_000) },
+        where: { id: job.id, ...claimable },
+        data: { status: 'running', attempt: { increment: 1 }, leaseToken, leaseUntil: new Date(Date.now() + LEASE_MS) },
       });
       if (claimed.count !== 1) return;
       await this.processClaimed(job.id, leaseToken);
@@ -265,11 +301,25 @@ export class ProfilesService implements OnModuleInit, OnModuleDestroy {
       await this.discovery.enqueueAutoMatch(job.workspaceId, candidate.id);
       return profile;
     } catch (error) {
+      const errorCode = error instanceof Error ? error.message : 'PROFILE_PARSE_FAILED';
+      if (job.attempt < MAX_ATTEMPTS && !NON_RETRYABLE_ERRORS.has(errorCode)) {
+        await this.db.processingJob.update({
+          where: { id: job.id },
+          data: {
+            status: 'queued',
+            nextRunAt: new Date(Date.now() + RETRY_BASE_DELAY_MS * job.attempt),
+            errorCode,
+            leaseToken: null,
+            leaseUntil: null,
+          },
+        });
+        return;
+      }
       await this.db.processingJob.update({
         where: { id: job.id },
         data: {
           status: 'failed',
-          errorCode: error instanceof Error ? error.message : 'PROFILE_PARSE_FAILED',
+          errorCode,
           leaseToken: null,
           leaseUntil: null,
         },

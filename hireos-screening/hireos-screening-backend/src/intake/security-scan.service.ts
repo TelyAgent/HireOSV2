@@ -29,7 +29,11 @@ export class SecurityScanService {
     const lowerName = fileName.toLowerCase();
 
     if (mime.includes('pdf') || lowerName.endsWith('.pdf')) {
-      if (containsAny(buffer, ['/JavaScript', '/JS', '/OpenAction', '/AA', '/Launch'])) {
+      // Only the action types that actually execute something. `/OpenAction` and `/AA`
+      // are just triggers -- WPS/Word exports routinely carry `/OpenAction[page /Fit]`
+      // ("open on page 1, fit to window"), which is harmless -- and a trigger pointing at
+      // script or a launch is still caught here by its action type.
+      if (containsAnyPdfName(buffer, ['/JavaScript', '/JS', '/Launch'])) {
         return { status: 'quarantined', reason: 'PDF_ACTIVE_CONTENT_DETECTED' };
       }
     }
@@ -51,4 +55,19 @@ function bufferStartsWith(buffer: Buffer, bytes: number[]) {
 
 function containsAny(buffer: Buffer, needles: string[]) {
   return needles.some((needle) => buffer.includes(Buffer.from(needle, 'latin1')));
+}
+
+// PDF name tokens end at whitespace or a delimiter, so `/JS` must not match `/JSFont`
+// or similar longer names.
+const PDF_NAME_TERMINATORS = new Set([0x00, 0x09, 0x0a, 0x0c, 0x0d, 0x20, 0x28, 0x29, 0x3c, 0x3e, 0x5b, 0x5d, 0x7b, 0x7d, 0x2f, 0x25]);
+
+function containsAnyPdfName(buffer: Buffer, names: string[]) {
+  return names.some((name) => {
+    const needle = Buffer.from(name, 'latin1');
+    for (let at = buffer.indexOf(needle); at !== -1; at = buffer.indexOf(needle, at + 1)) {
+      const next = at + needle.length;
+      if (next >= buffer.length || PDF_NAME_TERMINATORS.has(buffer[next])) return true;
+    }
+    return false;
+  });
 }

@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { z } from 'zod';
+import { cappedArray, cappedString } from '../shared/ai-schema';
 import { callAiForJson, isAiConfigured } from '../shared/ai-json-client';
 
 const MAX_RESUME_CHARS = 10000;
@@ -8,30 +9,30 @@ const MAX_RESUME_CHARS = 10000;
 const StatusField = z.object({ value: z.string(), status: z.enum(['known', 'unknown']) });
 
 const AiProfileSchema = z.object({
-  displayName: z.string().min(1).max(200),
+  displayName: z.string().min(1).pipe(cappedString(200)),
   email: z.string().nullable(),
   phone: z.string().nullable(),
   location: StatusField,
   workAuthorization: StatusField,
-  skills: z.array(z.string().max(80)).max(40),
-  languages: z.array(z.string().max(40)).max(15),
-  employmentHistory: z.array(z.object({
-    company: z.string().max(200),
-    title: z.string().max(200),
-    start: z.string().max(40),
-    end: z.string().max(40),
-    achievements: z.array(z.string().max(400)).max(10),
-  })).max(15),
-  education: z.array(z.object({
-    statement: z.string().max(300),
-    period: z.string().max(60),
-  })).max(10),
-  certifications: z.array(z.string().max(200)).max(15),
-  projects: z.array(z.object({ name: z.string().max(200), description: z.string().max(400) })).max(10),
+  skills: cappedArray(cappedString(80), 40),
+  languages: cappedArray(cappedString(40), 15),
+  employmentHistory: cappedArray(z.object({
+    company: cappedString(200),
+    title: cappedString(200),
+    start: cappedString(40),
+    end: cappedString(40),
+    achievements: cappedArray(cappedString(400), 10),
+  }), 15),
+  education: cappedArray(z.object({
+    statement: cappedString(300),
+    period: cappedString(60),
+  }), 10),
+  certifications: cappedArray(cappedString(200), 15),
+  projects: cappedArray(z.object({ name: cappedString(200), description: cappedString(400) }), 10),
   compensationExpectation: z.object({
     min: z.number().nonnegative(),
     max: z.number().nonnegative(),
-    currency: z.string().max(10),
+    currency: cappedString(10),
     period: z.enum(['year', 'month', 'hour']),
     basis: z.enum(['gross', 'net', 'unknown']),
   }).nullable(),

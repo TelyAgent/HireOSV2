@@ -4,7 +4,7 @@ export interface ResumeVersion {
   fileName: string;
   uploadedAt: string;
   source: string;
-  parseStatus: "succeeded" | "failed";
+  parseStatus: "succeeded" | "failed" | "pending";
   isLatest: boolean;
   changeNote?: string;
 }
