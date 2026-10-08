@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><title>HireOS Interview – Zoom Integration Security Overview</title>
+<style>
+  @page { size: A4; margin: 18mm 16mm; }
+  body { font-family: -apple-system, "Segoe UI", Helvetica, Arial, sans-serif; font-size: 11pt; line-height: 1.5; color: #111827; max-width: 760px; margin: 0 auto; }
+  h1 { font-size: 20pt; margin: 0 0 4px; }
+  h2 { font-size: 13pt; margin: 22px 0 6px; border-bottom: 1px solid #e5e7eb; padding-bottom: 3px; }
+  .meta { color: #4b5563; font-size: 10pt; margin-bottom: 14px; }
+  table { border-collapse: collapse; width: 100%; font-size: 10pt; margin: 6px 0; }
+  th, td { border: 1px solid #d1d5db; padding: 5px 7px; text-align: left; vertical-align: top; }
+  th { background: #f3f4f6; }
+  code { font-size: 9.5pt; background: #f3f4f6; padding: 0 3px; border-radius: 3px; }
+  .ph { background: #fef3c7; }
+</style></head>
+<body>
+<h1>HireOS Interview – Zoom Integration Security Overview</h1>
+<div class="meta"><span class="ph">[Company legal name]</span> · Version 1.0 · <span class="ph">[Date]</span></div>
+
+<p>This document describes how the HireOS Interview Zoom app handles Zoom data and how that data is protected. It covers only the Zoom integration: OAuth authorization, interview meetings, the embedded Meeting SDK and Realtime Media Streams (RTMS) transcripts.</p>
+
+<h2>1. Purpose of the integration</h2>
+<p>Interviewers connect their own Zoom account to HireOS. HireOS creates the interview meeting on that account, lets the interviewer host it inside HireOS through the Zoom Meeting SDK, and receives a live transcript of the meeting through RTMS. The transcript is used by the hiring team to review the interview.</p>
+
+<h2>2. Zoom data we handle</h2>
+<table>
+  <tr><th>Data</th><th>Source</th><th>Purpose</th><th>Storage</th></tr>
+  <tr><td>OAuth access and refresh tokens</td><td>Zoom OAuth</td><td>Call the Zoom APIs on behalf of the interviewer</td><td>Encrypted at rest (AES-256-GCM)</td></tr>
+  <tr><td>Zoom user ID and display name</td><td><code>GET /v2/users/me</code></td><td>Show which account hosts interviews; identify the host when starting RTMS</td><td>Encrypted at rest (AES-256-GCM), together with the tokens</td></tr>
+  <tr><td>Meeting join URL (meeting ID and passcode)</td><td><code>POST /v2/users/me/meetings</code></td><td>Join the interview meeting; share the link with the candidate</td><td>PostgreSQL, plain text</td></tr>
+  <tr><td>ZAK token</td><td><code>GET /v2/users/me/zak</code></td><td>Let the host start the meeting in the Meeting SDK</td><td>Not stored; passed only to the SDK in the browser</td></tr>
+  <tr><td>Meeting UUID to meeting ID mapping</td><td><code>GET /v2/meetings/{uuid}</code></td><td>Match RTMS events to the interview</td><td>In memory only; not stored</td></tr>
+  <tr><td>Live transcript (speaker display name and text)</td><td>RTMS</td><td>Interview review, summaries and draft scores</td><td>PostgreSQL, plain text</td></tr>
+  <tr><td>Meeting audio</td><td>RTMS</td><td>Not used</td><td>Not stored</td></tr>
+</table>
+<p>HireOS only acts on meetings it created for an interview. Webhook events for other meetings are ignored.</p>
+
+<h2>3. Security controls</h2>
+<table>
+  <tr><th>Area</th><th>Control</th></tr>
+  <tr><td>Transport</td><td>All traffic to HireOS uses HTTPS (TLS, Let's Encrypt certificate). All calls to Zoom and OpenAI use HTTPS/TLS, and RTMS media connections use TLS.</td></tr>
+  <tr><td>OAuth</td><td>Authorization code flow with a single-use, random <code>state</code> value (expires after 5 minutes) to prevent CSRF. The redirect URI is fixed in configuration. Tokens are refreshed automatically and stored encrypted.</td></tr>
+  <tr><td>Token encryption</td><td>Tokens and the Zoom user profile are encrypted with AES-256-GCM. The encryption key is a random 256-bit key stored separately from the data, in a file readable only by the service (permissions 0600).</td></tr>
+  <tr><td>Webhook verification</td><td>Every webhook is verified with the <code>x-zm-signature</code> HMAC-SHA256 signature and timestamp, using a constant-time comparison, before it is processed. The <code>endpoint.url_validation</code> challenge is answered as documented by Zoom.</td></tr>
+  <tr><td>Meeting SDK</td><td>SDK signatures are generated on the server (HS256, 30-minute expiry) and rate-limited. The SDK secret and client secret are never sent to the browser.</td></tr>
+  <tr><td>Least privilege</td><td>Only the scopes needed for the features above are requested. RTMS is started only with the "start" action, only for meetings HireOS created.</td></tr>
+  <tr><td>Secrets management</td><td>The Zoom client secret, webhook secret token, OpenAI API key and database credentials are stored in environment files on the server. They are not in the source repository or the container images.</td></tr>
+  <tr><td>Network isolation</td><td>The application runs in Docker containers on a Linux server in Google Cloud. PostgreSQL and the internal services are reachable only inside the private Docker network; only the HTTPS entry point is public.</td></tr>
+</table>
+
+<h2>4. Third-party processing</h2>
+<p>Transcript text and the interview's evaluation rubric are sent to the OpenAI API (<code>api.openai.com</code>) to draft an interview summary and rubric scores. A person reviews the drafts before they are used. Zoom OAuth tokens, credentials and audio are never sent to OpenAI. OpenAI processes this data under its API terms.</p>
+
+<h2>5. Data retention and deletion</h2>
+<p class="ph">[To be confirmed by the company before submission: how long transcripts and meeting links are kept, and how a user or customer can request deletion.]</p>
+<p class="ph">[Planned, not yet implemented: when a user removes the app from their Zoom account (app deauthorization event), their stored Zoom tokens and profile will be deleted automatically. Only state this as done once it is built.]</p>
+
+<h2>6. Contact</h2>
+<p>Security questions: <span class="ph">[security contact email]</span></p>
+</body></html>
