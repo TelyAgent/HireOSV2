@@ -2,7 +2,6 @@ import { useEffect, useLayoutEffect, useState } from "react";
 import { useStore } from "../store/StoreContext";
 import {
   CloseSvg,
-  FolderSvg,
   HomeSvg,
   PlusSvg,
   SettingsSvg,
@@ -220,24 +219,6 @@ export function SideNav() {
       </button>
       <div style={{ flex: 1 }} />
       <button
-        aria-label={t.sideFiles}
-        onClick={() => go("files")}
-        style={{
-          width: 32,
-          height: 32,
-          border: 0,
-          borderRadius: 8,
-          background: state.screen === "files" ? "var(--brand-soft)" : "transparent",
-          color: state.screen === "files" ? "var(--brand)" : "var(--ink-3)",
-          cursor: "pointer",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-        }}
-      >
-        <FolderSvg />
-      </button>
-      <button
         aria-label={t.sideSettings}
         onClick={() => {
           const { say } = useStore();
@@ -388,9 +369,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   ]);
 
   const isHome = state.screen === "home";
-  const isFiles = state.screen === "files";
   const isLive = state.screen === "live";
-  const isProject = !isHome && !isFiles;
+  const isProject = !isHome;
 
   const mainAreaStyle: React.CSSProperties = {
     flex: 1,

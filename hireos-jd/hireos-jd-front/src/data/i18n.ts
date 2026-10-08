@@ -27,7 +27,6 @@ export const ZH: Record<string, string> = {
   "Expand navigation": "展开导航",
   "Collapse navigation": "收起导航",
   Shared: "共享能力",
-  "Standalone mode — no Shell installed": "独立运行模式 — 未安装 Shell",
   Workspace: "工作区",
   Close: "关闭",
   Cancel: "取消",
@@ -90,8 +89,8 @@ export const ZH: Record<string, string> = {
   "Role switching is a demo control for this prototype, not a production permission model.":
     "角色切换是本原型的演示控件，并不代表生产环境的权限模型。",
   Current: "当前",
-  "This prototype runs standalone (no Shell / other L2 modules installed). Files & Integrations, Settings and AI Models are the shared public capabilities — fully usable here.":
-    "本原型独立运行（未安装 Shell 或其他 L2 模块）。文件与集成、设置、AI 模型属于共享公共能力，在此可完整使用。",
+  "This prototype runs standalone (no Shell / other L2 modules installed). Settings and AI Models are the shared public capabilities — fully usable here.":
+    "本原型独立运行（未安装 Shell 或其他 L2 模块）。设置、AI 模型属于共享公共能力，在此可完整使用。",
 
   /* ---------- appearance option labels (shared with `cap()` output) ---------- */
   /* `System` above is the activity actor; the theme option reuses the same word. */
@@ -485,9 +484,7 @@ export const ZH: Record<string, string> = {
   /* ---------- attachments ---------- */
   "Source material for this job — upload, preview and check origin.": "该职位的原始材料 — 上传、预览并核对来源。",
   "No attachments": "暂无附件",
-  "Upload source material or link an unassigned file from Files & Integrations.":
-    "上传原始材料，或从“文件与集成”中关联一个未分配的文件。",
-  "Go to Files & Integrations": "前往文件与集成",
+  "Upload source material for this job.": "上传该职位的原始材料。",
 
   /* ---------- activity ---------- */
   "Every human, AI and system fact for this job, in order.": "该职位下所有人工、AI 与系统事件的完整时间线。",

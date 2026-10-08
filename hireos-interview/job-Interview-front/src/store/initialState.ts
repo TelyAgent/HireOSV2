@@ -85,7 +85,6 @@ export const initialState: AppState = {
   dupResolved: false,
   triResolved: false,
 
-  filesTab: "files",
   uploadVisible: false,
   uploadBatch: [],
   uploadedFiles: [],

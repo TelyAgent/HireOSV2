@@ -24,7 +24,6 @@ const ROUTES = [
   '/comparisons/cmp-job-a',
   '/deliveries',
   '/deliveries/deliv-morganb-1',
-  '/files',
   '/settings/preferences',
   '/settings/ai-models',
   '/this-route-does-not-exist',

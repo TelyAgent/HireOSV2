@@ -5,7 +5,6 @@ import { CreateProjectModal, EvidenceRequestModal } from "./components/Modals";
 import { ScoreTraceDrawer } from "./components/Drawers";
 import { useStore } from "./store/StoreContext";
 import { HomePage } from "./pages/Home";
-import { FilesPage } from "./pages/Files";
 import { ProjectShell } from "./pages/project/ProjectShell";
 import { ProjectOverviewPage } from "./pages/project/ProjectOverviewPage";
 import { RubricPage } from "./pages/project/RubricPage";
@@ -25,7 +24,6 @@ export default function App() {
     <AppShell>
       <Routes>
         <Route path="/" element={<HomePage />} />
-        <Route path="/files" element={<FilesPage />} />
 
         {/* Project sub-pages all share the ProjectShell chrome and hang off a real task id */}
         <Route

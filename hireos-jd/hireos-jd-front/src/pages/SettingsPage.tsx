@@ -1,4 +1,4 @@
-import { Navigate, useNavigate, useParams, useSearchParams } from "react-router-dom";
+import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { MainInner, AppearancePanel, AppearancePreview } from "../components/AppShell";
 import { Icon } from "../components/ui/Icons";
 import { Button, EmptyState, PersonChip, StatusBadge } from "../components/ui/Primitives";
@@ -26,7 +26,6 @@ const SETTINGS_NAV = [
       { key: "members", label: "Members & Permissions" },
       { key: "workflow", label: "Workflow & Approvals" },
       { key: "email", label: "Email & Publication" },
-      { key: "files", label: "Files & Integrations" },
       { key: "ai-models", label: "AI Models" },
       { key: "data-policy", label: "Data Policy & Audit" },
     ],
@@ -37,9 +36,6 @@ export function SettingsPage() {
   const { section = "overview" } = useParams();
   const { t } = useStore();
   const navigate = useNavigate();
-
-  // Files & Integrations is a shared capability with its own top-level page.
-  if (section === "files") return <Navigate to="/files" replace />;
 
   return (
     <MainInner variant="flush">

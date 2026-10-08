@@ -22,7 +22,6 @@ const NAV_PRIMARY: NavItem[] = [
   { to: "/templates", icon: "dashboard_customize", label: "Templates", match: "/templates" },
 ];
 const NAV_SHARED: NavItem[] = [
-  { to: "/files", icon: "cloud_upload", label: "Files & Integrations", match: "/files" },
   { to: "/settings/overview", icon: "settings", label: "Settings", match: "/settings" },
 ];
 
@@ -130,17 +129,6 @@ function SideNav() {
         {NAV_SHARED.map((item) => (
           <NavLinkItem key={item.to} item={item} />
         ))}
-      </div>
-      <div className="sidenav-section sidenav-standalone-note">
-        <div className="sidenav-label">Sending Labs</div>
-        <div
-          className="nav-item"
-          title={t("Standalone mode — no Shell installed")}
-          style={{ cursor: "default", color: "var(--text-tertiary)", fontSize: "var(--fs-xs)", padding: "8px 12px" }}
-        >
-          <Icon name="info" size={16} />
-          <span className="nav-label">{t("Standalone mode — no Shell installed")}</span>
-        </div>
       </div>
       <button
         className="sidenav-toggle"
@@ -332,7 +320,7 @@ function DemoToolsModal() {
       <ModalBody>
         <p className="tiny" style={{ marginBottom: 10 }}>
           {t(
-            "This prototype runs standalone (no Shell / other L2 modules installed). Files & Integrations, Settings and AI Models are the shared public capabilities — fully usable here.",
+            "This prototype runs standalone (no Shell / other L2 modules installed). Settings and AI Models are the shared public capabilities — fully usable here.",
           )}
         </p>
         <div className="card card-pad" style={{ background: "var(--surface-alt)", border: "none" }}>

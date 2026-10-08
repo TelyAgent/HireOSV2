@@ -15,7 +15,6 @@ import { DecisionPage } from "./pages/DecisionPage";
 import { ComparePage } from "./pages/ComparePage";
 import { DeliveriesListPage } from "./pages/DeliveriesListPage";
 import { DeliveryDetailPage } from "./pages/DeliveryDetailPage";
-import { FilesPage } from "./pages/FilesPage";
 import { PreferencesPage } from "./pages/PreferencesPage";
 import { AiModelsPage } from "./pages/AiModelsPage";
 
@@ -40,7 +39,6 @@ export default function App() {
         <Route path="/comparisons/:id" element={<ComparePage />} />
         <Route path="/deliveries" element={<DeliveriesListPage />} />
         <Route path="/deliveries/:id" element={<DeliveryDetailPage />} />
-        <Route path="/files" element={<FilesPage />} />
         <Route path="/settings/preferences" element={<PreferencesPage />} />
         <Route path="/settings/ai-models" element={<AiModelsPage />} />
         <Route path="*" element={<Navigate to="/tasks" replace />} />

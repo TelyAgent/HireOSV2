@@ -56,7 +56,7 @@ export interface AppState {
   // routing (page state)
   screen: Screen;
   // The real InterviewTask id backing the current project-flow pages (Overview, Plan, ...).
-  // Null on "home"/"files"; set whenever a real task is opened from Home.
+  // Null on "home"; set whenever a real task is opened from Home.
   currentTaskId: string | null;
   // Set by Schedule's "Join link" for a Zoom-generated round link, just before navigating
   // to Live Interview — tells it which round's real Zoom meeting to auto-join on arrival.
@@ -145,7 +145,6 @@ export interface AppState {
   triResolved: boolean;
 
   // files tab
-  filesTab: "files" | "connections" | "activity";
   uploadVisible: boolean;
   uploadBatch: { name: string; status: "success" | "failed"; reason?: string }[];
   uploadedFiles: UploadedFile[];
@@ -172,7 +171,6 @@ export interface UploadedFile {
 
 export type Screen =
   | "home"
-  | "files"
   | "overview"
   | "rubric"
   | "plan"

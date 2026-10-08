@@ -6,7 +6,6 @@ import { JobLibraryPage } from "./pages/JobLibraryPage";
 import { NewJobPage } from "./pages/NewJobPage";
 import { JobWorkspacePage } from "./pages/JobWorkspacePage";
 import { TemplatesPage } from "./pages/TemplatesPage";
-import { FilesPage } from "./pages/FilesPage";
 import { SettingsPage } from "./pages/SettingsPage";
 import { NotFoundPage } from "./pages/NotFoundPage";
 import { useStore } from "./store/StoreContext";
@@ -45,7 +44,6 @@ export default function App() {
         <Route path="/jobs/:id" element={<JobWorkspacePage />} />
         <Route path="/jobs/:id/:tab" element={<JobWorkspacePage />} />
         <Route path="/templates" element={<TemplatesPage />} />
-        <Route path="/files" element={<FilesPage />} />
         <Route path="/settings" element={<Navigate to="/settings/overview" replace />} />
         <Route path="/settings/:section" element={<SettingsPage />} />
         <Route path="*" element={<NotFoundPage />} />

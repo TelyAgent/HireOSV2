@@ -33,7 +33,6 @@ const PROJECT_SCREENS: Screen[] = [
 
 export function screenToPath(screen: Screen, taskId: string | null): string {
   if (screen === "home") return "/";
-  if (screen === "files") return "/files";
   // Project-flow screens are meaningless without a real task to show; fall back home
   // rather than producing a broken /project/undefined/... URL.
   if (!taskId) return "/";
@@ -43,7 +42,6 @@ export function screenToPath(screen: Screen, taskId: string | null): string {
 export function pathToRoute(pathname: string): { screen: Screen; taskId: string | null } {
   const path = pathname.replace(/\/+$/, "") || "/";
   if (path === "/") return { screen: "home", taskId: null };
-  if (path === "/files") return { screen: "files", taskId: null };
   const seg = path.split("/").filter(Boolean);
   if (seg[0] === "project" && seg[1] && seg[2] && PROJECT_SCREENS.includes(seg[2] as Screen)) {
     return { screen: seg[2] as Screen, taskId: seg[1] };
@@ -90,9 +88,9 @@ function reducer(state: AppState, action: Action): AppState {
     case "TOAST":
       return { ...state, toast: action.payload };
     case "GO": {
-      // "home"/"files" are task-agnostic; leaving the project flow clears the task
+      // "home" is task-agnostic; leaving the project flow clears the task
       // so a stale id doesn't leak into the next screen change.
-      const clearsTask = action.payload === "home" || action.payload === "files";
+      const clearsTask = action.payload === "home";
       return {
         ...state,
         screen: action.payload,

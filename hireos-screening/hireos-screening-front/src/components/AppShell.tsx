@@ -36,7 +36,6 @@ const NAV_PRIMARY: NavItem[] = [
   },
 ];
 const NAV_WORKSPACE: NavItem[] = [
-  { to: "/files", icon: "cloud_upload", label: "Files & Integrations", isActive: (p) => p.startsWith("/files") },
   { to: "/settings/preferences", icon: "tune", label: "Settings", isActive: (p) => p.startsWith("/settings") },
 ];
 

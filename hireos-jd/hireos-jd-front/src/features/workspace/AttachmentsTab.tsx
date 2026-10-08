@@ -4,15 +4,13 @@ import { useStore } from "../../store/StoreContext";
 import { getPerson } from "../../data/fixtures/people";
 import { fmtRelative } from "../../lib/format";
 import { useStartCreate } from "../../pages/NewJobPage";
-import { FilePreviewModal } from "../../pages/FilesPage";
-import { useNavigate } from "react-router-dom";
+import { FilePreviewModal } from "./FilePreviewModal";
 
 const FILE_ICONS: Record<string, string> = { pdf: "picture_as_pdf", docx: "description", image: "image" };
 
 export function AttachmentsTab({ jobId }: { jobId: string }) {
   const { state, t, openModal } = useStore();
   const startCreate = useStartCreate();
-  const navigate = useNavigate();
   const files = state.files.filter((f) => f.jobId === jobId);
 
   return (
@@ -32,8 +30,7 @@ export function AttachmentsTab({ jobId }: { jobId: string }) {
           <EmptyState
             icon="folder_open"
             title={t("No attachments")}
-            body={t("Upload source material or link an unassigned file from Files & Integrations.")}
-            actions={<Button onClick={() => navigate("/files")}>{t("Go to Files & Integrations")}</Button>}
+            body={t("Upload source material for this job.")}
           />
         ) : (
           files.map((f) => (

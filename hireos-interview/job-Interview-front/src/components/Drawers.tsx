@@ -517,31 +517,31 @@ function ScoreTrace({
               {sourceAnswer.sourceText || sourceAnswer.text}
             </div>
             <div style={{ marginTop: 11, display: "flex", gap: 8, flexWrap: "wrap" }}>
-              <button
-                onClick={() => {
-                  if (originalIsResume) set({ screen: "files" });
-                  else
+              {!originalIsResume && (
+                <button
+                  onClick={() => {
                     set({
                       screen: "live",
                       roundView: originalIsManual ? "r2" : "r1",
                       liveTab: originalIsManual ? "notes" : "transcript",
                     });
-                  set({ drawer: null, sourceAnswer: null });
-                }}
-                style={{
-                  height: 30,
-                  padding: "0 11px",
-                  border: "1px solid var(--brand)",
-                  borderRadius: 8,
-                  background: "var(--brand)",
-                  color: "var(--brand-ink)",
-                  fontSize: 11.5,
-                  fontWeight: 600,
-                  cursor: "pointer",
-                }}
-              >
-                {t.openTranscriptContext}
-              </button>
+                    set({ drawer: null, sourceAnswer: null });
+                  }}
+                  style={{
+                    height: 30,
+                    padding: "0 11px",
+                    border: "1px solid var(--brand)",
+                    borderRadius: 8,
+                    background: "var(--brand)",
+                    color: "var(--brand-ink)",
+                    fontSize: 11.5,
+                    fontWeight: 600,
+                    cursor: "pointer",
+                  }}
+                >
+                  {t.openTranscriptContext}
+                </button>
+              )}
               <button
                 onClick={async () => {
                   try {
