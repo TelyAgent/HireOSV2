@@ -13,7 +13,7 @@ export const ZH: Record<string, string> = {
   "HireOS · Written Test": "HireOS · 笔试测评", "Written Test": "笔试测评",
   "Search projects, candidates...": "搜索项目、候选人…", "Toggle navigation": "切换导航", "Search": "搜索",
   "Notifications": "通知", "Appearance": "外观", "Demo tools": "演示工具", "Switch demo role": "切换演示角色",
-  "Standalone entry": "独立入口", "Workspace Shell": "工作区壳层", "Demo role": "演示角色",
+  "Demo role": "演示角色",
   "Language": "语言",
 
   "My Work": "我的工作台", "Signed in as": "当前登录：", "Accessible workspace": "可访问的工作区",
@@ -379,6 +379,23 @@ export const ZH: Record<string, string> = {
   "Task": "任务", "Primary": "主用模型", "Fallback": "备用模型", "Budget": "预算",
   "Nominal": "正常", "Fallback active": "已启用备用",
   "Sample data — no real vendor is called by this prototype.": "示例数据 —— 本原型不会调用任何真实供应商。",
+
+  "Enter a title first.": "请先填写标题。", "Enter the question content.": "请填写题目内容。",
+  "Question created.": "题目已创建。",
+  "Questions have been sent to the candidate and can no longer be added.": "题目已发送给候选人，不能再添加。", "Question updated.": "题目已更新。", "Delete": "删除",
+  "Scoring competencies are generated automatically from the content when you save the question.": "保存题目时会根据题目内容自动生成评分能力项。",
+  "Candidates who were already given this question keep their copy.": "已分配给候选人的题目不受影响。",
+  "Could not delete this question. Please try again.": "题目删除失败，请重试。",
+  "Add to favorites": "收藏", "Remove from favorites": "取消收藏", "Could not save this question. Please try again.": "题目保存失败，请重试。",
+  "Could not load the question bank.": "题库加载失败。",
+  "Could not generate competencies. Please try again.": "能力项生成失败，请重试。", "Generating competencies…": "正在生成能力项…",
+  "Scoring competencies are generated automatically from the content when you create the question.": "创建题目时会根据题目内容自动生成评分能力项。",
+  "e.g. Design a high-throughput sorting module": "例如：设计一个高吞吐的排序模块",
+  "Type or pick a role, press Enter to add": "输入或选择岗位，回车添加", "Add": "添加",
+  "Published questions are offered as presets when adding questions for candidates of these roles.": "已发布的题目会在为这些岗位的候选人添加测评题目时作为预设题出现。",
+  "Written": "笔试", "Easy": "易", "Hard": "难",
+  "Write the question, or generate a draft from the title with AI.": "填写题目内容，或根据标题用 AI 生成草稿。",
+  "Could not save to the server. Please refresh and try again.": "保存到服务器失败，请刷新后重试。",
 };
 
 export function translate(lang: "en" | "zh", source: string): string {

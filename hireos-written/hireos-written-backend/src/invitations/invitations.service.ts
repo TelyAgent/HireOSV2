@@ -7,6 +7,7 @@ import { MailAccountsService } from '../mail-accounts/mail-accounts.service';
 import { AiEvaluatorService } from '../ai/ai-evaluator.service';
 import type { CreateInvitationDto, QuestionSnapshotDto } from './create-invitation.dto';
 import type { SubmitAnswersDto } from './submit-answers.dto';
+import type { FinalizeEvaluationDto, ReleaseResultDto } from './case-result.dto';
 
 function generateToken(): string {
   return randomBytes(24).toString('base64url');
@@ -69,9 +70,54 @@ export class InvitationsService {
       status: inv.status,
       createdAt: inv.createdAt.toISOString(),
       submission: inv.submission
-        ? { answers: inv.submission.answers, submittedAt: inv.submission.submittedAt.toISOString(), evaluation: inv.submission.evaluation }
+        ? {
+            answers: inv.submission.answers,
+            submittedAt: inv.submission.submittedAt.toISOString(),
+            evaluation: inv.submission.evaluation,
+            finalEvaluation: inv.submission.finalEvaluation,
+            finalizedBy: inv.submission.finalizedBy,
+            finalizedAt: inv.submission.finalizedAt?.toISOString() ?? null,
+            release: inv.submission.release,
+            releasedAt: inv.submission.releasedAt?.toISOString() ?? null,
+          }
         : null,
     }));
+  }
+
+  /** The submission a case's review acts on: the one on its latest submitted invitation. */
+  private async latestSubmission(identity: Identity, caseId: string) {
+    const invitation = await this.db.invitation.findFirst({
+      where: { caseId, workspaceId: identity.workspaceId, submission: { isNot: null } },
+      include: { submission: true },
+      orderBy: { createdAt: 'desc' },
+    });
+    if (!invitation?.submission) throw new NotFoundException({ code: 'SUBMISSION_NOT_FOUND' });
+    return invitation.submission;
+  }
+
+  async finalizeEvaluation(identity: Identity, caseId: string, dto: FinalizeEvaluationDto) {
+    const submission = await this.latestSubmission(identity, caseId);
+    if (submission.finalizedAt) throw new ConflictException({ code: 'ALREADY_FINALIZED' });
+    const updated = await this.db.submission.update({
+      where: { id: submission.id },
+      data: {
+        finalEvaluation: { overall: dto.overall, criteria: dto.criteria } as unknown as object,
+        finalizedBy: dto.finalizedBy,
+        finalizedAt: new Date(),
+      },
+    });
+    return { finalizedAt: updated.finalizedAt!.toISOString() };
+  }
+
+  async releaseResult(identity: Identity, caseId: string, dto: ReleaseResultDto) {
+    const submission = await this.latestSubmission(identity, caseId);
+    if (!submission.finalizedAt) throw new ConflictException({ code: 'NOT_FINALIZED' });
+    if (submission.releasedAt) throw new ConflictException({ code: 'ALREADY_RELEASED' });
+    const updated = await this.db.submission.update({
+      where: { id: submission.id },
+      data: { release: { ...dto } as unknown as object, releasedAt: new Date() },
+    });
+    return { releasedAt: updated.releasedAt!.toISOString() };
   }
 
   async getPublic(token: string) {

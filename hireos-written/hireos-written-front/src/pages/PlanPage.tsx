@@ -1,6 +1,5 @@
 import { useEffect, useReducer, useState } from "react";
 import { useParams } from "react-router-dom";
-import { Modal } from "antd";
 import { useStore } from "../store/StoreContext";
 import { StatusBadge } from "../utils/status";
 import { Breadcrumbs, Button, EmptyState, Tabs } from "../components/ui/Primitives";
@@ -12,14 +11,14 @@ import { SubmissionDetailContent, RealSubmissionContent } from "./SubmissionDeta
 import { EvaluationReviewContent } from "./EvaluationReviewPage";
 import { ReleaseContent } from "./ReleasePage";
 import {
-  ATTEMPTS, CASES, CORE_APPLICATIONS, CORE_CANDIDATES, CORE_JOBS, INVITATIONS, PLANS, PROJECT, QUESTIONS, fmtDateShort,
-  type Invitation, type PlanItem, type Question,
+  ATTEMPTS, CASES, CORE_APPLICATIONS, CORE_CANDIDATES, CORE_JOBS, INVITATIONS, PLANS, PROJECT, QUESTIONS, RELEASES, fmtDateShort,
+  type PlanItem, type Question,
 } from "../data/fixtures";
-import { USERS } from "../data/users";
 import {
   createPlanItem, deletePlanItem, listCaseInvitations, listPlanItems, updatePlanItem,
   type RealInvitation,
 } from "../data/writtenApi";
+import { writtenStatusFromInvitation } from "../utils/writtenTasks";
 import { applyRealEvaluation, applyRealPlanItems, synthesizeOrphanedInvitationItems } from "../data/realPlanItemsMerge";
 
 type TabKey = "plan" | "submission" | "evaluation" | "result";
@@ -48,8 +47,6 @@ export function PlanPage() {
     setActiveTabState(key);
   };
 
-  const [owner, setOwner] = useState<string>(c?.ownership?.hrOwner ?? "");
-  const [deadline, setDeadline] = useState<string>(() => c?.rounds[0]?.deadlineAt ?? "");
   const [questionDrawer, setQuestionDrawer] = useState<QuestionDrawerState>(null);
   const [sendDrawerOpen, setSendDrawerOpen] = useState(false);
   // Question add/edit/delete/send all mutate the shared PLANS/CASES/INVITATIONS module objects
@@ -64,7 +61,6 @@ export function PlanPage() {
   // nothing extra rather than an error. Keyed by token to cross-reference against the
   // INVITATIONS fixture entry each QuestionCard already resolves for its "already sent" state.
   const [realInvitations, setRealInvitations] = useState<RealInvitation[]>([]);
-  const [viewingSubmission, setViewingSubmission] = useState<RealInvitation | null>(null);
   useEffect(() => {
     if (!caseId) return;
     let cancelled = false;
@@ -133,9 +129,18 @@ export function PlanPage() {
   // in the exact shape SubmissionDetailContent/EvaluationReviewContent already expect — see
   // applyRealEvaluation's own comment for why this reuses those components unchanged.
   const realSubmittedInvite = realInvitations.find((inv) => inv.submission);
+  // Every question goes out in one invitation, so the case has one overall assessment status --
+  // taken from the latest invitation (the backend lists them newest first; the fixture dict is the
+  // fallback for fixture-only demo cases). Answers are viewed per batch on the Submission tab.
+  const latestInvite: { status: string; mode: string; durationMin?: number | null; deadline?: string | null } | undefined =
+    realInvitations[0] ?? invs[invs.length - 1];
+  // Once the batch has gone out, the plan is frozen -- no more questions can be added to it.
+  const alreadySent = !!latestInvite;
   const realAttemptId = realSubmittedInvite?.submission
     ? applyRealEvaluation(caseId, realSubmittedInvite.questions[0]?.questionId ?? "", realSubmittedInvite.submission)
     : null;
+  const released = Object.values(RELEASES).some((r) => r.caseId === caseId);
+  const overallStatus = writtenStatusFromInvitation(latestInvite?.status, released);
   const attempts = Object.values(ATTEMPTS).filter((a) => a.caseId === caseId);
   const primaryAttempt = (realAttemptId && ATTEMPTS[realAttemptId]) || attempts[0];
 
@@ -192,7 +197,7 @@ export function PlanPage() {
       <Breadcrumbs items={[{ label: "My Tasks", href: "/tasks" }, { label: "Candidate detail" }]} />
       <h1 style={{ marginBottom: 4 }}>{cand.name}{t("'s plan")}</h1>
       <div className="muted" style={{ marginBottom: 16, display: "flex", alignItems: "center", gap: 8 }}>
-        {cand.email} · <StatusBadge status={c.status} />
+        {cand.email} · <StatusBadge status={overallStatus} />
       </div>
 
       <Tabs
@@ -217,31 +222,15 @@ export function PlanPage() {
           <div className="tiny" style={{ color: "var(--text-secondary)", lineHeight: 1.6 }}>{goalText}</div>
         </div>
 
-        <div className="grid-2" style={{ gap: 16, marginBottom: 16 }}>
-          <div className="field">
-            <label>{t("Owner")}</label>
-            <select className="input" value={owner} onChange={(e) => { setOwner(e.target.value); say("Owner updated.", { type: "success" }); }}>
-              <option value="">{t("— Not set (defaults to initiator) —")}</option>
-              {Object.values(USERS).map((u) => (
-                <option key={u.id} value={u.id}>{u.name} · {u.role}</option>
-              ))}
-            </select>
-          </div>
-          <div className="field">
-            <label>{t("Submission deadline")}</label>
-            <input
-              className="input"
-              type="datetime-local"
-              value={deadline ? deadline.slice(0, 16) : ""}
-              onChange={(e) => { setDeadline(e.target.value ? new Date(`${e.target.value}:00Z`).toISOString() : ""); say("Deadline updated.", { type: "success" }); }}
-            />
-          </div>
-        </div>
-
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 8, marginBottom: 2 }}>
           <h4 style={{ margin: 0 }}>{t("Assessment questions")}</h4>
           <div style={{ display: "flex", gap: 8, flex: "none" }}>
-            <Button size="sm" onClick={() => setQuestionDrawer({ mode: "add" })}>
+            <Button
+              size="sm"
+              disabled={alreadySent}
+              title={alreadySent ? t("Questions have been sent to the candidate and can no longer be added.") : undefined}
+              onClick={() => setQuestionDrawer({ mode: "add" })}
+            >
               <Icon name="add" style={{ fontSize: 16, verticalAlign: "text-bottom" }} /> {t("Add assessment question")}
             </Button>
             <Button
@@ -258,6 +247,18 @@ export function PlanPage() {
         <div className="tiny" style={{ color: "var(--text-tertiary)", marginBottom: 12 }}>
           {t("Confirming freezes this into a pending-send version; it is not sent to the candidate immediately.")}
         </div>
+        {latestInvite && (
+          <div className="card card-pad" style={{ marginBottom: 12, display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+            <StatusBadge status={overallStatus} />
+            <span className="tiny" style={{ color: "var(--text-tertiary)" }}>
+              {latestInvite.mode === "timed" ? `${latestInvite.durationMin} ${t("min timed")}` : t("Deadline only")} · {t("deadline")} {fmtDateShort(latestInvite.deadline ?? "")}
+            </span>
+            <div style={{ flex: 1 }} />
+            {(realSubmittedInvite || primaryAttempt) && (
+              <Button size="sm" variant="ghost" onClick={() => setActiveTab("submission")}>{t("View submission →")}</Button>
+            )}
+          </div>
+        )}
 
         {items.length === 0 ? (
           <EmptyState icon="assignment" title='No assessment questions yet. Click "Add assessment question" to get started.' />
@@ -266,12 +267,9 @@ export function PlanPage() {
             <QuestionCard
               key={pi.id}
               pi={pi}
-              invitations={invs}
-              realInvite={realInviteForQuestion(pi.questionId)}
+              alreadySent={!!realInviteForQuestion(pi.questionId) || invs.some((inv) => inv.questionIds.includes(pi.questionId))}
               onDelete={() => deleteQuestion(pi)}
               onEdit={() => setQuestionDrawer({ mode: "edit", planItem: pi })}
-              onViewSubmission={() => setActiveTab("submission")}
-              onViewRealSubmission={setViewingSubmission}
             />
           ))
         )}
@@ -301,7 +299,7 @@ export function PlanPage() {
       </div>
 
       <div style={{ display: activeTab === "result" ? "block" : "none" }}>
-        <ReleaseContent caseId={caseId} inline onGoToPlan={() => setActiveTab("plan")} />
+        <ReleaseContent caseId={caseId} inline onGoToPlan={() => setActiveTab("plan")} onPublished={forceTick} />
       </div>
 
       <AssessmentQuestionDrawer
@@ -325,93 +323,39 @@ export function PlanPage() {
         }}
       />
 
-      <Modal
-        open={!!viewingSubmission}
-        onCancel={() => setViewingSubmission(null)}
-        footer={null}
-        title={t("Candidate's submission")}
-        width={560}
-      >
-        {viewingSubmission?.submission?.answers.map((a) => {
-          const q = (viewingSubmission.questions ?? []).find((qq) => qq.questionId === a.questionId);
-          return (
-            <div key={a.questionId} className="card card-pad" style={{ marginBottom: 12 }}>
-              <b>{q ? `${q.code} · ${q.title}` : a.questionId}</b>
-              <div className="tiny" style={{ color: "var(--text-secondary)", lineHeight: 1.6, whiteSpace: "pre-wrap", marginTop: 8 }}>
-                {a.answerText}
-              </div>
-            </div>
-          );
-        })}
-        {viewingSubmission?.submission && (
-          <div className="tiny" style={{ color: "var(--text-tertiary)" }}>
-            {t("Submitted at")} {fmtDateShort(viewingSubmission.submission.submittedAt)}
-          </div>
-        )}
-      </Modal>
     </div>
   );
 }
 
 function QuestionCard({
-  pi, invitations, realInvite, onDelete, onEdit, onViewSubmission, onViewRealSubmission,
+  pi, alreadySent, onDelete, onEdit,
 }: {
   pi: PlanItem;
-  invitations: Invitation[];
-  realInvite: RealInvitation | undefined;
+  alreadySent: boolean;
   onDelete: () => void;
   onEdit: () => void;
-  onViewSubmission: () => void;
-  onViewRealSubmission: (inv: RealInvitation) => void;
 }) {
   const { t } = useStore();
   const q = QUESTIONS[pi.questionId];
-  // realInvite (fetched fresh from the backend on every load) is the durable signal; the fixture
-  // INVITATIONS entry is ephemeral and only used as a fallback for fixture-only demo cases that
-  // have no real backend data at all.
-  const sentInvite = invitations.find((inv) => inv.questionIds.includes(pi.questionId));
-  const alreadySent = !!realInvite || !!sentInvite;
   const bodyText = pi.customPrompt ?? q.prompt;
 
+  // No per-question status or "view reply" here: questions are sent together as one batch, whose
+  // single overall status (and link to the Submission tab) sits above the question list.
   return (
     <div className="card card-pad" style={{ marginBottom: 12 }}>
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 8, marginBottom: 8 }}>
-        <div>
-          <b>{q.code} · {q.title}</b>
-          <div className="tiny" style={{ marginTop: 2 }}>{t("adjustable for this candidate only")}</div>
-        </div>
-        <StatusBadge status={pi.status} />
+      <div style={{ marginBottom: 8 }}>
+        <b>{q.code} · {q.title}</b>
+        <div className="tiny" style={{ marginTop: 2 }}>{t("adjustable for this candidate only")}</div>
       </div>
-      <div className="tiny" style={{ color: "var(--text-secondary)", lineHeight: 1.6, whiteSpace: "pre-wrap", maxHeight: 90, overflow: "auto", marginBottom: 10 }}>
+      <div className="tiny" style={{ fontSize: 12, color: "var(--text-secondary)", lineHeight: 1.6, whiteSpace: "pre-wrap", maxHeight: 90, overflow: "auto", marginBottom: alreadySent ? 0 : 10 }}>
         {bodyText}
       </div>
-      <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 10, flexWrap: "wrap" }}>
-        {alreadySent ? (
-          <>
-            <Button size="sm" disabled>
-              {realInvite?.status === "submitted" ? t("Submitted") : realInvite?.status === "opened" ? t("Opened") : t("Sent")}
-            </Button>
-            {(sentInvite || realInvite) && (
-              <span className="tiny" style={{ color: "var(--text-tertiary)" }}>
-                {(sentInvite?.mode ?? realInvite?.mode) === "timed"
-                  ? `${sentInvite?.durationMin ?? realInvite?.durationMin} ${t("min timed")}`
-                  : t("Deadline only")} · {t("deadline")} {fmtDateShort(sentInvite?.deadline ?? realInvite?.deadline ?? "")}
-              </span>
-            )}
-            <div style={{ flex: 1 }} />
-            {realInvite?.submission ? (
-              <Button size="sm" variant="ghost" onClick={() => onViewRealSubmission(realInvite)}>{t("View candidate's reply →")}</Button>
-            ) : (
-              <Button size="sm" variant="ghost" onClick={onViewSubmission}>{t("View submission →")}</Button>
-            )}
-          </>
-        ) : (
-          <>
-            <Button size="sm" variant="ghost" onClick={onEdit}>{t("Edit question")}</Button>
-            <Button size="sm" variant="danger" onClick={onDelete}>{t("Delete question")}</Button>
-          </>
-        )}
-      </div>
+      {!alreadySent && (
+        <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 10, flexWrap: "wrap" }}>
+          <Button size="sm" variant="ghost" onClick={onEdit}>{t("Edit question")}</Button>
+          <Button size="sm" variant="danger" onClick={onDelete}>{t("Delete question")}</Button>
+        </div>
+      )}
     </div>
   );
 }

@@ -3,7 +3,7 @@ import { Drawer } from "antd";
 import { useStore } from "../store/StoreContext";
 import { Button } from "./ui/Primitives";
 import { Icon } from "./ui/Icon";
-import { QUESTIONS, type Competency, type PlanItem, type Question } from "../data/fixtures";
+import { QUESTIONS, bankQuestions, type Competency, type PlanItem, type Question } from "../data/fixtures";
 import { fetchCaseAiContext, generateAiQuestion, type CaseAiContext } from "../data/writtenApi";
 
 type Mode = "bank" | "ai";
@@ -25,7 +25,7 @@ export function AssessmentQuestionDrawer({
   const [selectedQuestionId, setSelectedQuestionId] = useState("");
   const [focusBrief, setFocusBrief] = useState("");
   const [contentDraft, setContentDraft] = useState("");
-  const [generated, setGenerated] = useState<{ competencies: Competency[] } | null>(null);
+  const [generated, setGenerated] = useState<{ title: string; competencies: Competency[] } | null>(null);
   const [aiLoading, setAiLoading] = useState(false);
   const [caseContext, setCaseContext] = useState<CaseAiContext | null>(null);
 
@@ -60,7 +60,7 @@ export function AssessmentQuestionDrawer({
     };
   }, [open, mode, caseId]);
 
-  const roleQuestions = Object.values(QUESTIONS).filter((q) => q.status === "published" && q.roles.includes(jobTitle));
+  const roleQuestions = bankQuestions().filter((q) => q.status === "published" && q.roles.includes(jobTitle));
   const roleCompetencyNames = Array.from(new Set(roleQuestions.flatMap((q) => q.competencies.map((cc) => cc.name))));
   const suggestionNames = roleCompetencyNames.length
     ? roleCompetencyNames.slice(0, 3)
@@ -87,7 +87,7 @@ export function AssessmentQuestionDrawer({
         lang: zh ? "zh" : "en",
       });
       setContentDraft(result.prompt);
-      setGenerated({ competencies: result.competencies });
+      setGenerated({ title: result.title, competencies: result.competencies });
     } catch {
       say(t("AI generation failed. Please try again."), { type: "danger" });
     } finally {
@@ -123,7 +123,8 @@ export function AssessmentQuestionDrawer({
       const newQuestion: Question = {
         id: qId,
         code: `AI-${qId.slice(-4).toUpperCase()}`,
-        title: `${zh ? "AI 生成 · " : "AI-generated · "}${focusBrief.trim().slice(0, 24)}`,
+        // Named from the generated content itself (see AiQuestionGeneratorService), not the focus brief.
+        title: generated?.title || focusBrief.trim().slice(0, 24),
         type: "Written",
         roles: [jobTitle],
         competencies: generated?.competencies ?? [{ name: focusBrief.trim().slice(0, 20) || "Custom focus", fraction: 1 }],
@@ -139,6 +140,7 @@ export function AssessmentQuestionDrawer({
         usageCount: 0,
         seenByCount: 0,
         prompt: contentDraft,
+        caseScoped: true,
       };
       QUESTIONS[qId] = newQuestion;
       const customPrompt = contentDraft !== newQuestion.prompt ? contentDraft : null;

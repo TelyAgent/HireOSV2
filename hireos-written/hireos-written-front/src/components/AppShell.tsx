@@ -11,28 +11,13 @@ import { fmtDate, nowISO } from "../data/fixtures";
 interface NavItem { href: string; label: string; ic: string }
 interface NavGroup { section: string | null; items: NavItem[] }
 
-const NAV_STANDALONE: NavGroup[] = [
+const NAV: NavGroup[] = [
   { section: null, items: [
     { href: "/tasks", label: "My Tasks", ic: "checklist" },
     { href: "/question-bank", label: "Question Bank", ic: "quiz" },
   ] },
   { section: "Workspace", items: [
-    { href: "/files", label: "Files & Integrations", ic: "cloud_upload" },
     { href: "/settings", label: "Settings", ic: "tune" },
-  ] },
-];
-
-const NAV_SHELL: NavGroup[] = [
-  { section: "Command", items: [
-    { href: "/tasks", label: "My Focus", ic: "track_changes" },
-    { href: "/assessments", label: "Jobs", ic: "work_outline" },
-    { href: "/settings", label: "Settings", ic: "tune" },
-  ] },
-  { section: "Assessment (embedded)", items: [
-    { href: "/tasks", label: "My Tasks", ic: "checklist" },
-    { href: "/assessments", label: "Assessments", ic: "work_outline" },
-    { href: "/question-bank", label: "Question Bank", ic: "quiz" },
-    { href: "/comparisons", label: "Comparisons", ic: "compare_arrows" },
   ] },
 ];
 
@@ -42,22 +27,21 @@ function navActive(href: string, pathname: string) {
 }
 
 export function AppShell({ openTaskCount, children }: { openTaskCount: number; children: ReactNode }) {
-  const { state, t, toggleLang, toggleSidebar, toggleAppearance, toggleRoleSwitcher, set } = useStore();
+  const { state, t, toggleLang, toggleSidebar, toggleAppearance, toggleRoleSwitcher } = useStore();
   const location = useLocation();
   const navigate = useNavigate();
-  const navGroups = state.shellMode === "shell" ? NAV_SHELL : NAV_STANDALONE;
 
   return (
     <div className="appshell">
       <nav className={`sidebar ${state.sidebarCollapsed ? "collapsed" : ""}`} aria-label="Primary navigation">
         <div className="nav-scroll">
-          {navGroups.map((group, gi) => (
+          {NAV.map((group, gi) => (
             <div key={gi}>
               {group.section && <div className="nav-section-label">{t(group.section)}</div>}
               {group.items.map((item, ii) => {
                 const active = navActive(item.href, location.pathname);
                 const label = t(item.label);
-                const showCount = item.label === "My Tasks" || item.label === "My Focus";
+                const showCount = item.label === "My Tasks";
                 return (
                   <Link key={ii} to={item.href} className={`nav-item ${active ? "active" : ""}`} title={label}>
                     <span className="ic material-icons-o">{item.ic}</span>
@@ -94,14 +78,6 @@ export function AppShell({ openTaskCount, children }: { openTaskCount: number; c
           <button className="icon-btn" type="button" title={t("Appearance")} aria-label={t("Appearance")} onClick={toggleAppearance}>
             <Icon name="palette" />
           </button>
-          <div
-            className={`badge ${state.shellMode === "shell" ? "info" : "neutral"}`}
-            style={{ cursor: "pointer" }}
-            onClick={() => set({ shellMode: state.shellMode === "shell" ? "standalone" : "shell" })}
-            title={t("Demo tools")}
-          >
-            {state.shellMode === "shell" ? t("Workspace Shell") : t("Standalone entry")}
-          </div>
           <RolePill onClick={toggleRoleSwitcher} />
         </div>
         <div className="content">{children}</div>

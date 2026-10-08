@@ -167,5 +167,42 @@ model Submission {
   // never rewritten after the initial AI pass), same as this app's other "AI draft, human review"
   // fixtures elsewhere (e.g. the AI-generated question rubric).
   evaluation   Json?
+  // The reviewer's finalized scoring (frontend "Comprehensive evaluation" -> Confirm finalize):
+  // { overall, criteria: [{name, max, ai, human, overridden, overrideReason}] }. Null until finalized.
+  finalEvaluation Json?
+  finalizedBy     String?
+  finalizedAt     DateTime?
+  // What was published to the candidate (frontend "Evaluation result" -> publish):
+  // { overall, showScore, outcomeText, feedbackText, nextStepText }. A non-null releasedAt is what
+  // moves the case to "Written completed" in the task list.
+  release         Json?
+  releasedAt      DateTime?
   invitation   Invitation @relation(fields: [invitationId], references: [id], onDelete: Cascade)
+}
+
+// A reusable Question Bank question (frontend Question Bank page). Distinct from PlanItem, which is
+// one candidate's own snapshot copy -- picking a bank question for a candidate copies its content
+// into a PlanItem, so editing the bank never changes what a candidate was already given.
+model Question {
+  id           String   @id @default(uuid())
+  workspaceId  String
+  code         String
+  title        String
+  prompt       String
+  type         String   @default("Written")
+  roles        Json
+  competencies Json
+  difficulty   String   @default("Medium")
+  estMinutes   Int      @default(120)
+  language     String   @default("中文")
+  version      Int      @default(1)
+  status       String   @default("published")
+  author       String?
+  deliverables Json?
+  favorite     Boolean  @default(false)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@unique([workspaceId, code])
+  @@index([workspaceId, createdAt])
 }

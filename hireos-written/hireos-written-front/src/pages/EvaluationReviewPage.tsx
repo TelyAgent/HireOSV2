@@ -5,6 +5,7 @@ import { useStore } from "../store/StoreContext";
 import { StatusBadge } from "../utils/status";
 import { Breadcrumbs, Button, EmptyState } from "../components/ui/Primitives";
 import { ATTEMPTS, CASES, CORE_CANDIDATES, EVALUATIONS, QUESTIONS, RESULTS, type Criterion, type Evaluation } from "../data/fixtures";
+import { finalizeCaseEvaluation } from "../data/writtenApi";
 
 function computeOverall(criteria: Criterion[], key: "ai" | "human"): number | null {
   if (criteria.some((c) => c[key] == null)) return null;
@@ -102,6 +103,15 @@ export function EvaluationReviewContent({
       return;
     }
     const overall = computeOverall(ev.criteria, "human")!;
+    // Real cases persist the finalized scoring so it (and the result built on it) survives a reload;
+    // fixture-only demo cases have no backend row and stay in-memory only.
+    if (att.id.startsWith("att_real_")) {
+      finalizeCaseEvaluation(att.caseId, {
+        overall,
+        finalizedBy: state.currentUser,
+        criteria: ev.criteria.map((c) => ({ name: c.name, max: c.max, ai: c.ai, human: c.human as number, overridden: c.overridden, overrideReason: c.overrideReason })),
+      }).catch(() => say(t("Could not save to the server. Please refresh and try again."), { type: "danger" }));
+    }
     updateEvaluation((prev) => ({ ...prev, status: "final", finalizedBy: state.currentUser, finalizedAt: new Date().toISOString() }));
     RESULTS[`result_${att.caseId}`] = { id: `result_${att.caseId}`, caseId: att.caseId, evaluationId: ev.id, overall, status: "final_not_released", releaseId: null };
     setConfirmOpen(false);

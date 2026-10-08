@@ -50,8 +50,86 @@ export async function fetchCaseAiContext(caseId: string): Promise<CaseAiContext 
 }
 
 export interface GeneratedQuestion {
+  title: string;
   prompt: string;
   competencies: { name: string; fraction: number }[];
+}
+
+export interface RealBankQuestion {
+  id: string;
+  code: string;
+  title: string;
+  prompt: string;
+  type: string;
+  roles: string[];
+  competencies: { name: string; fraction: number }[];
+  difficulty: string;
+  estMinutes: number;
+  language: string;
+  version: number;
+  status: "published" | "draft_review" | "internal_only" | "concept";
+  author: string | null;
+  deliverables: string[];
+  favorite: boolean;
+  createdAt: string;
+}
+
+export async function listBankQuestions(): Promise<RealBankQuestion[]> {
+  const response = await fetch(`${BASE}/questions`);
+  if (!response.ok) throw new Error(`Request failed (${response.status})`);
+  return response.json() as Promise<RealBankQuestion[]>;
+}
+
+export async function createBankQuestion(input: {
+  title: string;
+  prompt: string;
+  roles: string[];
+  competencies: { name: string; fraction: number }[];
+  language?: string;
+  author?: string;
+}): Promise<RealBankQuestion> {
+  const response = await fetch(`${BASE}/questions`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify(input),
+  });
+  if (!response.ok) await throwWithMessage(response);
+  return response.json() as Promise<RealBankQuestion>;
+}
+
+/** Any subset -- a content change (title/prompt/competencies) bumps the question's version server-side. */
+export async function updateBankQuestion(
+  id: string,
+  input: { title?: string; prompt?: string; roles?: string[]; competencies?: { name: string; fraction: number }[]; favorite?: boolean },
+): Promise<RealBankQuestion> {
+  const response = await fetch(`${BASE}/questions/${encodeURIComponent(id)}`, {
+    method: "PATCH",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify(input),
+  });
+  if (!response.ok) await throwWithMessage(response);
+  return response.json() as Promise<RealBankQuestion>;
+}
+
+export async function deleteBankQuestion(id: string): Promise<void> {
+  const response = await fetch(`${BASE}/questions/${encodeURIComponent(id)}`, { method: "DELETE" });
+  if (!response.ok) await throwWithMessage(response);
+}
+
+/** Scoring competencies for a hand-written Question Bank question, derived by AI from its content. */
+export async function extractQuestionCompetencies(input: {
+  title: string;
+  prompt: string;
+  roles?: string[];
+  lang: "zh" | "en";
+}): Promise<{ competencies: { name: string; fraction: number }[] }> {
+  const response = await fetch(`${BASE}/ai/extract-competencies`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify(input),
+  });
+  if (!response.ok) throw new Error(`Request failed (${response.status})`);
+  return response.json() as Promise<{ competencies: { name: string; fraction: number }[] }>;
 }
 
 export async function generateAiQuestion(input: {
@@ -93,7 +171,48 @@ export interface RealInvitation {
   deadline: string | null;
   status: string;
   createdAt: string;
-  submission: { answers: { questionId: string; answerText: string }[]; submittedAt: string; evaluation: RealEvaluation | null } | null;
+  submission: RealSubmission | null;
+}
+
+export interface RealFinalCriterion { name: string; max: number; ai: number; human: number; overridden?: boolean; overrideReason?: string }
+export interface RealReleaseInput { overall: number; showScore: boolean; outcomeText: string; feedbackText: string; nextStepText: string }
+
+export interface RealSubmission {
+  answers: { questionId: string; answerText: string }[];
+  submittedAt: string;
+  evaluation: RealEvaluation | null;
+  /** Set once a reviewer finalizes the scoring (Comprehensive evaluation tab). */
+  finalEvaluation?: { overall: number; criteria: RealFinalCriterion[] } | null;
+  finalizedBy?: string | null;
+  finalizedAt?: string | null;
+  /** Set once the result is published (Evaluation result tab) -- the case is then "Written completed". */
+  release?: RealReleaseInput | null;
+  releasedAt?: string | null;
+}
+
+/** Persists the finalized scoring on the case's latest submission. Throws on a fixture-only demo case (404). */
+export async function finalizeCaseEvaluation(
+  caseId: string,
+  input: { overall: number; criteria: RealFinalCriterion[]; finalizedBy?: string },
+): Promise<{ finalizedAt: string }> {
+  const response = await fetch(`${BASE}/cases/${encodeURIComponent(caseId)}/result/finalize`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify(input),
+  });
+  if (!response.ok) throw new Error(`Request failed (${response.status})`);
+  return response.json() as Promise<{ finalizedAt: string }>;
+}
+
+/** Persists the published result on the case's latest submission (must already be finalized). */
+export async function releaseCaseResult(caseId: string, input: RealReleaseInput): Promise<{ releasedAt: string }> {
+  const response = await fetch(`${BASE}/cases/${encodeURIComponent(caseId)}/result/release`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify(input),
+  });
+  if (!response.ok) throw new Error(`Request failed (${response.status})`);
+  return response.json() as Promise<{ releasedAt: string }>;
 }
 
 /** Only cases created via a real screening handoff can hold a real invitation — callers should

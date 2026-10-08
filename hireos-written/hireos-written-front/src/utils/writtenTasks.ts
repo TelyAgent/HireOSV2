@@ -42,6 +42,19 @@ export function writtenTaskStatus(task: Task): WrittenTaskStatus {
   return "pending_test";
 }
 
+/**
+ * The overall status of a case's assessment, derived from its latest invitation -- all of a case's
+ * questions go out together in one invitation, so there is exactly one status for the whole batch
+ * (never per question). Same mapping hireos-written-backend's TasksService uses for the task list,
+ * so the candidate detail page and My Tasks always agree.
+ */
+export function writtenStatusFromInvitation(invitationStatus: string | undefined, released = false): WrittenTaskStatus {
+  if (invitationStatus === "submitted") return released ? "written_completed" : "pending_result_review";
+  if (invitationStatus === "opened" || invitationStatus === "accepted" || invitationStatus === "started") return "pending_submission";
+  if (invitationStatus === "sent") return "test_sent";
+  return "pending_test";
+}
+
 export function writtenTaskJob(task: Task): CoreJob {
   const c = task.sourceRef ? CASES[task.sourceRef] : undefined;
   const app = c ? CORE_APPLICATIONS[c.applicationId] : undefined;

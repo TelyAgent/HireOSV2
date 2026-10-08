@@ -65,6 +65,15 @@ export interface Question {
    * doesn't get one at creation time — there's no internal answer key to write until someone reviews it. */
   rubricNote?: string;
   usageCount: number; seenByCount: number; pendingFractionIssue?: boolean;
+  /** Set on a question that only exists for one candidate's plan (AI-generated in the plan drawer, or
+   * the per-case copy of a real PlanItem) -- it lives in QUESTIONS so plan/send/submission helpers can
+   * resolve it, but it is never part of the reusable Question Bank. */
+  caseScoped?: boolean;
+}
+
+/** The reusable Question Bank -- QUESTIONS minus per-candidate, case-scoped questions. */
+export function bankQuestions(): Question[] {
+  return Object.values(QUESTIONS).filter((q) => !q.caseScoped);
 }
 
 // Filled at runtime only: real plan items (data/realPlanItemsMerge.ts) and AI-generated questions.

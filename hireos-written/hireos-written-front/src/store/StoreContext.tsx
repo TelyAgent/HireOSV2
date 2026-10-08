@@ -147,7 +147,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       // localStorage unavailable (private browsing, etc.) — prefs just won't persist.
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [state.lang, state.theme, state.accent, state.textSize, state.sidebarCollapsed, state.shellMode, state.currentUser]);
+  }, [state.lang, state.theme, state.accent, state.textSize, state.sidebarCollapsed, state.currentUser]);
 
   const value = useMemo<StoreValue>(
     () => ({

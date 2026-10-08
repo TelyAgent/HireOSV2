@@ -4,6 +4,7 @@ import { AppShell } from "./components/AppShell";
 import { useStore } from "./store/StoreContext";
 import { useOpenTaskCount } from "./features/useOpenTaskCount";
 import { loadRealWrittenTasksIntoFixtures } from "./data/realTasksMerge";
+import { loadBankQuestionsIntoFixtures } from "./data/realQuestionsMerge";
 import { TasksPage } from "./pages/TasksPage";
 import { QuestionBankPage } from "./pages/QuestionBankPage";
 import { QuestionDetailPage } from "./pages/QuestionDetailPage";
@@ -20,7 +21,6 @@ import { RevisionPage } from "./pages/RevisionPage";
 import { DeliveryPage } from "./pages/DeliveryPage";
 import { ComparisonsListPage } from "./pages/ComparisonsListPage";
 import { ComparisonDetailPage } from "./pages/ComparisonDetailPage";
-import { FilesPage } from "./pages/FilesPage";
 import { SettingsPage } from "./pages/SettingsPage";
 import { AiModelsPage } from "./pages/AiModelsPage";
 import { CandidateApplyPage } from "./pages/CandidateApplyPage";
@@ -45,6 +45,18 @@ export default function App() {
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // The Question Bank is needed app-wide too (question detail page, the plan drawer's preset picker),
+  // not just on the bank page -- loaded once here, re-fetched by the bank page itself on every visit.
+  useEffect(() => {
+    let cancelled = false;
+    loadBankQuestionsIntoFixtures()
+      .then(() => { if (!cancelled) set({ bankQuestionsVersion: Date.now() }); })
+      .catch((error) => console.warn("Failed to load the question bank from the backend:", error));
+    return () => {
+      cancelled = true;
+    };
+  }, [set]);
 
   return (
     <Routes>
@@ -76,7 +88,6 @@ function ShellRoutes({ openTaskCount }: { openTaskCount: number }) {
         <Route path="/deliveries/:id" element={<DeliveryPage />} />
         <Route path="/comparisons" element={<ComparisonsListPage />} />
         <Route path="/comparisons/:id" element={<ComparisonDetailPage />} />
-        <Route path="/files" element={<FilesPage />} />
         <Route path="/settings" element={<SettingsPage />} />
         <Route path="/ai-models" element={<AiModelsPage />} />
         <Route path="*" element={<Navigate to="/tasks" replace />} />

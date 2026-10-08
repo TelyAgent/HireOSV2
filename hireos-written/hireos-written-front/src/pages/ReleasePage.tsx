@@ -5,10 +5,11 @@ import { useStore } from "../store/StoreContext";
 import { PageHeader, Button, EmptyState } from "../components/ui/Primitives";
 import { getUser } from "../data/users";
 import {
-  CASES, CORE_CANDIDATES, EVALUATIONS, INVITATIONS, RESULTS, RELEASES,
+  ATTEMPTS, CASES, CORE_CANDIDATES, EVALUATIONS, INVITATIONS, RESULTS, RELEASES,
   fmtDate, type Release,
 } from "../data/fixtures";
 import type { UserId } from "../store/types";
+import { releaseCaseResult } from "../data/writtenApi";
 
 /**
  * Ported from the prototype's pageRelease(caseId, opts). `inline` drops the breadcrumb/title (used
@@ -21,7 +22,7 @@ import type { UserId } from "../store/types";
  * those same module objects) this one picks the change up on its next render without a page reload.
  * `forceTick` re-renders this component after a mutation *it* makes itself (publish, request revision).
  */
-export function ReleaseContent({ caseId, inline = false, onGoToPlan }: { caseId: string; inline?: boolean; onGoToPlan?: () => void }) {
+export function ReleaseContent({ caseId, inline = false, onGoToPlan, onPublished }: { caseId: string; inline?: boolean; onGoToPlan?: () => void; onPublished?: () => void }) {
   const { t, say } = useStore();
   const navigate = useNavigate();
   const [, forceTick] = useReducer((n: number) => n + 1, 0);
@@ -58,7 +59,15 @@ export function ReleaseContent({ caseId, inline = false, onGoToPlan }: { caseId:
     result!.status = "published";
     result!.releaseId = relId;
     c.status = "released";
+    // Real cases persist the published result -- that is what moves the task list to "Written
+    // completed" and keeps it after a reload. Fixture-only demo cases stay in-memory only.
+    if (ATTEMPTS[`att_real_${caseId}`]) {
+      const { overall, showScore, outcomeText, feedbackText, nextStepText } = rel;
+      releaseCaseResult(caseId, { overall, showScore, outcomeText, feedbackText, nextStepText })
+        .catch(() => say(t("Could not save to the server. Please refresh and try again."), { type: "danger" }));
+    }
     forceTick();
+    onPublished?.();
     say("Result finalized and published. Candidate portal and notification queued.", { type: "success" });
   }
 

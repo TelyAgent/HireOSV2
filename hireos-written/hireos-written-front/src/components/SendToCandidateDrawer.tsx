@@ -104,7 +104,9 @@ export function SendToCandidateDrawer({
       deadline: deadlineIso,
       status: "sent", acceptedAt: null, startedAt: null, disclosurePolicy: disclosure, token,
     };
-    c.status = "awaiting_acceptance";
+    // "invited" is the case-status vocabulary writtenTaskStatus() maps to "Test sent" -- the same
+    // value hireos-written-backend derives for a case whose latest invitation is still "sent".
+    c.status = "invited";
     round.status = "invited";
     setSending(false);
 

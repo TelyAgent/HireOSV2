@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { Modal } from "antd";
 import { useStore } from "../store/StoreContext";
@@ -6,6 +6,7 @@ import { StatusBadge, taskTypeSource } from "../utils/status";
 import { Button, Card, EmptyState } from "../components/ui/Primitives";
 import { Icon } from "../components/ui/Icon";
 import { roundsForCase } from "../utils/cases";
+import { loadRealWrittenTasksIntoFixtures } from "../data/realTasksMerge";
 import { isWrittenTestTask, taskCountsFor, writtenTaskJob, writtenTaskStatus, writtenTestTasks, type WrittenTaskStatus } from "../utils/writtenTasks";
 import {
   PROJECT, INVITATIONS, MAIL, RESULTS, EVALUATIONS, TASKS, CASES, CORE_CANDIDATES, CORE_JOBS, COMPARISONS,
@@ -40,6 +41,7 @@ const FILTER_DEFS: { key: FilterKey; label: string }[] = [
   { key: "all", label: "All tasks" },
   { key: "written_completed", label: "Written completed" },
   { key: "pending_test", label: "Pending test" },
+  { key: "test_sent", label: "Test sent" },
   { key: "pending_submission", label: "Pending submission" },
   { key: "pending_result_review", label: "Pending result review" },
 ];
@@ -55,11 +57,23 @@ export function TasksPage() {
   const [resumeFor, setResumeFor] = useState<{ candidate: CoreCandidate; job: CoreJob } | null>(null);
   const [collapsedOverride, setCollapsedOverride] = useState<Record<string, boolean>>({});
 
-  // Depends on realTasksVersion so this recomputes once App's real-task load merges new
+  // App loads real tasks only once per session, so a status change made since then (an invitation
+  // sent from the case page, a candidate submitting) would otherwise stay stale here until a hard
+  // reload -- re-fetch every time My Tasks mounts.
+  const [refreshVersion, setRefreshVersion] = useState(0);
+  useEffect(() => {
+    let cancelled = false;
+    loadRealWrittenTasksIntoFixtures()
+      .then(() => { if (!cancelled) setRefreshVersion((v) => v + 1); })
+      .catch((error) => console.warn("Failed to refresh real written tasks from the backend:", error));
+    return () => { cancelled = true; };
+  }, []);
+
+  // Depends on realTasksVersion/refreshVersion so this recomputes once a real-task load merges new
   // entries into the TASKS/CASES fixture dicts after mount (see data/realTasksMerge.ts) --
   // eslint can't see that writtenTestTasks() reads those mutable module dicts.
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  const allWritten = useMemo(() => writtenTestTasks(), [state.realTasksVersion]);
+  const allWritten = useMemo(() => writtenTestTasks(), [state.realTasksVersion, refreshVersion]);
   const counts = taskCountsFor(uid);
 
   const primaryMetrics = [
@@ -74,7 +88,6 @@ export function TasksPage() {
     { label: "Awaiting submission", value: scoped ? 0 : Object.values(INVITATIONS).filter((i) => ["accepted", "started"].includes(i.status)).length, link: "/assessments" },
     { label: "Submission issues", value: scoped ? 0 : new Set(Object.values(MAIL).filter((m) => ["incomplete", "needs_confirmation", "quarantined"].includes(m.classification)).map((m) => m.caseId || m.id)).size, link: "/submissions" },
     { label: "Results to release", value: scoped ? 0 : Object.values(RESULTS).filter((r) => r.status === "final_not_released").length, link: "/assessments" },
-    { label: "Delivery issues", value: scoped ? t("Unavailable") : 0, link: "/files" },
   ];
   const [expanded, setExpanded] = useState(false);
 

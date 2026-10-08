@@ -5,8 +5,11 @@
  * send-to-candidate preview, ...) keeps working unchanged whether the item is fixture demo data or
  * a real, backend-persisted one.
  */
-import { ATTEMPTS, EVALUATIONS, PLANS, QUESTIONS, type Attempt, type Criterion, type Evaluation, type PlanItem, type Question } from "./fixtures";
-import type { QuestionSnapshot, RealEvaluation, RealInvitation, RealPlanItem } from "./writtenApi";
+import {
+  ATTEMPTS, CASES, EVALUATIONS, PLANS, QUESTIONS, RELEASES, RESULTS,
+  type Attempt, type Criterion, type Evaluation, type PlanItem, type Question,
+} from "./fixtures";
+import type { QuestionSnapshot, RealEvaluation, RealFinalCriterion, RealInvitation, RealPlanItem, RealSubmission } from "./writtenApi";
 
 function toQuestion(item: RealPlanItem): Question {
   return {
@@ -28,6 +31,7 @@ function toQuestion(item: RealPlanItem): Question {
     deliverables: item.deliverables ?? [],
     usageCount: 0,
     seenByCount: 0,
+    caseScoped: true,
   };
 }
 
@@ -79,6 +83,7 @@ function toOrphanedQuestion(snapshot: QuestionSnapshot): Question {
     deliverables: [],
     usageCount: 0,
     seenByCount: 0,
+    caseScoped: true,
   };
 }
 
@@ -109,21 +114,26 @@ function toCriterion(c: RealEvaluation["criteria"][number]): Criterion {
   return { name: c.name, max: c.max, ai: c.score, human: null, confidence: "Medium", coverage: "Full", evidence: c.evidence, source: "AI evaluation" };
 }
 
+function toFinalCriterion(c: RealFinalCriterion): Criterion {
+  return {
+    name: c.name, max: c.max, ai: c.ai, human: c.human, confidence: "Medium", coverage: "Full",
+    overridden: c.overridden, overrideReason: c.overrideReason, evidence: "", source: "AI evaluation",
+  };
+}
+
 /**
- * Writes a real, AI-auto-generated evaluation (see AiEvaluatorService, run right after the
- * candidate submits) into the ATTEMPTS/EVALUATIONS fixture dicts in exactly the shape
- * EvaluationReviewContent already expects (Criterion.ai/human/confidence/...) -- reviewers get the
- * existing accept/override/finalize workflow for free, same component, unchanged, whether the
- * criteria came from fixture demo data or a real AI pass over a real candidate's real answer.
- * Returns the synthetic attemptId to pass into <EvaluationReviewContent attemptId=... />, or null if
- * this submission has no evaluation yet (AI wasn't configured, or the auto-eval attempt failed --
- * left for a human to score from the raw answers shown on the Submission tab).
+ * Writes a real submission into the ATTEMPTS/EVALUATIONS/RESULTS/RELEASES fixture dicts in exactly
+ * the shape EvaluationReviewContent / ReleaseContent already expect, so reviewers get the existing
+ * accept/override/finalize/publish workflow unchanged.
+ *
+ * - A persisted finalized scoring / published result (hireos-written-backend) always wins -- that is
+ *   what makes them survive a page reload.
+ * - Otherwise the AI draft is seeded only once: this runs on every PlanPage render, and re-seeding
+ *   would wipe the reviewer's in-progress human scores.
+ *
+ * Returns the synthetic attemptId to pass into <EvaluationReviewContent attemptId=... />.
  */
-export function applyRealEvaluation(
-  caseId: string,
-  questionId: string,
-  submission: { submittedAt: string; evaluation: RealEvaluation | null },
-): string | null {
+export function applyRealEvaluation(caseId: string, questionId: string, submission: RealSubmission): string {
   const attemptId = `att_real_${caseId}`;
   const attempt: Attempt = {
     id: attemptId, caseId, questionId, round: 1, status: "submitted",
@@ -131,9 +141,29 @@ export function applyRealEvaluation(
   };
   ATTEMPTS[attemptId] = attempt;
 
-  if (!submission.evaluation) return attemptId;
+  const evaluationId = `eval_${caseId}`;
+  const final = submission.finalEvaluation;
+  if (final && submission.finalizedAt) {
+    if (EVALUATIONS[evaluationId]?.status !== "final") {
+      EVALUATIONS[evaluationId] = {
+        id: evaluationId, attemptId, status: "final", finalizedBy: submission.finalizedBy ?? null, finalizedAt: submission.finalizedAt,
+        criteria: final.criteria.map(toFinalCriterion),
+      };
+    }
+    const resultId = `result_${caseId}`;
+    const relId = `rel_${caseId}`;
+    const released = !!(submission.release && submission.releasedAt);
+    RESULTS[resultId] = { id: resultId, caseId, evaluationId, overall: final.overall, status: released ? "published" : "final_not_released", releaseId: released ? relId : null };
+    if (released) {
+      RELEASES[relId] = { ...RELEASES[relId], id: relId, caseId, ...submission.release!, publishedAt: submission.releasedAt! };
+      if (CASES[caseId]) CASES[caseId].status = "released";
+    }
+    return attemptId;
+  }
+
+  if (!submission.evaluation || EVALUATIONS[evaluationId]) return attemptId;
   const evaluation: Evaluation = {
-    id: `eval_${caseId}`, attemptId, status: "ai_draft", finalizedBy: null, finalizedAt: null,
+    id: evaluationId, attemptId, status: "ai_draft", finalizedBy: null, finalizedAt: null,
     criteria: submission.evaluation.criteria.map(toCriterion),
   };
   EVALUATIONS[evaluation.id] = evaluation;

@@ -1,20 +1,70 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Modal } from "antd";
 import { useStore } from "../store/StoreContext";
 import { StatusBadge } from "../utils/status";
 import { Button, Chip } from "../components/ui/Primitives";
-import { QUESTIONS } from "../data/fixtures";
+import { QuestionCreateDrawer } from "../components/QuestionCreateDrawer";
+import { QUESTIONS, bankQuestions, type Question } from "../data/fixtures";
+import { deleteBankQuestion, updateBankQuestion } from "../data/writtenApi";
+import { loadBankQuestionsIntoFixtures } from "../data/realQuestionsMerge";
 
 export function QuestionBankPage() {
-  const { t, say } = useStore();
+  const { t, say, state, set } = useStore();
   const navigate = useNavigate();
   const [q, setQ] = useState("");
   const [role, setRole] = useState("all");
   const [competency, setCompetency] = useState("all");
   const [importOpen, setImportOpen] = useState(false);
+  const [createOpen, setCreateOpen] = useState(false);
+  const [loading, setLoading] = useState(true);
 
-  const questions = Object.values(QUESTIONS);
+  // Re-fetch the bank from the backend on every visit; QUESTIONS is a mutable module dict, so the
+  // store's bankQuestionsVersion bump is what re-renders this page (and the memos below) afterwards.
+  useEffect(() => {
+    let cancelled = false;
+    loadBankQuestionsIntoFixtures()
+      .then(() => { if (!cancelled) set({ bankQuestionsVersion: Date.now() }); })
+      .catch(() => { if (!cancelled) say(t("Could not load the question bank."), { type: "danger" }); })
+      .finally(() => { if (!cancelled) setLoading(false); });
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const questions = useMemo(() => bankQuestions(), [state.bankQuestionsVersion]);
+
+  async function toggleFavorite(qu: Question) {
+    try {
+      const saved = await updateBankQuestion(qu.id, { favorite: !qu.favorite });
+      QUESTIONS[qu.id] = { ...qu, favorite: saved.favorite };
+      set({ bankQuestionsVersion: Date.now() });
+    } catch {
+      say(t("Could not save this question. Please try again."), { type: "danger" });
+    }
+  }
+
+  function confirmDelete(qu: Question) {
+    Modal.confirm({
+      title: t("Delete question"),
+      content: `${qu.code} · ${qu.title} — ${t("Candidates who were already given this question keep their copy.")}`,
+      okText: t("Delete question"),
+      okButtonProps: { danger: true },
+      cancelText: t("Cancel"),
+      onOk: async () => {
+        try {
+          await deleteBankQuestion(qu.id);
+          delete QUESTIONS[qu.id];
+          set({ bankQuestionsVersion: Date.now() });
+          say(t("Question deleted."), { type: "success" });
+        } catch {
+          say(t("Could not delete this question. Please try again."), { type: "danger" });
+        }
+      },
+    });
+  }
   const roles = useMemo(() => ["all", ...Array.from(new Set(questions.flatMap((qu) => qu.roles))).sort()], [questions]);
   const competencies = useMemo(() => ["all", ...Array.from(new Set(questions.flatMap((qu) => qu.competencies.map((c) => c.name)))).sort()], [questions]);
 
@@ -48,7 +98,7 @@ export function QuestionBankPage() {
         </div>
         <div style={{ display: "flex", gap: 8 }}>
           <Button size="sm" onClick={() => setImportOpen(true)}>{t("Import ZIP")}</Button>
-          <Button size="sm" variant="primary" onClick={() => say(t("Demo: opens blank question editor (not wired in this prototype pass)."))}>{t("Create question")}</Button>
+          <Button size="sm" variant="primary" onClick={() => setCreateOpen(true)}>{t("Create question")}</Button>
         </div>
       </div>
 
@@ -65,16 +115,17 @@ export function QuestionBankPage() {
               <th>{t("Difficulty")}</th>
               <th>{t("Version")}</th>
               <th>{t("Status")}</th>
+              <th></th>
             </tr>
           </thead>
           <tbody>
             {list.length === 0 ? (
-              <tr><td colSpan={9}><div className="empty">{t(questions.length === 0 ? "No questions yet." : "No questions match these filters.")}</div></td></tr>
+              <tr><td colSpan={10}><div className="empty">{t(loading && questions.length === 0 ? "Loading…" : questions.length === 0 ? "No questions yet." : "No questions match these filters.")}</div></td></tr>
             ) : (
               list.map((qu) => (
                 <tr key={qu.id} className="clickable" onClick={() => navigate(`/questions/${qu.id}`)}>
-                  <td>
-                    <span className="material-icons-o" style={{ fontSize: 17, color: qu.favorite ? "#F2B400" : "var(--text-secondary)" }}>
+                  <td onClick={(e) => { e.stopPropagation(); void toggleFavorite(qu); }} title={t(qu.favorite ? "Remove from favorites" : "Add to favorites")}>
+                    <span className="material-icons-o" style={{ fontSize: 17, cursor: "pointer", color: qu.favorite ? "#F2B400" : "var(--text-secondary)" }}>
                       {qu.favorite ? "star" : "star_outline"}
                     </span>
                   </td>
@@ -82,16 +133,21 @@ export function QuestionBankPage() {
                   <td>{qu.title}</td>
                   <td>{qu.roles.map((r) => <Chip key={r}>{r.replace(" Analyst", "").replace(" Associate", "")}</Chip>)}</td>
                   <td>{qu.competencies.length ? qu.competencies.map((c) => <Chip key={c.name}>{c.name} {Math.round(c.fraction * 100)}%</Chip>) : "—"}</td>
-                  <td>{qu.type}</td>
-                  <td>{qu.difficulty}</td>
+                  <td>{t(qu.type)}</td>
+                  <td>{t(qu.difficulty)}</td>
                   <td>v{qu.version}</td>
                   <td><StatusBadge status={qu.status} /></td>
+                  <td onClick={(e) => e.stopPropagation()}>
+                    <Button size="sm" variant="ghost" onClick={() => confirmDelete(qu)}>{t("Delete")}</Button>
+                  </td>
                 </tr>
               ))
             )}
           </tbody>
         </table>
       </div>
+
+      <QuestionCreateDrawer open={createOpen} onClose={() => setCreateOpen(false)} onCreated={() => set({ bankQuestionsVersion: Date.now() })} />
 
       <Modal
         open={importOpen}

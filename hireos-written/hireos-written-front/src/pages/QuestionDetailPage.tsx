@@ -1,22 +1,50 @@
 import { useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { Drawer } from "antd";
+import { Drawer, Modal } from "antd";
 import { useStore } from "../store/StoreContext";
 import { StatusBadge } from "../utils/status";
 import { Breadcrumbs, Button, Chip, Tabs } from "../components/ui/Primitives";
 import { QUESTIONS } from "../data/fixtures";
+import { QuestionCreateDrawer } from "../components/QuestionCreateDrawer";
+import { deleteBankQuestion } from "../data/writtenApi";
 
 type TabKey = "prompt" | "rubric" | "usage";
 
 export function QuestionDetailPage() {
   const { id = "" } = useParams();
-  const { t, state } = useStore();
+  const { t, state, set, say } = useStore();
   const navigate = useNavigate();
   const [tab, setTab] = useState<TabKey>("prompt");
   const [previewOpen, setPreviewOpen] = useState(false);
+  const [editOpen, setEditOpen] = useState(false);
 
   const q = QUESTIONS[id];
-  if (!q) return <div className="banner danger">{t("Question not found.")}</div>;
+  // bankQuestionsVersion stays 0 until App's first bank load lands -- on a hard reload of this URL,
+  // "not found" before then would just be "not loaded yet".
+  if (!q) return state.bankQuestionsVersion === 0
+    ? <div className="muted">{t("Loading…")}</div>
+    : <div className="banner danger">{t("Question not found.")}</div>;
+
+  function confirmDelete() {
+    Modal.confirm({
+      title: t("Delete question"),
+      content: `${q.code} · ${q.title} — ${t("Candidates who were already given this question keep their copy.")}`,
+      okText: t("Delete question"),
+      okButtonProps: { danger: true },
+      cancelText: t("Cancel"),
+      onOk: async () => {
+        try {
+          await deleteBankQuestion(q.id);
+          delete QUESTIONS[q.id];
+          set({ bankQuestionsVersion: Date.now() });
+          say(t("Question deleted."), { type: "success" });
+          navigate("/question-bank");
+        } catch {
+          say(t("Could not delete this question. Please try again."), { type: "danger" });
+        }
+      },
+    });
+  }
 
   const zh = state.lang === "zh";
   const sum = q.competencies.reduce((a, c) => a + c.fraction, 0);
@@ -29,7 +57,8 @@ export function QuestionDetailPage() {
         <h1>{q.title}</h1>
         <div style={{ display: "flex", gap: 8 }}>
           <Button size="sm" onClick={() => setPreviewOpen(true)}>{t("Preview candidate view")}</Button>
-          <Button size="sm" variant="primary" onClick={() => navigate(`/questions/${q.id}/builder`)}>{t("Edit / Builder")}</Button>
+          <Button size="sm" variant="danger" onClick={confirmDelete}>{t("Delete question")}</Button>
+          <Button size="sm" variant="primary" onClick={() => setEditOpen(true)}>{t("Edit question")}</Button>
         </div>
       </div>
       <div style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 16 }}>
@@ -95,6 +124,8 @@ export function QuestionDetailPage() {
           <div className="tiny" style={{ marginTop: 12 }}>{t("Mapped roles:")} {q.roles.map((r) => <Chip key={r}>{r}</Chip>)}</div>
         </div>
       )}
+
+      <QuestionCreateDrawer open={editOpen} onClose={() => setEditOpen(false)} editing={q} onCreated={() => set({ bankQuestionsVersion: Date.now() })} />
 
       <Drawer open={previewOpen} onClose={() => setPreviewOpen(false)} title={`${t("Candidate preview —")} ${q.code}`} width={520}>
         <div className="banner info" style={{ marginBottom: 12 }}>{t("This is exactly what the candidate will see — no rubric, internal notes, or answer key.")}</div>

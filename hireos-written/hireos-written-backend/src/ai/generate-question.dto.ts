@@ -21,3 +21,23 @@ export class GenerateQuestionDto {
   @IsIn(['zh', 'en'])
   lang?: 'zh' | 'en';
 }
+
+export class ExtractCompetenciesDto {
+  @IsString()
+  @MinLength(1)
+  @MaxLength(200)
+  title!: string;
+
+  @IsString()
+  @MinLength(1)
+  @MaxLength(8000)
+  prompt!: string;
+
+  @IsOptional()
+  @IsString({ each: true })
+  roles?: string[];
+
+  @IsOptional()
+  @IsIn(['zh', 'en'])
+  lang?: 'zh' | 'en';
+}

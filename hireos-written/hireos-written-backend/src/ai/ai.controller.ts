@@ -3,7 +3,7 @@ import { WorkspaceGuard, type Identity } from '../auth/workspace.guard';
 import { PrismaService } from '../persistence/prisma.service';
 import { AiCallError } from './ai-json-client';
 import { AiQuestionGeneratorService } from './ai-question-generator.service';
-import { GenerateQuestionDto } from './generate-question.dto';
+import { ExtractCompetenciesDto, GenerateQuestionDto } from './generate-question.dto';
 
 @Controller()
 @UseGuards(WorkspaceGuard)
@@ -33,8 +33,17 @@ export class AiController {
 
   @Post('ai/generate-question')
   async generateQuestion(@Body() dto: GenerateQuestionDto) {
+    return this.callAi(() => this.generator.generate(dto));
+  }
+
+  @Post('ai/extract-competencies')
+  async extractCompetencies(@Body() dto: ExtractCompetenciesDto) {
+    return this.callAi(() => this.generator.extractCompetencies(dto));
+  }
+
+  private async callAi<T>(fn: () => Promise<T>): Promise<T> {
     try {
-      return await this.generator.generate(dto);
+      return await fn();
     } catch (error) {
       if (error instanceof AiCallError && error.message === 'AI_NOT_CONFIGURED') {
         throw new ServiceUnavailableException({ code: 'AI_NOT_CONFIGURED' });
