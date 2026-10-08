@@ -185,6 +185,7 @@ export const ZH: Record<string, string> = {
   "Uploading and extracting…": "正在上传并抽取信息…",
   "Uploaded file": "已上传文件",
   "Couldn't process this file. Please try again.": "无法处理该文件，请重试。",
+  "Only PDF, DOCX or TXT files are supported.": "仅支持 PDF、DOCX 或 TXT 文件。",
   "Source job": "源职位",
   "Will copy": "会被复制",
   "Skills / requirements wording": "技能 / 要求措辞",
@@ -260,8 +261,6 @@ export const ZH: Record<string, string> = {
   Changes: "变更",
   "I can help define and manage this job — its responsibilities, requirements and compensation. Select any text in the document to ask me to rewrite, shorten, clarify it, or ask me anything below.":
     "我可以帮你定义和管理这个职位 — 包括职责、要求与薪酬。在文档中选中任意文本，让我改写、精简或澄清它，也可以在下方直接提问。",
-  "No text selected — Copilot will ask before acting on the whole document.":
-    "尚未选中文本 — 在对整篇文档操作前，Copilot 会先向你确认。",
   "This looks like internal compensation. It can’t be used in the External JD conversation.":
     "这看起来是内部薪酬信息，不能用于对外 JD 的对话中。",
   "Ask Copilot to rewrite, explain, or draft something…": "让 Copilot 改写、解释或起草内容…",
@@ -270,8 +269,25 @@ export const ZH: Record<string, string> = {
   Accept: "采纳",
   Reject: "拒绝",
   Refine: "细化",
-  'I don’t have a selection to work from yet — select a sentence, list item or paragraph in the document first, or tell me "whole document" to widen the scope.':
-    "我还没有可处理的选中内容 — 请先在文档中选中一句话、一个列表项或一个段落，或者告诉我“整篇文档”以扩大范围。",
+  "Thinking…": "思考中…",
+  "Copilot couldn’t generate a suggestion. Please try again.": "Copilot 暂时无法生成建议，请重试。",
+  "The text changed since this suggestion was generated — select it again and ask Copilot.":
+    "生成建议后原文已被修改 — 请重新选中后再询问 Copilot。",
+  "The selected text changed after this suggestion was generated.": "生成该建议后，选中的原文已被修改。",
+  "Previous proposal": "上一版建议",
+  "Couldn't update this suggestion. Please try again.": "无法更新该建议，请重试。",
+  "Couldn't save your suggestion. Please try again.": "无法保存你的建议，请重试。",
+  "Review in Changes": "在“变更”中审阅",
+  Suggestion: "建议",
+  "Suggesting: click a paragraph or list to edit it. Your edits are saved as suggestions and only change the document once accepted.":
+    "建议模式：点击段落或列表即可修改。你的修改会保存为建议，被采纳后才会写入文档。",
+  "Adjust it as follows": "请按以下要求调整",
+  "Improve the previous proposal.": "请改进上一版建议。",
+  "I don’t have anything to work on yet — select some text, or click into the paragraph or list you want changed, then ask again.":
+    "还没有可处理的内容 — 请先在文档中选中文字，或点击要修改的段落/列表，然后再询问。",
+  "Current block": "当前段落",
+  "No text selected — Copilot will work on the paragraph or list your cursor is in.":
+    "未选中文本 — Copilot 会处理光标所在的段落或列表。",
   "No comments yet": "暂无评论",
   "Select text in the document and choose Add comment.": "在文档中选中文本，然后选择“添加评论”。",
   Resolved: "已解决",

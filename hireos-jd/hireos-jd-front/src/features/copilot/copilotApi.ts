@@ -1,8 +1,7 @@
 /**
  * Thin client for the real `hireos-jd-backend` Copilot endpoints
  * (`/api/copilot/conversations/...`). Used by GeminiPanel's "create a job"
- * flow in place of the offline `geminiLogic.ts` mock. The in-document "edit"
- * flow is untouched and keeps using the mock for now.
+ * flow.
  */
 
 import { API_BASE_URL } from "../../lib/apiBase";

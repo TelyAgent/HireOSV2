@@ -95,10 +95,13 @@ export class DecisionsService {
           payload: json({ applicationId, evaluationId: currentEvaluation?.id || null, outcome: raw.outcome, nextStepTarget: raw.nextStepTarget }),
         },
       });
-      // Recording a decision *is* what "screening_review" was waiting on -- close
-      // the loop here so the task never has to be marked done by hand.
+      // Recording a decision *is* what "screening_review" was waiting on -- close the loop
+      // here so the task never has to be marked done by hand. A still-open
+      // "screening_evaluation_issue" task is closed the same way: recording a decision
+      // despite an AI hiccup is still a human resolving the situation, not a system
+      // superseding it, so it counts as completed too.
       await tx.humanTask.updateMany({
-        where: { workspaceId: identity.workspaceId, applicationId, taskType: 'screening_review', status: { notIn: ['completed', 'cancelled'] } },
+        where: { workspaceId: identity.workspaceId, applicationId, taskType: { in: ['screening_review', 'screening_evaluation_issue'] }, status: { notIn: ['completed', 'cancelled'] } },
         data: { status: 'completed', completedAt: new Date(), completionRef: created.id },
       });
       // "Move to interview" is a fact Interview needs to know about. Written in this
@@ -269,7 +272,7 @@ export class DecisionsService {
 
   private async completeScreeningTask(identity: Identity, applicationId: string, decisionId: string) {
     await this.db.humanTask.updateMany({
-      where: { workspaceId: identity.workspaceId, applicationId, taskType: 'screening_review', status: { notIn: ['completed', 'cancelled'] } },
+      where: { workspaceId: identity.workspaceId, applicationId, taskType: { in: ['screening_review', 'screening_evaluation_issue'] }, status: { notIn: ['completed', 'cancelled'] } },
       data: { status: 'completed', completedAt: new Date(), completionRef: decisionId },
     });
   }

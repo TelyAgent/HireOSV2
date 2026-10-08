@@ -64,7 +64,7 @@ export interface ConversationActionOption {
 export type GeminiMsg =
   | { role: "user"; text: string }
   | { role: "thinking" }
-  | { role: "ai"; text: string; canReplace?: boolean; options?: ConversationActionOption[]; draft?: undefined }
+  | { role: "ai"; text: string; options?: ConversationActionOption[]; draft?: undefined }
   | { role: "ai"; draft: GeminiDraft; text?: undefined; options?: undefined };
 
 export interface AppState {
@@ -101,6 +101,12 @@ export interface AppState {
   wsAudience: Audience;
   wsCurrentJob: string | null;
   wsCopilotThread: CopilotMsg[];
+  /** A Copilot document rewrite request is in flight. */
+  wsCopilotBusy: boolean;
+  /** Block the cursor is in; Copilot falls back to it when no text is selected. */
+  wsFocusBlockId: string | null;
+  /** Bumped to ask the open document to save itself (e.g. after accepting a suggestion). */
+  wsSaveRequest: number;
 
   // Ask Copilot (Gemini-style) panel
   geminiChats: Record<string, GeminiMsg[]>;

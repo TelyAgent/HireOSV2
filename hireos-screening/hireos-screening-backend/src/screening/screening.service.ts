@@ -218,9 +218,21 @@ export class ScreeningService {
     const hardRequirements = requirements.filter((requirement) => requirement.hard);
     const resumeText = input.material?.text || '';
 
-    const { dimensionResults, eligibilityResults, overall, coverage, evaluatorVersion } = this.aiEvaluator.isConfigured() && resumeText
-      ? await this.evaluateWithAi(input.job?.title || '', dimensions, hardRequirements, resumeText)
-      : this.evaluateLocally(dimensions, hardRequirements, input.profile, buildCorpus(input.profile, resumeText));
+    let evaluationResult: Awaited<ReturnType<ScreeningService['evaluateWithAi']>> | ReturnType<ScreeningService['evaluateLocally']>;
+    if (this.aiEvaluator.isConfigured() && resumeText) {
+      try {
+        evaluationResult = await this.evaluateWithAi(input.job?.title || '', dimensions, hardRequirements, resumeText);
+      } catch (error) {
+        // The AI call failing happens before any ScreeningEvaluation row exists for this
+        // attempt, so there's nothing to anchor a task to inside a transaction -- flag it
+        // standalone, then rethrow so the caller still sees the original 503 unchanged.
+        await this.flagEvaluationIssue(identity, application, input, 'AI evaluation call failed.');
+        throw error;
+      }
+    } else {
+      evaluationResult = this.evaluateLocally(dimensions, hardRequirements, input.profile, buildCorpus(input.profile, resumeText));
+    }
+    const { dimensionResults, eligibilityResults, overall, coverage, evaluatorVersion } = evaluationResult;
 
     const eligibilityStatus = aggregateEligibility(eligibilityResults);
     const missingInformation = dimensionResults.filter((dimension) => dimension.status !== 'evaluated').map((dimension) => dimension.name);
@@ -274,6 +286,31 @@ export class ScreeningService {
           completedAt: new Date(),
         },
       });
+      // Any earlier "AI evaluation issue" task for this application is superseded by this
+      // run actually completing (confident or not) -- nobody acted on it, it was just
+      // overtaken by a newer attempt, so it's cancelled rather than completed.
+      await tx.humanTask.updateMany({
+        where: { workspaceId: identity.workspaceId, applicationId: application.id, taskType: 'screening_evaluation_issue', status: { notIn: ['completed', 'cancelled'] } },
+        data: { status: 'cancelled' },
+      });
+      if (overall == null) {
+        await tx.humanTask.create({
+          data: {
+            workspaceId: identity.workspaceId,
+            sourceModule: 'Resume Library',
+            taskType: 'screening_evaluation_issue',
+            title: `AI evaluation incomplete: ${input.candidate.displayName} — ${input.job.title}`,
+            subjectLabel: 'AI screening could not produce a confident score (insufficient evidence).',
+            requiredAction: 'Review the résumé manually, or re-run screening once more information is available.',
+            completionRule: { requiredResultType: 'screening_evaluation_issue_resolved' },
+            candidateId: application.candidateId,
+            jobId: application.jobId,
+            applicationId: application.id,
+            priority: 'normal',
+            linkRoute: `/applications/${application.id}`,
+          },
+        });
+      }
       // Real evidenceQuotes (from the AI evaluator) get their own EvidenceItem each, so a
       // reviewer opening one dimension's evidence sees the exact quote that justified it,
       // not one generic sentence shared across every dimension. The local fallback
@@ -448,6 +485,35 @@ export class ScreeningService {
   // dimension off corpus length and name-substring matches (e.g. a longer resume scores
   // higher regardless of content), which is not a real judgment. A genuine AI failure
   // must surface as an error the caller can retry, not silently degrade to that.
+  // Best-effort signal only -- a failure in here must never mask the real screening error
+  // that triggered it, so every path through this method swallows its own errors.
+  private async flagEvaluationIssue(identity: Identity, application: ApplicationInput, input: EvaluationInputs, subjectLabel: string) {
+    try {
+      const existing = await this.db.humanTask.findFirst({
+        where: { workspaceId: identity.workspaceId, applicationId: application.id, taskType: 'screening_evaluation_issue', status: { notIn: ['completed', 'cancelled'] } },
+      });
+      if (existing) return;
+      await this.db.humanTask.create({
+        data: {
+          workspaceId: identity.workspaceId,
+          sourceModule: 'Resume Library',
+          taskType: 'screening_evaluation_issue',
+          title: `AI evaluation incomplete: ${input.candidate.displayName} — ${input.job.title}`,
+          subjectLabel,
+          requiredAction: 'Review the résumé manually, or re-run screening once the issue is resolved.',
+          completionRule: { requiredResultType: 'screening_evaluation_issue_resolved' },
+          candidateId: application.candidateId,
+          jobId: application.jobId,
+          applicationId: application.id,
+          priority: 'normal',
+          linkRoute: `/applications/${application.id}`,
+        },
+      });
+    } catch {
+      // swallow -- see method comment
+    }
+  }
+
   private async evaluateWithAi(
     jobTitle: string,
     dimensions: DimensionInput[],

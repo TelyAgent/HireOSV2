@@ -48,6 +48,9 @@ export const initialState: AppState = {
   wsAudience: "internal",
   wsCurrentJob: null,
   wsCopilotThread: [],
+  wsCopilotBusy: false,
+  wsFocusBlockId: null,
+  wsSaveRequest: 0,
 
   geminiChats: {},
   geminiConversationIds: {},

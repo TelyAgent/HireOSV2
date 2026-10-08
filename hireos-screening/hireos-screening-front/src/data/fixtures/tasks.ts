@@ -4,6 +4,7 @@ export type TaskType =
   | "duplicate_review"
   | "link_confirmation"
   | "screening_review"
+  | "screening_evaluation_issue"
   | "next_step"
   | "comparison_review"
   | "delivery_exception"

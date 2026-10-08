@@ -420,6 +420,11 @@ a:focus-visible, button:focus-visible, [tabindex]:focus-visible, input:focus-vis
 .mark-badge{ font-size:9px; font-weight:700; text-transform:uppercase; letter-spacing:.04em; vertical-align:super; padding:0 4px; border-radius:4px; margin-left:2px; }
 .mark-badge.ai{ background:var(--ai-bg); color:var(--ai-text); }
 .mark-badge.human{ background:var(--info-bg); color:var(--info-text); }
+.mark-badge{ cursor:pointer; }
+/* Suggesting mode: blocks open for editing on click; edits become proposals instead of changing the text. */
+.jw-doc .doc-block.suggestable{ cursor:text; border-radius:6px; }
+.jw-doc .doc-block.suggestable:hover{ background:var(--surface-alt); }
+.rich-block-editor.is-suggesting{ box-shadow:0 0 0 2px var(--info-border); }
 .comment-anchor{ display:inline-flex; align-items:center; justify-content:center; width:16px; height:16px; border-radius:50%; background:var(--warning-bg); color:var(--warning-text); font-size:10px; cursor:pointer; margin-left:3px; border:1px solid var(--warning-border); vertical-align:middle; }
 .stale-flag{ display:inline-flex; align-items:center; gap:3px; font-size:var(--fs-xs); background:var(--neutral-bg); color:var(--neutral-text); border:1px dashed var(--border-strong); padding:1px 8px; border-radius:10px; margin-left:6px; }
 
@@ -434,6 +439,11 @@ a:focus-visible, button:focus-visible, [tabindex]:focus-visible, input:focus-vis
 .jw-side-tab{ flex:1; text-align:center; padding:12px 6px; font-size:var(--fs-sm); font-weight:500; color:var(--text-secondary); cursor:pointer; border-bottom:3px solid transparent; }
 .jw-side-tab.active{ color:var(--accent-600); border-color:var(--accent-600); }
 .jw-side-body{ flex:1; overflow-y:auto; padding:16px; }
+/* Copilot tab: only the conversation scrolls; the composer stays pinned to the bottom. */
+.jw-side-body.is-copilot{ display:flex; flex-direction:column; overflow:hidden; padding:0; min-height:0; }
+.copilot-scroll{ flex:1; min-height:0; overflow-y:auto; padding:16px 16px 8px; }
+.copilot-composer{ flex:0 0 auto; padding:12px 16px 16px; border-top:1px solid var(--border); background:var(--surface); }
+.copilot-composer .field{ margin-bottom:10px; }
 
 .chip{ display:inline-flex; align-items:center; gap:6px; background:var(--accent-50); color:var(--accent-700); border:1px solid var(--accent-100); border-radius:14px; padding:4px 10px; font-size:var(--fs-xs); font-weight:500; }
 .chip button{ background:none; border:none; color:var(--accent-700); cursor:pointer; display:flex; padding:0; }
@@ -555,10 +565,6 @@ a:focus-visible, button:focus-visible, [tabindex]:focus-visible, input:focus-vis
 @media (max-width:1100px){ .two-col{ grid-template-columns:1fr; } }
 
 /* ---- Gemini-style Ask Copilot panel (voice-first) ---- */
-.gemini-fab{ position:fixed; right:28px; bottom:28px; width:56px; height:56px; border-radius:50%; border:none; cursor:pointer; z-index:40;
-  background:linear-gradient(135deg,#4285f4,#7c4dcf 55%,#d24ba0); box-shadow:0 4px 14px rgba(60,30,120,.35); display:flex; align-items:center; justify-content:center; color:#fff; transition:transform .15s; }
-.gemini-fab:hover{ transform:scale(1.06); }
-.gemini-fab .material-icons-o{ font-size:26px; }
 .gemini-launch-card{ border:1px solid transparent; border-radius:10px; padding:14px 16px; cursor:pointer; background:linear-gradient(135deg,rgba(66,133,244,.10),rgba(124,77,207,.10) 55%,rgba(210,75,160,.10)); display:flex; flex-direction:row; gap:12px; align-items:flex-start; }
 .gemini-launch-card:hover{ background:linear-gradient(135deg,rgba(66,133,244,.16),rgba(124,77,207,.16) 55%,rgba(210,75,160,.16)); }
 .gemini-launch-icon{ width:34px; height:34px; border-radius:50%; flex:0 0 auto; background:linear-gradient(135deg,#4285f4,#7c4dcf 55%,#d24ba0); display:flex; align-items:center; justify-content:center; color:#fff; }

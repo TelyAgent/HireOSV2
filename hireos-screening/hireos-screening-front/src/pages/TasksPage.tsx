@@ -2,7 +2,7 @@ import { useMemo, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { useStore } from "../store/StoreContext";
 import { useTasks } from "../features/tasks/useTasks";
-import { claimTask, deferTask } from "../data/api/tasks";
+import { deferTask } from "../data/api/tasks";
 import { getCandidate, getJob, getPerson } from "../data/db";
 import { PEOPLE } from "../data/fixtures/people";
 import type { Task, TaskType } from "../data/fixtures/tasks";
@@ -21,16 +21,27 @@ import { Modal } from "../components/ui/Overlays";
 const TASK_TYPE_LABEL: Record<TaskType, string> = {
   duplicate_review: "Duplicate / identity review",
   link_confirmation: "Job link confirmation",
-  screening_review: "Screening review",
+  screening_review: "Pending screening decision",
+  screening_evaluation_issue: "AI evaluation issue",
   next_step: "Next-step decision",
   comparison_review: "Comparison review",
   delivery_exception: "Delivery exception",
   ownership_assignment: "Needs owner",
 };
+// The task-filter tabs below are organized around these four -- the real, currently-live
+// taskTypes a candidate's résumé actually produces as it moves through the screening
+// pipeline (upload/dedup -> job matching -> screening decision). Not status, not assignee:
+// with a single hardcoded dev actor (see WorkspaceGuard), "assigned to me" / "claimable" /
+// "created or followed" never meant anything real -- every task always carried the same
+// assignee (or none), so those tabs were permanently stuck at 0 or dumping everything into
+// one bucket. See git history around 2026-10-08 for the investigation.
+const PIPELINE_TASK_TYPES: TaskType[] = ["duplicate_review", "link_confirmation", "screening_review", "screening_evaluation_issue"];
+
 const TASK_TYPE_ICON: Record<TaskType, string> = {
   duplicate_review: "content_copy",
   link_confirmation: "link",
   screening_review: "fact_check",
+  screening_evaluation_issue: "sync_problem",
   next_step: "call_split",
   comparison_review: "compare_arrows",
   delivery_exception: "report_problem",
@@ -45,6 +56,8 @@ function taskNextActionLabel(t: Task, tt: (s: string, k?: string) => string): st
       return tt(t.needsRefresh ? "Refresh & review" : "Review recommendation");
     case "screening_review":
       return tt("Open screening");
+    case "screening_evaluation_issue":
+      return tt("Review manually");
     case "next_step":
       return tt(t.status === "waiting" ? "View status" : "Choose next step");
     case "comparison_review":
@@ -87,13 +100,9 @@ function TaskSubject({ task }: { task: Task }) {
 
 function TaskRow({
   task,
-  showClaim,
-  onClaim,
   onDefer,
 }: {
   task: Task;
-  showClaim?: boolean;
-  onClaim?: (id: string) => void;
   onDefer?: (task: Task) => void;
 }) {
   const { t, state } = useStore();
@@ -148,22 +157,16 @@ function TaskRow({
         )}
       </td>
       <td className="text-right">
-        {showClaim ? (
-          <Button variant="secondary" size="sm" onClick={() => onClaim?.(task.id)}>
-            {t("Claim")}
-          </Button>
-        ) : (
-          <span className="flex items-center gap-8" style={{ justifyContent: "flex-end" }}>
-            <Link className="btn btn-sm btn-secondary" to={task.linkRoute || "#"}>
-              {taskNextActionLabel(task, t)}
-            </Link>
-            {onDefer && (task.status === "open" || task.status === "in_progress") && (
-              <button className="btn btn-sm btn-text" onClick={() => onDefer(task)}>
-                {t("Defer")}
-              </button>
-            )}
-          </span>
-        )}
+        <span className="flex items-center gap-8" style={{ justifyContent: "flex-end" }}>
+          <Link className="btn btn-sm btn-secondary" to={task.linkRoute || "#"}>
+            {taskNextActionLabel(task, t)}
+          </Link>
+          {onDefer && (task.status === "open" || task.status === "in_progress") && (
+            <button className="btn btn-sm btn-text" onClick={() => onDefer(task)}>
+              {t("Defer")}
+            </button>
+          )}
+        </span>
       </td>
     </tr>
   );
@@ -173,14 +176,10 @@ const COLS = ["Task", "Candidate / Job", "Priority", "Status", "Due / waiting", 
 
 function TaskTable({
   rows,
-  showClaim,
-  onClaim,
   onDefer,
   empty,
 }: {
   rows: Task[];
-  showClaim?: boolean;
-  onClaim?: (id: string) => void;
   onDefer?: (task: Task) => void;
   empty: React.ReactNode;
 }) {
@@ -198,7 +197,7 @@ function TaskTable({
       </thead>
       <tbody>
         {rows.map((task) => (
-          <TaskRow key={task.id} task={task} showClaim={showClaim} onClaim={onClaim} onDefer={onDefer} />
+          <TaskRow key={task.id} task={task} onDefer={onDefer} />
         ))}
       </tbody>
     </table>
@@ -253,76 +252,63 @@ function DeferModal({ task, onClose, onDeferred }: { task: Task; onClose: () => 
 }
 
 export function TasksPage() {
-  const { t, state, say } = useStore();
+  const { t, state } = useStore();
   const { tasks, reload } = useTasks();
   const [searchParams, setSearchParams] = useSearchParams();
   const [statsExpanded, setStatsExpanded] = useState(true);
   const [deferring, setDeferring] = useState<Task | null>(null);
-  const tab = searchParams.get("tab") || "mine";
+  const tab = searchParams.get("tab") || PIPELINE_TASK_TYPES[0];
 
-  const mine = useMemo(() => tasks.filter((t2) => t2.assignee === state.currentUser), [tasks, state.currentUser]);
-  const claimable = useMemo(() => tasks.filter((t2) => !t2.assignee && t2.status === "open"), [tasks]);
-  const followed = useMemo(
-    () => tasks.filter((t2) => t2.createdOrFollowed || (t2.assignee !== state.currentUser && t2.assignee)),
-    [tasks, state.currentUser],
-  );
+  // "Assigned to me" / "Claimable" no longer exist as tabs (see PIPELINE_TASK_TYPES
+  // comment), but the stat cards above still describe real, assignee-independent facts
+  // about the whole workspace's open work -- so they're computed over every task now,
+  // not just the ones that happened to carry the single dev actor's id.
+  const stats = useMemo(() => taskStatsFor(tasks), [tasks]);
+  const openByType = useMemo(() => {
+    const map = new Map<TaskType, Task[]>();
+    for (const type of PIPELINE_TASK_TYPES) {
+      map.set(type, tasks.filter((t2) => t2.type === type && t2.status !== "completed" && t2.status !== "cancelled"));
+    }
+    return map;
+  }, [tasks]);
   const completed = useMemo(() => tasks.filter((t2) => t2.status === "completed"), [tasks]);
-  const stats = useMemo(() => taskStatsFor(mine), [mine]);
 
-  const setTab = (id: string) => setSearchParams(id === "mine" ? {} : { tab: id });
-
-  const handleClaim = async (id: string) => {
-    const task = tasks.find((t2) => t2.id === id);
-    await claimTask(id, state.currentUser);
-    say(`${t("Claimed:")} ${task?.title ?? ""}`, { type: "success" });
-    reload();
-  };
+  const setTab = (id: string) => setSearchParams(id === PIPELINE_TASK_TYPES[0] ? {} : { tab: id });
 
   const tabsDef = [
-    { id: "mine", label: "Assigned to me", count: mine.filter((t2) => t2.status !== "completed").length },
-    { id: "claim", label: "Available to claim", count: claimable.length },
-    { id: "followed", label: "Created or followed", count: followed.length },
+    ...PIPELINE_TASK_TYPES.map((type) => ({ id: type, label: TASK_TYPE_LABEL[type], count: (openByType.get(type) || []).length })),
     { id: "completed", label: "Completed", count: completed.length },
   ];
 
-  const person = getPerson(state.currentUser)!;
   const subtitle =
     state.lang === "zh" ? (
       <>
-        已为 <strong>{person.name}</strong> 显示 <strong>{stats.unfinished} 个未完成</strong>任务 · 截至 {fmtDateTime(new Date().toISOString(), state.lang)} ·{" "}
-        <span className="tiny">时区：America/Chicago（演示）</span>
+        工作区共有 <strong>{stats.unfinished} 个未完成</strong>任务 · 截至 {fmtDateTime(new Date().toISOString(), state.lang)} · <span className="tiny">时区：America/Chicago（演示）</span>
       </>
     ) : (
       <>
-        Showing <strong>{stats.unfinished} unfinished</strong> task{stats.unfinished === 1 ? "" : "s"} for <strong>{person.name}</strong> · as of{" "}
-        {fmtDateTime(new Date().toISOString(), state.lang)} · <span className="tiny">Timezone: America/Chicago (demo)</span>
+        <strong>{stats.unfinished} unfinished</strong> task{stats.unfinished === 1 ? "" : "s"} across the workspace · as of {fmtDateTime(new Date().toISOString(), state.lang)} ·{" "}
+        <span className="tiny">Timezone: America/Chicago (demo)</span>
       </>
     );
 
+  const emptyForType: Record<TaskType, React.ReactNode> = {
+    duplicate_review: <EmptyState icon="task_alt" title={t("No duplicate reviews pending")} body={t("New possible-duplicate résumés will show up here.")} />,
+    link_confirmation: <EmptyState icon="task_alt" title={t("No job links waiting on confirmation")} body={t("New AI-proposed candidate-job matches will show up here.")} />,
+    screening_review: <EmptyState icon="task_alt" title={t("No screening decisions pending")} body={t("Confirmed links awaiting a screening decision will show up here.")} />,
+    screening_evaluation_issue: <EmptyState icon="task_alt" title={t("No AI evaluation issues")} body={t("Screens the AI couldn't complete will show up here.")} />,
+    next_step: null,
+    comparison_review: null,
+    delivery_exception: null,
+    ownership_assignment: null,
+  };
+
   let listHtml: React.ReactNode;
-  if (tab === "mine") {
-    listHtml = (
-      <TaskTable
-        rows={mine.filter((t2) => t2.status !== "completed")}
-        onDefer={setDeferring}
-        empty={<EmptyState icon="task_alt" title={t("Nothing assigned to you right now")} body={t("Check Available to claim, or come back after new material is imported.")} />}
-      />
-    );
-  } else if (tab === "claim") {
-    listHtml = (
-      <TaskTable
-        rows={claimable}
-        showClaim
-        onClaim={handleClaim}
-        empty={<EmptyState icon="inbox" title={t("No unclaimed tasks")} body={t("Everything routed so far has an owner.")} />}
-      />
-    );
-  } else if (tab === "followed") {
-    listHtml = (
-      <TaskTable rows={followed} empty={<EmptyState icon="visibility" title={t("Nothing created or followed")} body={t("Tasks you create or collaborate on will show up here.")} />} />
-    );
-  } else {
+  if (tab === "completed") {
     listHtml = <TaskTable rows={completed} empty={<EmptyState icon="done_all" title={t("Nothing completed yet")} />} />;
+  } else {
+    const type = tab as TaskType;
+    listHtml = <TaskTable rows={openByType.get(type) || []} onDefer={setDeferring} empty={emptyForType[type]} />;
   }
 
   return (
@@ -347,11 +333,11 @@ export function TasksPage() {
       <section className="task-metric-section" aria-labelledby="my-work-heading">
         <div className="task-metric-head">
           <div className="task-metric-kicker" id="my-work-heading">
-            {t("My work")} · {person.name}
+            {t("Task overview")}
           </div>
         </div>
         <div className="task-metric-grid">
-          <button className="task-metric-card" onClick={() => setTab("mine")}>
+          <button className="task-metric-card" onClick={() => setTab(PIPELINE_TASK_TYPES[0])}>
             <span className="task-metric-icon">
               <Icon name="warning" />
             </span>
@@ -359,7 +345,7 @@ export function TasksPage() {
             <span className="task-metric-label">{t("Overdue")}</span>
             <span className="task-metric-meta">{t("action required")}</span>
           </button>
-          <button className="task-metric-card" onClick={() => setTab("mine")}>
+          <button className="task-metric-card" onClick={() => setTab(PIPELINE_TASK_TYPES[0])}>
             <span className="task-metric-icon">
               <Icon name="today" />
             </span>
@@ -367,21 +353,13 @@ export function TasksPage() {
             <span className="task-metric-label">{t("Due today")}</span>
             <span className="task-metric-meta">{t("deadline today")}</span>
           </button>
-          <button className="task-metric-card" onClick={() => setTab("mine")}>
+          <button className="task-metric-card" onClick={() => setTab(PIPELINE_TASK_TYPES[0])}>
             <span className="task-metric-icon">
               <Icon name="pending_actions" />
             </span>
             <span className="task-metric-number">{stats.open}</span>
             <span className="task-metric-label">{t("Open / in progress")}</span>
-            <span className="task-metric-meta">{t("assigned workload")}</span>
-          </button>
-          <button className="task-metric-card" onClick={() => setTab("claim")}>
-            <span className="task-metric-icon">
-              <Icon name="group_add" />
-            </span>
-            <span className="task-metric-number">{claimable.length}</span>
-            <span className="task-metric-label">{t("Available to claim")}</span>
-            <span className="task-metric-meta">{t("unassigned queue")}</span>
+            <span className="task-metric-meta">{t("across the workspace")}</span>
           </button>
         </div>
       </section>
@@ -397,7 +375,7 @@ export function TasksPage() {
         </div>
         {statsExpanded && (
           <div className="task-metric-grid overview">
-            <button className="task-metric-card" onClick={() => setTab("mine")}>
+            <button className="task-metric-card" onClick={() => setTab(PIPELINE_TASK_TYPES[0])}>
               <span className="task-metric-icon">
                 <Icon name="schedule" />
               </span>

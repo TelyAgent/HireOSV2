@@ -12,6 +12,7 @@ import {
 } from "../data/api/candidates";
 import { runMatchAgain } from "../data/api/library";
 import { listJobs } from "../data/api/jobs";
+import { ApiError } from "../data/api/shared";
 import { getJob, getPerson } from "../data/db";
 import type { Candidate } from "../data/fixtures/candidates";
 import type { Application } from "../data/fixtures/applications";
@@ -100,6 +101,18 @@ function ConfirmLinkModal({
       onClose();
       say(t('Linked to role — "Review screening & choose next step" added to My Tasks'), { type: "success" });
       onConfirmed(app.id);
+    } catch (error) {
+      // Without this, a failed confirm (e.g. the recommendation went stale because the
+      // candidate's profile or the job's criteria changed since it was proposed) used to
+      // fail completely silently -- the modal just sat there and the status never moved,
+      // with nothing telling the recruiter why.
+      if (error instanceof ApiError && error.code === "RECOMMENDATION_STALE") {
+        say(t("This recommendation is out of date (profile or job criteria changed) — refresh matching and try again."), { type: "error" });
+      } else if (error instanceof ApiError && error.code === "JOB_NOT_OPEN") {
+        say(t("This role is no longer open."), { type: "error" });
+      } else {
+        say(error instanceof ApiError ? error.message : t("Could not confirm this job link."), { type: "error" });
+      }
     } finally {
       setConfirming(false);
     }

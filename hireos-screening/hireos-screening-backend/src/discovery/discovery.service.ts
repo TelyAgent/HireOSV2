@@ -188,8 +188,8 @@ export class DiscoveryService implements OnModuleInit, OnModuleDestroy {
 
   async createManual(identity: Identity, candidateId: string, jobId: string) {
     const [candidate, job] = await Promise.all([
-      this.db.candidate.findFirst({ where: { id: candidateId, workspaceId: identity.workspaceId }, select: { id: true } }),
-      this.db.job.findFirst({ where: { id: jobId, workspaceId: identity.workspaceId }, select: { id: true, status: true } }),
+      this.db.candidate.findFirst({ where: { id: candidateId, workspaceId: identity.workspaceId }, select: { id: true, displayName: true } }),
+      this.db.job.findFirst({ where: { id: jobId, workspaceId: identity.workspaceId }, select: { id: true, status: true, title: true } }),
     ]);
     if (!candidate || !job) throw new NotFoundException({ code: 'NOT_FOUND' });
     if (job.status !== 'open') throw new BadRequestException({ code: 'JOB_NOT_OPEN' });
@@ -219,7 +219,54 @@ export class DiscoveryService implements OnModuleInit, OnModuleDestroy {
         proposalSource: 'manual',
       },
     });
+    await this.createLinkConfirmationTask(identity.workspaceId, recommendation.id, candidate, job);
     return toFrontendRecommendation(recommendation);
+  }
+
+  // Every recommendation (manual or matched) that lands as 'proposed' needs a human to
+  // confirm/dismiss/defer it -- that's exactly what the link_confirmation task tracks.
+  // Centralized here so the manual and matched creation paths can't drift in shape.
+  private async createLinkConfirmationTask(
+    workspaceId: string,
+    recommendationId: string,
+    candidate: { id: string; displayName: string },
+    job: { id: string; title: string },
+    tx: Prisma.TransactionClient | PrismaService = this.db,
+  ) {
+    await tx.humanTask.create({
+      data: {
+        workspaceId,
+        sourceModule: 'Resume Library',
+        taskType: 'link_confirmation',
+        title: `Confirm job link: ${candidate.displayName} — ${job.title}`,
+        subjectLabel: 'AI proposed this candidate-job match; needs human confirmation.',
+        requiredAction: 'Confirm, dismiss, or defer this recommendation.',
+        completionRule: { requiredResultType: 'link_confirmation_completed' },
+        candidateId: candidate.id,
+        jobId: job.id,
+        recommendationId,
+        priority: 'normal',
+        linkRoute: `/candidates/${candidate.id}/jobs`,
+      },
+    });
+  }
+
+  // Closes out whatever link_confirmation task is still open for a recommendation.
+  // `status: 'completed'` means a human actually confirmed/dismissed/deferred it;
+  // `status: 'cancelled'` means it was superseded automatically (e.g. marked stale by a
+  // newer discovery run) without anyone acting on it.
+  private async closeLinkConfirmationTask(
+    workspaceId: string,
+    recommendationId: string,
+    status: 'completed' | 'cancelled',
+    tx: Prisma.TransactionClient | PrismaService = this.db,
+  ) {
+    await tx.humanTask.updateMany({
+      where: { workspaceId, recommendationId, taskType: 'link_confirmation', status: { notIn: ['completed', 'cancelled'] } },
+      data: status === 'completed'
+        ? { status, completedAt: new Date(), completionRef: recommendationId }
+        : { status },
+    });
   }
 
   private async processQueuedMatchJobs() {
@@ -336,6 +383,18 @@ export class DiscoveryService implements OnModuleInit, OnModuleDestroy {
     const criteria = job.criteriaVersions?.[0];
     if (!criteria || !profile) return { status: 'insufficient_data', recommendationsCreated: 0 };
 
+    // A candidate already confirmed for this job (an Application exists) doesn't need a
+    // fresh proposal every time something re-triggers matching (e.g. a résumé re-parse
+    // after a duplicate-review resolution) -- that used to re-propose them alongside their
+    // existing link, and confirming the new proposal would reuse the Application but still
+    // spawn a second screening_review task and re-run screening on an application that may
+    // already have a decision. Skip the (expensive) match entirely in that case.
+    const alreadyConfirmed = await this.db.candidateJobRecommendation.findFirst({
+      where: { workspaceId, candidateId: candidate.id, jobId: job.id, status: 'confirmed' },
+      select: { id: true },
+    });
+    if (alreadyConfirmed) return { status: 'already_linked', recommendationsCreated: 0 };
+
     const requirements = asArray(criteria.requirements) as unknown as JobRequirementInput[];
     const dimensions = asArray(criteria.dimensions) as unknown as JobDimensionInput[];
     const resumeText = buildResumeText(candidate, profile);
@@ -383,38 +442,48 @@ export class DiscoveryService implements OnModuleInit, OnModuleDestroy {
 
     const status = evaluation.overallScore >= RECOMMENDATION_THRESHOLD ? 'recommendations_ready' : 'no_match';
     if (runId && status === 'recommendations_ready') {
-      await this.db.candidateJobRecommendation.updateMany({
+      const staleRecommendations = await this.db.candidateJobRecommendation.findMany({
         where: { workspaceId, candidateId: candidate.id, jobId: job.id, status: 'proposed' },
-        data: { status: 'stale', staleReason: 'Replaced by a newer discovery run.' },
+        select: { id: true },
       });
-      const persistedEvaluation = await this.db.preLinkMatchEvaluation.create({
-        data: {
-          workspaceId,
-          candidateId: candidate.id,
-          jobId: job.id,
-          discoveryRunId: runId,
-          profileVersion: profile.version,
-          criteriaVersion: criteria.version,
-          status: 'completed',
-          overallScore: evaluation.overallScore,
-          coverage: evaluation.coverage,
-          rationale: evaluation.rationale,
-          gaps: evaluation.gaps,
-          evidence: evaluation.evidence,
-        },
-      });
-      await this.db.candidateJobRecommendation.create({
-        data: {
-          workspaceId,
-          candidateId: candidate.id,
-          jobId: job.id,
-          prelinkEvaluationId: persistedEvaluation.id,
-          discoveryRunId: runId,
-          confidence: Math.round(evaluation.confidence * 100) / 100,
-          rationale: evaluation.rationale,
-          gaps: evaluation.gaps,
-          proposalSource: evaluation.proposalSource,
-        },
+      await this.db.$transaction(async (tx) => {
+        await tx.candidateJobRecommendation.updateMany({
+          where: { id: { in: staleRecommendations.map((r) => r.id) } },
+          data: { status: 'stale', staleReason: 'Replaced by a newer discovery run.' },
+        });
+        for (const stale of staleRecommendations) {
+          await this.closeLinkConfirmationTask(workspaceId, stale.id, 'cancelled', tx);
+        }
+        const persistedEvaluation = await tx.preLinkMatchEvaluation.create({
+          data: {
+            workspaceId,
+            candidateId: candidate.id,
+            jobId: job.id,
+            discoveryRunId: runId,
+            profileVersion: profile.version,
+            criteriaVersion: criteria.version,
+            status: 'completed',
+            overallScore: evaluation.overallScore,
+            coverage: evaluation.coverage,
+            rationale: evaluation.rationale,
+            gaps: evaluation.gaps,
+            evidence: evaluation.evidence,
+          },
+        });
+        const created = await tx.candidateJobRecommendation.create({
+          data: {
+            workspaceId,
+            candidateId: candidate.id,
+            jobId: job.id,
+            prelinkEvaluationId: persistedEvaluation.id,
+            discoveryRunId: runId,
+            confidence: Math.round(evaluation.confidence * 100) / 100,
+            rationale: evaluation.rationale,
+            gaps: evaluation.gaps,
+            proposalSource: evaluation.proposalSource,
+          },
+        });
+        await this.createLinkConfirmationTask(workspaceId, created.id, candidate, job, tx);
       });
     }
     return { status, recommendationsCreated: runId && status === 'recommendations_ready' ? 1 : 0 };
@@ -423,7 +492,11 @@ export class DiscoveryService implements OnModuleInit, OnModuleDestroy {
   private async updateRecommendation(identity: Identity, id: string, status: 'dismissed' | 'deferred') {
     const recommendation = await this.db.candidateJobRecommendation.findFirst({ where: { id, workspaceId: identity.workspaceId } });
     if (!recommendation) throw new NotFoundException({ code: 'NOT_FOUND' });
-    return toFrontendRecommendation(await this.db.candidateJobRecommendation.update({ where: { id }, data: { status } }));
+    const updated = await this.db.candidateJobRecommendation.update({ where: { id }, data: { status } });
+    // Dismissing or deferring is a human decision about this recommendation -- the
+    // link_confirmation task asking for exactly that decision is done, not abandoned.
+    await this.closeLinkConfirmationTask(identity.workspaceId, id, 'completed');
+    return toFrontendRecommendation(updated);
   }
 }
 

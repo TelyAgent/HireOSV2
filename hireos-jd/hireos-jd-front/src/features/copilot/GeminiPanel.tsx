@@ -16,7 +16,7 @@ import {
   type CopilotConversationDto,
   type CopilotJdFields,
 } from "./copilotApi";
-import { CREATE_EXAMPLES, EDIT_CHIPS, EDIT_SELECTION_CHIPS, generateEditResponse, trunc } from "./geminiLogic";
+import { CREATE_EXAMPLES } from "./geminiLogic";
 import { VoiceInputButton, type VoiceInputStatus } from "./VoiceInputButton";
 import { mergeVoiceTranscript } from "../../lib/voice-stream";
 import { fmtRelative } from "../../lib/format";
@@ -47,7 +47,7 @@ export function jdFieldsToGeminiDraft(fields: CopilotJdFields): GeminiDraft {
 }
 
 export interface GeminiCtx {
-  mode: "create" | "edit";
+  mode: "create";
   jobId: string | null;
   audience: Audience;
   selText: string | null;
@@ -91,17 +91,11 @@ export function GeminiPanel({ ctx }: { ctx: GeminiCtx }) {
   const voiceBaseInputRef = useRef<string | null>(null);
   const messagesRef = useRef<HTMLDivElement>(null);
   const attachFileInputRef = useRef<HTMLInputElement>(null);
-  const timers = useRef<number[]>([]);
 
   useEffect(() => {
     const el = messagesRef.current;
     if (el) el.scrollTop = el.scrollHeight;
   }, [msgs.length]);
-
-  useEffect(() => {
-    const pending = timers.current;
-    return () => pending.forEach((id) => window.clearTimeout(id));
-  }, []);
 
   const push = (msg: GeminiMsg) =>
     mutate((draft) => {
@@ -159,19 +153,7 @@ export function GeminiPanel({ ctx }: { ctx: GeminiCtx }) {
     push({ role: "user", text });
     push({ role: "thinking" });
 
-    if (ctx.mode === "create") {
-      void sendCreate(text);
-      return;
-    }
-
-    const id = window.setTimeout(() => {
-      mutate((draft) => {
-        const list = (draft.geminiChats[key] ?? []).filter((m) => m.role !== "thinking");
-        const reply: GeminiMsg = { role: "ai", text: generateEditResponse(text, ctx.selText), canReplace: !!ctx.selText };
-        draft.geminiChats = { ...draft.geminiChats, [key]: [...list, reply] };
-      });
-    }, 900);
-    timers.current.push(id);
+    void sendCreate(text);
   };
 
   const handleVoicePartial = (transcript: string) => {
@@ -307,42 +289,6 @@ export function GeminiPanel({ ctx }: { ctx: GeminiCtx }) {
     }
   };
 
-  const insert = (text: string, mode: "append" | "replace") => {
-    if (!ctx.jobId) return;
-    const jobId = ctx.jobId;
-    let applied = false;
-    mutate((draft) => {
-      const doc = draft.drafts[`${jobId}:${ctx.audience}`];
-      if (!doc) return;
-      if (mode === "replace" && ctx.selText) {
-        for (const b of doc.blocks) {
-          if (applied) break;
-          if (typeof b.text === "string" && b.text.includes(ctx.selText)) {
-            b.text = b.text.replace(ctx.selText, text);
-            applied = true;
-          } else if (Array.isArray(b.text)) {
-            const li = b.text.findIndex((x) => x.includes(ctx.selText!));
-            if (li >= 0) {
-              b.text[li] = b.text[li].replace(ctx.selText, text);
-              applied = true;
-            }
-          }
-        }
-      }
-      if (!applied) doc.blocks.push(mkBlock(uid("gb"), "p", text));
-      doc.revision = (doc.revision || 1) + 1;
-      doc.saveState = "dirty";
-      (draft.activity[jobId] = draft.activity[jobId] || []).unshift({
-        at: nowISO(),
-        actor: draft.currentUserId,
-        text: "Inserted Copilot-generated text via Ask Copilot.",
-        tag: "AI",
-      });
-    });
-    closeModal();
-    say(applied ? t("Replaced the selected text") : t("Inserted into the document"));
-  };
-
   const createJobFromDraft = async (d: GeminiDraft) => {
     // Confirms the draft as a real Job on the Core Record service and uses its real id, so the job
     // this navigates to is the same one the Job Library page (which now reads real backend data) will
@@ -435,16 +381,8 @@ export function GeminiPanel({ ctx }: { ctx: GeminiCtx }) {
     navigate(option.href);
   };
 
-  const title = ctx.mode === "create" ? t("Ask Copilot — Create a job") : t("Ask Copilot");
-  const sub =
-    ctx.mode === "create"
-      ? t("Describe the role out loud or in writing — Copilot drafts a structured job for you to review.")
-      : ctx.selText
-        ? `${t("Working with the selected text")}: “${trunc(ctx.selText, 90)}”`
-        : t(
-            "Ask for a rewrite, a new section, or anything else — Copilot drafts it here first, nothing changes in the document until you insert it.",
-          );
-  const chips = ctx.selText ? EDIT_SELECTION_CHIPS : EDIT_CHIPS;
+  const title = t("Ask Copilot — Create a job");
+  const sub = t("Describe the role out loud or in writing — Copilot drafts a structured job for you to review.");
 
   return (
     <div className="gemini-panel">
@@ -452,7 +390,7 @@ export function GeminiPanel({ ctx }: { ctx: GeminiCtx }) {
         <span className="gp-icon material-icons-o">auto_awesome</span>
         <div className="gp-title">{historyOpen ? t("History") : title}</div>
         <div style={{ flex: 1 }} />
-        {ctx.mode === "create" && !historyOpen && (
+        {!historyOpen && (
           <>
             <button className="icon-btn" type="button" disabled={busy} onClick={() => void startNewConversation()} title={t("New conversation")} aria-label={t("New conversation")}>
               <Icon name="add" />
@@ -493,39 +431,23 @@ export function GeminiPanel({ ctx }: { ctx: GeminiCtx }) {
       ) : (
         <div className="gemini-messages" ref={messagesRef}>
           {msgs.length === 0 ? (
-            ctx.mode === "create" ? (
-              <div className="gm-intro">
-                <p>{t(JD_STEWARD_GREETING)}</p>
-                <div className="gm-example-list">
-                  <p className="gm-example-label">{t("You could say")}</p>
-                  {CREATE_EXAMPLES.map((example) => (
-                    <button key={example} className="gm-example" type="button" onClick={() => send(example)}>
-                      <Icon name="subdirectory_arrow_right" size={16} />
-                      <span>{example}</span>
-                    </button>
-                  ))}
-                </div>
+            <div className="gm-intro">
+              <p>{t(JD_STEWARD_GREETING)}</p>
+              <div className="gm-example-list">
+                <p className="gm-example-label">{t("You could say")}</p>
+                {CREATE_EXAMPLES.map((example) => (
+                  <button key={example} className="gm-example" type="button" onClick={() => send(example)}>
+                    <Icon name="subdirectory_arrow_right" size={16} />
+                    <span>{example}</span>
+                  </button>
+                ))}
               </div>
-            ) : (
-              <div className="gm-empty">
-                <Icon name="auto_awesome" size={34} />
-                <div style={{ marginTop: 6 }}>{t("Tap the microphone and describe what you need, or type below.")}</div>
-                <div className="gm-chip-row">
-                  {chips.map((c) => (
-                    <div key={c} className="gm-chip" onClick={() => send(c)}>
-                      {t(c)}
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )
+            </div>
           ) : (
             msgs.map((m, i) => (
               <GeminiMessage
                 key={i}
                 msg={m}
-                showInsertActions={ctx.mode === "edit"}
-                onInsert={insert}
                 onCreate={createJobFromDraft}
                 onSelectOption={handleSelectOption}
               />
@@ -558,30 +480,26 @@ export function GeminiPanel({ ctx }: { ctx: GeminiCtx }) {
             />
             <div className="gemini-composer-footer">
               <div className="gemini-composer-tools">
-                {ctx.mode === "create" && (
-                  <button
-                    className="gemini-composer-tool"
-                    type="button"
-                    disabled={attaching || busy}
-                    onClick={() => attachFileInputRef.current?.click()}
-                    title={t("Upload source material")}
-                    aria-label={t("Upload source material")}
-                  >
-                    <Icon name="add" />
-                  </button>
-                )}
-                {ctx.mode === "create" && (
-                  <button
-                    className="gemini-composer-tool"
-                    type="button"
-                    disabled={busy}
-                    onClick={() => void handleAutoComplete()}
-                    title={AUTO_COMPLETE_LABEL}
-                    aria-label={AUTO_COMPLETE_LABEL}
-                  >
-                    <Icon name="auto_fix_high" />
-                  </button>
-                )}
+                <button
+                  className="gemini-composer-tool"
+                  type="button"
+                  disabled={attaching || busy}
+                  onClick={() => attachFileInputRef.current?.click()}
+                  title={t("Upload source material")}
+                  aria-label={t("Upload source material")}
+                >
+                  <Icon name="add" />
+                </button>
+                <button
+                  className="gemini-composer-tool"
+                  type="button"
+                  disabled={busy}
+                  onClick={() => void handleAutoComplete()}
+                  title={AUTO_COMPLETE_LABEL}
+                  aria-label={AUTO_COMPLETE_LABEL}
+                >
+                  <Icon name="auto_fix_high" />
+                </button>
                 <input
                   ref={attachFileInputRef}
                   type="file"
@@ -639,14 +557,10 @@ function VoiceWaveform({ level, listening }: { level: number; listening: boolean
 
 function GeminiMessage({
   msg,
-  showInsertActions,
-  onInsert,
   onCreate,
   onSelectOption,
 }: {
   msg: GeminiMsg;
-  showInsertActions: boolean;
-  onInsert: (text: string, mode: "append" | "replace") => void;
   onCreate: (draft: GeminiDraft) => void;
   onSelectOption: (option: ConversationActionOption) => void;
 }) {
@@ -710,20 +624,6 @@ function GeminiMessage({
               <span>{option.label}</span>
             </button>
           ))}
-        </div>
-      )}
-      {showInsertActions && (
-        <div className="gm-actions">
-          <Button variant="primary" size="sm" onClick={() => onInsert(msg.text!, "append")}>
-            <Icon name="add" />
-            {t("Insert into document")}
-          </Button>
-          {msg.canReplace && (
-            <Button size="sm" onClick={() => onInsert(msg.text!, "replace")}>
-              <Icon name="find_replace" />
-              {t("Replace selected text")}
-            </Button>
-          )}
         </div>
       )}
     </div>

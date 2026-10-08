@@ -112,3 +112,31 @@ model JobDocument {
 
   @@unique([workspaceId, jobId, audience])
 }
+
+/// A proposed change to one block of a JobDocument — from the Copilot rewrite (author "ai") or typed
+/// in Suggesting mode (author "human"). Accepting it is applied to the document client-side; this row
+/// only tracks the proposal and its decision so it survives reloads and is visible to the whole team.
+model JobDocumentSuggestion {
+  id          String    @id @default(uuid())
+  workspaceId String
+  jobId       String
+  audience    String
+  anchorBlock String
+  status      String    @default("proposed")
+  author      String
+  initiatedBy String
+  createdBy   String
+  instruction String    @default("")
+  oldText     String
+  newText     String
+  newItems    Json?
+  reason      String    @default("")
+  staleReason String?
+  supersedes  String?
+  decidedBy   String?
+  decidedAt   DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@index([workspaceId, jobId, audience])
+}

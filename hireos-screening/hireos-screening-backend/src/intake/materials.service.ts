@@ -46,11 +46,24 @@ export class MaterialsService {
     // falls back to the old workspace-local hash dedup -- exactly what ran before this
     // migration, so mock mode is unaffected.
     const coreMaterial = await this.coreRecord.uploadMaterial(identity, { buffer: file.buffer, originalname: originalName, mimetype: file.mimetype });
+    // Must match on hash even when coreMaterial is present: rows created before this
+    // workspace's Core Record integration went live (or while it was unreachable) have
+    // coreMaterialId: null, so a coreMaterialId-only lookup misses them -- the re-upload
+    // then falls through to create() and dies on the (workspaceId, hash) unique constraint
+    // instead of being recognized as the same file. See git history around 2026-10-08.
     const existing = await this.db.material.findFirst({
-      where: coreMaterial ? { coreMaterialId: coreMaterial.id } : { workspaceId: identity.workspaceId, hash },
-      select: { id: true, name: true, size: true, hash: true, readStatus: true, securityStatus: true, errorCode: true, updatedAt: true },
+      where: {
+        workspaceId: identity.workspaceId,
+        OR: [{ hash }, ...(coreMaterial ? [{ coreMaterialId: coreMaterial.id }] : [])],
+      },
+      select: { id: true, name: true, size: true, hash: true, coreMaterialId: true, readStatus: true, securityStatus: true, errorCode: true, updatedAt: true },
     });
     if (existing) {
+      // Backfill the link for a legacy row the first time we see it again with a real
+      // Core Record id, instead of leaving it permanently disconnected.
+      if (coreMaterial && !existing.coreMaterialId) {
+        await this.db.material.update({ where: { id: existing.id }, data: { coreMaterialId: coreMaterial.id } });
+      }
       // A file that was quarantined or failed extraction never produced a candidate, so it
       // is not a real duplicate -- re-running it against the current scanner/extractor lets
       // a re-upload recover (e.g. after a scanner false positive) instead of being skipped

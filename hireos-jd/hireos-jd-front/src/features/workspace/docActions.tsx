@@ -3,13 +3,21 @@
  * the Copilot / Comments / Changes side panel.
  */
 import { useMemo, useState } from "react";
+import { Input } from "antd";
 import { useNavigate } from "react-router-dom";
 import { Button } from "../../components/ui/Primitives";
 import { CancelButton, ModalBody, ModalFooter, ModalHeader } from "../../components/ui/Overlays";
 import { useStore } from "../../store/StoreContext";
-import { blockPlainText, ensureDraft, makeSuggestion, selectDraft, selectSuggestions } from "./docHelpers";
+import { blockPlainText, ensureDraft, selectDraft, selectSuggestions, stripHtml } from "./docHelpers";
+import {
+  createSuggestion,
+  rewriteDocumentSelection,
+  updateSuggestion,
+  type NewSuggestion,
+  type RewriteRequest,
+} from "./documentsApi";
 import { nowISO, uid } from "../../lib/format";
-import type { Audience } from "../../data/types";
+import type { Audience, DocBlock, Suggestion } from "../../data/types";
 
 export function useDocActions(jobId: string, audience: Audience) {
   const { state, t, set, mutate, say, openModal, closeModal } = useStore();
@@ -22,23 +30,93 @@ export function useDocActions(jobId: string, audience: Audience) {
         draft.wsCopilotThread = [...draft.wsCopilotThread, { kind, text }];
       });
 
-    const generate = (blockId: string | null, selText: string, instruction?: string) => {
-      if (!blockId) {
+    /** Writes a suggestion's status change to the backend first, then mirrors it into the store. */
+    const persistSuggestion = async (id: string, patch: Parameters<typeof updateSuggestion>[3]) => {
+      // Seeded demo suggestions (fixture ids like "sug-seed-1") were never stored server-side.
+      if (isLocalOnlyId(id)) return true;
+      try {
+        await updateSuggestion(jobId, audience, id, patch);
+        return true;
+      } catch (error) {
+        say(error instanceof Error ? error.message : t("Couldn't update this suggestion. Please try again."), { type: "error" });
+        return false;
+      }
+    };
+
+    const setStoredSuggestion = (id: string, patch: Partial<Suggestion>) =>
+      mutate((draft) => {
+        const stored = draft.suggestions[key]?.find((x) => x.id === id);
+        if (stored) Object.assign(stored, patch);
+      });
+
+    const addSuggestion = async (body: NewSuggestion) => {
+      const created = await createSuggestion(jobId, audience, body);
+      mutate((draft) => {
+        draft.suggestions[key] = [...(draft.suggestions[key] ?? []), created];
+      });
+      return created;
+    };
+
+    const generate = async (
+      blockId: string | null,
+      selText: string,
+      action: RewriteRequest["action"],
+      instruction?: string,
+      supersedes?: string,
+    ) => {
+      const doc = selectDraft(state, jobId, audience);
+      const block = blockId ? doc.blocks.find((b) => b.id === blockId) : undefined;
+      if (!block || !selText.trim()) {
         pushThreadMsg(
           "text",
-          t(
-            'I don’t have a selection to work from yet — select a sentence, list item or paragraph in the document first, or tell me "whole document" to widen the scope.',
-          ),
+          t("I don’t have anything to work on yet — select some text, or click into the paragraph or list you want changed, then ask again."),
         );
         return;
       }
-      const { suggestion, explain } = makeSuggestion(state.currentUserId, blockId, selText, instruction);
-      mutate((draft) => {
-        draft.suggestions[key] = [...(draft.suggestions[key] ?? []), suggestion];
-        draft.wsCopilotThread = [...draft.wsCopilotThread, { kind: "suggestion", suggestion, explain }];
-        draft.wsSelection = null;
-        draft.wsSideTab = "copilot";
-      });
+      if (state.wsCopilotBusy) return;
+
+      const items = Array.isArray(block.text) ? block.text.map(stripHtml) : null;
+      const selected = selText.trim();
+      // A selection inside one list item / paragraph is rewritten in place; one spanning several
+      // list items rewrites the whole list.
+      const scope: RewriteRequest["scope"] = items && !items.some((x) => x.includes(selected)) ? "items" : "fragment";
+      const job = state.jobs[jobId];
+
+      set({ wsCopilotBusy: true, wsSideTab: "copilot" });
+      try {
+        const result = await rewriteDocumentSelection(jobId, audience, {
+          selectedText: selected,
+          instruction,
+          action,
+          target: items ? { kind: block.kind, items } : { kind: block.kind, text: stripHtml(block.text as string) },
+          scope,
+          context: {
+            jobTitle: job?.title,
+            department: job?.department,
+            documentText: doc.blocks.map((b) => (Array.isArray(b.text) ? b.text.map((x) => `- ${stripHtml(x)}`).join("\n") : stripHtml(b.text))).join("\n\n"),
+          },
+        });
+        const suggestion = await addSuggestion({
+          anchorBlock: block.id,
+          author: "ai",
+          initiatedBy: state.currentUserId,
+          instruction: instruction || action,
+          oldText: scope === "items" ? items!.join("\n") : selected,
+          newText: result.text,
+          newItems: result.items,
+          reason: result.reason,
+          supersedes: supersedes ?? null,
+        });
+        mutate((draft) => {
+          draft.wsCopilotThread = [...draft.wsCopilotThread, { kind: "suggestion", suggestion, explain: result.explain }];
+          draft.wsSelection = null;
+          draft.wsSideTab = "copilot";
+        });
+      } catch (error) {
+        pushThreadMsg("text", error instanceof Error ? error.message : t("Copilot couldn’t generate a suggestion. Please try again."));
+      } finally {
+        set({ wsCopilotBusy: false });
+      }
     };
 
     return {
@@ -68,15 +146,20 @@ export function useDocActions(jobId: string, audience: Audience) {
       quickAction(blockId: string | null, text: string, kind: "rewrite" | "shorten" | "clarify") {
         const label = { rewrite: "Rewrite this", shorten: "Shorten this", clarify: "Clarify this" }[kind];
         pushThreadMsg("user", t(label));
-        generate(blockId, text, kind);
+        void generate(blockId, text, kind);
       },
 
       sendCopilot(instruction: string) {
         if (!instruction.trim()) return;
         pushThreadMsg("user", instruction);
         const sel = state.wsSelection;
-        if (!sel) return generate(null, "");
-        generate(sel.blockId, sel.text, instruction);
+        if (sel) return void generate(sel.blockId, sel.text, "custom", instruction);
+        // No selection: work on the whole block the cursor is in.
+        const focused = state.wsFocusBlockId
+          ? selectDraft(state, jobId, audience).blocks.find((b) => b.id === state.wsFocusBlockId)
+          : undefined;
+        const text = focused ? (Array.isArray(focused.text) ? focused.text.map(stripHtml).join("\n") : stripHtml(focused.text)) : "";
+        void generate(focused?.id ?? null, text, "custom", instruction);
       },
 
       addCommentFromSelection(blockId: string | null, text: string) {
@@ -105,19 +188,26 @@ export function useDocActions(jobId: string, audience: Audience) {
         });
       },
 
-      acceptSuggestion(suggestionId: string) {
+      async acceptSuggestion(suggestionId: string) {
         const s = selectSuggestions(state, jobId, audience).find((x) => x.id === suggestionId);
         if (!s) return;
         if (s.status === "stale") return say(t("This suggestion needs a refresh before it can be accepted."), { type: "error" });
         if (s.status !== "proposed") return say(`${t("This suggestion was already")} ${t(s.status)}.`);
 
+        // Dry-run on a copy first: the text may have been edited since the suggestion was generated.
+        const current = selectDraft(state, jobId, audience).blocks.find((b) => b.id === s.anchorBlock);
+        const probe = current ? { ...current, text: Array.isArray(current.text) ? [...current.text] : current.text } : null;
+        if (!probe || !applySuggestionToBlock(probe, s)) {
+          const staleReason = "The selected text changed after this suggestion was generated.";
+          if (await persistSuggestion(s.id, { status: "stale", staleReason })) setStoredSuggestion(s.id, { status: "stale", staleReason });
+          return say(t("The text changed since this suggestion was generated — select it again and ask Copilot."), { type: "error" });
+        }
+
+        if (!(await persistSuggestion(s.id, { status: "accepted" }))) return;
         mutate((draft) => {
           const doc = ensureDraft(draft, jobId, audience);
           const block = doc.blocks.find((b) => b.id === s.anchorBlock);
-          if (block) {
-            if (Array.isArray(block.text)) block.text = block.text.map((x) => (x === s.oldText ? s.newText : x));
-            else if (block.text === s.oldText) block.text = s.newText;
-          }
+          if (!block || !applySuggestionToBlock(block, s)) return;
           const stored = draft.suggestions[key]?.find((x) => x.id === suggestionId);
           if (stored) stored.status = "accepted";
           doc.revision++;
@@ -135,18 +225,82 @@ export function useDocActions(jobId: string, audience: Audience) {
             actor: draft.currentUserId,
             text: "Accepted a document suggestion — text and requirement draft updated together.",
           });
+          // The suggestion is already recorded as accepted server-side, so save the document right away
+          // rather than leaving the accepted text only in this browser.
+          draft.wsSaveRequest++;
         });
         say(t("Suggestion accepted — working draft updated (not yet approved)"));
       },
 
-      rejectSuggestion(suggestionId: string) {
+      async rejectSuggestion(suggestionId: string) {
         const s = selectSuggestions(state, jobId, audience).find((x) => x.id === suggestionId);
         if (!s || s.status !== "proposed") return say(t("Nothing to reject."));
-        mutate((draft) => {
-          const stored = draft.suggestions[key]?.find((x) => x.id === suggestionId);
-          if (stored) stored.status = "rejected";
-        });
+        if (!(await persistSuggestion(s.id, { status: "rejected" }))) return;
+        setStoredSuggestion(s.id, { status: "rejected" });
         say(t("Suggestion rejected"));
+      },
+
+      /**
+       * Suggesting mode: records what the current user typed into a block as a proposal instead of
+       * editing the document. Re-editing a block that already has your own pending proposal updates
+       * that proposal; editing it back to the original withdraws it.
+       */
+      async proposeEdit(blockId: string, text: string | string[]) {
+        const block = selectDraft(state, jobId, audience).blocks.find((b) => b.id === blockId);
+        if (!block) return;
+        const own = selectSuggestions(state, jobId, audience).find(
+          (x) => x.status === "proposed" && x.author === "human" && x.initiatedBy === state.currentUserId && x.anchorBlock === blockId,
+        );
+        const isList = Array.isArray(text);
+        const plainNew = isList ? text.map(stripHtml).filter((x) => x.trim()) : stripHtml(text);
+        const plainOld = Array.isArray(block.text) ? block.text.map(stripHtml) : stripHtml(block.text);
+        const unchanged = JSON.stringify(plainNew) === JSON.stringify(plainOld);
+        const newItems = isList ? text.filter((x) => stripHtml(x).trim()) : null;
+        const newText = isList ? (plainNew as string[]).join("\n") : (text as string);
+        try {
+          if (own) {
+            if (unchanged) {
+              await updateSuggestion(jobId, audience, own.id, { status: "cancelled" });
+              setStoredSuggestion(own.id, { status: "cancelled" });
+            } else if (own.newText !== newText || JSON.stringify(own.newItems ?? null) !== JSON.stringify(newItems)) {
+              await updateSuggestion(jobId, audience, own.id, { newText, newItems });
+              setStoredSuggestion(own.id, { newText, newItems });
+            }
+            return;
+          }
+          if (unchanged) return;
+          await addSuggestion({
+            anchorBlock: blockId,
+            author: "human",
+            initiatedBy: state.currentUserId,
+            instruction: "Suggested edit",
+            oldText: Array.isArray(plainOld) ? plainOld.join("\n") : plainOld,
+            newText,
+            newItems,
+            reason: "",
+          });
+          set({ wsSideTab: "changes" });
+        } catch (error) {
+          say(error instanceof Error ? error.message : t("Couldn't save your suggestion. Please try again."), { type: "error" });
+        }
+      },
+
+      /** Regenerates a proposal with the user's follow-up note; the old proposal is marked superseded. */
+      async refineWith(suggestionId: string, note: string) {
+        const old = selectSuggestions(state, jobId, audience).find((x) => x.id === suggestionId);
+        if (!old) return;
+        if (old.status === "proposed") {
+          if (!(await persistSuggestion(old.id, { status: "rejected" }))) return;
+          setStoredSuggestion(old.id, { status: "rejected" });
+        }
+        pushThreadMsg("user", `${t("Refine")}: ${note || t("Refine")}`);
+        void generate(
+          old.anchorBlock,
+          old.oldText,
+          "custom",
+          `${t("Previous proposal")}: ${old.newText}\n${note ? `${t("Adjust it as follows")}: ${note}` : t("Improve the previous proposal.")}`,
+          old.id,
+        );
       },
 
       refineSuggestion(suggestionId: string) {
@@ -157,16 +311,51 @@ export function useDocActions(jobId: string, audience: Audience) {
         openModal(<ReviewLatestModal jobId={jobId} audience={audience} suggestionId={suggestionId} />);
       },
 
-      dismissStale(suggestionId: string) {
-        mutate((draft) => {
-          const stored = draft.suggestions[key]?.find((x) => x.id === suggestionId);
-          if (stored) stored.status = "cancelled";
-        });
+      async dismissStale(suggestionId: string) {
+        if (!(await persistSuggestion(suggestionId, { status: "cancelled" }))) return;
+        setStoredSuggestion(suggestionId, { status: "cancelled" });
         closeModal();
         say(t("Outdated suggestion dismissed"));
       },
     };
   }, [jobId, audience, key, state, t, set, mutate, say, openModal, closeModal, navigate]);
+}
+
+/** Server-stored suggestions have UUID ids; anything else is a seeded demo suggestion held only locally. */
+function isLocalOnlyId(id: string) {
+  return !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
+}
+
+/**
+ * Writes an accepted suggestion into its block: a whole-list rewrite replaces every item; otherwise
+ * the selected fragment is swapped inside the item / paragraph that contains it (falling back to
+ * returning false when the fragment can no longer be found — the text changed since the suggestion).
+ */
+function applySuggestionToBlock(block: DocBlock, s: Suggestion): boolean {
+  const swap = (text: string) =>
+    text.includes(s.oldText)
+      ? text.replace(s.oldText, s.newText)
+      : stripHtml(text).includes(s.oldText)
+        ? stripHtml(text).replace(s.oldText, s.newText)
+        : null;
+  if (Array.isArray(block.text)) {
+    if (s.newItems?.length) {
+      block.text = [...s.newItems];
+      return true;
+    }
+    for (let i = 0; i < block.text.length; i++) {
+      const next = swap(block.text[i]);
+      if (next !== null) {
+        block.text[i] = next;
+        return true;
+      }
+    }
+    return false;
+  }
+  const next = swap(block.text);
+  if (next === null) return false;
+  block.text = next;
+  return true;
 }
 
 /* ---------------------------------------------------------------
@@ -215,7 +404,13 @@ function AddCommentModal({
         <div className="tiny" style={{ marginBottom: 8 }}>
           {t("On")}: “{onText.slice(0, 80)}”
         </div>
-        <textarea placeholder={t("Add a comment…")} value={body} onChange={(e) => setBody(e.target.value)} autoFocus />
+        <Input.TextArea
+          placeholder={t("Add a comment…")}
+          autoSize={{ minRows: 3, maxRows: 8 }}
+          value={body}
+          onChange={(e) => setBody(e.target.value)}
+          autoFocus
+        />
       </ModalBody>
       <ModalFooter>
         <CancelButton />
@@ -247,7 +442,13 @@ function ReplyModal({ jobId, audience, threadId }: { jobId: string; audience: Au
     <>
       <ModalHeader title={t("Reply")} />
       <ModalBody>
-        <textarea placeholder={t("Write a reply…")} value={body} onChange={(e) => setBody(e.target.value)} autoFocus />
+        <Input.TextArea
+          placeholder={t("Write a reply…")}
+          autoSize={{ minRows: 3, maxRows: 8 }}
+          value={body}
+          onChange={(e) => setBody(e.target.value)}
+          autoFocus
+        />
       </ModalBody>
       <ModalFooter>
         <CancelButton />
@@ -260,39 +461,14 @@ function ReplyModal({ jobId, audience, threadId }: { jobId: string; audience: Au
 }
 
 function RefineModal({ jobId, audience, suggestionId }: { jobId: string; audience: Audience; suggestionId: string }) {
-  const { state, t, mutate, closeModal } = useStore();
+  const { state, t, closeModal } = useStore();
+  const actions = useDocActions(jobId, audience);
   const [note, setNote] = useState("");
-  const key = `${jobId}:${audience}`;
   const old = selectSuggestions(state, jobId, audience).find((x) => x.id === suggestionId);
   if (!old) return null;
 
   const submit = () => {
-    const refined = {
-      id: uid("sug"),
-      anchorBlock: old.anchorBlock,
-      status: "proposed" as const,
-      author: "ai" as const,
-      initiatedBy: state.currentUserId,
-      createdAt: nowISO(),
-      instruction: "Refine",
-      oldText: old.oldText,
-      newText: old.newText.replace(/\.$/, "") + (note.trim() ? ` (${note.trim()})` : " (refined)"),
-      reason: `Refined based on: ${note.trim() || "follow-up context"}. Supersedes the previous proposal.`,
-      supersedes: old.id,
-    };
-    mutate((draft) => {
-      const stored = draft.suggestions[key]?.find((x) => x.id === suggestionId);
-      if (stored) stored.status = "rejected";
-      draft.suggestions[key] = [...(draft.suggestions[key] ?? []), refined];
-      draft.wsCopilotThread = [
-        ...draft.wsCopilotThread,
-        {
-          kind: "suggestion",
-          suggestion: refined,
-          explain: "Here’s a refined version based on your note. The previous proposal is kept in history as superseded.",
-        },
-      ];
-    });
+    actions.refineWith(suggestionId, note.trim());
     closeModal();
   };
 
@@ -303,8 +479,9 @@ function RefineModal({ jobId, audience, suggestionId }: { jobId: string; audienc
         <div className="tiny" style={{ marginBottom: 8 }}>
           {t("Current proposal")}: “{old.newText}”
         </div>
-        <textarea
+        <Input.TextArea
           placeholder={t("e.g. This role is mostly internal-team facing")}
+          autoSize={{ minRows: 3, maxRows: 8 }}
           value={note}
           onChange={(e) => setNote(e.target.value)}
           autoFocus

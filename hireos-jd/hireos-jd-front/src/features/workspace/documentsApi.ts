@@ -4,7 +4,7 @@
  * (from Copilot) that seeds a document which has never been saved.
  */
 import { API_BASE_URL } from "../../lib/apiBase";
-import type { Audience, DocBlock } from "../../data/types";
+import type { Audience, DocBlock, Suggestion } from "../../data/types";
 import type { MoneyRange } from "../../lib/format";
 
 const JOBS = `${API_BASE_URL}api/jobs`;
@@ -59,4 +59,71 @@ export async function getCurrentDraft(jobId: string): Promise<CurrentDraftDto | 
   const response = await fetch(`${JOBS}/${jobId}/drafts/current`);
   if (response.status === 404) return null;
   return parseOrThrow<CurrentDraftDto>(response);
+}
+
+export interface RewriteRequest {
+  selectedText: string;
+  instruction?: string;
+  action: "rewrite" | "shorten" | "clarify" | "custom";
+  target: { kind: string; text?: string; items?: string[] };
+  scope: "fragment" | "items";
+  context: { jobTitle?: string; department?: string; documentText?: string };
+}
+
+export interface RewriteResult {
+  text: string;
+  items: string[] | null;
+  explain: string;
+  reason: string;
+}
+
+/** AI rewrite of a selected part of the document — backs the Copilot side panel. */
+export async function rewriteDocumentSelection(jobId: string, audience: Audience, body: RewriteRequest): Promise<RewriteResult> {
+  const response = await fetch(`${JOBS}/${jobId}/documents/${audience}/rewrite`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify(body),
+  });
+  return parseOrThrow<RewriteResult>(response);
+}
+
+export interface NewSuggestion {
+  anchorBlock: string;
+  author: "ai" | "human";
+  initiatedBy: string;
+  instruction: string;
+  oldText: string;
+  newText: string;
+  newItems?: string[] | null;
+  reason: string;
+  supersedes?: string | null;
+}
+
+/** Proposed document changes persisted per job document, so they survive reloads and are shared. */
+export async function listSuggestions(jobId: string, audience: Audience): Promise<Suggestion[]> {
+  const response = await fetch(`${JOBS}/${jobId}/documents/${audience}/suggestions`);
+  return parseOrThrow<Suggestion[]>(response);
+}
+
+export async function createSuggestion(jobId: string, audience: Audience, body: NewSuggestion): Promise<Suggestion> {
+  const response = await fetch(`${JOBS}/${jobId}/documents/${audience}/suggestions`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify(body),
+  });
+  return parseOrThrow<Suggestion>(response);
+}
+
+export async function updateSuggestion(
+  jobId: string,
+  audience: Audience,
+  id: string,
+  patch: Partial<Pick<Suggestion, "status" | "staleReason" | "newText" | "newItems">>,
+): Promise<Suggestion> {
+  const response = await fetch(`${JOBS}/${jobId}/documents/${audience}/suggestions/${id}`, {
+    method: "PATCH",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify(patch),
+  });
+  return parseOrThrow<Suggestion>(response);
 }

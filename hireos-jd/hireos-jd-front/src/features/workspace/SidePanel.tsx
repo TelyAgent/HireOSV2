@@ -4,7 +4,7 @@ import { Button, EmptyState, PersonAvatar } from "../../components/ui/Primitives
 import { useStore } from "../../store/StoreContext";
 import { getPerson } from "../../data/fixtures/people";
 import { fmtRelative } from "../../lib/format";
-import { selectSuggestions, selectThreads } from "./docHelpers";
+import { blockPlainText, selectDraft, selectSuggestions, selectThreads, stripHtml } from "./docHelpers";
 import { useDocActions } from "./docActions";
 import { scrollToBlock } from "./DocumentTab";
 import type { Audience, Suggestion } from "../../data/types";
@@ -40,7 +40,7 @@ export function SidePanel({ jobId, audience }: { jobId: string; audience: Audien
           </div>
         ))}
       </div>
-      <div className="jw-side-body">
+      <div className={`jw-side-body${activeTab === "copilot" ? " is-copilot" : ""}`}>
         {activeTab === "copilot" && <CopilotTab jobId={jobId} audience={audience} />}
         {activeTab === "comments" && <CommentsTab jobId={jobId} audience={audience} />}
         {activeTab === "changes" && <ChangesTab jobId={jobId} audience={audience} />}
@@ -58,6 +58,10 @@ function CopilotTab({ jobId, audience }: { jobId: string; audience: Audience }) 
   const [input, setInput] = useState("");
   const threadRef = useRef<HTMLDivElement>(null);
   const sel = state.wsSelection;
+  const busy = state.wsCopilotBusy;
+  const focused = state.wsFocusBlockId
+    ? selectDraft(state, jobId, audience).blocks.find((b) => b.id === state.wsFocusBlockId)
+    : undefined;
 
   // The External JD conversation must never carry internal compensation.
   const restrictedBlocked =
@@ -66,77 +70,97 @@ function CopilotTab({ jobId, audience }: { jobId: string; audience: Audience }) 
   useEffect(() => {
     const el = threadRef.current;
     if (el) el.scrollTop = el.scrollHeight;
-  }, [state.wsCopilotThread.length]);
+  }, [state.wsCopilotThread.length, busy]);
 
   const send = () => {
-    if (!input.trim()) return;
+    if (!input.trim() || busy) return;
     actions.sendCopilot(input.trim());
     setInput("");
   };
 
   return (
     <>
-      <div className="copilot-msg">
-        <div className="who">
-          <Icon name="auto_awesome" size={15} />
-          Copilot
+      <div className="copilot-scroll" ref={threadRef}>
+        <div className="copilot-msg">
+          <div className="who">
+            <Icon name="auto_awesome" size={15} />
+            Copilot
+          </div>
+          <div className="bubble">
+            {t(
+              "I can help define and manage this job — its responsibilities, requirements and compensation. Select any text in the document to ask me to rewrite, shorten, clarify it, or ask me anything below.",
+            )}
+          </div>
         </div>
-        <div className="bubble">
-          {t(
-            "I can help define and manage this job — its responsibilities, requirements and compensation. Select any text in the document to ask me to rewrite, shorten, clarify it, or ask me anything below.",
+
+        {sel ? (
+          <div className="chip" style={{ marginBottom: 12 }}>
+            <Icon name="text_fields" size={14} />
+            <span style={{ maxWidth: 230, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+              {t(sel.scopeLabel || "Selected text")}: “{(sel.text || "").slice(0, 60)}
+              {(sel.text || "").length > 60 ? "…" : ""}”
+            </span>
+            <button onClick={actions.clearSelection} aria-label={t("Clear selection")}>
+              <Icon name="close" size={14} />
+            </button>
+          </div>
+        ) : focused ? (
+          <div className="chip" style={{ marginBottom: 12 }}>
+            <Icon name="text_fields" size={14} />
+            <span style={{ maxWidth: 230, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+              {t("Current block")}: “{blockPlainText(focused).slice(0, 60)}”
+            </span>
+          </div>
+        ) : (
+          <div className="tiny" style={{ marginBottom: 12 }}>
+            {t("No text selected — Copilot will work on the paragraph or list your cursor is in.")}
+          </div>
+        )}
+
+        {restrictedBlocked && (
+          <div className="warning-inline" style={{ marginBottom: 12 }}>
+            <Icon name="lock" />
+            {t("This looks like internal compensation. It can’t be used in the External JD conversation.")}
+          </div>
+        )}
+
+        <div>
+          {state.wsCopilotThread.map((m, i) => (
+            <CopilotMessage key={i} msg={m} jobId={jobId} audience={audience} />
+          ))}
+          {busy && (
+            <div className="copilot-msg">
+              <div className="who">
+                <Icon name="auto_awesome" size={15} />
+                Copilot
+              </div>
+              <div className="bubble tiny">{t("Thinking…")}</div>
+            </div>
           )}
         </div>
       </div>
 
-      {sel ? (
-        <div className="chip" style={{ marginBottom: 12 }}>
-          <Icon name="text_fields" size={14} />
-          <span style={{ maxWidth: 230, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-            {t(sel.scopeLabel || "Selected text")}: “{(sel.text || "").slice(0, 60)}
-            {(sel.text || "").length > 60 ? "…" : ""}”
-          </span>
-          <button onClick={actions.clearSelection} aria-label={t("Clear selection")}>
-            <Icon name="close" size={14} />
-          </button>
+      <div className="copilot-composer">
+        <div className="field">
+          <textarea
+            placeholder={t("Ask Copilot to rewrite, explain, or draft something…")}
+            disabled={restrictedBlocked}
+            style={{ minHeight: 60 }}
+            value={input}
+            onChange={(e) => setInput(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" && !e.shiftKey) {
+                e.preventDefault();
+                send();
+              }
+            }}
+          />
         </div>
-      ) : (
-        <div className="tiny" style={{ marginBottom: 12 }}>
-          {t("No text selected — Copilot will ask before acting on the whole document.")}
-        </div>
-      )}
-
-      {restrictedBlocked && (
-        <div className="warning-inline" style={{ marginBottom: 12 }}>
-          <Icon name="lock" />
-          {t("This looks like internal compensation. It can’t be used in the External JD conversation.")}
-        </div>
-      )}
-
-      <div ref={threadRef}>
-        {state.wsCopilotThread.map((m, i) => (
-          <CopilotMessage key={i} msg={m} jobId={jobId} audience={audience} />
-        ))}
+        <Button variant="primary" className="w-full" disabled={restrictedBlocked || busy} onClick={send}>
+          <Icon name="send" />
+          {t("Ask Copilot")}
+        </Button>
       </div>
-
-      <div className="field" style={{ marginTop: 14 }}>
-        <textarea
-          placeholder={t("Ask Copilot to rewrite, explain, or draft something…")}
-          disabled={restrictedBlocked}
-          style={{ minHeight: 60 }}
-          value={input}
-          onChange={(e) => setInput(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === "Enter" && !e.shiftKey) {
-              e.preventDefault();
-              send();
-            }
-          }}
-        />
-      </div>
-      <Button variant="primary" className="w-full" disabled={restrictedBlocked} onClick={send}>
-        <Icon name="send" />
-        {t("Ask Copilot")}
-      </Button>
     </>
   );
 }
@@ -185,7 +209,7 @@ function CopilotMessage({ msg, jobId, audience }: { msg: CopilotMsg; jobId: stri
           <Icon name="auto_awesome" size={13} />
           {t("AI suggestion")} • {fmtRelative(live.createdAt)}
         </div>
-        <div className="sc-diff">
+        <div className="sc-diff" style={{ whiteSpace: "pre-line" }}>
           <span className="ci-old" style={{ textDecoration: "line-through", color: "var(--danger-text)" }}>
             {live.oldText}
           </span>
@@ -302,9 +326,11 @@ function ChangesTab({ jobId, audience }: { jobId: string; audience: Audience }) 
     );
   }
 
-  const acceptAllReady = () => {
-    const ready = list.filter((s) => s.status === "proposed");
-    ready.forEach((s) => actions.acceptSuggestion(s.id));
+  const acceptAllReady = async () => {
+    // One per block: accepting a block's first proposal changes the text the others were based on.
+    const seen = new Set<string>();
+    const ready = list.filter((s) => s.status === "proposed" && !seen.has(s.anchorBlock) && seen.add(s.anchorBlock));
+    for (const s of ready) await actions.acceptSuggestion(s.id);
     say(`${ready.length} ${t("change(s) accepted")}`);
   };
 
@@ -312,7 +338,7 @@ function ChangesTab({ jobId, audience }: { jobId: string; audience: Audience }) 
     <>
       <div className="tiny" style={{ marginBottom: 10 }}>
         {list.length} {t("unresolved")} •{" "}
-        <button className="link-btn" onClick={acceptAllReady}>
+        <button className="link-btn" onClick={() => void acceptAllReady()}>
           {t("Accept all ready")}
         </button>
       </div>
@@ -323,10 +349,10 @@ function ChangesTab({ jobId, audience }: { jobId: string; audience: Audience }) 
             {s.author === "ai" ? t("AI suggestion") : getPerson(s.initiatedBy)?.name} • {fmtRelative(s.createdAt)}{" "}
             {s.status === "stale" && <span className="badge badge-warning">{t("Needs refresh")}</span>}
           </div>
-          <div className="ci-diff">
+          <div className="ci-diff" style={{ whiteSpace: "pre-line" }}>
             <span className="ci-old">{s.oldText}</span>
             <br />
-            <span className="ci-new">{s.newText}</span>
+            <span className="ci-new">{stripHtml(s.newText)}</span>
           </div>
           <div className="tiny" style={{ marginBottom: 8 }}>
             {s.reason}
@@ -335,7 +361,7 @@ function ChangesTab({ jobId, audience }: { jobId: string; audience: Audience }) 
             <>
               <div className="warning-inline" style={{ marginBottom: 8 }}>
                 <Icon name="warning" />
-                {s.staleReason || t("Based on an older draft.")}
+                {s.staleReason ? t(s.staleReason) : t("Based on an older draft.")}
               </div>
               <Button size="sm" onClick={() => actions.reviewLatest(s.id)}>
                 {t("Review latest text")}

@@ -43,6 +43,8 @@ export function RichBlockEditor({
   onEditorReady,
   onEditorDestroy,
   onActivity,
+  onBlurBlock,
+  autoFocus,
 }: {
   block: DocBlock;
   onTextChange: (text: string | string[]) => void;
@@ -50,10 +52,21 @@ export function RichBlockEditor({
   onEditorReady: (editor: Editor) => void;
   onEditorDestroy: () => void;
   onActivity: () => void;
+  /** Called with the editor's final text when it loses focus (Suggesting mode turns it into a proposal). */
+  onBlurBlock?: (text: string | string[]) => void;
+  autoFocus?: boolean;
 }) {
   const commitTimer = useRef<number | undefined>(undefined);
-  const latest = useRef({ onTextChange, onFocusBlock, onActivity });
-  latest.current = { onTextChange, onFocusBlock, onActivity };
+  // Last text this editor itself committed — lets the sync effect below tell the editor's own edits
+  // apart from changes made outside it (e.g. accepting a Copilot suggestion).
+  const lastCommitted = useRef(JSON.stringify(block.text));
+  const lastProp = useRef(lastCommitted.current);
+  const latest = useRef({ onTextChange, onFocusBlock, onActivity, onBlurBlock });
+  latest.current = { onTextChange, onFocusBlock, onActivity, onBlurBlock };
+  const readText = (editor: Editor) => {
+    const html = editor.getHTML();
+    return block.kind === "ul" ? listItemsFromHtml(html) : innerHtmlOfSingleNode(html);
+  };
 
   const editor = useEditor(
     {
@@ -82,11 +95,14 @@ export function RichBlockEditor({
       onUpdate: ({ editor }) => {
         window.clearTimeout(commitTimer.current);
         commitTimer.current = window.setTimeout(() => {
-          const html = editor.getHTML();
-          latest.current.onTextChange(block.kind === "ul" ? listItemsFromHtml(html) : innerHtmlOfSingleNode(html));
+          const text = readText(editor);
+          lastCommitted.current = JSON.stringify(text);
+          latest.current.onTextChange(text);
         }, COMMIT_DEBOUNCE_MS);
       },
+      autofocus: autoFocus ? "end" : false,
       onFocus: () => latest.current.onFocusBlock(),
+      onBlur: ({ editor }) => latest.current.onBlurBlock?.(readText(editor)),
       onSelectionUpdate: () => latest.current.onActivity(),
       onTransaction: () => latest.current.onActivity(),
     },
@@ -99,6 +115,20 @@ export function RichBlockEditor({
     return () => onEditorDestroy();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [editor]);
+
+  // The editor is uncontrolled after mount, so push in block text that changed from outside.
+  useEffect(() => {
+    if (!editor) return;
+    const next = JSON.stringify(block.text);
+    // Only react to the prop actually changing, and not to it catching up with our own commit.
+    if (next === lastProp.current) return;
+    lastProp.current = next;
+    if (next === lastCommitted.current) return;
+    lastCommitted.current = next;
+    window.clearTimeout(commitTimer.current);
+    editor.commands.setContent(initialHtml(block), { emitUpdate: false });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [editor, block.text]);
 
   useEffect(() => () => window.clearTimeout(commitTimer.current), []);
 

@@ -207,6 +207,8 @@ export interface Suggestion {
   instruction: string;
   oldText: string;
   newText: string;
+  /** Set when the suggestion replaces a whole list block (one entry per list item). */
+  newItems?: string[] | null;
   reason: string;
   staleReason?: string;
   requirementRef?: string | null;

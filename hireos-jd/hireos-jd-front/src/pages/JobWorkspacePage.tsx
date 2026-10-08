@@ -4,7 +4,6 @@ import { MainInner } from "../components/AppShell";
 import { Icon } from "../components/ui/Icons";
 import { Button, ErrorState, PersonAvatar, StatusBadge } from "../components/ui/Primitives";
 import { useStore } from "../store/StoreContext";
-import { GeminiPanel } from "../features/copilot/GeminiPanel";
 import { DocumentTab } from "../features/workspace/DocumentTab";
 import { ApprovalTab } from "../features/workspace/ApprovalTab";
 import { PublicationTab } from "../features/workspace/PublicationTab";
@@ -251,20 +250,6 @@ export function JobWorkspacePage() {
         {tab === "activity" && <ActivityTab jobId={id} />}
         {tab === "versions" && <VersionsTab jobId={id} />}
       </div>
-      <button
-        className="gemini-fab"
-        title={t("Ask Copilot — voice or chat")}
-        aria-label={t("Ask Copilot — voice or chat")}
-        onClick={() => {
-          const sel = window.getSelection()?.toString().trim();
-          openDrawer(
-            <GeminiPanel ctx={{ mode: "edit", jobId: id, audience, selText: sel && sel.length > 1 ? sel : null }} />,
-            { drawerClass: "gemini-drawer-shell", overlayClass: "gemini-overlay" },
-          );
-        }}
-      >
-        <Icon name="auto_awesome" />
-      </button>
     </MainInner>
   );
 }

@@ -1,13 +1,13 @@
 /**
  * Document-draft helpers ported from the prototype's job-workspace section
- * (`docKey` / `getDraft` / `buildDefaultDraft` / `canonicalSuggestion`).
+ * (`docKey` / `getDraft` / `buildDefaultDraft`).
  *
  * `buildDefaultDraft` is pure: jobs with no stored draft get one derived from
  * their active role version and requirements, exactly as the prototype did on
  * first read.
  */
 import { mkBlock } from "../../data/fixtures/documents";
-import { money, nowISO, uid } from "../../lib/format";
+import { money } from "../../lib/format";
 import type { AppState } from "../../store/types";
 import type { CurrentDraftDto } from "./documentsApi";
 import type { Audience, DocBlock, DocumentDraft, Suggestion } from "../../data/types";
@@ -143,82 +143,3 @@ export function blockPlainText(b: DocBlock): string {
   return Array.isArray(b.text) ? b.text.map(stripHtml).join(" • ") : stripHtml(b.text);
 }
 
-interface CanonicalSuggestion {
-  newText: string;
-  explain: string;
-  reason: string;
-  requirementRef?: string;
-}
-
-/**
- * The prototype's flagship demo rewrites (PRD/Brief §17.4): turning vague
- * requirement wording into something a screener can actually verify.
- */
-export function canonicalSuggestion(selText: string, instruction?: string): CanonicalSuggestion {
-  if (/strong communication skills/i.test(selText)) {
-    return {
-      newText:
-        "Can explain technical trade-offs clearly to non-technical stakeholders, supported by an example from a previous project.",
-      explain:
-        "I rewrote this as a requirement that can actually be verified in an interview or work sample, and kept it must-have. Whether it applies to this specific role is still yours to confirm.",
-      reason:
-        "Evidence expectation changes from unspecified to a concrete example; priority (must-have) is unchanged. This updates the linked requirement draft (req-102-comm) alongside the document text.",
-      requirementRef: "req-102-comm",
-    };
-  }
-  if (/b2b saas/i.test(selText)) {
-    return {
-      newText: "2+ years building B2B SaaS platforms, with a named product and your specific contribution.",
-      explain:
-        "I made this easier to screen against a resume by asking for a named product and a specific contribution, while keeping it must-have as Maya requested.",
-      reason: "Adds a verifiable evidence bar; does not change priority. Linked to req-102-b2b.",
-      requirementRef: "req-102-b2b",
-    };
-  }
-  if (/shorten/i.test(instruction || "")) {
-    const words = selText.split(" ");
-    const short = words.slice(0, Math.max(4, Math.ceil(words.length * 0.6))).join(" ");
-    return {
-      newText: short + (short.endsWith(".") ? "" : "."),
-      explain: "Shortened while keeping the core requirement.",
-      reason: "Wording simplified; no change to must-have/preferred or evaluation dimension.",
-    };
-  }
-  if (/clarify/i.test(instruction || "")) {
-    return {
-      newText: selText.replace(/\.$/, "") + ", with a specific example as evidence.",
-      explain: "Added a concrete evidence expectation to reduce ambiguity.",
-      reason: "Evidence standard clarified; priority unchanged.",
-    };
-  }
-  return {
-    newText: selText.replace(/\.$/, "") + " (rewritten for clarity).",
-    explain: "Here’s a clearer version of the selected text.",
-    reason: "Wording clarified; no change to must-have/preferred or evaluation dimension.",
-  };
-}
-
-export function makeSuggestion(
-  currentUserId: string,
-  blockId: string,
-  selText: string,
-  instruction?: string,
-): { suggestion: Suggestion; explain: string } {
-  const c = canonicalSuggestion(selText, instruction);
-  return {
-    suggestion: {
-      id: uid("sug"),
-      anchorBlock: blockId,
-      status: "proposed",
-      author: "ai",
-      initiatedBy: currentUserId,
-      createdAt: nowISO(),
-      instruction: instruction || "Rewrite",
-      oldText: selText,
-      newText: c.newText,
-      reason: c.reason,
-      requirementRef: c.requirementRef ?? null,
-    },
-    explain: c.explain,
-  };
-}

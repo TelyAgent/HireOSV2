@@ -5,10 +5,11 @@ import { Button } from "../../components/ui/Primitives";
 import { useStore } from "../../store/StoreContext";
 import { selectDraft, selectSuggestions, selectThreads, pendingSuggestionsFor, ensureDraft, stripHtml, docKey, buildDraftFromBackend } from "./docHelpers";
 import { COMMIT_DEBOUNCE_MS, RichBlockEditor } from "./RichBlockEditor";
-import { getCurrentDraft, getJobDocument, saveJobDocument } from "./documentsApi";
+import { getCurrentDraft, getJobDocument, listSuggestions, saveJobDocument } from "./documentsApi";
+import { getPerson } from "../../data/fixtures/people";
 import { SidePanel } from "./SidePanel";
 import { useDocActions } from "./docActions";
-import type { Audience, DocBlock } from "../../data/types";
+import type { Audience, DocBlock, Suggestion } from "../../data/types";
 import type { WsMode } from "../../store/types";
 
 const MODES: WsMode[] = ["editing", "suggesting", "viewing"];
@@ -50,6 +51,10 @@ export function DocumentTab({ jobId, audience }: { jobId: string; audience: Audi
   const [, bumpTick] = useReducer((c: number) => c + 1, 0);
   const activeEditor = activeBlockId ? editorsRef.current.get(activeBlockId) : undefined;
   const canFormat = isRichEditable && !!activeEditor;
+  // Suggesting mode: clicking a block opens it for editing; on blur the edit becomes a proposal.
+  const canSuggest = state.wsMode === "suggesting" && audience === "internal";
+  const [suggestEditingId, setSuggestEditingId] = useState<string | null>(null);
+  useEffect(() => setSuggestEditingId(null), [jobId, audience, state.wsMode]);
 
   // Clear the floating toolbar whenever the document identity changes.
   useEffect(() => setPendingSel(null), [jobId, audience, state.wsMode]);
@@ -57,6 +62,8 @@ export function DocumentTab({ jobId, audience }: { jobId: string; audience: Audi
   // (whichever blocks exist for the new jobId/audience naturally (de)register themselves) — this only
   // needs to drop the now-stale "focused block" pointer from the previous document.
   useEffect(() => setActiveBlockId(null), [jobId, audience]);
+  // Mirror the focused block into the store so the Copilot panel can act on it without a selection.
+  useEffect(() => set({ wsFocusBlockId: activeBlockId }), [activeBlockId, set]);
 
   // Load the saved document, or — for a job whose document was never saved — seed it from the
   // structured JD content Copilot stored when the job was created. Unsaved local edits win.
@@ -99,6 +106,23 @@ export function DocumentTab({ jobId, audience }: { jobId: string; audience: Audi
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [jobId, audience]);
 
+  // Suggestions live server-side so they survive reloads and are shared with the team.
+  useEffect(() => {
+    let cancelled = false;
+    listSuggestions(jobId, audience)
+      .then((list) => {
+        if (cancelled) return;
+        mutate((d) => {
+          d.suggestions[docKey(jobId, audience)] = list;
+        });
+      })
+      .catch((error) => console.warn("Failed to load document suggestions:", error));
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [jobId, audience]);
+
   const isDirty = draft.saveState === "dirty";
   const saveDocument = async () => {
     if (latestDraft.current.saveState === "saving") return;
@@ -125,6 +149,13 @@ export function DocumentTab({ jobId, audience }: { jobId: string; audience: Audi
   // Cmd/Ctrl+S saves; leaving the page with unsaved edits asks first.
   const saveRef = useRef(saveDocument);
   saveRef.current = saveDocument;
+  // Accepting a suggestion asks for an immediate save (see `acceptSuggestion`).
+  const handledSaveRequest = useRef(state.wsSaveRequest);
+  useEffect(() => {
+    if (state.wsSaveRequest === handledSaveRequest.current) return;
+    handledSaveRequest.current = state.wsSaveRequest;
+    if (latestDraft.current.saveState === "dirty") void saveRef.current();
+  }, [state.wsSaveRequest]);
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "s") {
@@ -173,15 +204,17 @@ export function DocumentTab({ jobId, audience }: { jobId: string; audience: Audi
       const sel = window.getSelection();
       const txt = sel?.toString().trim();
       if (!txt || txt.length < 2 || state.wsMode === "viewing") return setPendingSel(null);
-      if (!sel?.anchorNode || !docRef.current?.contains(sel.anchorNode)) return setPendingSel(null);
-      const rect = sel.getRangeAt(0).getBoundingClientRect();
+      const doc = docRef.current;
+      if (!sel || !sel.rangeCount || !doc || !sel.getRangeAt(0).intersectsNode(doc)) return setPendingSel(null);
+      const range = sel.getRangeAt(0);
+      const rect = range.getBoundingClientRect();
       const wrap = wrapRef.current;
       if (!wrap) return;
       const wrapRect = wrap.getBoundingClientRect();
-      const blockEl = (sel.anchorNode.parentElement as HTMLElement | null)?.closest(".doc-block");
+      const { blockId, text } = selectionInBlock(doc, range, txt);
       setPendingSel({
-        text: txt,
-        blockId: blockEl?.getAttribute("data-block-id") ?? null,
+        text,
+        blockId,
         top: Math.max(4, rect.top - wrapRect.top - 44 + wrap.scrollTop),
         left: Math.max(0, rect.left - wrapRect.left),
       });
@@ -307,6 +340,11 @@ export function DocumentTab({ jobId, audience }: { jobId: string; audience: Audi
                 • {draft.reviewStatus === "reviewed" ? t("Reviewed") : t("Needs review")}
               </div>
             )}
+            {canSuggest && (
+              <div className="info-inline" style={{ marginBottom: 18 }}>
+                {t("Suggesting: click a paragraph or list to edit it. Your edits are saved as suggestions and only change the document once accepted.")}
+              </div>
+            )}
             {draft.blocks.map((b) => (
               <DocBlockView
                 key={b.id}
@@ -314,6 +352,13 @@ export function DocumentTab({ jobId, audience }: { jobId: string; audience: Audi
                 jobId={jobId}
                 audience={audience}
                 editable={isRichEditable}
+                suggestMode={canSuggest}
+                suggestEditing={canSuggest && suggestEditingId === b.id}
+                onStartSuggest={() => setSuggestEditingId(b.id)}
+                onSuggestBlur={(text) => {
+                  setSuggestEditingId(null);
+                  void actions.proposeEdit(b.id, text);
+                }}
                 isActive={activeBlockId === b.id}
                 onTextChange={(text) => commitBlockText(b.id, text)}
                 onFocusBlock={() => setActiveBlockId(b.id)}
@@ -398,6 +443,10 @@ function DocBlockView({
   jobId,
   audience,
   editable,
+  suggestMode,
+  suggestEditing,
+  onStartSuggest,
+  onSuggestBlur,
   isActive,
   onTextChange,
   onFocusBlock,
@@ -409,6 +458,10 @@ function DocBlockView({
   jobId: string;
   audience: Audience;
   editable: boolean;
+  suggestMode: boolean;
+  suggestEditing: boolean;
+  onStartSuggest: () => void;
+  onSuggestBlur: (text: string | string[]) => void;
   isActive: boolean;
   onTextChange: (text: string | string[]) => void;
   onFocusBlock: () => void;
@@ -425,38 +478,54 @@ function DocBlockView({
     (s) => s.status === "stale" && s.anchorBlock === block.id,
   );
 
-  const marked = (text: string) => {
-    // Demo suggestions are always plain text matched against the block's stripped content — a block
-    // that's been rich-edited (and so may contain `<strong>`/`<em>`) just won't match, same as today.
-    const active = suggestions.find((s) => s.oldText && stripHtml(text).includes(s.oldText));
-    if (!active) return renderInlineHtml(text);
-    const plain = stripHtml(text);
-    const [before, ...rest] = plain.split(active.oldText);
-    return (
-      <>
-        {before}
-        <span className="del">{active.oldText}</span>
-        <span className="ins">{active.newText}</span>
-        <span className={`mark-badge ${active.author === "ai" ? "ai" : "human"}`}>
-          {active.author === "ai" ? "AI" : "Maya"}
-        </span>
-        {rest.join(active.oldText)}
-      </>
-    );
-  };
+  // Pending proposals are shown inline (Suggesting / Viewing); the first one per block is marked, the
+  // rest are reviewed from the Changes tab.
+  const active = suggestions[0];
+  const badge = active ? <SuggestionBadge s={active} onClick={() => actions.setSideTab("changes")} /> : null;
+  const markedText = (text: string) => (active ? markFragment(text, active, badge) : renderInlineHtml(text));
 
   const richEditorProps = { onTextChange, onFocusBlock, onEditorReady, onEditorDestroy, onActivity };
   const richWrapClass = `rich-block-editor kind-${block.kind}${isActive ? " is-focused" : ""}`;
 
+  if (suggestEditing) {
+    // Start from your own pending proposal for this block, if there is one.
+    const own = suggestions.find((x) => x.author === "human" && x.initiatedBy === state.currentUserId);
+    const startText = own ? (Array.isArray(block.text) ? (own.newItems ?? own.newText.split("\n")) : own.newText) : block.text;
+    return (
+      <div className="doc-block" data-block-id={block.id}>
+        <div className={`rich-block-editor kind-${block.kind} is-focused is-suggesting`}>
+          <RichBlockEditor
+            key={`${block.id}-suggest`}
+            block={{ ...block, text: startText }}
+            {...richEditorProps}
+            onTextChange={() => undefined}
+            onBlurBlock={onSuggestBlur}
+            autoFocus
+          />
+        </div>
+      </div>
+    );
+  }
+
+  const startSuggest = () => {
+    // A drag-selection is for the Copilot toolbar, not for opening the block.
+    if (!suggestMode || !window.getSelection()?.isCollapsed) return;
+    onStartSuggest();
+  };
+
   return (
-    <div className={`doc-block${openThreadCount > 0 ? " has-comment" : ""}`} data-block-id={block.id}>
+    <div
+      className={`doc-block${openThreadCount > 0 ? " has-comment" : ""}${suggestMode ? " suggestable" : ""}`}
+      data-block-id={block.id}
+      onClick={startSuggest}
+    >
       {block.kind === "h2" &&
         (editable ? (
           <div className={richWrapClass}>
             <RichBlockEditor block={block} {...richEditorProps} />
           </div>
         ) : (
-          <h2 className="docH">{marked(block.text as string)}</h2>
+          <h2 className="docH">{markedText(block.text as string)}</h2>
         ))}
       {block.kind === "h3" &&
         (editable ? (
@@ -464,7 +533,7 @@ function DocBlockView({
             <RichBlockEditor block={block} {...richEditorProps} />
           </div>
         ) : (
-          <h3 className="docH3">{marked(block.text as string)}</h3>
+          <h3 className="docH3">{markedText(block.text as string)}</h3>
         ))}
       {block.kind === "p" &&
         (editable ? (
@@ -472,7 +541,9 @@ function DocBlockView({
             <RichBlockEditor block={block} {...richEditorProps} />
           </div>
         ) : (
-          <p className={`docP${block.role === "requirement" ? "" : " presentation-only"}`}>{marked(block.text as string)}</p>
+          <p className={`docP${block.role === "requirement" ? "" : " presentation-only"}`}>
+            {markedText(block.text as string)}
+          </p>
         ))}
       {block.kind === "ul" &&
         (editable ? (
@@ -480,11 +551,7 @@ function DocBlockView({
             <RichBlockEditor block={block} {...richEditorProps} />
           </div>
         ) : (
-          <ul className="docList">
-            {(block.text as string[]).map((x, i) => (
-              <li key={i}>{marked(x)}</li>
-            ))}
-          </ul>
+          <ul className="docList">{renderListItems(block.text as string[], active, badge)}</ul>
         ))}
       {openThreadCount > 0 && (
         <span
@@ -502,5 +569,117 @@ function DocBlockView({
         </span>
       )}
     </div>
+  );
+}
+
+/**
+ * Resolves which document block a selection belongs to. Reading only `anchorNode` misses selections
+ * that start on a container element (e.g. selecting a whole list, or dragging from the margin), so
+ * this takes the first block the range actually intersects. A selection spanning several blocks is
+ * clipped to that first block, since a suggestion always targets exactly one block.
+ */
+function selectionInBlock(root: HTMLElement, range: Range, fallbackText: string): { blockId: string | null; text: string } {
+  const blocks = Array.from(root.querySelectorAll<HTMLElement>(".doc-block"));
+  const hit = blocks.filter((el) => range.intersectsNode(el) && rangeTextIn(range, el) !== "");
+  const first = hit[0];
+  if (!first) return { blockId: null, text: fallbackText };
+  const blockId = first.getAttribute("data-block-id");
+  if (hit.length === 1) return { blockId, text: fallbackText };
+  return { blockId, text: rangeTextIn(range, first) || fallbackText };
+}
+
+function rangeTextIn(range: Range, el: HTMLElement): string {
+  const clipped = range.cloneRange();
+  const bounds = document.createRange();
+  bounds.selectNodeContents(el);
+  if (clipped.compareBoundaryPoints(Range.START_TO_START, bounds) < 0) clipped.setStart(bounds.startContainer, bounds.startOffset);
+  if (clipped.compareBoundaryPoints(Range.END_TO_END, bounds) > 0) clipped.setEnd(bounds.endContainer, bounds.endOffset);
+  return clipped.toString().trim();
+}
+
+function SuggestionBadge({ s, onClick }: { s: Suggestion; onClick: () => void }) {
+  const { t } = useStore();
+  const name = s.author === "ai" ? "AI" : (getPerson(s.initiatedBy)?.name ?? t("Suggestion"));
+  return (
+    <span
+      className={`mark-badge ${s.author === "ai" ? "ai" : "human"}`}
+      title={t("Review in Changes")}
+      onClick={(e) => {
+        e.stopPropagation();
+        onClick();
+      }}
+    >
+      {name}
+    </span>
+  );
+}
+
+/** Splits `a` → `b` into shared prefix, removed middle, inserted middle and shared suffix. */
+function diffMiddle(a: string, b: string) {
+  let p = 0;
+  while (p < a.length && p < b.length && a[p] === b[p]) p++;
+  let q = 0;
+  while (q < a.length - p && q < b.length - p && a[a.length - 1 - q] === b[b.length - 1 - q]) q++;
+  return { prefix: a.slice(0, p), del: a.slice(p, a.length - q), ins: b.slice(p, b.length - q), suffix: a.slice(a.length - q) };
+}
+
+function renderDiff(oldText: string, newText: string, badge: ReactNode) {
+  const d = diffMiddle(oldText, newText);
+  return (
+    <>
+      {d.prefix}
+      {d.del && <span className="del">{d.del}</span>}
+      {d.ins && <span className="ins">{d.ins}</span>}
+      {badge}
+      {d.suffix}
+    </>
+  );
+}
+
+/** Marks a fragment suggestion inside one paragraph / heading / list item, or returns the plain text. */
+function markFragment(text: string, s: Suggestion, badge: ReactNode): ReactNode {
+  const plain = stripHtml(text);
+  const idx = s.oldText ? plain.indexOf(s.oldText) : -1;
+  if (idx < 0) return renderInlineHtml(text);
+  return (
+    <>
+      {plain.slice(0, idx)}
+      {renderDiff(s.oldText, stripHtml(s.newText), badge)}
+      {plain.slice(idx + s.oldText.length)}
+    </>
+  );
+}
+
+function renderListItems(items: string[], s: Suggestion | undefined, badge: ReactNode): ReactNode {
+  if (!s) return items.map((x, i) => <li key={i}>{renderInlineHtml(x)}</li>);
+  if (!s.newItems) {
+    // Fragment inside one item: mark the first item that contains it.
+    const hit = items.findIndex((x) => stripHtml(x).includes(s.oldText));
+    return items.map((x, i) => <li key={i}>{i === hit ? markFragment(x, s, badge) : renderInlineHtml(x)}</li>);
+  }
+  const next = s.newItems.map(stripHtml);
+  if (next.length === items.length) {
+    // Same shape: show a per-item diff, unchanged items as-is.
+    const last = next.reduce((acc, x, i) => (x !== stripHtml(items[i]) ? i : acc), -1);
+    return items.map((x, i) => {
+      const old = stripHtml(x);
+      return <li key={i}>{old === next[i] ? renderInlineHtml(x) : renderDiff(old, next[i], i === last ? badge : null)}</li>;
+    });
+  }
+  // Items added or removed: show the whole old list struck through, then the proposed list.
+  return (
+    <>
+      {items.map((x, i) => (
+        <li key={`old-${i}`}>
+          <span className="del">{stripHtml(x)}</span>
+        </li>
+      ))}
+      {next.map((x, i) => (
+        <li key={`new-${i}`}>
+          <span className="ins">{x}</span>
+          {i === next.length - 1 && badge}
+        </li>
+      ))}
+    </>
   );
 }

@@ -86,6 +86,7 @@ function CreateModal({ mode }: { mode: CreateMode }) {
   const [uploadFileName, setUploadFileName] = useState("");
   const [extractError, setExtractError] = useState("");
   const [pastedNotes, setPastedNotes] = useState("");
+  const [dragOver, setDragOver] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const notAvailable = () => {
@@ -130,7 +131,14 @@ function CreateModal({ mode }: { mode: CreateMode }) {
   }
 
   function handleFileSelected(file: File) {
+    if (extractStatus === "extracting") return;
     setUploadFileName(file.name);
+    // The input's `accept` filter doesn't apply to drag-and-drop, so check the extension here too.
+    if (!/\.(pdf|docx|txt)$/i.test(file.name)) {
+      setExtractStatus("error");
+      setExtractError(t("Only PDF, DOCX or TXT files are supported."));
+      return;
+    }
     void extractIntoCopilot(file, `[${t("Uploaded file")}] ${file.name}`);
   }
 
@@ -150,8 +158,28 @@ function CreateModal({ mode }: { mode: CreateMode }) {
         <ModalBody>
           <div
             className="empty-state"
-            style={{ padding: 32, border: "1px dashed var(--border-strong)", borderRadius: 8, cursor: "pointer" }}
+            style={{
+              padding: 32,
+              border: `1px dashed ${dragOver ? "var(--info-border)" : "var(--border-strong)"}`,
+              background: dragOver ? "var(--info-bg)" : undefined,
+              borderRadius: 8,
+              cursor: "pointer",
+            }}
             onClick={() => fileInputRef.current?.click()}
+            onDragOver={(e) => {
+              e.preventDefault();
+              e.dataTransfer.dropEffect = "copy";
+              setDragOver(true);
+            }}
+            onDragLeave={(e) => {
+              if (!e.currentTarget.contains(e.relatedTarget as Node | null)) setDragOver(false);
+            }}
+            onDrop={(e) => {
+              e.preventDefault();
+              setDragOver(false);
+              const file = e.dataTransfer.files?.[0];
+              if (file) void handleFileSelected(file);
+            }}
           >
             <Icon name="upload_file" />
             <h3>{t("Drop PDF, DOCX or TXT")}</h3>

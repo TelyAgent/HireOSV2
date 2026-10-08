@@ -58,7 +58,7 @@ export class LinkingService {
       origin: 'sourced',
       linkReason,
     }, `screening:application:create:${identity.workspaceId}:${recommendation.candidateId}:${recommendation.jobId}:cycle-1`);
-    const application = await this.db.$transaction(async (tx) => {
+    const { application, needsScreeningKickoff } = await this.db.$transaction(async (tx) => {
       const existing = await tx.application.findUnique({
         where: {
           workspaceId_candidateId_jobId_cycleId: {
@@ -100,23 +100,45 @@ export class LinkingService {
           inputManifest,
         },
       });
-      await tx.humanTask.create({
-        data: {
-          workspaceId: identity.workspaceId,
-          sourceModule: 'Resume Library',
-          taskType: 'screening_review',
-          title: `Review screening: ${recommendation.candidate.displayName} — ${recommendation.job.title}`,
-          subjectLabel: 'Linked, screening not yet run.',
-          requiredAction: 'Review screening and choose next step.',
-          completionRule: { requiredResultType: 'screening_review_completed' },
-          candidateId: recommendation.candidateId,
-          jobId: recommendation.jobId,
-          applicationId: created.id,
-          recommendationId: recommendation.id,
-          assigneeId: identity.actorId,
-          priority: 'normal',
-          linkRoute: `/applications/${created.id}`,
-        },
+      // Reusing an existing Application (another recommendation for the same candidate+job
+      // got re-proposed and confirmed again) must not spawn a second screening_review task
+      // or re-run screening out from under a decision that's already been made -- check
+      // both before deciding whether this confirm actually needs to kick anything off.
+      const hasOpenScreeningTask = existing && await tx.humanTask.findFirst({
+        where: { workspaceId: identity.workspaceId, applicationId: created.id, taskType: 'screening_review', status: { notIn: ['completed', 'cancelled'] } },
+        select: { id: true },
+      });
+      const hasApprovedDecision = existing && await tx.screeningDecision.findFirst({
+        where: { workspaceId: identity.workspaceId, applicationId: created.id, status: 'approved' },
+        select: { id: true },
+      });
+      const needsScreeningKickoff = !hasOpenScreeningTask && !hasApprovedDecision;
+      if (needsScreeningKickoff) {
+        await tx.humanTask.create({
+          data: {
+            workspaceId: identity.workspaceId,
+            sourceModule: 'Resume Library',
+            taskType: 'screening_review',
+            title: `Review screening: ${recommendation.candidate.displayName} — ${recommendation.job.title}`,
+            subjectLabel: 'Link confirmed — awaiting a screening decision.',
+            requiredAction: 'Record a screening decision (advance / hold / reject / request info).',
+            completionRule: { requiredResultType: 'screening_review_completed' },
+            candidateId: recommendation.candidateId,
+            jobId: recommendation.jobId,
+            applicationId: created.id,
+            recommendationId: recommendation.id,
+            assigneeId: identity.actorId,
+            priority: 'normal',
+            linkRoute: `/applications/${created.id}`,
+          },
+        });
+      }
+      // The link_confirmation task (created when this recommendation was proposed) is done
+      // now that a human has confirmed it -- close it out alongside the screening_review
+      // task created above so the recruiter never has to close it by hand.
+      await tx.humanTask.updateMany({
+        where: { workspaceId: identity.workspaceId, recommendationId: recommendation.id, taskType: 'link_confirmation', status: { notIn: ['completed', 'cancelled'] } },
+        data: { status: 'completed', completedAt: new Date(), completionRef: recommendation.id },
       });
       await tx.job.update({
         where: { id: recommendation.jobId },
@@ -132,7 +154,7 @@ export class LinkingService {
           payload: { recommendationId: recommendation.id, inputManifest },
         },
       });
-      return created;
+      return { application: created, needsScreeningKickoff };
     });
     // Confirming a link means "screen this candidate for this role" -- kick screening off
     // immediately instead of making the recruiter open the application and click "Run
@@ -141,9 +163,13 @@ export class LinkingService {
     // should roll back or block the confirm-link response the recruiter is waiting on. The
     // application still starts out in "not_started" screeningStatus either way; if this
     // fails, the recruiter sees the normal "Run screening" empty state and can retry by hand.
-    void this.screening.run(identity, application.id, 'initial').catch((error) => {
-      this.logger.warn(`Auto-screen after link confirm failed for application ${application.id}: ${error instanceof Error ? error.message : error}`);
-    });
+    // Skipped entirely when this confirm just reused an application that's already being
+    // screened or already has a decision -- see needsScreeningKickoff above.
+    if (needsScreeningKickoff) {
+      void this.screening.run(identity, application.id, 'initial').catch((error) => {
+        this.logger.warn(`Auto-screen after link confirm failed for application ${application.id}: ${error instanceof Error ? error.message : error}`);
+      });
+    }
     return toFrontendApplication(application);
   }
 
