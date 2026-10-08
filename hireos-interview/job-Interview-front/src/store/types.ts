@@ -140,6 +140,9 @@ export interface AppState {
   // invites
   inviteFailed: boolean;
 
+  // side navigation: icon-only rail (collapsed) vs icon + label (expanded)
+  sidenavCollapsed: boolean;
+
   // file dup/triage
   dupResolved: boolean;
   triResolved: boolean;

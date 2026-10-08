@@ -11,6 +11,7 @@ export const initialState: AppState = {
   accent: "teal",
   textSize: "medium",
   lang: "en",
+  sidenavCollapsed: false,
   roleIdx: 0,
   systemDark: false,
 

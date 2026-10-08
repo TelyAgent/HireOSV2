@@ -30,6 +30,7 @@ export function AppShell({ openTaskCount, children }: { openTaskCount: number; c
   const { state, t, toggleLang, toggleSidebar, toggleAppearance, toggleRoleSwitcher } = useStore();
   const location = useLocation();
   const navigate = useNavigate();
+  const toggleLabel = state.sidebarCollapsed ? t("Expand navigation") : t("Collapse navigation");
 
   return (
     <div className="appshell">
@@ -53,6 +54,17 @@ export function AppShell({ openTaskCount, children }: { openTaskCount: number; c
             </div>
           ))}
         </div>
+        <button
+          className="sidebar-toggle"
+          type="button"
+          title={toggleLabel}
+          aria-label={toggleLabel}
+          aria-expanded={!state.sidebarCollapsed}
+          onClick={toggleSidebar}
+        >
+          <span className="ic material-icons-o">{state.sidebarCollapsed ? "left_panel_open" : "left_panel_close"}</span>
+          {!state.sidebarCollapsed && <span className="truncate">{toggleLabel}</span>}
+        </button>
       </nav>
 
       <div className="main-col">

@@ -170,6 +170,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
             overviewStatsOpen:
               p.overviewStatsOpen !== false,
             lang: p.lang || "en",
+            sidenavCollapsed: !!p.sidenavCollapsed,
           },
         });
       }
@@ -188,6 +189,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
           moreOpen: state.moreOpen,
           overviewStatsOpen: state.overviewStatsOpen,
           lang: state.lang,
+          sidenavCollapsed: state.sidenavCollapsed,
         }),
       );
     } catch {}
@@ -198,6 +200,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     state.moreOpen,
     state.overviewStatsOpen,
     state.lang,
+    state.sidenavCollapsed,
   ]);
 
   // System dark mode tracking

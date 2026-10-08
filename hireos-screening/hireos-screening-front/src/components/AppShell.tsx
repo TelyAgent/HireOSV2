@@ -104,8 +104,9 @@ function NavLinkItem({ item, collapsed, count }: { item: NavItem; collapsed: boo
 }
 
 export function SideNav({ openTaskCount }: { openTaskCount: number }) {
-  const { state, t } = useStore();
+  const { state, t, toggleSidenav } = useStore();
   const collapsed = state.sidenavCollapsed;
+  const toggleLabel = collapsed ? t("Expand navigation") : t("Collapse navigation");
   return (
     <nav className={`sidenav${collapsed ? " collapsed" : ""}`} aria-label="Primary">
       <div className="sidenav-section">
@@ -127,6 +128,17 @@ export function SideNav({ openTaskCount }: { openTaskCount: number }) {
           </div>
         </div>
       )}
+      <button
+        className="sidenav-toggle"
+        type="button"
+        title={toggleLabel}
+        aria-label={toggleLabel}
+        aria-expanded={!collapsed}
+        onClick={toggleSidenav}
+      >
+        <Icon name={collapsed ? "left_panel_open" : "left_panel_close"} />
+        {!collapsed && <span className="toggle-label">{toggleLabel}</span>}
+      </button>
     </nav>
   );
 }

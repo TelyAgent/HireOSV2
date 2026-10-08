@@ -187,6 +187,14 @@ textarea.input { height: auto; padding: var(--space-3); resize: vertical; }
 .nav-item[title]::after { content: attr(title); position: absolute; left: calc(100% + 10px); top: 50%; transform: translateY(-50%); background: var(--text-primary); color: var(--surface); padding: 6px 8px; border-radius: 7px; font-size: 11px; font-weight: 600; opacity: 0; pointer-events: none; white-space: nowrap; box-shadow: var(--shadow-2); transition: opacity .12s ease; z-index: 80; }
 .sidebar:not(.collapsed) .nav-item[title]::after { display: none; }
 .nav-item[title]:hover::after { opacity: 1; }
+/* Collapse / expand toggle pinned to the bottom of the sidebar (same as hireos-jd-front). */
+.sidebar-toggle {
+  display: flex; align-items: center; gap: 12px; height: 44px; padding: 0 20px; border: none; border-top: 1px solid var(--border);
+  background: none; color: var(--text-secondary); font-size: 12px; font-weight: 600; font-family: inherit; cursor: pointer; white-space: nowrap; flex: none;
+}
+.sidebar-toggle:hover { background: var(--surface-alt); color: var(--text-primary); }
+.sidebar-toggle .ic { width: 20px; flex: none; font-size: 20px; }
+.sidebar.collapsed .sidebar-toggle { justify-content: center; padding: 0; }
 
 .main-col { margin-left: var(--sidebar-w-collapsed); padding-top: var(--appbar-h); min-width: 0; display: flex; flex-direction: column; }
 .sidebar:not(.collapsed) ~ .main-col { margin-left: var(--sidebar-w); }

@@ -2,9 +2,6 @@ import { useEffect, useLayoutEffect, useState } from "react";
 import { useStore } from "../store/StoreContext";
 import {
   CloseSvg,
-  HomeSvg,
-  PlusSvg,
-  SettingsSvg,
   SunSvg,
 } from "./ui/Icons";
 import { AppearancePopover } from "./AppearancePopover";
@@ -172,76 +169,125 @@ function RoleButton({ role }: { role: { initials: string; name: string; title: s
   );
 }
 
+/**
+ * Same look as the other subsystems' side nav (hireos-written-front / hireos-jd-front): 220px wide
+ * with icon + label, a "Workspace" group for Settings, and a collapse toggle pinned to the bottom;
+ * collapsed it becomes a 52px icon-only rail with the label in the native tooltip.
+ */
 export function SideNav() {
-  const { state, t, go, set } = useStore();
-  const sideBtn = (active: boolean) => ({
-    width: 32,
-    height: 32,
+  const { state, t, go, set, say } = useStore();
+  const collapsed = state.sidenavCollapsed;
+  const toggleLabel = collapsed ? t.expandNav : t.collapseNav;
+
+  const navItem = (active: boolean): React.CSSProperties => ({
+    width: collapsed ? 40 : "100%",
+    height: 40,
+    margin: collapsed ? "0 auto 4px" : "0 0 4px",
+    padding: collapsed ? 0 : "0 12px",
     border: 0,
-    borderRadius: 8,
-    background: active ? "var(--surface-3)" : "transparent",
-    color: active ? "var(--brand)" : "var(--ink-2)",
+    borderRadius: 11,
+    background: active ? "var(--brand-soft)" : "transparent",
+    color: active ? "var(--brand-strong)" : "var(--ink-2)",
     cursor: "pointer",
     display: "flex",
     alignItems: "center",
-    justifyContent: "center",
+    justifyContent: collapsed ? "center" : "flex-start",
+    gap: 12,
+    fontSize: 12,
+    fontWeight: active ? 700 : 600,
+    fontFamily: "inherit",
+    whiteSpace: "nowrap",
   });
+  const icon = (name: string) => (
+    <span className="material-symbols-rounded" style={{ fontSize: 20, width: 20, flex: "none" }}>
+      {name}
+    </span>
+  );
+  const label = (text: string) => (collapsed ? null : <span>{text}</span>);
 
   return (
     <div
       role="navigation"
       aria-label={t.primaryNav}
       style={{
-        width: 52,
+        width: collapsed ? 52 : 220,
         flex: "none",
         borderRight: "1px solid var(--line)",
         background: "var(--surface)",
         display: "flex",
         flexDirection: "column",
-        alignItems: "center",
-        gap: 10,
-        padding: "14px 0",
+        transition: "width .15s ease",
+        overflow: "hidden",
       }}
     >
+      <div style={{ flex: 1, padding: "10px 8px", overflowY: "auto" }}>
+        <button
+          aria-label={t.sideHome}
+          title={collapsed ? t.sideHome : undefined}
+          onClick={() => go("home")}
+          style={navItem(state.screen === "home")}
+        >
+          {icon("home")}
+          {label(t.sideHome)}
+        </button>
+        {!collapsed && (
+          <div
+            style={{
+              fontFamily: "'IBM Plex Mono', monospace",
+              fontSize: 10,
+              fontWeight: 700,
+              letterSpacing: ".08em",
+              textTransform: "uppercase",
+              color: "var(--ink-3)",
+              padding: "14px 10px 6px",
+              whiteSpace: "nowrap",
+            }}
+          >
+            {t.sideWorkspace}
+          </div>
+        )}
+        <button
+          aria-label={t.sideSettings}
+          title={collapsed ? t.sideSettings : undefined}
+          onClick={() =>
+            say(
+              state.lang === "zh"
+                ? "设置模块不在当前演示范围内。"
+                : "Settings module is not part of this demo.",
+            )
+          }
+          style={navItem(false)}
+        >
+          {icon("tune")}
+          {label(t.sideSettings)}
+        </button>
+      </div>
       <button
-        aria-label={t.sideHome}
-        onClick={() => go("home")}
-        style={sideBtn(state.screen === "home")}
-      >
-        <HomeSvg />
-      </button>
-      <button
-        aria-label={t.sideNew}
-        onClick={() => set({ showCreateModal: true })}
-        style={sideBtn(state.showCreateModal)}
-      >
-        <PlusSvg />
-      </button>
-      <div style={{ flex: 1 }} />
-      <button
-        aria-label={t.sideSettings}
-        onClick={() => {
-          const { say } = useStore();
-          say(
-            state.lang === "zh"
-              ? "设置模块不在当前演示范围内。"
-              : "Settings module is not part of this demo.",
-          );
-        }}
+        aria-label={toggleLabel}
+        aria-expanded={!collapsed}
+        title={toggleLabel}
+        onClick={() => set({ sidenavCollapsed: !collapsed })}
         style={{
-          width: 32,
-          height: 32,
-          border: 0,
-          borderRadius: 8,
-          background: "transparent",
-          color: "var(--ink-3)",
-          cursor: "pointer",
           display: "flex",
           alignItems: "center",
-          justifyContent: "center",
+          justifyContent: collapsed ? "center" : "flex-start",
+          gap: 12,
+          height: 44,
+          padding: collapsed ? 0 : "0 20px",
+          border: 0,
+          borderTop: "1px solid var(--line)",
+          background: "transparent",
+          color: "var(--ink-2)",
+          fontSize: 12,
+          fontWeight: 600,
+          fontFamily: "inherit",
+          cursor: "pointer",
+          whiteSpace: "nowrap",
+          flex: "none",
         }}
       >
-        <SettingsSvg />
+        {icon(collapsed ? "left_panel_open" : "left_panel_close")}
+        {label(toggleLabel)}
       </button>
     </div>
   );

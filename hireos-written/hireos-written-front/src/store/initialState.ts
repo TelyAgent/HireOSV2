@@ -6,7 +6,7 @@ export const initialState: AppState = {
   accent: "teal",
   textSize: "medium",
   systemDark: false,
-  sidebarCollapsed: true,
+  sidebarCollapsed: false,
 
   currentUser: "user_john",
 

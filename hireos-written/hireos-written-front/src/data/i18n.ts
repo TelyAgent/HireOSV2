@@ -11,7 +11,7 @@ export const ZH: Record<string, string> = {
   "Overview": "概览", "Question Bank": "题库", "Comparisons": "候选人对比", "Files & Integrations": "文件与集成",
   "Settings": "设置", "Workspace": "工作区", "Command": "指挥台", "Assessment (embedded)": "测评（嵌入模式）",
   "HireOS · Written Test": "HireOS · 笔试测评", "Written Test": "笔试测评",
-  "Search projects, candidates...": "搜索项目、候选人…", "Toggle navigation": "切换导航", "Search": "搜索",
+  "Search projects, candidates...": "搜索项目、候选人…", "Toggle navigation": "切换导航", "Expand navigation": "展开导航", "Collapse navigation": "收起导航", "Search": "搜索",
   "Notifications": "通知", "Appearance": "外观", "Demo tools": "演示工具", "Switch demo role": "切换演示角色",
   "Demo role": "演示角色",
   "Language": "语言",

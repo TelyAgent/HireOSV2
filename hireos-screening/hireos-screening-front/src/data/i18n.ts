@@ -49,6 +49,8 @@ export const ZH: Record<string, string> = {
   Comparisons: "候选人对比",
   Workspace: "工作区",
   "Files & Integrations": "文件与集成",
+  "Expand navigation": "展开导航",
+  "Collapse navigation": "收起导航",
   Settings: "设置",
   Demo: "演示说明",
   "All data on this prototype is fictional. External sends, real emails and model calls are simulated.":

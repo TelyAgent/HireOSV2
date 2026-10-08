@@ -53,7 +53,7 @@ button{ font-family:inherit; }
 
 .shell{ flex:1; display:flex; min-height:0; }
 
-.sidenav{ width:236px; flex:0 0 auto; background:var(--surface); border-right:1px solid var(--border); padding:12px 8px; overflow-y:auto; }
+.sidenav{ width:236px; flex:0 0 auto; background:var(--surface); border-right:1px solid var(--border); padding:12px 8px; overflow-y:auto; display:flex; flex-direction:column; }
 .sidenav-section{ margin-bottom:18px; }
 .sidenav-label{ font-size:var(--fs-xs); text-transform:uppercase; letter-spacing:.06em; color:var(--text-tertiary); padding:6px 12px; font-weight:600; }
 .nav-item{ display:flex; align-items:center; gap:12px; padding:9px 12px; border-radius:12px; color:var(--text); font-size:var(--fs-sm); cursor:pointer; position:relative; margin-bottom:2px; text-decoration:none; }
@@ -375,6 +375,11 @@ body{ letter-spacing:-.006em; }
 .sidenav.collapsed .nav-item[title]::after{ content:attr(title); position:absolute; left:calc(100% + 10px); top:50%; transform:translateY(-50%); background:#111827; color:#fff; padding:6px 8px; border-radius:7px; font-size:11px; font-weight:600; opacity:0; pointer-events:none; white-space:nowrap; box-shadow:var(--shadow-2); transition:opacity .12s ease; z-index:80; }
 .sidenav.collapsed .nav-item[title]:hover::after{ opacity:1; }
 #sidenav-toggle .material-icons-o{ font-size:20px; }
+/* Collapse / expand toggle pinned to the bottom of the side nav (same as hireos-jd-front). */
+.sidenav-toggle{ display:flex; align-items:center; gap:12px; width:100%; margin-top:auto; padding:9px 12px; border:0; border-top:1px solid var(--border); border-radius:0; background:none; color:var(--text-secondary); font-size:var(--fs-sm); font-family:inherit; cursor:pointer; }
+.sidenav-toggle:hover{ background:var(--surface-alt); }
+.sidenav-toggle .material-icons-o{ font-size:19px; flex:0 0 auto; }
+.sidenav.collapsed .sidenav-toggle{ width:40px; justify-content:center; padding:9px 0; }
 .main-inner,.main-inner.wide{ max-width:none; margin:0; padding:24px 32px 60px; }
 
 .page-title{ font-size:var(--fs-h1); font-weight:700; letter-spacing:-.025em; }
