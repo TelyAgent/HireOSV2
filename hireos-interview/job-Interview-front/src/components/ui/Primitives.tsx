@@ -7,47 +7,6 @@ export function useEffectOnce(fn: () => void) {
   }, []);
 }
 
-interface ToastProps {
-  text: string;
-}
-
-export function Toast({ text }: ToastProps) {
-  const [visible, setVisible] = useState(false);
-
-  useEffect(() => {
-    if (text) {
-      setVisible(true);
-    } else {
-      setVisible(false);
-    }
-  }, [text]);
-
-  if (!text || !visible) return null;
-  return (
-    <div
-      role="status"
-      aria-live="polite"
-      style={{
-        position: "fixed",
-        left: "50%",
-        bottom: 24,
-        transform: "translateX(-50%)",
-        maxWidth: 520,
-        padding: "12px 16px",
-        borderRadius: 12,
-        background: "var(--ink)",
-        color: "var(--surface)",
-        fontSize: 12.5,
-        lineHeight: 1.5,
-        boxShadow: "0 10px 30px rgba(0,0,0,0.25)",
-        zIndex: 50,
-      }}
-    >
-      {text}
-    </div>
-  );
-}
-
 interface SectionTitleProps {
   children: ReactNode;
 }

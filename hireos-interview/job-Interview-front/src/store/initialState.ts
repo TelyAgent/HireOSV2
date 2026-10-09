@@ -31,7 +31,6 @@ export const initialState: AppState = {
   showEvidenceRequest: false,
   drawer: null,
   sourceAnswer: null,
-  toast: "",
 
   jdText:
     "Senior Backend Engineer — Platform Engineering\nRemote (APAC / EU overlap)\n\nWe're looking for a Senior Backend Engineer to own the reliability and evolution of our order and payments platform...",

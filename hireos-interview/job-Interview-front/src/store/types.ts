@@ -78,7 +78,6 @@ export interface AppState {
   showEvidenceRequest: boolean;
   drawer: string | null; // "compId:score" | "compId:anchors" | "compId:evidence" | "file:FILENAME"
   sourceAnswer: EvidenceItem | null;
-  toast: string;
 
   // create modal
   jdText: string;

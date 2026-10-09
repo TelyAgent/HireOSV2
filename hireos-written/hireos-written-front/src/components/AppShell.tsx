@@ -2,7 +2,7 @@ import { type ReactNode } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { Modal, Radio } from "antd";
 import { Icon } from "./ui/Icon";
-import { Button, ToastHost } from "./ui/Primitives";
+import { Button } from "./ui/Primitives";
 import { useStore } from "../store/StoreContext";
 import { USERS } from "../data/users";
 import type { UserId } from "../store/types";
@@ -97,7 +97,6 @@ export function AppShell({ openTaskCount, children }: { openTaskCount: number; c
 
       <AppearanceModal />
       <RoleSwitcherModal />
-      <ToastHost />
     </div>
   );
 }

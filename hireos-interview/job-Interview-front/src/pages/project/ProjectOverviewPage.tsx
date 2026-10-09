@@ -4,7 +4,7 @@ import { Banner } from "../../components/ui/Primitives";
 import { COMPS } from "../../data/comps";
 
 export function ProjectOverviewPage() {
-  const { state, t, set, go, role } = useStore();
+  const { state, t, set, say, go, role } = useStore();
 
   const overviewMaterials = state.jdOnlyDraft
     ? [
@@ -86,7 +86,7 @@ export function ProjectOverviewPage() {
               <button
                 onClick={() => {
                   set({ candidateLinked: true });
-                  set({ toast: state.lang === "zh" ? "已将 Elena Torres 关联为该项目候选人。" : "Elena Torres linked as the candidate for this project." });
+                  say(state.lang === "zh" ? "已将 Elena Torres 关联为该项目候选人。" : "Elena Torres linked as the candidate for this project.");
                 }}
                 style={{
                   height: 32,

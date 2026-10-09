@@ -116,29 +116,3 @@ export function Tabs<T extends string>({ value, onChange, options }: { value: T;
     </div>
   );
 }
-
-/* ---------------------------------------------------------------
-   Toast host
-   --------------------------------------------------------------- */
-export function ToastHost() {
-  const { state, dismissToast } = useStore();
-  if (!state.toasts.length) return null;
-  return (
-    <div style={{ position: "fixed", bottom: 24, left: "50%", transform: "translateX(-50%)", zIndex: 300, display: "flex", flexDirection: "column", gap: 8, alignItems: "center" }}>
-      {state.toasts.map((toast) => (
-        <div
-          key={toast.id}
-          className={`toast ${toast.type === "success" ? "success" : toast.type === "danger" ? "danger" : ""}`}
-          style={{
-            background: toast.type === "success" ? "#137333" : toast.type === "danger" ? "#C5221F" : "var(--text-primary)",
-            color: "var(--surface)", boxShadow: "var(--shadow-2)", borderRadius: 12, padding: "12px 16px",
-            fontSize: 12.5, display: "flex", alignItems: "center", gap: 14, minWidth: 280, maxWidth: 520, cursor: "pointer",
-          }}
-          onClick={() => dismissToast(toast.id)}
-        >
-          <span>{toast.msg}</span>
-        </div>
-      ))}
-    </div>
-  );
-}

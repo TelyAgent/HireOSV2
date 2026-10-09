@@ -57,5 +57,4 @@ export const initialState: AppState = {
 
   homeTrendsOpen: false,
 
-  toasts: [],
 };

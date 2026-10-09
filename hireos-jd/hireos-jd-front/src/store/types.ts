@@ -23,13 +23,6 @@ export type TextSize = "small" | "medium" | "large";
 export type WsMode = "editing" | "suggesting" | "viewing";
 export type SideTab = "copilot" | "comments" | "changes";
 
-export interface ToastItem {
-  id: string;
-  msg: string;
-  type: "default" | "success" | "error";
-  actionLabel?: string;
-}
-
 /** A text selection inside the document editor, used to scope Copilot actions. */
 export interface DocSelection {
   blockId: string | null;
@@ -115,7 +108,4 @@ export interface AppState {
 
   // home page
   homeTrendsOpen: boolean;
-
-  // toast queue
-  toasts: ToastItem[];
 }

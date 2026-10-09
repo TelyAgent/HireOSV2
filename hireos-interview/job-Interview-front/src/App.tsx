@@ -1,6 +1,5 @@
 import { Routes, Route, Navigate } from "react-router-dom";
 import { AppShell } from "./components/AppShell";
-import { Toast } from "./components/ui/Primitives";
 import { CreateProjectModal, EvidenceRequestModal } from "./components/Modals";
 import { ScoreTraceDrawer } from "./components/Drawers";
 import { useStore } from "./store/StoreContext";
@@ -55,7 +54,6 @@ export default function App() {
       <CreateProjectModal />
       <EvidenceRequestModal />
       <ScoreTraceDrawer />
-      <Toast text={state.toast} />
     </AppShell>
   );
 }

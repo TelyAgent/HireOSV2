@@ -15,7 +15,6 @@ export const initialState: AppState = {
 
   clockOffsetMin: 0,
 
-  toasts: [],
   realTasksVersion: 0,
   bankQuestionsVersion: 0,
 };

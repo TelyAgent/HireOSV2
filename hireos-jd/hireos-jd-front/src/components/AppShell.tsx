@@ -2,7 +2,7 @@ import { useLayoutEffect, type ReactNode } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { useStore } from "../store/StoreContext";
 import { Icon } from "./ui/Icons";
-import { Button, StatusBadge, ToastStack } from "./ui/Primitives";
+import { Button, StatusBadge } from "./ui/Primitives";
 import { CloseButton, ModalBody, ModalFooter, ModalHeader, OverlayHost } from "./ui/Overlays";
 import { PEOPLE } from "../data/fixtures/people";
 import type { Accent, TextSize, ThemeMode } from "../store/types";
@@ -365,7 +365,6 @@ export function AppShell({ children }: { children: ReactNode }) {
         <main className="main">{children}</main>
       </div>
       <OverlayHost />
-      <ToastStack />
     </div>
   );
 }

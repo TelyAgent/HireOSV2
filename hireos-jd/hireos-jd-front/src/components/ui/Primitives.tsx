@@ -225,24 +225,3 @@ export function InlineNote({
     </div>
   );
 }
-
-/* ---------------------------------------------------------------
-   Toasts
-   --------------------------------------------------------------- */
-export function ToastStack() {
-  const { state, toastAction } = useStore();
-  return (
-    <div className="toast-stack">
-      {state.toasts.map((toast) => (
-        <div key={toast.id} className={`toast${toast.type !== "default" ? " " + toast.type : ""}`}>
-          <span>{toast.msg}</span>
-          {toast.actionLabel && (
-            <button className="toast-action" onClick={() => toastAction(toast.id)}>
-              {toast.actionLabel}
-            </button>
-          )}
-        </div>
-      ))}
-    </div>
-  );
-}

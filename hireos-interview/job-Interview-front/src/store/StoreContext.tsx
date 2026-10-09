@@ -9,6 +9,7 @@ import {
   type ReactNode,
 } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
+import { App as AntApp } from "antd";
 import { initialState } from "./initialState";
 import type { AppState, RolePerson, Screen } from "./types";
 import { ROLES } from "../data/roles";
@@ -57,7 +58,6 @@ type Action =
   | { type: "SET_THEME"; payload: AppState["theme"] }
   | { type: "SET_ACCENT"; payload: AppState["accent"] }
   | { type: "SET_TEXT_SIZE"; payload: AppState["textSize"] }
-  | { type: "TOAST"; payload: string }
   | { type: "GO"; payload: AppState["screen"] }
   | { type: "OPEN_TASK"; payload: { taskId: string; screen: AppState["screen"] } }
   | { type: "RESET_PREFS" };
@@ -72,12 +72,7 @@ function reducer(state: AppState, action: Action): AppState {
       return { ...state, showAppearance: !state.showAppearance };
     case "CYCLE_ROLE": {
       const next = (state.roleIdx + 1) % ROLES.length;
-      const r = ROLES[next];
-      return {
-        ...state,
-        roleIdx: next,
-        toast: `Switched to ${r.name} (${r.title}).`,
-      };
+      return { ...state, roleIdx: next };
     }
     case "SET_THEME":
       return { ...state, theme: action.payload };
@@ -85,8 +80,6 @@ function reducer(state: AppState, action: Action): AppState {
       return { ...state, accent: action.payload };
     case "SET_TEXT_SIZE":
       return { ...state, textSize: action.payload };
-    case "TOAST":
-      return { ...state, toast: action.payload };
     case "GO": {
       // "home" is task-agnostic; leaving the project flow clears the task
       // so a stale id doesn't leak into the next screen change.
@@ -115,10 +108,6 @@ function reducer(state: AppState, action: Action): AppState {
         textSize: "medium",
         moreOpen: false,
         overviewStatsOpen: true,
-        toast:
-          state.lang === "zh"
-            ? "外观已重置为浅色、青绿色和中等字号。"
-            : "Appearance reset to Light, Teal, Medium.",
       };
     default:
       return state;
@@ -152,7 +141,6 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     const route = pathToRoute(window.location.pathname);
     return { ...initial, screen: route.screen, currentTaskId: route.taskId };
   });
-  const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Persist prefs to localStorage
   useEffect(() => {
@@ -221,13 +209,8 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     } catch {}
   }, []);
 
-  const say = useCallback((msg: string) => {
-    dispatch({ type: "TOAST", payload: msg });
-    if (toastTimer.current) clearTimeout(toastTimer.current);
-    toastTimer.current = setTimeout(() => {
-      dispatch({ type: "TOAST", payload: "" });
-    }, 4200);
-  }, []);
+  const { message } = AntApp.useApp();
+  const say = useCallback((msg: string) => void message.info(msg), [message]);
 
   const value: StoreValue = useMemo(() => {
     const role = ROLES[state.roleIdx];
@@ -238,14 +221,21 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       say,
       go: (s) => dispatch({ type: "GO", payload: s }),
       openTask: (taskId, s = "overview") => dispatch({ type: "OPEN_TASK", payload: { taskId, screen: s } }),
-      cycleRole: () => dispatch({ type: "CYCLE_ROLE" }),
+      cycleRole: () => {
+        const next = ROLES[(state.roleIdx + 1) % ROLES.length];
+        dispatch({ type: "CYCLE_ROLE" });
+        say(`Switched to ${next.name} (${next.title}).`);
+      },
       toggleLang: () => dispatch({ type: "TOGGLE_LANG" }),
       toggleAppearance: () => dispatch({ type: "TOGGLE_APPEARANCE" }),
       setTheme: (theme) => dispatch({ type: "SET_THEME", payload: theme }),
       setAccent: (accent) => dispatch({ type: "SET_ACCENT", payload: accent }),
       setTextSize: (textSize) =>
         dispatch({ type: "SET_TEXT_SIZE", payload: textSize }),
-      resetPrefs: () => dispatch({ type: "RESET_PREFS" }),
+      resetPrefs: () => {
+        dispatch({ type: "RESET_PREFS" });
+        say(state.lang === "zh" ? "外观已重置为浅色、青绿色和中等字号。" : "Appearance reset to Light, Teal, Medium.");
+      },
       role,
       t,
       comps: COMPS,

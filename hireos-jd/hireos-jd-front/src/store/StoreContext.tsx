@@ -5,7 +5,6 @@ import {
   useEffect,
   useMemo,
   useReducer,
-  useRef,
   useState,
   type ReactNode,
 } from "react";
@@ -13,7 +12,8 @@ import { translate } from "../data/i18n";
 import { getPerson } from "../data/fixtures/people";
 import { setFormatLang, uid } from "../lib/format";
 import { initialState, PREF_KEYS, PREFS_STORAGE_KEY } from "./initialState";
-import type { AppState, Lang, ToastItem } from "./types";
+import { App as AntApp } from "antd";
+import type { AppState, Lang } from "./types";
 import type { PersonId } from "../data/types";
 
 type Action =
@@ -23,9 +23,7 @@ type Action =
    * nested objects in place and we hand back a fresh top-level object so React
    * re-renders. Domain data here is demo fixture data, never shared state.
    */
-  | { type: "MUTATE"; fn: (draft: AppState) => void }
-  | { type: "PUSH_TOAST"; toast: ToastItem }
-  | { type: "DISMISS_TOAST"; id: string };
+  | { type: "MUTATE"; fn: (draft: AppState) => void };
 
 function reducer(state: AppState, action: Action): AppState {
   switch (action.type) {
@@ -36,10 +34,6 @@ function reducer(state: AppState, action: Action): AppState {
       action.fn(next);
       return next;
     }
-    case "PUSH_TOAST":
-      return { ...state, toasts: [...state.toasts, action.toast] };
-    case "DISMISS_TOAST":
-      return { ...state, toasts: state.toasts.filter((t) => t.id !== action.id) };
     default:
       return state;
   }
@@ -76,10 +70,9 @@ export interface OverlayEntry extends OverlayOpts {
   node: ReactNode;
 }
 
+/** `say` renders with antd `message`; "default" shows as info. */
 export interface SayOpts {
-  type?: ToastItem["type"];
-  actionLabel?: string;
-  actionFn?: () => void;
+  type?: "default" | "success" | "error" | "info" | "warning";
 }
 
 interface StoreValue {
@@ -87,8 +80,6 @@ interface StoreValue {
   set: (partial: Partial<AppState>) => void;
   mutate: (fn: (draft: AppState) => void) => void;
   say: (msg: string, opts?: SayOpts) => void;
-  dismissToast: (id: string) => void;
-  toastAction: (id: string) => void;
 
   overlays: OverlayEntry[];
   openModal: (node: ReactNode, opts?: OverlayOpts) => void;
@@ -114,35 +105,18 @@ const StoreContext = createContext<StoreValue | null>(null);
 export function StoreProvider({ children }: { children: ReactNode }) {
   const [state, dispatch] = useReducer(reducer, undefined, lazyInit);
   const [overlays, setOverlays] = useState<OverlayEntry[]>([]);
-  const toastActions = useRef<Map<string, () => void>>(new Map());
+  const { message } = AntApp.useApp();
 
   const set = useCallback((payload: Partial<AppState>) => dispatch({ type: "SET", payload }), []);
   const mutate = useCallback((fn: (draft: AppState) => void) => dispatch({ type: "MUTATE", fn }), []);
 
-  const dismissToast = useCallback((id: string) => {
-    dispatch({ type: "DISMISS_TOAST", id });
-    toastActions.current.delete(id);
-  }, []);
-
   const say = useCallback<StoreValue["say"]>(
     (msg, opts) => {
-      const id = uid("toast");
-      if (opts?.actionFn) toastActions.current.set(id, opts.actionFn);
-      dispatch({
-        type: "PUSH_TOAST",
-        toast: { id, msg, type: opts?.type ?? "default", actionLabel: opts?.actionLabel },
-      });
-      setTimeout(() => dismissToast(id), 3800);
+      const type = opts?.type ?? "default";
+      if (type === "default") message.open({ type: "info", content: msg });
+      else message[type](msg);
     },
-    [dismissToast],
-  );
-
-  const toastAction = useCallback(
-    (id: string) => {
-      toastActions.current.get(id)?.();
-      dismissToast(id);
-    },
-    [dismissToast],
+    [message],
   );
 
   const pushOverlay = useCallback((kind: OverlayEntry["kind"], node: ReactNode, opts?: OverlayOpts) => {
@@ -224,8 +198,6 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       set,
       mutate,
       say,
-      dismissToast,
-      toastAction,
       overlays,
       openModal,
       openDrawer,
@@ -247,8 +219,6 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       set,
       mutate,
       say,
-      dismissToast,
-      toastAction,
       overlays,
       openModal,
       openDrawer,
