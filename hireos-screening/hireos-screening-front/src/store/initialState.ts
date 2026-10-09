@@ -13,7 +13,6 @@ export const initialState: AppState = {
   showAppearance: false,
   showRoleSwitcher: false,
 
-  toasts: [],
 };
 
 export const PREF_KEYS = ["lang", "theme", "accent", "textSize", "sidenavCollapsed"] as const;

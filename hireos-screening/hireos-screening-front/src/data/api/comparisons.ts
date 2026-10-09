@@ -1,6 +1,5 @@
 import { db } from "../db";
 import type { ComparisonSet, ComparisonSnapshot } from "../fixtures/comparisons";
-import type { PersonId } from "../fixtures/people";
 import type { Application } from "../fixtures/applications";
 import { apiFetch } from "./shared";
 
@@ -65,17 +64,6 @@ export async function refreshComparison(id: string): Promise<ComparisonSnapshot>
   const cmp = await apiFetch<ComparisonSet>(`/comparisons/${id}`);
   db.comparisons[id] = cmp;
   return snapshot;
-}
-
-export async function addAnnotation(id: string, targetId: string, body: string, author: PersonId): Promise<ComparisonSet> {
-  void author; // server derives the author from the authenticated session
-  await apiFetch(`/comparisons/${id}/annotations`, {
-    method: "POST",
-    body: JSON.stringify({ targetId, body }),
-  });
-  const cmp = await apiFetch<ComparisonSet>(`/comparisons/${id}`);
-  db.comparisons[id] = cmp;
-  return cmp;
 }
 
 export interface ExportComparisonInput {

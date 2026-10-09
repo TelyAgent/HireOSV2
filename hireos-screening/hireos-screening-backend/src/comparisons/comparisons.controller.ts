@@ -34,15 +34,6 @@ export class ComparisonsController {
     return this.comparisons.refresh(req.identity, id);
   }
 
-  @Post(':id/annotations')
-  annotate(
-    @Req() req: { identity: Identity },
-    @Param('id') id: string,
-    @Body() body: { targetId?: string; body?: string },
-  ) {
-    return this.comparisons.annotate(req.identity, id, body);
-  }
-
   @Post(':id/exports')
   export(
     @Req() req: { identity: Identity },

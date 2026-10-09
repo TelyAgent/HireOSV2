@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { useStore } from "../store/StoreContext";
-import { getJobDetail, runJobMatch } from "../data/api/jobs";
+import { getJobDetail, listJobBelowThreshold, runJobMatch, type BelowThresholdCandidate } from "../data/api/jobs";
 import { getJobRecommendations, type JobRecommendation } from "../data/api/candidates";
 import { getApplicationDetail, listApplicationsForJob, type ApplicationWithNames } from "../data/api/screening";
 import { createComparison, refreshComparison } from "../data/api/comparisons";
@@ -126,16 +126,20 @@ export function ScreeningWorkspacePage() {
   const [creatingComparison, setCreatingComparison] = useState(false);
   const [matching, setMatching] = useState(false);
   const [importTab, setImportTab] = useState<ImportTab | null>(null);
+  const [belowThreshold, setBelowThreshold] = useState<BelowThresholdCandidate[]>([]);
+  const [showBelow, setShowBelow] = useState(false);
 
   const load = useCallback(async () => {
     try {
       const jobDetail = await getJobDetail(id);
       setJob(jobDetail);
-      const [recs, apps] = await Promise.all([
+      const [recs, apps, below] = await Promise.all([
         getJobRecommendations(jobDetail.id),
         listApplicationsForJob(jobDetail.id),
+        listJobBelowThreshold(jobDetail.id).catch(() => []),
       ]);
       setSuggested(recs);
+      setBelowThreshold(below);
       // Each application's evaluation is fetched individually -- there is no
       // bulk "evaluations for this job" endpoint, and at workspace scale
       // (a handful of linked candidates per role) N requests is fine.
@@ -303,6 +307,56 @@ export function ScreeningWorkspacePage() {
           </tbody>
         </table>
       </div>
+
+      {belowThreshold.length > 0 && (
+        <>
+          <button type="button" className="candidate-section-heading collapse-heading" style={{ marginTop: 16 }} aria-expanded={showBelow} onClick={() => setShowBelow((v) => !v)}>
+            <Icon name={showBelow ? "expand_more" : "chevron_right"} size={18} />
+            {t("Below match threshold")} <span className="cnt">{belowThreshold.length}</span>
+            <span className="tiny muted" style={{ marginLeft: 8, fontWeight: 400 }}>
+              {t("Evaluated against this job but not suggested — you can still review them.")}
+            </span>
+          </button>
+          {showBelow && (
+            <div className="card ws-card">
+              <table className="data-table ai-suggested-table">
+                <thead>
+                  <tr>
+                    <th></th>
+                    <th>{t("Candidate")}</th>
+                    <th>{t("Overall")}</th>
+                    <th>{t("Status")}</th>
+                    <th>{t("Rationale")}</th>
+                    <th></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {belowThreshold.map((c) => (
+                    <tr className="clickable" key={c.candidateId} onClick={() => navigate(`/candidates/${c.candidateId}`)}>
+                      <td>
+                        <CandidateAvatar id={c.candidateId} name={c.candidateName} />
+                      </td>
+                      <td>
+                        <div style={{ fontWeight: 500 }}>{c.candidateName}</div>
+                      </td>
+                      <td>{c.score != null ? <ScoreRing overall={c.score} size="sm" /> : "—"}</td>
+                      <td>
+                        {c.reason === "below_threshold" ? <Badge tone="outline">{t("Below threshold")}</Badge> : <Badge tone="neutral">{t("Dismissed")}</Badge>}
+                      </td>
+                      <td className="tiny suggestion-copy">{c.rationale}</td>
+                      <td className="text-right">
+                        <Link className="btn btn-sm btn-secondary" to={`/candidates/${c.candidateId}`} onClick={(e) => e.stopPropagation()}>
+                          {t("Open", "Open (action)")}
+                        </Link>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </>
+      )}
 
       {importTab && (
         <ResumeImportModal

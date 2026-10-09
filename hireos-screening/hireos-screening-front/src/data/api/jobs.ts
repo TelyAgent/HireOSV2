@@ -56,6 +56,21 @@ export async function reopenJobCriteriaForEdit(id: string): Promise<Job> {
   return job;
 }
 
+/** Evaluated against the job but not suggested or linked (below threshold, or dismissed). */
+export interface BelowThresholdCandidate {
+  candidateId: string;
+  candidateName: string;
+  reason: "below_threshold" | "dismissed";
+  /** 0–100 overall match score. */
+  score?: number;
+  rationale: string;
+  gaps: string[];
+  evaluatedAt: string;
+}
+export async function listJobBelowThreshold(id: string): Promise<BelowThresholdCandidate[]> {
+  return apiFetch(`/jobs/${id}/below-threshold`);
+}
+
 /** Re-runs auto-match of the resume library against this job's confirmed criteria. */
 export async function runJobMatch(id: string): Promise<{ status: string; candidatesScanned: number; recommendationsCreated: number }> {
   return apiFetch(`/jobs/${id}/match`, { method: "POST" });

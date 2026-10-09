@@ -22,6 +22,11 @@ export class DiscoveryController {
     return this.discovery.listJobRecommendations(req.identity, id);
   }
 
+  @Get('jobs/:id/below-threshold')
+  listJobBelowThreshold(@Req() req: { identity: Identity }, @Param('id') id: string) {
+    return this.discovery.listJobBelowThreshold(req.identity, id);
+  }
+
   @Post('candidates/:candidateId/jobs/:jobId/recommend')
   manualRecommendation(
     @Req() req: { identity: Identity },

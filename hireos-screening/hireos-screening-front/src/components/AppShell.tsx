@@ -4,7 +4,7 @@ import { useStore } from "../store/StoreContext";
 import { PEOPLE } from "../data/fixtures/people";
 import type { Accent, TextSize, ThemeMode } from "../store/types";
 import { Icon } from "./ui/Icons";
-import { Button, PersonAvatar, ToastStack } from "./ui/Primitives";
+import { Button, PersonAvatar } from "./ui/Primitives";
 import { Modal } from "./ui/Overlays";
 
 /* ---------------------------------------------------------------
@@ -251,7 +251,6 @@ export function AppShell({ children }: { children: ReactNode }) {
       </div>
       <AppearanceModal />
       <RoleSwitcherModal />
-      <ToastStack />
     </div>
   );
 }

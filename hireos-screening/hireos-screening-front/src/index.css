@@ -203,14 +203,6 @@ table.data-table{ width:100%; border-collapse:collapse; font-size:var(--fs-sm); 
 .close-x{ background:none; border:none; color:var(--text-tertiary); cursor:pointer; padding:4px; border-radius:50%; }
 .close-x:hover{ background:var(--surface-alt); }
 
-/* ---------- Toasts ---------- */
-.toast-stack{ position:fixed; bottom:20px; left:50%; transform:translateX(-50%); z-index:200; display:flex; flex-direction:column; gap:8px; align-items:center; }
-.toast{ background:#323639; color:#fff; padding:12px 18px; border-radius:8px; font-size:var(--fs-sm); box-shadow:var(--shadow-2); display:flex; align-items:center; gap:14px; min-width:280px; }
-[data-theme="dark"] .toast, [data-theme="deep"] .toast{ background:#484c50; }
-.toast.success{ background:#137333; }
-.toast.info{ background:#1a73e8; }
-.toast.error{ background:#c5221f; }
-.toast .toast-action{ color:var(--accent-300); font-weight:600; cursor:pointer; background:none; border:none; font-size:var(--fs-sm); }
 
 /* ---------- Empty / error states ---------- */
 .empty-state{ text-align:center; padding:56px 24px; color:var(--text-secondary); }
@@ -478,9 +470,6 @@ input[type="checkbox"],input[type="radio"]{ accent-color:var(--accent-600); }
 .drawer-body{ padding:16px 20px 24px; }
 .drawer-footer{ position:sticky; bottom:0; padding:14px 20px; background:var(--surface); }
 .close-x{ width:32px; height:32px; display:flex; align-items:center; justify-content:center; border-radius:9px; }
-.toast-stack{ bottom:24px; max-width:min(520px,calc(100vw - 32px)); width:max-content; }
-.toast{ max-width:520px; min-width:280px; padding:12px 16px; border-radius:12px; background:var(--text); color:var(--surface); }
-.toast.success{ background:#065f46; }.toast.info{ background:#1d4ed8; }.toast.error{ background:#b91c1c; }
 .empty-state{ padding:48px 24px; }
 .empty-state h3{ font-weight:700; }
 a:focus-visible,button:focus-visible,[tabindex]:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible{ outline:2px solid var(--accent-600); outline-offset:2px; }
@@ -564,3 +553,5 @@ a:focus-visible,button:focus-visible,[tabindex]:focus-visible,input:focus-visibl
 .jm-step.jm-active .material-icons-o{ animation:spin 1s linear infinite; }
 .jm-step.jm-failed{ color:var(--danger-text); }
 .jm-sep{ width:14px; height:1px; background:var(--border-strong); }
+.candidate-section-heading.collapse-heading{ width:100%; border:0; background:none; cursor:pointer; text-align:left; font:inherit; font-size:var(--fs-sm); font-weight:500; color:var(--text); }
+.candidate-section-heading.collapse-heading:hover{ color:var(--accent-700); }

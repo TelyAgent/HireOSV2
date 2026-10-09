@@ -5,27 +5,23 @@ import {
   useEffect,
   useMemo,
   useReducer,
-  useRef,
   type ReactNode,
 } from "react";
 import { translate } from "../data/i18n";
 import { getPerson, type PersonId } from "../data/fixtures/people";
 import { initialState, PREF_KEYS, PREFS_STORAGE_KEY } from "./initialState";
-import type { AppState, ToastItem } from "./types";
+import { App as AntApp } from "antd";
+import type { AppState } from "./types";
 
-type Action =
-  | { type: "SET"; payload: Partial<AppState> }
-  | { type: "PUSH_TOAST"; toast: ToastItem }
-  | { type: "DISMISS_TOAST"; id: string };
+/** Kinds of notice `say` can show — rendered with antd `message`. */
+export type NoticeType = "default" | "success" | "info" | "error" | "warning";
+
+type Action = { type: "SET"; payload: Partial<AppState> };
 
 function reducer(state: AppState, action: Action): AppState {
   switch (action.type) {
     case "SET":
       return { ...state, ...action.payload };
-    case "PUSH_TOAST":
-      return { ...state, toasts: [...state.toasts, action.toast] };
-    case "DISMISS_TOAST":
-      return { ...state, toasts: state.toasts.filter((t) => t.id !== action.id) };
     default:
       return state;
   }
@@ -53,9 +49,7 @@ function lazyInit(): AppState {
 interface StoreValue {
   state: AppState;
   set: (partial: Partial<AppState>) => void;
-  say: (msg: string, opts?: { type?: ToastItem["type"]; actionLabel?: string; actionFn?: () => void }) => void;
-  dismissToast: (id: string) => void;
-  toastAction: (id: string) => void;
+  say: (msg: string, opts?: { type?: NoticeType }) => void;
   toggleLang: () => void;
   setTheme: (theme: AppState["theme"]) => void;
   setAccent: (accent: AppState["accent"]) => void;
@@ -73,32 +67,17 @@ const StoreContext = createContext<StoreValue | null>(null);
 
 export function StoreProvider({ children }: { children: ReactNode }) {
   const [state, dispatch] = useReducer(reducer, undefined, lazyInit);
-  const toastActions = useRef<Map<string, () => void>>(new Map());
+  const { message } = AntApp.useApp();
 
   const set = useCallback((payload: Partial<AppState>) => dispatch({ type: "SET", payload }), []);
 
-  const dismissToast = useCallback((id: string) => {
-    dispatch({ type: "DISMISS_TOAST", id });
-    toastActions.current.delete(id);
-  }, []);
-
   const say = useCallback<StoreValue["say"]>(
     (msg, opts) => {
-      const id = "t" + Date.now() + Math.random().toString(36).slice(2, 6);
-      if (opts?.actionFn) toastActions.current.set(id, opts.actionFn);
-      dispatch({ type: "PUSH_TOAST", toast: { id, msg, type: opts?.type ?? "default", actionLabel: opts?.actionLabel } });
-      setTimeout(() => dismissToast(id), 4200);
+      const type = opts?.type ?? "default";
+      if (type === "default") message.open({ type: "info", content: msg });
+      else message[type](msg);
     },
-    [dismissToast],
-  );
-
-  const toastAction = useCallback(
-    (id: string) => {
-      const fn = toastActions.current.get(id);
-      fn?.();
-      dismissToast(id);
-    },
-    [dismissToast],
+    [message],
   );
 
   const toggleLang = useCallback(() => set({ lang: state.lang === "en" ? "zh" : "en" }), [set, state.lang]);
@@ -153,8 +132,6 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       state,
       set,
       say,
-      dismissToast,
-      toastAction,
       toggleLang,
       setTheme,
       setAccent,
@@ -171,8 +148,6 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       state,
       set,
       say,
-      dismissToast,
-      toastAction,
       toggleLang,
       setTheme,
       setAccent,

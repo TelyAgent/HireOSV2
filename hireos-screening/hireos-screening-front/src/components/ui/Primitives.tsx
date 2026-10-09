@@ -313,35 +313,6 @@ export function Card({ padded = true, className, children }: { padded?: boolean;
 }
 
 /* ---------------------------------------------------------------
-   Toasts (rendered once at app root)
-   --------------------------------------------------------------- */
-export function ToastStack() {
-  const { state, dismissToast, toastAction } = useStore();
-  return (
-    <div className="toast-stack" role="status" aria-live="polite" aria-atomic="true">
-      {state.toasts.map((toastItem) => (
-        <div className={`toast ${toastItem.type}`} key={toastItem.id}>
-          <span>{toastItem.msg}</span>
-          {toastItem.actionLabel && (
-            <button className="toast-action" onClick={() => toastAction(toastItem.id)}>
-              {toastItem.actionLabel}
-            </button>
-          )}
-          <button
-            className="close-x"
-            style={{ color: "inherit" }}
-            aria-label="Dismiss"
-            onClick={() => dismissToast(toastItem.id)}
-          >
-            <Icon name="close" size={14} />
-          </button>
-        </div>
-      ))}
-    </div>
-  );
-}
-
-/* ---------------------------------------------------------------
    Misc
    --------------------------------------------------------------- */
 export function useEffectOnce(effect: () => void | (() => void)) {

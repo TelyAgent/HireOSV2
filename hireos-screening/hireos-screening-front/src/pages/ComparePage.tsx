@@ -2,21 +2,18 @@ import { useCallback, useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
 import { useStore } from "../store/StoreContext";
 import {
-  addAnnotation,
   addCandidateToComparison,
   exportComparison,
   getComparison,
   refreshComparison,
 } from "../data/api/comparisons";
-import { recordDecision, type NextStepTarget } from "../data/api/decisions";
-import { db, getApplication, getApplicationsForJob, getCandidate, getConcerns, getEvaluation, getJob } from "../data/db";
+import { getApplication, getApplicationsForJob, getCandidate, getConcerns, getEvaluation, getJob } from "../data/db";
 import type { ComparisonSet } from "../data/fixtures/comparisons";
 import type { Application } from "../data/fixtures/applications";
 import type { Candidate } from "../data/fixtures/candidates";
 import type { Evaluation } from "../data/fixtures/evaluations";
 import type { Job, Dimension } from "../data/fixtures/jobs";
-import type { DecisionOutcome } from "../data/fixtures/decisions";
-import { fmtDate, fmtMoney, relTime } from "../lib/format";
+import { fmtDate, fmtMoney } from "../lib/format";
 import { Badge, Button, CandidateAvatar, EligibilityBadge, EmptyState, FreshnessBadge, PageHeader, PillTabs, ScoreRing } from "../components/ui/Primitives";
 import { EvidenceCard } from "../components/ui/EvidenceCard";
 import { Icon } from "../components/ui/Icons";
@@ -28,18 +25,6 @@ interface Member {
   app: Application;
   cand: Candidate;
   ev: Evaluation | undefined;
-}
-
-const DECISION_LABEL: Record<DecisionOutcome, string> = {
-  strong_advance: "Strong advance",
-  advance: "Advance",
-  hold: "Hold",
-  do_not_advance: "Do not advance",
-  request_information: "Request Information",
-};
-
-function cap(s: string): string {
-  return s ? s.charAt(0).toUpperCase() + s.slice(1) : s;
 }
 
 /* ---------------------------------------------------------------
@@ -371,95 +356,6 @@ function ExportModal({ cmp, members, onClose }: { cmp: ComparisonSet; members: M
   );
 }
 
-const NEXT_STEP_LABEL: Record<string, string> = {
-  assessment: "Send Assessment",
-  interview: "Move to Interview",
-  request_information: "Request Information",
-  hold: "Hold",
-  do_not_advance: "Do Not Advance",
-};
-function mapNextStepToDecision(v: string): { outcome: DecisionOutcome; target: NextStepTarget } {
-  if (v === "assessment") return { outcome: "advance", target: "send_assessment" };
-  if (v === "interview") return { outcome: "advance", target: "move_to_interview" };
-  if (v === "request_information") return { outcome: "request_information", target: "record_only" };
-  if (v === "hold") return { outcome: "hold", target: "record_only" };
-  return { outcome: "do_not_advance", target: "record_only" };
-}
-
-function SubmitNextStepsModal({
-  entries,
-  onClose,
-  onSubmitted,
-}: {
-  entries: [string, string][];
-  onClose: () => void;
-  onSubmitted: () => void;
-}) {
-  const { t, state, say } = useStore();
-  const [submitting, setSubmitting] = useState(false);
-
-  const submit = async () => {
-    setSubmitting(true);
-    let ok = 0;
-    for (const [appId, v] of entries) {
-      const { outcome, target } = mapNextStepToDecision(v);
-      try {
-        await recordDecision(appId, {
-          outcome,
-          nextStepTarget: target,
-          reason: "Selected via candidate comparison.",
-          decidedBy: state.currentUser,
-        });
-        ok++;
-      } catch {
-        // Each candidate is handled independently — one failure never blocks the others.
-      }
-    }
-    setSubmitting(false);
-    onClose();
-    say(t("Submitted {n} next-step decision(s)").replace("{n}", String(ok)), { type: "success" });
-    onSubmitted();
-  };
-
-  return (
-    <Modal
-      open
-      onClose={onClose}
-      title={t("Confirm next steps")}
-      footer={
-        <>
-          <Button variant="secondary" onClick={onClose}>
-            {t("Cancel")}
-          </Button>
-          <Button variant="primary" onClick={submit} disabled={submitting}>
-            {t("Submit")}
-          </Button>
-        </>
-      }
-    >
-      <p className="tiny" style={{ marginBottom: 10 }}>
-        {t("Review the exact list before submitting. Each candidate is handled independently — a failure for one does not affect the others.")}
-      </p>
-      <table className="data-table">
-        <thead>
-          <tr>
-            <th>{t("Candidate")}</th>
-            <th>{t("Action")}</th>
-          </tr>
-        </thead>
-        <tbody>
-          {entries.map(([appId, v]) => (
-            <tr key={appId}>
-              <td>{getCandidate(getApplication(appId)!.candidateId)!.displayName}</td>
-              <td>{t(NEXT_STEP_LABEL[v])}</td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </Modal>
-  );
-}
-
 /* ---------------------------------------------------------------
    Page
    --------------------------------------------------------------- */
@@ -470,12 +366,9 @@ export function ComparePage() {
   const [mode, setMode] = useState<CompareMode>("current_summary");
   const [diffOnly, setDiffOnly] = useState(false);
   const [snapIdx, setSnapIdx] = useState(0);
-  const [nextStepDraft, setNextStepDraft] = useState<Record<string, string>>({});
   const [evidenceTarget, setEvidenceTarget] = useState<{ member: Member; dimension: Dimension } | null>(null);
   const [showAdd, setShowAdd] = useState(false);
   const [showExport, setShowExport] = useState(false);
-  const [showSubmit, setShowSubmit] = useState(false);
-  const [note, setNote] = useState("");
 
   const load = useCallback(() => {
     getComparison(id)
@@ -530,26 +423,6 @@ export function ComparePage() {
     setSnapIdx(cmp.snapshots.findIndex((s) => s.id === snapshot.id));
   };
 
-  const handleAddAnnotation = async () => {
-    const body = note.trim();
-    if (!body) return;
-    await addAnnotation(cmp.id, "", body, "emma");
-    setNote("");
-    load();
-  };
-
-  const entries = Object.entries(nextStepDraft).filter(([appId, v]) => v && cmp.memberIds.includes(appId) && !db.decisions[appId]);
-
-  const applyAllNextStep = (value: string) => {
-    if (!value) return;
-    const next = { ...nextStepDraft };
-    for (const appId of cmp.memberIds) {
-      if (db.decisions[appId]) continue;
-      next[appId] = value;
-    }
-    setNextStepDraft(next);
-  };
-
   return (
     <>
       <PageHeader
@@ -602,127 +475,9 @@ export function ComparePage() {
         <CompareMatrix job={job} members={members} diffOnly={diffOnly} onOpenEvidence={(member, dimension) => setEvidenceTarget({ member, dimension })} />
       </div>
 
-      <div className="section-block" style={{ marginTop: 24 }}>
-        <div className="section-title">{t("Annotations")}</div>
-        <div className="card card-pad">
-          {cmp.annotations.length ? (
-            cmp.annotations.map((a) => (
-              <div style={{ marginBottom: 10 }} key={a.id}>
-                <span style={{ fontWeight: 500, fontSize: "var(--fs-sm)" }}>{db.people[a.author]?.name}</span> <span className="tiny">{relTime(a.createdAt, "en")}</span>
-                <p style={{ fontSize: "var(--fs-sm)", margin: "2px 0 0" }}>{a.body}</p>
-              </div>
-            ))
-          ) : (
-            <p className="tiny">{t("No annotations yet.")}</p>
-          )}
-          <div className="flex gap-8" style={{ marginTop: 8 }}>
-            <input
-              type="text"
-              placeholder={t("Add a note for the team...")}
-              value={note}
-              onChange={(e) => setNote(e.target.value)}
-              style={{ flex: 1, padding: "8px 12px", border: "1px solid var(--border-strong)", borderRadius: 6, background: "var(--surface)", color: "var(--text)", fontSize: "var(--fs-sm)" }}
-            />
-            <Button variant="secondary" onClick={handleAddAnnotation}>
-              {t("Add")}
-            </Button>
-          </div>
-        </div>
-      </div>
-
-      <div className="section-block">
-        <div className="flex items-center justify-between">
-          <div className="section-title" style={{ marginBottom: 6 }}>
-            {t("Next steps")}
-          </div>
-          <div className="flex gap-8 items-center">
-            <span className="tiny">{t("Apply to all:")}</span>
-            <select value="" onChange={(e) => applyAllNextStep(e.target.value)}>
-              <option value="">{t("Choose…")}</option>
-              <option value="assessment">{t("Send Assessment")}</option>
-              <option value="hold">{t("Hold")}</option>
-            </select>
-          </div>
-        </div>
-        <div className="card card-pad">
-          <table className="data-table">
-            <thead>
-              <tr>
-                <th>{t("Candidate")}</th>
-                <th>{t("Current status")}</th>
-                <th>{t("Next step")}</th>
-              </tr>
-            </thead>
-            <tbody>
-              {members.map((m) => {
-                const decided = db.decisions[m.app.id];
-                return (
-                  <tr key={m.app.id}>
-                    <td>
-                      <span className="flex items-center gap-8">
-                        <CandidateAvatar id={m.cand.id} name={m.cand.displayName} size="sm" /> {m.cand.displayName}
-                      </span>
-                    </td>
-                    <td>
-                      {decided ? (
-                        <Badge tone="success">
-                          {t("Decided —")} {t(DECISION_LABEL[decided.outcome] || cap(decided.outcome))}
-                        </Badge>
-                      ) : (
-                        <Badge tone="info">{t("Pending")}</Badge>
-                      )}
-                    </td>
-                    <td>
-                      {decided ? (
-                        <span className="tiny muted">{t("Already decided")}</span>
-                      ) : (
-                        <select value={nextStepDraft[m.app.id] || ""} onChange={(e) => setNextStepDraft({ ...nextStepDraft, [m.app.id]: e.target.value })}>
-                          <option value="">{t("Choose…")}</option>
-                          <option value="assessment">{t("Send Assessment")}</option>
-                          <option value="interview">{t("Move to Interview")}</option>
-                          <option value="request_information">{t("Request Information")}</option>
-                          <option value="hold">{t("Hold")}</option>
-                          <option value="do_not_advance">{t("Do Not Advance")}</option>
-                        </select>
-                      )}
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-          <Button
-            variant="primary"
-            style={{ marginTop: 12 }}
-            onClick={() => {
-              if (!entries.length) {
-                say(t("Choose at least one next step first"), { type: "error" });
-                return;
-              }
-              setShowSubmit(true);
-            }}
-          >
-            {t("Submit selected next steps")}
-          </Button>
-          <p className="tiny" style={{ marginTop: 6 }}>
-            {t("Generating this comparison or selecting values above does not notify anyone. Nothing is sent until you submit and confirm.")}
-          </p>
-        </div>
-      </div>
-
       {evidenceTarget && <MatrixEvidenceDrawer member={evidenceTarget.member} dimension={evidenceTarget.dimension} onClose={() => setEvidenceTarget(null)} />}
       {showAdd && <AddCandidateModal cmp={cmp} job={job} onClose={() => setShowAdd(false)} onAdded={load} />}
       {showExport && <ExportModal cmp={cmp} members={members} onClose={() => setShowExport(false)} />}
-      {showSubmit && (
-        <SubmitNextStepsModal
-          entries={entries}
-          onClose={() => setShowSubmit(false)}
-          onSubmitted={() => {
-            setNextStepDraft({});
-            load();
-          }}
-        />
-      )}
     </>
   );
 }

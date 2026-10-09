@@ -150,21 +150,6 @@ export class ComparisonsService {
     return serializeSnapshot({ ...snapshot, rankingSnapshot: { entries: rankedEntries } });
   }
 
-  async annotate(identity: Identity, comparisonId: string, raw: { targetId?: string; body?: string }) {
-    await this.findComparison(identity.workspaceId, comparisonId);
-    if (!raw.body?.trim()) throw new BadRequestException({ code: 'ANNOTATION_REQUIRED' });
-    const annotation = await this.db.comparisonAnnotation.create({
-      data: {
-        workspaceId: identity.workspaceId,
-        comparisonSetId: comparisonId,
-        targetId: raw.targetId || '',
-        body: raw.body.trim(),
-        authorId: identity.actorId,
-      },
-    });
-    return serializeAnnotation(annotation);
-  }
-
   async export(identity: Identity, comparisonId: string, raw: { format?: 'png' | 'pdf'; applicationIds?: string[] }) {
     if (!['png', 'pdf'].includes(raw.format || '')) throw new BadRequestException({ code: 'INVALID_EXPORT_FORMAT' });
     await this.findComparison(identity.workspaceId, comparisonId);

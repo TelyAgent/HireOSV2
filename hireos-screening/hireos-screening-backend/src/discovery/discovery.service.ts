@@ -170,6 +170,42 @@ export class DiscoveryService implements OnModuleInit, OnModuleDestroy {
     return recommendations.map((r) => ({ ...toFrontendRecommendation(r), candidateName: r.candidate.displayName }));
   }
 
+  /**
+   * Candidates evaluated against this job that are neither a live recommendation nor linked:
+   * scored below the match threshold, or matched but the suggestion was dismissed/replaced.
+   * Together with suggestions and linked candidates this accounts for the jobs-list "Resumes" count.
+   */
+  async listJobBelowThreshold(identity: Identity, jobId: string) {
+    const job = await this.db.job.findFirst({ where: { id: jobId, workspaceId: identity.workspaceId }, select: { id: true } });
+    if (!job) throw new NotFoundException({ code: 'NOT_FOUND' });
+    const [evaluations, liveRecs, applications] = await Promise.all([
+      this.db.preLinkMatchEvaluation.findMany({
+        where: { workspaceId: identity.workspaceId, jobId },
+        orderBy: { createdAt: 'desc' },
+        distinct: ['candidateId'],
+        include: { candidate: { select: { displayName: true } } },
+      }),
+      this.db.candidateJobRecommendation.findMany({
+        where: { workspaceId: identity.workspaceId, jobId, status: { in: ['proposed', 'deferred', 'confirmed'] } },
+        select: { candidateId: true },
+      }),
+      this.db.application.findMany({ where: { workspaceId: identity.workspaceId, jobId }, select: { candidateId: true } }),
+    ]);
+    const excluded = new Set([...liveRecs.map((r) => r.candidateId), ...applications.map((a) => a.candidateId)]);
+    return evaluations
+      .filter((e) => !excluded.has(e.candidateId))
+      .sort((a, b) => (b.overallScore ?? -1) - (a.overallScore ?? -1))
+      .map((e) => ({
+        candidateId: e.candidateId,
+        candidateName: e.candidate.displayName,
+        reason: e.status === 'no_match' ? 'below_threshold' : 'dismissed',
+        score: e.overallScore ?? undefined,
+        rationale: e.rationale,
+        gaps: asArray(e.gaps),
+        evaluatedAt: e.createdAt.toISOString(),
+      }));
+  }
+
   async listCandidateRecommendations(identity: Identity, candidateId: string) {
     const candidate = await this.db.candidate.findFirst({ where: { id: candidateId, workspaceId: identity.workspaceId }, select: { id: true } });
     if (!candidate) throw new NotFoundException({ code: 'NOT_FOUND' });
