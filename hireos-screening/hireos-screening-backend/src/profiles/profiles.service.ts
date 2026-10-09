@@ -39,7 +39,8 @@ export class ProfilesService implements OnModuleInit, OnModuleDestroy {
     if (this.timer) globalThis.clearInterval(this.timer);
   }
 
-  async enqueue(workspaceId: string, candidateId: string, resumeVersionId: string, materialId: string) {
+  /** `targetJobId`: auto-match the parsed profile against that job only (import started from a job). */
+  async enqueue(workspaceId: string, candidateId: string, resumeVersionId: string, materialId: string, targetJobId?: string) {
     return this.db.processingJob.create({
       data: {
         workspaceId,
@@ -47,7 +48,7 @@ export class ProfilesService implements OnModuleInit, OnModuleDestroy {
         resumeVersionId,
         materialId,
         type: 'resume_parse',
-        input: { candidateId, resumeVersionId, materialId, parserVersion: 'local-resume-parser-v1' },
+        input: { candidateId, resumeVersionId, materialId, parserVersion: 'local-resume-parser-v1', ...(targetJobId ? { targetJobId } : {}) },
       },
     });
   }
@@ -298,7 +299,8 @@ export class ProfilesService implements OnModuleInit, OnModuleDestroy {
       // PRD: matching runs automatically once a profile exists, not on a manual button
       // press. Enqueued after commit so a slow/failing match run can never roll back or
       // block the profile that triggered it.
-      await this.discovery.enqueueAutoMatch(job.workspaceId, candidate.id);
+      const targetJobId = (job.input as { targetJobId?: string } | null)?.targetJobId;
+      await this.discovery.enqueueAutoMatch(job.workspaceId, candidate.id, targetJobId);
       return profile;
     } catch (error) {
       const errorCode = error instanceof Error ? error.message : 'PROFILE_PARSE_FAILED';

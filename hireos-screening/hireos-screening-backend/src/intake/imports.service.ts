@@ -7,8 +7,17 @@ import type { Identity } from '../auth/workspace.guard';
 import { CoreRecordClient } from '../core-record/core-record.client';
 import type { ImportChannel } from './imports.types';
 import { ProfilesService } from '../profiles/profiles.service';
+import { AUTO_MATCH_JOB } from '../discovery/discovery.service';
 
 type MulterFile = Express.Multer.File;
+
+type JobMatchProgress = {
+  stage: 'parsing' | 'matching' | 'done';
+  result?: 'matched' | 'no_match' | 'already_linked' | 'job_not_open' | 'criteria_not_confirmed' | 'not_evaluated' | 'parse_failed' | 'match_failed';
+  score?: number;
+  confidence?: number;
+  recommendationStatus?: string;
+};
 
 const TERMINAL_ITEM_STATUSES = new Set(['completed', 'duplicate', 'needs_review', 'failed', 'cancelled']);
 const RETRYABLE_ITEM_STATUSES = new Set(['failed']);
@@ -49,8 +58,13 @@ export class ImportsService implements OnModuleInit, OnModuleDestroy {
     files: MulterFile[],
     channel: ImportChannel = 'manual_upload',
     idempotencyKey?: string,
+    targetJobId?: string,
   ) {
     if (!files?.length) throw new NotFoundException({ code: 'NO_FILES' });
+    if (targetJobId) {
+      const job = await this.db.job.findFirst({ where: { id: targetJobId, workspaceId: identity.workspaceId }, select: { id: true } });
+      if (!job) throw new BadRequestException({ code: 'JOB_NOT_FOUND' });
+    }
 
     if (idempotencyKey) {
       const existing = await this.db.ingestionOperation.findFirst({
@@ -66,7 +80,7 @@ export class ImportsService implements OnModuleInit, OnModuleDestroy {
         kind: 'resume_import',
         createdBy: identity.actorId,
         idempotencyKey,
-        batch: { create: { workspaceId: identity.workspaceId, createdBy: identity.actorId } },
+        batch: { create: { workspaceId: identity.workspaceId, createdBy: identity.actorId, targetJobId } },
       },
       include: { batch: true },
     });
@@ -81,7 +95,7 @@ export class ImportsService implements OnModuleInit, OnModuleDestroy {
       action: 'import_batch_created',
       stage: 'received',
       status: 'processing',
-      metadata: { channel, fileCount: files.length },
+      metadata: { channel, fileCount: files.length, ...(targetJobId ? { targetJobId } : {}) },
     });
 
     for (const file of files) {
@@ -110,13 +124,99 @@ export class ImportsService implements OnModuleInit, OnModuleDestroy {
       include: { items: { orderBy: { createdAt: 'asc' } }, operation: true },
     });
     if (!batch) throw new NotFoundException({ code: 'NOT_FOUND' });
+    const progress = batch.targetJobId ? await this.jobMatchProgress(workspaceId, batch.targetJobId, batch.items) : undefined;
     return {
       id: batch.id,
       operationId: batch.operationId ?? undefined,
       createdAt: batch.createdAt.toISOString(),
       status: batch.status,
-      items: batch.items.map(serializeItem),
+      targetJobId: batch.targetJobId ?? undefined,
+      items: batch.items.map((item) => ({ ...serializeItem(item), jobMatch: progress?.get(item.id) })),
     };
+  }
+
+  /**
+   * For a batch imported from a job's screening workspace: how far each resume has got past
+   * intake -- profile parse, then auto-match against that job -- and the match outcome. The
+   * batch itself settles once candidates exist; parse and match keep running after that.
+   */
+  private async jobMatchProgress(
+    workspaceId: string,
+    jobId: string,
+    items: Array<{ id: string; candidateId: string | null; createdAt: Date }>,
+  ) {
+    const result = new Map<string, JobMatchProgress>();
+    const withCandidate = items.filter((item): item is typeof item & { candidateId: string } => Boolean(item.candidateId));
+    if (!withCandidate.length) return result;
+    const candidateIds = [...new Set(withCandidate.map((item) => item.candidateId))];
+    const since = new Date(Math.min(...withCandidate.map((item) => item.createdAt.getTime())));
+    const [jobs, evaluations, recommendations, applications, job] = await Promise.all([
+      this.db.processingJob.findMany({
+        where: { workspaceId, candidateId: { in: candidateIds }, type: { in: ['resume_parse', AUTO_MATCH_JOB] }, createdAt: { gte: since } },
+        orderBy: { createdAt: 'desc' },
+        select: { candidateId: true, type: true, status: true, createdAt: true },
+      }),
+      this.db.preLinkMatchEvaluation.findMany({
+        where: { workspaceId, jobId, candidateId: { in: candidateIds }, createdAt: { gte: since } },
+        orderBy: { createdAt: 'desc' },
+        select: { id: true, candidateId: true, status: true, overallScore: true, createdAt: true },
+      }),
+      this.db.candidateJobRecommendation.findMany({
+        where: { workspaceId, jobId, candidateId: { in: candidateIds } },
+        select: { prelinkEvaluationId: true, status: true, confidence: true },
+      }),
+      this.db.application.findMany({ where: { workspaceId, jobId, candidateId: { in: candidateIds } }, select: { candidateId: true } }),
+      this.db.job.findFirst({
+        where: { id: jobId, workspaceId },
+        select: { status: true, criteriaVersions: { where: { status: 'confirmed' }, take: 1, select: { id: true } } },
+      }),
+    ]);
+    const linked = new Set(applications.map((a) => a.candidateId));
+    const recByEvaluation = new Map(recommendations.map((r) => [r.prelinkEvaluationId, r]));
+
+    for (const item of withCandidate) {
+      const after = (at: Date, bound: Date) => at.getTime() >= bound.getTime();
+      const parse = jobs.find((j) => j.candidateId === item.candidateId && j.type === 'resume_parse' && after(j.createdAt, item.createdAt));
+      if (!parse || parse.status === 'queued' || parse.status === 'running') {
+        result.set(item.id, { stage: 'parsing' });
+        continue;
+      }
+      if (parse.status !== 'succeeded') {
+        result.set(item.id, { stage: 'done', result: 'parse_failed' });
+        continue;
+      }
+      const match = jobs.find((j) => j.candidateId === item.candidateId && j.type === AUTO_MATCH_JOB && after(j.createdAt, parse.createdAt));
+      if (!match || match.status === 'queued' || match.status === 'running') {
+        result.set(item.id, { stage: 'matching' });
+        continue;
+      }
+      if (match.status !== 'succeeded') {
+        result.set(item.id, { stage: 'done', result: 'match_failed' });
+        continue;
+      }
+      const evaluation = evaluations.find((e) => e.candidateId === item.candidateId && after(e.createdAt, match.createdAt));
+      if (evaluation) {
+        const rec = recByEvaluation.get(evaluation.id);
+        result.set(item.id, {
+          stage: 'done',
+          result: evaluation.status === 'no_match' ? 'no_match' : 'matched',
+          score: evaluation.overallScore ?? undefined,
+          confidence: rec?.confidence,
+          recommendationStatus: rec?.status,
+        });
+        continue;
+      }
+      // Matching finished without evaluating this job -- say why instead of a bare "no result".
+      const reason = linked.has(item.candidateId)
+        ? 'already_linked'
+        : !job || job.status !== 'open'
+          ? 'job_not_open'
+          : !job.criteriaVersions.length
+            ? 'criteria_not_confirmed'
+            : 'not_evaluated';
+      result.set(item.id, { stage: 'done', result: reason });
+    }
+    return result;
   }
 
   async retryBatch(identity: Identity, id: string) {
@@ -207,31 +307,6 @@ export class ImportsService implements OnModuleInit, OnModuleDestroy {
       actorId: event.actorId,
       metadata: event.metadata,
       createdAt: event.createdAt.toISOString(),
-    }));
-  }
-
-  async unifiedIntake(workspaceId: string) {
-    const items = await this.db.importItem.findMany({
-      where: { workspaceId },
-      orderBy: { createdAt: 'desc' },
-      take: 200,
-      include: { batch: true },
-    });
-    const candidateIds = items.map((item) => item.candidateId).filter((id): id is string => Boolean(id));
-    const candidates = await this.db.candidate.findMany({
-      where: { workspaceId, id: { in: candidateIds } },
-      select: { id: true, displayName: true },
-    });
-    const candidateNames = new Map(candidates.map((candidate) => [candidate.id, candidate.displayName]));
-    return items.map((item) => ({
-      at: item.createdAt.toISOString(),
-      label: item.fileName,
-      source: item.batch.createdBy === 'local-screening-user' ? 'Manual upload' : item.batch.createdBy,
-      status: intakeStatusLabel(item),
-      stage: item.stage,
-      errorCode: item.errorCode ?? undefined,
-      candidateId: item.candidateId ?? undefined,
-      candidateName: item.candidateId ? candidateNames.get(item.candidateId) : undefined,
     }));
   }
 
@@ -336,7 +411,8 @@ export class ImportsService implements OnModuleInit, OnModuleDestroy {
     try {
       const material = await this.db.material.findUniqueOrThrow({ where: { id: job.materialId } });
       const candidate = await this.createCandidateFromMaterial(identity, material.id, material.name, input.channel);
-      await this.profiles.enqueue(job.workspaceId, candidate.id, candidate.resumeVersionId, material.id);
+      const batch = await this.db.importBatch.findUnique({ where: { id: input.batchId }, select: { targetJobId: true } });
+      await this.profiles.enqueue(job.workspaceId, candidate.id, candidate.resumeVersionId, material.id, batch?.targetJobId ?? undefined);
       await this.updateItem(identity, input.operationId, input.batchId, input.itemId, {
         stage: 'profile_processing',
         status: 'completed',
@@ -750,23 +826,4 @@ export function normalizeName(fileName: string) {
 export function displayNameFromFileName(fileName: string) {
   const normalized = normalizeName(fileName);
   return normalized.replace(/\b\w/g, (letter) => letter.toUpperCase()).slice(0, 200) || 'Unnamed candidate';
-}
-
-// The unified intake shows why an item stopped, not just "Pending" -- a quarantined or
-// duplicate file otherwise looks identical to one still being processed.
-function intakeStatusLabel(item: { status: string; stage: string; outcome: string | null }) {
-  switch (item.status) {
-    case 'completed':
-      return 'Processed';
-    case 'needs_review':
-      return 'Needs review';
-    case 'duplicate':
-      return 'Duplicate file';
-    case 'failed':
-      if (item.stage === 'quarantined') return 'Quarantined';
-      if (item.outcome === 'parse_failed') return 'Parse failed';
-      return 'Failed';
-    default:
-      return 'Pending';
-  }
 }

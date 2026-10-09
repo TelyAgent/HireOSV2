@@ -27,14 +27,3 @@ export async function runMatchAgain(candidateId: string): Promise<JobDiscoveryRu
   db.jobDiscovery[candidateId] = result;
   return result;
 }
-
-export interface PasteProfileInput {
-  name: string;
-  email?: string;
-  location?: string;
-  notes?: string;
-}
-
-export async function pasteProfile(input: PasteProfileInput): Promise<Candidate> {
-  return apiFetch<Candidate>("/candidates", { method: "POST", body: JSON.stringify(input) });
-}

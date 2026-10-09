@@ -8,6 +8,7 @@ import { relTime } from "../lib/format";
 import { Icon } from "../components/ui/Icons";
 import { Badge, Button, CandidateAvatar, EmptyState, PageHeader, PersonAvatar } from "../components/ui/Primitives";
 import { ConfirmDialog } from "../components/ui/Overlays";
+import { ResumeImportModal, type ImportTab } from "../features/imports/ResumeImportPanel";
 
 function MatchStatusBadge({ entry }: { entry: LibraryEntry }) {
   const { t } = useStore();
@@ -40,6 +41,7 @@ export function LibraryPage() {
   const [matching, setMatching] = useState<string | null>(null);
   const [deleting, setDeleting] = useState<string | null>(null);
   const [confirmingDeleteId, setConfirmingDeleteId] = useState<string | null>(null);
+  const [importTab, setImportTab] = useState<ImportTab | null>(null);
 
   const load = useCallback((q: string) => {
     listLibraryEntries(q).then((rows) => {
@@ -87,14 +89,14 @@ export function LibraryPage() {
         subtitle={t("Every candidate stays here whether or not they’re linked to a job — resumes can arrive before any role exists.")}
         actions={
           <>
-            <Link className="btn btn-secondary" to="/imports/new">
+            <Button variant="secondary" onClick={() => setImportTab("paste")}>
               <Icon name="description" />
               {t("Paste profile")}
-            </Link>
-            <Link className="btn btn-primary" to="/imports/new">
+            </Button>
+            <Button variant="primary" onClick={() => setImportTab("upload")}>
               <Icon name="upload" />
               {t("Upload resumes")}
-            </Link>
+            </Button>
           </>
         }
       />
@@ -200,6 +202,15 @@ export function LibraryPage() {
           confirmLabel={t("Delete")}
           danger
           onConfirm={() => handleDelete(confirmingDeleteId)}
+        />
+      )}
+      {importTab && (
+        <ResumeImportModal
+          initialTab={importTab}
+          onClose={() => {
+            setImportTab(null);
+            load(query);
+          }}
         />
       )}
     </>

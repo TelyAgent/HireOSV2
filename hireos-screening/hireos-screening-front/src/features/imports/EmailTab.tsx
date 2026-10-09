@@ -8,7 +8,7 @@ import { relTime } from "../../lib/format";
 import { Icon } from "../../components/ui/Icons";
 import { Badge, Button, EmptyState } from "../../components/ui/Primitives";
 
-export function EmailTab({ onChanged }: { onChanged?: () => void }) {
+export function EmailTab({ onChanged, jobId }: { onChanged?: () => void; jobId?: string }) {
   const { t, say, state } = useStore();
   const [mailboxes, setMailboxes] = useState<CorporateMailbox[] | null>(null);
   const [readingId, setReadingId] = useState<string | null>(null);
@@ -21,7 +21,7 @@ export function EmailTab({ onChanged }: { onChanged?: () => void }) {
   const readNow = async (mailbox: CorporateMailbox) => {
     setReadingId(mailbox.id);
     try {
-      const result = await importFromMailbox(mailbox.id);
+      const result = await importFromMailbox(mailbox.id, { jobId });
       if (result.attachmentsImported > 0) {
         say(`${mailbox.name || mailbox.email}: ${t("found")} ${result.attachmentsImported} ${t("resume attachment(s) — added to the Resume Library")}`, { type: "success" });
         onChanged?.();

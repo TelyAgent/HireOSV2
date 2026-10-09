@@ -1,9 +1,6 @@
 import { Navigate, Route, Routes } from "react-router-dom";
 import { AppShell } from "./components/AppShell";
-import { useOpenTaskCount } from "./features/tasks/useOpenTaskCount";
-import { TasksPage } from "./pages/TasksPage";
 import { LibraryPage } from "./pages/LibraryPage";
-import { ImportPage } from "./pages/ImportPage";
 import { DuplicateDetailPage } from "./pages/DuplicateDetailPage";
 import { CandidateProfilePage } from "./pages/CandidateProfilePage";
 import { JobRecommendationsPage } from "./pages/JobRecommendationsPage";
@@ -19,15 +16,12 @@ import { PreferencesPage } from "./pages/PreferencesPage";
 import { AiModelsPage } from "./pages/AiModelsPage";
 
 export default function App() {
-  const openTaskCount = useOpenTaskCount();
-
   return (
-    <AppShell openTaskCount={openTaskCount}>
+    <AppShell>
       <Routes>
-        <Route path="/" element={<Navigate to="/tasks" replace />} />
-        <Route path="/tasks" element={<TasksPage />} />
+        <Route path="/" element={<Navigate to="/jobs" replace />} />
         <Route path="/library" element={<LibraryPage />} />
-        <Route path="/imports/new" element={<ImportPage />} />
+        <Route path="/imports/new" element={<Navigate to="/library" replace />} />
         <Route path="/duplicates/:id" element={<DuplicateDetailPage />} />
         <Route path="/candidates/:id" element={<CandidateProfilePage />} />
         <Route path="/candidates/:id/jobs" element={<JobRecommendationsPage />} />
@@ -41,7 +35,7 @@ export default function App() {
         <Route path="/deliveries/:id" element={<DeliveryDetailPage />} />
         <Route path="/settings/preferences" element={<PreferencesPage />} />
         <Route path="/settings/ai-models" element={<AiModelsPage />} />
-        <Route path="*" element={<Navigate to="/tasks" replace />} />
+        <Route path="*" element={<Navigate to="/jobs" replace />} />
       </Routes>
     </AppShell>
   );

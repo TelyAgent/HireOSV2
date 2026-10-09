@@ -5,7 +5,7 @@ import { PrismaService } from '../persistence/prisma.service';
 import type { Identity } from '../auth/workspace.guard';
 import { AiMatcherService, AiMatchError, type JobDimensionInput, type JobRequirementInput } from './ai-matcher.service';
 
-const AUTO_MATCH_JOB = 'job_discovery_match';
+export const AUTO_MATCH_JOB = 'job_discovery_match';
 const AUTO_MATCH_LEASE_MS = 120_000;
 const RECOMMENDATION_THRESHOLD = 35;
 
@@ -59,9 +59,11 @@ export class DiscoveryService implements OnModuleInit, OnModuleDestroy {
   // button the recruiter has to remember to click). Runs through the same durable job
   // queue every other async step in this service uses, so a slow or failing AI call
   // never blocks the resume-parse worker that triggered it.
-  async enqueueAutoMatch(workspaceId: string, candidateId: string) {
+  // `jobId` scopes the run to that one job (resume added from a job's screening workspace);
+  // without it the candidate is matched against every open job.
+  async enqueueAutoMatch(workspaceId: string, candidateId: string, jobId?: string) {
     await this.db.processingJob.create({
-      data: { workspaceId, candidateId, type: AUTO_MATCH_JOB, input: { candidateId } },
+      data: { workspaceId, candidateId, type: AUTO_MATCH_JOB, input: { candidateId, ...(jobId ? { jobId } : {}) } },
     });
   }
 
@@ -306,7 +308,8 @@ export class DiscoveryService implements OnModuleInit, OnModuleDestroy {
         include: CANDIDATE_MATCH_INCLUDE,
       });
       if (!candidate) throw new Error('CANDIDATE_NOT_FOUND');
-      await this.runMatchForCandidate(job.workspaceId, candidate);
+      const targetJobId = (job.input as { jobId?: string } | null)?.jobId;
+      await this.runMatchForCandidate(job.workspaceId, candidate, targetJobId);
       await this.db.processingJob.update({ where: { id: job.id }, data: { status: 'succeeded', leaseToken: null, leaseUntil: null } });
     } catch (error) {
       await this.db.processingJob.update({
@@ -316,9 +319,9 @@ export class DiscoveryService implements OnModuleInit, OnModuleDestroy {
     }
   }
 
-  private async runMatchForCandidate(workspaceId: string, candidate: CandidateForMatch) {
+  private async runMatchForCandidate(workspaceId: string, candidate: CandidateForMatch, jobId?: string) {
     const openJobs = await this.db.job.findMany({
-      where: { workspaceId, status: 'open' },
+      where: { workspaceId, status: 'open', ...(jobId ? { id: jobId } : {}) },
       include: { criteriaVersions: { where: { status: 'confirmed' }, orderBy: { version: 'desc' }, take: 1 } },
     });
     const run = await this.db.jobDiscoveryRun.create({
@@ -484,6 +487,26 @@ export class DiscoveryService implements OnModuleInit, OnModuleDestroy {
           },
         });
         await this.createLinkConfirmationTask(workspaceId, created.id, candidate, job, tx);
+      });
+    }
+    if (runId && status === 'no_match') {
+      // Below-threshold results are kept too (no recommendation), so the jobs list can count
+      // everyone actually evaluated against this job — not just the ones that matched.
+      await this.db.preLinkMatchEvaluation.create({
+        data: {
+          workspaceId,
+          candidateId: candidate.id,
+          jobId: job.id,
+          discoveryRunId: runId,
+          profileVersion: profile.version,
+          criteriaVersion: criteria.version,
+          status: 'no_match',
+          overallScore: evaluation.overallScore,
+          coverage: evaluation.coverage,
+          rationale: evaluation.rationale,
+          gaps: evaluation.gaps,
+          evidence: evaluation.evidence,
+        },
       });
     }
     return { status, recommendationsCreated: runId && status === 'recommendations_ready' ? 1 : 0 };

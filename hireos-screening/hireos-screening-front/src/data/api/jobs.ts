@@ -55,3 +55,8 @@ export async function reopenJobCriteriaForEdit(id: string): Promise<Job> {
   db.jobs[job.id] = job;
   return job;
 }
+
+/** Re-runs auto-match of the resume library against this job's confirmed criteria. */
+export async function runJobMatch(id: string): Promise<{ status: string; candidatesScanned: number; recommendationsCreated: number }> {
+  return apiFetch(`/jobs/${id}/match`, { method: "POST" });
+}

@@ -8,6 +8,8 @@ export const pasteCandidateSchema = z.object({
   email: z.string().trim().email().max(320).optional().or(z.literal('')),
   location: z.string().trim().max(200).optional(),
   notes: z.string().max(5000).optional(),
+  // Added from a job's screening workspace: auto-match only against this job.
+  jobId: z.string().trim().min(1).max(100).optional(),
 }).strict();
 
 export function validate<T>(schema: z.ZodType<T>, value: unknown): T {

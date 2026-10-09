@@ -88,7 +88,7 @@ export class CandidatesService {
       // PRD: matching runs automatically once a profile exists, not on a manual button
       // press. Enqueued after commit so a slow/failing match run can never roll back or
       // block the candidate creation that triggered it.
-      await this.discovery.enqueueAutoMatch(identity.workspaceId, candidate.created.id);
+      await this.discovery.enqueueAutoMatch(identity.workspaceId, candidate.created.id, input.jobId);
     }
     return this.toFrontendCandidate(candidate.created, candidate.profile ?? undefined);
   }

@@ -58,8 +58,9 @@ export class IntakeController {
     @UploadedFiles() files: MulterFile[],
     @Headers('x-import-channel') channel: 'manual_upload' | 'email' | 'folder' | 'api' | undefined,
     @Headers('idempotency-key') idempotencyKey?: string,
+    @Headers('x-target-job-id') targetJobId?: string,
   ) {
-    return this.imports.createBatch(req.identity, files, channel || 'manual_upload', idempotencyKey);
+    return this.imports.createBatch(req.identity, files, channel || 'manual_upload', idempotencyKey, targetJobId || undefined);
   }
 
   @Get('imports/:id')
@@ -85,10 +86,5 @@ export class IntakeController {
   @Get('imports/:id/activity')
   importActivity(@Req() req: { identity: Identity }, @Param('id') id: string) {
     return this.imports.activity(req.identity.workspaceId, id);
-  }
-
-  @Get('intake')
-  unifiedIntake(@Req() req: { identity: Identity }) {
-    return this.imports.unifiedIntake(req.identity.workspaceId);
   }
 }

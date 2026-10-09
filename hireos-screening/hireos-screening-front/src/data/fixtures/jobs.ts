@@ -60,6 +60,19 @@ export interface Job {
   openings: number;
   applicantCount: number;
   assessmentRequired?: boolean;
+  /** Only on the jobs list response — people (not files) per funnel stage. */
+  funnel?: JobFunnel;
+}
+
+export interface JobFunnel {
+  resumes: number;
+  matched: number;
+  linked: number;
+  /** Proposed matches still waiting for a person to confirm. */
+  pending: number;
+  /** People in the resume pool with a resume uploaded today. */
+  today: number;
+  sources: Array<{ source: string; count: number }>;
 }
 
 /** Canonical dimension pool per PRD §5.3 — used to populate the "add dimension" picker. */

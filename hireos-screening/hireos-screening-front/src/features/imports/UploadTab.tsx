@@ -8,6 +8,8 @@ import {
   runImportBatch,
   type ImportBatch,
   type ImportItemResult,
+  type JobMatchProgress,
+  type JobMatchResult,
 } from "../../data/api/imports";
 import { delay } from "../../data/api/shared";
 import { Icon } from "../../components/ui/Icons";
@@ -22,22 +24,94 @@ interface Run {
 
 const POLL_INTERVAL_MS = 700;
 const POLL_TIMEOUT_MS = 30_000;
+/** Job-scoped imports also wait for profile parse + AI match, which can take minutes. */
+const JOB_MATCH_POLL_TIMEOUT_MS = 5 * 60_000;
+const JOB_MATCH_POLL_INTERVAL_MS = 2_000;
+
+/** A job-scoped batch isn't settled until every created candidate has a match outcome. */
+function jobMatchPending(batch: ImportBatch) {
+  return Boolean(batch.targetJobId) && batch.items.some((i) => i.status === "completed" && i.candidateId && i.jobMatch?.stage !== "done");
+}
+
+function isUnsettled(batch: ImportBatch) {
+  return batch.status === "processing" || jobMatchPending(batch);
+}
 
 /** Real uploads hand candidate creation off to an async job (import chain plan,
  * Phase 1) and return while it's still in flight. Poll until the batch leaves
- * "processing" so the UI reflects what actually happened instead of a stale
- * first response. No-op for mock batches, which are always already terminal. */
+ * "processing" -- and, for imports from a job, until each resume has been parsed and
+ * matched against it -- so the UI reflects what actually happened. */
 async function pollUntilSettled(batch: ImportBatch, onUpdate: (batch: ImportBatch) => void): Promise<void> {
   const startedAt = Date.now();
+  const timeout = batch.targetJobId ? JOB_MATCH_POLL_TIMEOUT_MS : POLL_TIMEOUT_MS;
   let current = batch;
-  while (current.status === "processing" && Date.now() - startedAt < POLL_TIMEOUT_MS) {
+  while (isUnsettled(current) && Date.now() - startedAt < timeout) {
+    if (current.status !== "processing") {
+      await delay(JOB_MATCH_POLL_INTERVAL_MS - POLL_INTERVAL_MS);
+    }
     await delay(POLL_INTERVAL_MS);
     current = await getImportBatch(batch.id);
     onUpdate(current);
   }
 }
 
-function ImportItemRow({ item, onRetry, retrying }: { item: ImportItemResult; onRetry: () => void; retrying: boolean }) {
+const MATCH_RESULT: Record<JobMatchResult, { tone: "success" | "neutral" | "outline" | "warning" | "danger"; label: string }> = {
+  matched: { tone: "success", label: "Matched — added to AI suggestions" },
+  no_match: { tone: "outline", label: "Below match threshold" },
+  already_linked: { tone: "neutral", label: "Already linked to this job" },
+  job_not_open: { tone: "warning", label: "Job is not open — not matched" },
+  criteria_not_confirmed: { tone: "warning", label: "Job criteria not confirmed — not matched" },
+  not_evaluated: { tone: "warning", label: "Could not evaluate against this job" },
+  parse_failed: { tone: "danger", label: "Resume parsing failed" },
+  match_failed: { tone: "danger", label: "Matching failed" },
+};
+
+/** Parse → match → result for one resume imported from a job's screening workspace. */
+function JobMatchSteps({ progress }: { progress?: JobMatchProgress }) {
+  const { t } = useStore();
+  const stage = progress?.stage ?? "parsing";
+  const failedAt = progress?.result === "parse_failed" ? "parse" : progress?.result === "match_failed" ? "match" : null;
+  const step = (key: "parse" | "match" | "result", label: string) => {
+    const order = { parse: 0, match: 1, result: 2 }[key];
+    const current = { parsing: 0, matching: 1, done: 2 }[stage];
+    const state = failedAt === key ? "failed" : order < current || (stage === "done" && key === "result") ? "done" : order === current ? "active" : "todo";
+    return (
+      <span className={`jm-step jm-${state}`}>
+        <Icon name={state === "done" ? "check_circle" : state === "failed" ? "error" : state === "active" ? "progress_activity" : "radio_button_unchecked"} size={14} />
+        {t(label)}
+      </span>
+    );
+  };
+  const outcome = progress?.result ? MATCH_RESULT[progress.result] : null;
+  return (
+    <div className="jm-row">
+      {step("parse", stage === "parsing" ? "Parsing resume…" : "Parsed")}
+      <span className="jm-sep" />
+      {step("match", stage === "matching" ? "Matching against this job…" : "Matched against job")}
+      <span className="jm-sep" />
+      {outcome ? (
+        <Badge tone={outcome.tone}>
+          {t(outcome.label)}
+          {progress?.score != null && ` · ${Math.round(progress.score)}`}
+        </Badge>
+      ) : (
+        <span className="jm-step jm-todo">{t("Result")}</span>
+      )}
+    </div>
+  );
+}
+
+function ImportItemRow({
+  item,
+  onRetry,
+  retrying,
+  jobScoped,
+}: {
+  item: ImportItemResult;
+  onRetry: () => void;
+  retrying: boolean;
+  jobScoped: boolean;
+}) {
   const { t } = useStore();
   const { tone, label, detail } = describeItem(item);
   let action: React.ReactNode = null;
@@ -77,6 +151,7 @@ function ImportItemRow({ item, onRetry, retrying }: { item: ImportItemResult; on
           {item.fileName} <span className="tiny muted">({formatFileSize(item.sizeKB)})</span>
         </div>
         <div className="tiny">{t(detail)}</div>
+        {jobScoped && item.status === "completed" && item.candidateId && <JobMatchSteps progress={item.jobMatch} />}
       </div>
       <Badge tone={tone}>{t(label)}</Badge>
       <div style={{ width: 130, textAlign: "right" }}>{action}</div>
@@ -114,11 +189,18 @@ function BatchCard({
     );
   }
   const batch = run.batch;
-  const doneCount = batch.items.filter((i) => i.status !== "processing").length;
+  const jobScoped = Boolean(batch.targetJobId);
+  // From a job, an item is only "done" once its match against that job has an outcome.
+  const isItemDone = (i: ImportItemResult) =>
+    i.status !== "processing" && !(jobScoped && i.status === "completed" && i.candidateId && i.jobMatch?.stage !== "done");
+  const doneCount = batch.items.filter(isItemDone).length;
   const failCount = batch.items.filter((i) => i.status === "failed").length;
   const isProcessing = batch.status === "processing";
+  const isMatching = !isProcessing && jobMatchPending(batch);
   const stateBadge = isProcessing ? (
     <Badge tone="neutral">{t("Processing…")}</Badge>
+  ) : isMatching ? (
+    <Badge tone="neutral">{t("Matching…")}</Badge>
   ) : failCount === 0 ? (
     <Badge tone="success">{t("Succeeded")}</Badge>
   ) : failCount === batch.items.length ? (
@@ -145,15 +227,16 @@ function BatchCard({
         <div className="progress-fill" style={{ width: `${batch.items.length ? Math.round((doneCount / batch.items.length) * 100) : 100}%` }} />
       </div>
       {batch.items.map((item) => (
-        <ImportItemRow key={item.id} item={item} onRetry={() => onRetryItem(item.id)} retrying={retryingId === item.id} />
+        <ImportItemRow key={item.id} item={item} jobScoped={jobScoped} onRetry={() => onRetryItem(item.id)} retrying={retryingId === item.id} />
       ))}
     </div>
   );
 }
 
-export function UploadTab({ onChanged }: { onChanged?: () => void }) {
+/** Import batches started from one tab: upload, poll to settled, retry/cancel, and the
+ * batch cards that show their progress. Shared by the file upload and paste tabs. */
+export function useImportRuns({ jobId, onChanged }: { jobId?: string; onChanged?: () => void }) {
   const { t, say } = useStore();
-  const [dragOver, setDragOver] = useState(false);
   const [runs, setRuns] = useState<Run[]>([]);
   const [retryingId, setRetryingId] = useState<string | null>(null);
   const [cancellingId, setCancellingId] = useState<string | null>(null);
@@ -165,7 +248,7 @@ export function UploadTab({ onChanged }: { onChanged?: () => void }) {
 
   const finishRun = async (id: string, batch: ImportBatch) => {
     applyBatchUpdate(id, batch);
-    if (batch.status === "processing") {
+    if (isUnsettled(batch)) {
       await pollUntilSettled(batch, (updated) => applyBatchUpdate(id, updated));
     }
   };
@@ -173,13 +256,8 @@ export function UploadTab({ onChanged }: { onChanged?: () => void }) {
   const startRun = async (files: File[]) => {
     const id = "run-" + Date.now();
     setRuns((prev) => [{ id, fileCount: files.length }, ...prev]);
-    const batch = await runImportBatch(files);
+    const batch = await runImportBatch(files, { jobId });
     await finishRun(id, batch);
-  };
-
-  const handleFiles = (fileList: FileList | File[]) => {
-    const files = Array.from(fileList);
-    if (files.length) startRun(files);
   };
 
   const handleRetryItem = async (runId: string, itemId: string) => {
@@ -206,6 +284,30 @@ export function UploadTab({ onChanged }: { onChanged?: () => void }) {
     } finally {
       setCancellingId(null);
     }
+  };
+
+  const runCards = runs.map((run) => (
+    <BatchCard
+      key={run.id}
+      run={run}
+      onRetryItem={(itemId) => handleRetryItem(run.id, itemId)}
+      retryingId={retryingId}
+      onCancel={(batchId) => handleCancel(run.id, batchId)}
+      cancelling={cancellingId === run.batch?.id}
+    />
+  ));
+
+  return { startRun, runCards };
+}
+
+export function UploadTab({ onChanged, jobId }: { onChanged?: () => void; jobId?: string }) {
+  const { t } = useStore();
+  const [dragOver, setDragOver] = useState(false);
+  const { startRun, runCards } = useImportRuns({ jobId, onChanged });
+
+  const handleFiles = (fileList: FileList | File[]) => {
+    const files = Array.from(fileList);
+    if (files.length) startRun(files);
   };
 
   return (
@@ -242,7 +344,11 @@ export function UploadTab({ onChanged }: { onChanged?: () => void }) {
         />
         <Icon name="cloud_upload" size={36} style={{ color: "var(--text-tertiary)" }} />
         <h3 style={{ margin: "8px 0 4px", fontWeight: 500 }}>{t("Drag files here, or click to choose")}</h3>
-        <p className="tiny">{t("Supports PDF, DOCX, TXT · Up to 25 MB per file · No job selection required")}</p>
+        <p className="tiny">
+          {jobId
+            ? t("Supports PDF, DOCX, TXT · Up to 25 MB per file · Matched against this job only")
+            : t("Supports PDF, DOCX, TXT · Up to 25 MB per file · No job selection required")}
+        </p>
         <Button
           variant="primary"
           style={{ marginTop: 10 }}
@@ -254,16 +360,7 @@ export function UploadTab({ onChanged }: { onChanged?: () => void }) {
           {t("Choose files")}
         </Button>
       </div>
-      {runs.map((run) => (
-        <BatchCard
-          key={run.id}
-          run={run}
-          onRetryItem={(itemId) => handleRetryItem(run.id, itemId)}
-          retryingId={retryingId}
-          onCancel={(batchId) => handleCancel(run.id, batchId)}
-          cancelling={cancellingId === run.batch?.id}
-        />
-      ))}
+      {runCards}
     </>
   );
 }

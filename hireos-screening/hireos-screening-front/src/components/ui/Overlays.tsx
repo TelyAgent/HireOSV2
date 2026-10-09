@@ -16,6 +16,7 @@ export function Modal({
   onClose,
   title,
   wide,
+  width,
   footer,
   children,
 }: {
@@ -23,6 +24,8 @@ export function Modal({
   onClose: () => void;
   title: ReactNode;
   wide?: boolean;
+  /** Explicit pixel width; overrides `wide`. */
+  width?: number;
   footer?: ReactNode;
   children: ReactNode;
 }) {
@@ -33,7 +36,7 @@ export function Modal({
       footer={null}
       closable={false}
       destroyOnHidden
-      width={wide ? 760 : 640}
+      width={width ?? (wide ? 760 : 640)}
       styles={{ content: { padding: 0, borderRadius: 18, overflow: "hidden" }, mask: { background: "rgba(15,23,42,.44)" } }}
     >
       <div className="modal-header">

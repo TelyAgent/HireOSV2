@@ -110,7 +110,8 @@ export class SettingsController {
   }
 
   @Post('settings/corporate-mailboxes/:id/import')
-  importFromMailbox(@Req() req: { identity: Identity }, @Param('id') id: string) {
-    return this.settings.importFromMailbox(req.identity, id);
+  importFromMailbox(@Req() req: { identity: Identity }, @Param('id') id: string, @Body() body: { jobId?: unknown } | undefined) {
+    const jobId = typeof body?.jobId === 'string' && body.jobId.trim() ? body.jobId.trim() : undefined;
+    return this.settings.importFromMailbox(req.identity, id, jobId);
   }
 }

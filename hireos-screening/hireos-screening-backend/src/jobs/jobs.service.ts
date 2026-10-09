@@ -31,7 +31,71 @@ export class JobsService {
       orderBy: { createdAt: 'desc' },
       include: { criteriaVersions: { orderBy: { version: 'desc' }, take: 1 } },
     });
-    return jobs.map((job) => toFrontendJob(job));
+    const funnels = await this.jobFunnels(identity.workspaceId, jobs.map((job) => job.id));
+    return jobs.map((job) => ({ ...toFrontendJob(job), funnel: funnels.get(job.id) }));
+  }
+
+  /**
+   * Per-job funnel for the jobs list, counted in people (not files):
+   * Resumes (candidates actually evaluated against the job, plus anyone already matched/linked) → Matched (live AI recommendation, incl. already linked)
+   * → Linked (an Application exists). Each stage is a subset of the previous one.
+   */
+  private async jobFunnels(workspaceId: string, jobIds: string[]) {
+    const [evaluations, recs, applications] = await Promise.all([
+      this.db.preLinkMatchEvaluation.findMany({
+        where: { workspaceId, jobId: { in: jobIds } },
+        distinct: ['candidateId', 'jobId'],
+        select: { candidateId: true, jobId: true },
+      }),
+      this.db.candidateJobRecommendation.findMany({
+        where: { workspaceId, jobId: { in: jobIds }, status: { in: ['proposed', 'deferred', 'confirmed'] } },
+        select: { candidateId: true, jobId: true, status: true },
+      }),
+      this.db.application.findMany({ where: { workspaceId, jobId: { in: jobIds } }, select: { candidateId: true, jobId: true } }),
+    ]);
+    const allIds = [...new Set([...evaluations.map((e) => e.candidateId), ...recs.map((r) => r.candidateId), ...applications.map((a) => a.candidateId)])];
+    const versions = await this.db.resumeVersion.findMany({
+      where: { workspaceId, candidateId: { in: allIds } },
+      select: { candidateId: true, isLatest: true, version: true, uploadedAt: true, material: { select: { sourceType: true } } },
+    });
+    const startOfToday = new Date();
+    startOfToday.setHours(0, 0, 0, 0);
+    const resumeInfo = new Map<string, { source: string; version: number; isLatest: boolean; today: boolean }>();
+    for (const v of versions) {
+      const prev = resumeInfo.get(v.candidateId);
+      const today = (prev?.today ?? false) || v.uploadedAt >= startOfToday;
+      const better = !prev || (v.isLatest && !prev.isLatest) || (v.isLatest === prev.isLatest && v.version > prev.version);
+      resumeInfo.set(v.candidateId, better
+        ? { source: v.material?.sourceType || 'manual_upload', version: v.version, isLatest: v.isLatest, today }
+        : { ...prev, today });
+    }
+
+    const result = new Map<string, { resumes: number; matched: number; linked: number; pending: number; today: number; sources: Array<{ source: string; count: number }> }>();
+    for (const jobId of jobIds) {
+      const linked = new Set(applications.filter((a) => a.jobId === jobId).map((a) => a.candidateId));
+      const jobRecs = recs.filter((r) => r.jobId === jobId);
+      const matched = new Set([...linked, ...jobRecs.map((r) => r.candidateId)]);
+      const pending = new Set(jobRecs.filter((r) => r.status === 'proposed' && !linked.has(r.candidateId)).map((r) => r.candidateId));
+      const evaluated = evaluations.filter((e) => e.jobId === jobId).map((e) => e.candidateId);
+      const pool = new Set([...evaluated, ...matched]);
+      const sources = new Map<string, number>();
+      let today = 0;
+      for (const id of pool) {
+        const info = resumeInfo.get(id);
+        if (!info) continue;
+        sources.set(info.source, (sources.get(info.source) || 0) + 1);
+        if (info.today) today++;
+      }
+      result.set(jobId, {
+        resumes: pool.size,
+        matched: matched.size,
+        linked: linked.size,
+        pending: pending.size,
+        today,
+        sources: [...sources.entries()].sort((a, b) => b[1] - a[1]).map(([source, count]) => ({ source, count })),
+      });
+    }
+    return result;
   }
 
   /**

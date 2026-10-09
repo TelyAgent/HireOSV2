@@ -15,16 +15,8 @@ interface NavItem {
   icon: string;
   label: string;
   isActive: (pathname: string) => boolean;
-  showCount?: boolean;
 }
 const NAV_PRIMARY: NavItem[] = [
-  { to: "/tasks", icon: "checklist", label: "My Tasks", isActive: (p) => p.startsWith("/tasks"), showCount: true },
-  {
-    to: "/library",
-    icon: "folder_shared",
-    label: "Resume Library",
-    isActive: (p) => p.startsWith("/library") || p.startsWith("/imports") || p.startsWith("/duplicates") || p.startsWith("/candidates"),
-  },
   {
     to: "/jobs",
     icon: "work_outline",
@@ -34,12 +26,18 @@ const NAV_PRIMARY: NavItem[] = [
     // global nav item, so it highlights Jobs instead of getting its own entry.
     isActive: (p) => p.startsWith("/jobs") || p.startsWith("/applications") || p.startsWith("/deliveries") || p.startsWith("/comparisons"),
   },
+  {
+    to: "/library",
+    icon: "folder_shared",
+    label: "Resume Library",
+    isActive: (p) => p.startsWith("/library") || p.startsWith("/imports") || p.startsWith("/duplicates") || p.startsWith("/candidates"),
+  },
 ];
 const NAV_WORKSPACE: NavItem[] = [
   { to: "/settings/preferences", icon: "tune", label: "Settings", isActive: (p) => p.startsWith("/settings") },
 ];
 
-export function TopBar({ openTaskCount }: { openTaskCount: number }) {
+export function TopBar() {
   const { state, t, toggleLang, toggleAppearance, toggleRoleSwitcher, person } = useStore();
   const langLabel = state.lang === "en" ? "中 / EN" : "EN / 中";
   return (
@@ -51,10 +49,6 @@ export function TopBar({ openTaskCount }: { openTaskCount: number }) {
         <span className="brand-context">{t("Resume Screening")}</span>
       </div>
       <div className="topbar-actions">
-        <Link to="/tasks" className="icon-btn" title={t("Notifications")} aria-label={t("Notifications")}>
-          <Icon name="notifications_none" />
-          {openTaskCount > 0 && <span className="dot" />}
-        </Link>
         <Button variant="secondary" size="sm" style={{ borderRadius: 20 }} onClick={toggleLang}>
           {langLabel}
         </Button>
@@ -83,7 +77,7 @@ export function TopBar({ openTaskCount }: { openTaskCount: number }) {
   );
 }
 
-function NavLinkItem({ item, collapsed, count }: { item: NavItem; collapsed: boolean; count?: number }) {
+function NavLinkItem({ item, collapsed }: { item: NavItem; collapsed: boolean }) {
   const { pathname } = useLocation();
   const { t } = useStore();
   const active = item.isActive(pathname);
@@ -98,12 +92,11 @@ function NavLinkItem({ item, collapsed, count }: { item: NavItem; collapsed: boo
     >
       <Icon name={item.icon} />
       {!collapsed && label}
-      {count != null && count > 0 && <span className="badge-count">{count}</span>}
     </Link>
   );
 }
 
-export function SideNav({ openTaskCount }: { openTaskCount: number }) {
+export function SideNav() {
   const { state, t, toggleSidenav } = useStore();
   const collapsed = state.sidenavCollapsed;
   const toggleLabel = collapsed ? t("Expand navigation") : t("Collapse navigation");
@@ -111,7 +104,7 @@ export function SideNav({ openTaskCount }: { openTaskCount: number }) {
     <nav className={`sidenav${collapsed ? " collapsed" : ""}`} aria-label="Primary">
       <div className="sidenav-section">
         {NAV_PRIMARY.map((item) => (
-          <NavLinkItem key={item.to} item={item} collapsed={collapsed} count={item.showCount ? openTaskCount : undefined} />
+          <NavLinkItem key={item.to} item={item} collapsed={collapsed} />
         ))}
       </div>
       <div className="sidenav-section">
@@ -233,7 +226,7 @@ function RoleSwitcherModal() {
   );
 }
 
-export function AppShell({ children, openTaskCount = 0 }: { children: ReactNode; openTaskCount?: number }) {
+export function AppShell({ children }: { children: ReactNode }) {
   const { state } = useStore();
 
   const effectiveDark = state.theme === "system" ? state.systemDark : state.theme === "dark" || state.theme === "deep";
@@ -249,9 +242,9 @@ export function AppShell({ children, openTaskCount = 0 }: { children: ReactNode;
 
   return (
     <div id="app">
-      <TopBar openTaskCount={openTaskCount} />
+      <TopBar />
       <div className="shell">
-        <SideNav openTaskCount={openTaskCount} />
+        <SideNav />
         <main className="main">
           <div className="main-inner wide">{children}</div>
         </main>

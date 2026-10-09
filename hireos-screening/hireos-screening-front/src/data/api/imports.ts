@@ -30,20 +30,45 @@ export interface ImportItemResult {
   businessConsumeStatus?: string;
   candidateId?: string;
   duplicateReviewId?: string;
+  /** Only for batches imported from a job: parse → match → outcome against that job. */
+  jobMatch?: JobMatchProgress;
 }
+
+export type JobMatchResult =
+  | "matched"
+  | "no_match"
+  | "already_linked"
+  | "job_not_open"
+  | "criteria_not_confirmed"
+  | "not_evaluated"
+  | "parse_failed"
+  | "match_failed";
+export interface JobMatchProgress {
+  stage: "parsing" | "matching" | "done";
+  result?: JobMatchResult;
+  /** 0–100 overall match score. */
+  score?: number;
+  confidence?: number;
+  recommendationStatus?: string;
+}
+
 export interface ImportBatch {
   id: string;
   operationId?: string;
   createdAt: string;
   status: "processing" | "completed" | "partial" | "failed" | "cancelled";
+  targetJobId?: string;
   items: ImportItemResult[];
 }
 
 export type UploadFileInput = File;
 
-export async function runImportBatch(files: UploadFileInput[]): Promise<ImportBatch> {
+/** `jobId`: import started from a job's screening workspace — the backend auto-matches
+ * these resumes against that job only, instead of every open job. */
+export async function runImportBatch(files: UploadFileInput[], opts?: { jobId?: string }): Promise<ImportBatch> {
   return apiUpload<ImportBatch>("/imports", files, "files", {
     "Idempotency-Key": `resume-import-${safeRandomUUID()}`,
+    ...(opts?.jobId ? { "X-Target-Job-Id": opts.jobId } : {}),
   });
 }
 
@@ -61,18 +86,6 @@ export async function getImportBatch(id: string): Promise<ImportBatch> {
 
 export async function cancelImportBatch(id: string): Promise<ImportBatch> {
   return apiFetch<ImportBatch>(`/imports/${id}/cancel`, { method: "POST" });
-}
-
-export interface UnifiedIntakeRow {
-  at: string;
-  label: string;
-  source: string;
-  status: string;
-  candidateId?: string;
-  candidateName?: string;
-}
-export async function getUnifiedIntake(): Promise<UnifiedIntakeRow[]> {
-  return apiFetch<UnifiedIntakeRow[]>("/intake");
 }
 
 export async function getDuplicateReview(id: string): Promise<DuplicateReview> {

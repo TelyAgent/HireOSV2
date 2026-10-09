@@ -192,6 +192,9 @@ model ImportBatch {
   workspaceId String
   createdBy   String
   status      String              @default("processing")
+  // Set when the import was started from a job's screening workspace: resumes from this
+  // batch are auto-matched against that job only, instead of every open job.
+  targetJobId String?
   operationId String?             @unique
   createdAt   DateTime            @default(now())
   items       ImportItem[]

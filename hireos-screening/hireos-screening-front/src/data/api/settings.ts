@@ -72,6 +72,10 @@ export interface MailboxImportResult {
  * via the normal import pipeline -- this is what the "Import from email" tab's
  * "立即读取" button calls, distinct from the lightweight `syncCorporateMailbox`
  * status check used on the Preferences page. */
-export async function importFromMailbox(id: string): Promise<MailboxImportResult> {
-  return apiFetch<MailboxImportResult>(`/settings/corporate-mailboxes/${id}/import`, { method: "POST" });
+/** `jobId`: imported resumes are auto-matched against that job only. */
+export async function importFromMailbox(id: string, opts?: { jobId?: string }): Promise<MailboxImportResult> {
+  return apiFetch<MailboxImportResult>(`/settings/corporate-mailboxes/${id}/import`, {
+    method: "POST",
+    body: JSON.stringify(opts?.jobId ? { jobId: opts.jobId } : {}),
+  });
 }

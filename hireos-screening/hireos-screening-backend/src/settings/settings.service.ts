@@ -337,7 +337,7 @@ export class SettingsService {
   // candidate creation), so "Import from email" is real ingestion, not just a
   // status display. IMAP's own \Seen flag is the only dedupe state kept -- a
   // message this already imported from never comes back on the next click.
-  async importFromMailbox(identity: Identity, id: string) {
+  async importFromMailbox(identity: Identity, id: string, targetJobId?: string) {
     const existing = await this.getMailboxSetting(identity.workspaceId, id);
     if (!existing) throw new NotFoundException({ code: 'NOT_FOUND' });
     const payload = existing.payload as any;
@@ -373,7 +373,7 @@ export class SettingsService {
     );
     let batchId: string | undefined;
     if (files.length) {
-      const batch = await this.imports.createBatch(identity, files, 'email');
+      const batch = await this.imports.createBatch(identity, files, 'email', undefined, targetJobId);
       batchId = batch.id;
       await this.mail.markSeen(creds, messages.map((m) => m.uid)).catch(() => undefined);
     }

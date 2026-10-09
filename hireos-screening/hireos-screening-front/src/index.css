@@ -469,6 +469,8 @@ input[type="checkbox"],input[type="radio"]{ accent-color:var(--accent-600); }
 .modal-header{ padding:24px 28px 4px; }
 .modal-title{ font-size:22px; }
 .modal-body{ padding:14px 28px 8px; }
+/* No footer: the body is the last block, so give it the same breathing room as the header top. */
+.modal-body:last-child{ padding-bottom:24px; }
 .modal-footer{ padding:14px 28px 22px; }
 .drawer{ width:520px; max-width:96vw; }
 .drawer-header{ position:sticky; top:0; z-index:1; padding:17px 20px 15px; background:var(--surface); }
@@ -488,3 +490,77 @@ a:focus-visible,button:focus-visible,[tabindex]:focus-visible,input:focus-visibl
   .brand{ min-width:210px; }
   .topbar-search{ max-width:440px; }
 }
+
+/* Jobs list — per-job funnel */
+.jobs-table th,.jobs-table td{ padding:14px 16px; }
+.jobs-table td{ white-space:nowrap; }
+.jobs-table td.job-cell{ white-space:normal; min-width:220px; }
+.jobs-table .job-title{ font-size:var(--fs-sm); font-weight:600; color:var(--text); line-height:1.35; }
+.jobs-table .job-meta{ margin-top:3px; color:var(--text-tertiary); font-size:var(--fs-xs); line-height:1.4; }
+.jobs-table th.num,.jobs-table td.num{ text-align:center; }
+.jobs-table .status-stack{ display:flex; flex-wrap:wrap; gap:6px; }
+.jobs-table th.fn-th{ cursor:help; }
+.jobs-table td.fn-cell{ min-width:84px; }
+.jobs-table .fn-num{ font-weight:700; font-size:var(--fs-body); line-height:1.25; font-variant-numeric:tabular-nums; }
+.jobs-table .fn-sub{ margin-top:2px; font-size:var(--fs-xs); color:var(--text-tertiary); white-space:nowrap; }
+.jobs-table .fn-sub.fresh{ color:var(--success-text); font-weight:600; }
+.jobs-table .fn-pend{ color:var(--accent-700); font-weight:700; }
+.jobs-table .fn-bar{ height:4px; margin:6px auto 0; width:64px; border-radius:2px; background:var(--surface-3, var(--surface-alt)); overflow:hidden; }
+.jobs-table .fn-bar span{ display:block; height:100%; border-radius:2px; }
+.jobs-table .fn-fill-1{ background:var(--accent-300); }
+.jobs-table .fn-fill-2{ background:var(--accent-500); }
+.jobs-table .fn-fill-3{ background:var(--accent-700); }
+.jobs-table .source-chips{ display:flex; flex-wrap:wrap; gap:5px; }
+.jobs-table .source-chip{ display:inline-flex; align-items:center; gap:5px; padding:2px 8px; border-radius:999px; background:var(--surface-alt); border:1px solid var(--border); color:var(--text-secondary); font-size:var(--fs-xs); line-height:1.4; }
+.jobs-table .source-chip b{ color:var(--text); font-weight:700; }
+.jobs-table td.action-cell{ text-align:right; width:1%; }
+.jobs-table tr.clickable .row-open{ opacity:.9; }
+.jobs-table tr.clickable:hover .row-open{ opacity:1; }
+@media (max-width:900px){ .jobs-table .col-source{ display:none; } }
+
+/* Screening workspace — header, resume upload strip, candidate sections */
+.screening-toolbar{ display:flex; align-items:center; gap:14px; margin-bottom:11px; flex-wrap:wrap; }
+.job-title-line{ display:flex; align-items:center; gap:10px; flex-wrap:wrap; margin-bottom:5px; }
+.job-title-line h2{ margin:0; }
+.ws-head{ align-items:flex-start; margin-bottom:12px; }
+.ws-head > div:first-child{ flex:1 1 0; min-width:240px; }
+.ws-head .job-title-line{ margin-bottom:2px; }
+.ws-head .page-subtitle{ margin:0; }
+.breadcrumb-back{ display:inline-flex; align-items:center; justify-content:center; width:28px; height:28px; padding:0; margin-right:2px; border:1px solid var(--border); border-radius:7px; background:var(--surface); color:var(--text-secondary); cursor:pointer; transition:background .12s,border-color .12s,color .12s; }
+.breadcrumb-back:hover{ background:var(--surface-alt); border-color:var(--border-strong); color:var(--text); }
+.breadcrumb-back .material-icons-o{ font-size:18px; }
+.table-head-filter{ width:auto; min-width:96px; padding:0 20px 0 0; border:0; border-radius:0; background-color:transparent; color:inherit; font:inherit; font-weight:inherit; text-transform:inherit; letter-spacing:inherit; cursor:pointer; box-shadow:none; }
+.table-head-filter:focus{ outline:none; color:var(--accent-700); }
+.candidate-section-heading{ min-height:38px; display:flex; align-items:center; gap:4px; padding:9px 2px; margin-bottom:9px; color:var(--text); font-size:var(--fs-sm); font-weight:500; }
+.candidate-section-heading.compact{ margin-bottom:0; }
+.candidate-section-heading .cnt{ color:var(--text-tertiary); font-weight:400; }
+.candidate-section-heading .heading-action{ margin-left:auto; }
+.upload-strip{ display:flex; align-items:center; gap:12px 16px; flex-wrap:wrap; padding:10px 14px; margin-bottom:14px; background:var(--surface); border:1px solid var(--border); border-radius:12px; }
+.upload-strip-label{ display:flex; align-items:center; gap:10px; min-width:0; margin-right:auto; }
+.upload-strip-label .us-icon{ width:32px; height:32px; flex:none; display:flex; align-items:center; justify-content:center; border-radius:9px; background:var(--accent-50); color:var(--accent-600); }
+.upload-strip-label .us-icon .material-icons-o{ font-size:19px; }
+.upload-strip-label .us-title{ display:block; font-size:var(--fs-sm); font-weight:600; line-height:1.25; }
+.upload-strip-label .us-sub{ display:block; font-size:var(--fs-xs); color:var(--text-tertiary); line-height:1.3; }
+.upload-strip-actions{ display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
+.upload-strip-actions .btn .material-icons-o{ font-size:16px; }
+.linked-candidates-table th:first-child, .linked-candidates-table td:first-child{ padding-right:4px; }
+.linked-candidates-table th:nth-child(2), .linked-candidates-table td:nth-child(2){ width:120px; min-width:120px; padding-left:4px; }
+.ai-suggested-table th:first-child, .ai-suggested-table td:first-child{ width:44px; min-width:44px; max-width:44px; padding-right:4px; }
+.ai-suggested-table th:nth-child(2), .ai-suggested-table td:nth-child(2){ padding-left:4px; }
+.ai-suggested-table .suggestion-copy{ color:var(--text); }
+.screening-workspace .candidate-section-heading{ min-height:30px; padding:2px 2px; margin-bottom:8px; }
+.screening-workspace .candidate-list-header{ margin-bottom:8px; align-items:center; }
+.screening-workspace .candidate-section-heading.compact{ margin-bottom:0; }
+.screening-workspace .ws-card{ margin-bottom:16px; }
+.screening-workspace .ai-suggested-table td,.screening-workspace .linked-candidates-table td{ padding-top:8px; padding-bottom:8px; }
+.screening-workspace .ai-suggested-table th,.screening-workspace .linked-candidates-table th{ padding-top:7px; padding-bottom:7px; }
+.screening-workspace .ai-suggested-table td:nth-child(2),.screening-workspace .ai-suggested-table td:nth-child(3){ white-space:nowrap; }
+
+/* Import from a job: per-resume parse → match → result steps */
+.jm-row{ display:flex; align-items:center; flex-wrap:wrap; gap:6px; margin-top:6px; }
+.jm-step{ display:inline-flex; align-items:center; gap:4px; font-size:var(--fs-xs); color:var(--text-tertiary); }
+.jm-step.jm-done{ color:var(--success-text); }
+.jm-step.jm-active{ color:var(--accent-700); font-weight:600; }
+.jm-step.jm-active .material-icons-o{ animation:spin 1s linear infinite; }
+.jm-step.jm-failed{ color:var(--danger-text); }
+.jm-sep{ width:14px; height:1px; background:var(--border-strong); }
