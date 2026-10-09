@@ -19,9 +19,12 @@ export class ZoomHostController {
   authorize(@Req() req: { identity: Identity }, @Headers('x-hireos-zoom') header?: string) { this.mutation(header); return this.zoom.authorize(req.identity); }
   @Post('start')
   @Header('Cache-Control', 'no-store')
-  start(@Req() req: { identity: Identity }, @Headers('x-hireos-zoom') header?: string, @Body() body?: { roundId?: string; topic?: string }) {
+  async start(@Req() req: { identity: Identity }, @Headers('x-hireos-zoom') header?: string, @Body() body?: { roundId?: string; topic?: string }) {
     this.mutation(header);
-    return this.zoom.start(req.identity, body?.roundId, body?.topic);
+    const result = await this.zoom.start(req.identity, body?.roundId, body?.topic);
+    const roundId = body?.roundId?.trim();
+    if (roundId) await this.rtms.syncRoundMeetingLink(req.identity.workspaceId, roundId, result.joinUrl);
+    return result;
   }
   @Post('link')
   @Header('Cache-Control', 'no-store')
@@ -38,6 +41,12 @@ export class ZoomHostController {
     const roundId = body?.roundId?.trim();
     if (!roundId) throw new BadRequestException({ code: 'ZOOM_ROUND_ID_REQUIRED' });
     return this.rtms.startRound(req.identity.workspaceId, roundId);
+  }
+  @Post('end')
+  @Header('Cache-Control', 'no-store')
+  end(@Req() req: { identity: Identity }, @Headers('x-hireos-zoom') header?: string, @Body() body?: { roundId?: string }) {
+    this.mutation(header);
+    return this.zoom.endMeetingNow(req.identity, body?.roundId);
   }
   @Post('reset-meeting')
   @Header('Cache-Control', 'no-store')

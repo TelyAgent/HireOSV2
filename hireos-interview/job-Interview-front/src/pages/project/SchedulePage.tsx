@@ -52,7 +52,8 @@ export function SchedulePage() {
   const [draftTz, setDraftTz] = useState("UTC+8");
   const [draftLink, setDraftLink] = useState("");
   const [saving, setSaving] = useState(false);
-  type ZoomConnection = { connected: boolean; name: string | null; pending: boolean; error: string | null };
+  // mode 's2s': the backend uses a Server-to-Server app on a fixed host account — nothing to authorize.
+  type ZoomConnection = { mode?: "oauth" | "s2s"; connected: boolean; name: string | null; pending: boolean; error: string | null };
   const [zoomConnection, setZoomConnection] = useState<ZoomConnection | null>(null);
   const [zoomAuthBusy, setZoomAuthBusy] = useState(false);
 
@@ -229,14 +230,14 @@ export function SchedulePage() {
             </div>
           </div>
         </div>
-        <button
+        {zoomConnection?.mode !== "s2s" && <button
           type="button"
           disabled={zoomAuthBusy}
           onClick={() => void authorizeZoom()}
           className="h-8 cursor-pointer rounded-[9px] border border-[var(--line-strong)] bg-[var(--surface-2)] px-3 text-[12px] font-semibold text-[var(--ink-2)] disabled:cursor-not-allowed disabled:opacity-60"
         >
           {zoomAuthBusy ? (zh ? "授权中…" : "Authorizing…") : zoomConnection?.connected ? (zh ? "重新授权" : "Reauthorize") : (zh ? "授权 Zoom" : "Authorize Zoom")}
-        </button>
+        </button>}
         {zoomConnection?.error && (
           <div role="alert" className="basis-full text-[11.5px] text-[var(--bad)]">
             {errorText(zoomConnection.error, state.lang)}

@@ -24,6 +24,11 @@ type Account = {
   creating?: boolean;
 };
 const DEFAULT_MEETING_KEY = 'default';
+// ZOOM_AUTH_MODE=s2s: a Server-to-Server OAuth app (account credentials, no user ever clicks
+// "authorize") creates every meeting on one configured host user and starts RTMS for it; the
+// General app (ZM_RTMS_*) only receives the stream, verifies webhooks and signs Meeting SDK
+// joins. All identities share this one storage slot, since there is a single host account.
+const S2S_OWNER = 's2s-host';
 type Pending = {
   server?: Server;
   timer: NodeJS.Timeout;
@@ -42,7 +47,41 @@ export class ZoomHostService implements OnModuleDestroy {
   private readonly failures = new Map<string, string>();
   private readonly locks = new Map<string, Promise<unknown>>();
   private readonly directory = join(process.cwd(), '.local', 'zoom');
+  private s2sTokenCache: { token: string; expires: number } | null = null;
   constructor(private readonly config: ConfigService, private readonly signatures: MeetingsService) {}
+
+  private s2sMode() { return this.config.get<string>('ZOOM_AUTH_MODE')?.trim() === 's2s'; }
+  private s2sConfig() {
+    const value = (key: string) => this.config.get<string>(key)?.trim() || '';
+    const config = {
+      accountId: value('ZOOM_S2S_ACCOUNT_ID'), clientId: value('ZOOM_S2S_CLIENT_ID'),
+      clientSecret: value('ZOOM_S2S_CLIENT_SECRET'), host: value('ZOOM_S2S_HOST_USER'),
+    };
+    if (!config.accountId || !config.clientId || !config.clientSecret || !config.host) {
+      throw new ServiceUnavailableException({ code: 'ZOOM_S2S_CONFIG_REQUIRED' });
+    }
+    return config;
+  }
+  /** Account-credentials token (1 hour, no refresh token), cached until a minute before expiry. */
+  private async s2sAccessToken() {
+    if (this.s2sTokenCache && this.s2sTokenCache.expires > Date.now() + 60000) return this.s2sTokenCache;
+    const { accountId, clientId, clientSecret } = this.s2sConfig();
+    const body = await this.call(`https://zoom.us/oauth/token?grant_type=account_credentials&account_id=${encodeURIComponent(accountId)}`, {
+      method: 'POST',
+      headers: { Authorization: `Basic ${Buffer.from(`${clientId}:${clientSecret}`).toString('base64')}` },
+    }, 'TOKEN');
+    if (typeof body?.access_token !== 'string' || !Number.isFinite(body.expires_in)) throw new ServiceUnavailableException({ code: 'ZOOM_TOKEN_FAILED' });
+    this.s2sTokenCache = { token: body.access_token, expires: Date.now() + body.expires_in * 1000 };
+    return this.s2sTokenCache;
+  }
+  /** Storage/lock key: per HireOS user in OAuth mode, one shared slot in S2S mode. */
+  private store(identity: Identity) { return this.s2sMode() ? S2S_OWNER : this.owner(identity); }
+  /** Where meetings are created: the OAuth user's own account, or the configured S2S host. */
+  private meetingsUrl(account: Account) {
+    return this.s2sMode()
+      ? `https://api.zoom.us/v2/users/${encodeURIComponent(account.id)}/meetings`
+      : 'https://api.zoom.us/v2/users/me/meetings';
+  }
 
   private enabled() {
     if (this.config.get('NODE_ENV') === 'production' || this.config.get('ZOOM_DEV_ENABLED') !== 'true') throw new NotFoundException({ code: 'ZOOM_DISABLED' });
@@ -136,14 +175,28 @@ export class ZoomHostService implements OnModuleDestroy {
   onModuleDestroy() { for (const owner of this.pending.keys()) this.close(owner); }
 
   async status(identity: Identity) {
-    this.enabled(); const owner = this.owner(identity); const account = await this.read(owner);
+    this.enabled();
+    if (this.s2sMode()) {
+      // Nothing to authorize: "connected" means the S2S credentials work and the host exists.
+      try {
+        const account = await this.exclusive(S2S_OWNER, () => this.account(S2S_OWNER));
+        const defaultMeeting = account.meetings?.[DEFAULT_MEETING_KEY];
+        return { mode: 's2s' as const, connected: true, name: account.name, pending: false, error: null, meeting: defaultMeeting ? { meetingNumber: defaultMeeting.id, joinUrl: defaultMeeting.joinUrl } : null };
+      } catch (error) {
+        const code = (error as { getResponse?: () => { code?: string } }).getResponse?.().code;
+        return { mode: 's2s' as const, connected: false, name: null, pending: false, error: code && /^ZOOM_[A-Z0-9_]+$/.test(code) ? code : 'ZOOM_S2S_FAILED', meeting: null };
+      }
+    }
+    const owner = this.owner(identity); const account = await this.read(owner);
     const connected = !!account && account.clientId === this.clientId();
     const defaultMeeting = connected ? account!.meetings?.[DEFAULT_MEETING_KEY] : undefined;
-    return { connected, name: connected ? account!.name : null, pending: this.pending.has(owner), error: this.failures.get(owner) || null, meeting: defaultMeeting ? { meetingNumber: defaultMeeting.id, joinUrl: defaultMeeting.joinUrl } : null };
+    return { mode: 'oauth' as const, connected, name: connected ? account!.name : null, pending: this.pending.has(owner), error: this.failures.get(owner) || null, meeting: defaultMeeting ? { meetingNumber: defaultMeeting.id, joinUrl: defaultMeeting.joinUrl } : null };
   }
 
   async authorize(identity: Identity) {
-    this.enabled(); const clientId = this.clientId(); const owner = this.owner(identity);
+    this.enabled();
+    if (this.s2sMode()) throw new BadRequestException({ code: 'ZOOM_S2S_NO_AUTHORIZATION' });
+    const clientId = this.clientId(); const owner = this.owner(identity);
     return this.exclusive(owner, async () => {
       this.close(owner); this.failures.delete(owner);
       const state = randomBytes(32).toString('base64url');
@@ -223,7 +276,32 @@ export class ZoomHostService implements OnModuleDestroy {
     }
   }
 
+  /** S2S mode: the configured host user (looked up once and remembered with its meetings), with
+   * a fresh account-credentials token. The token itself is never relied on from storage. */
+  private async s2sAccount(): Promise<Account> {
+    const { clientId, host } = this.s2sConfig();
+    const { token, expires } = await this.s2sAccessToken();
+    let account = await this.read(S2S_OWNER);
+    const matchesHost = !!account && account.clientId === clientId && (account.id === host || account.email?.toLowerCase() === host.toLowerCase());
+    if (!account || !matchesHost) {
+      const user = await this.call(`https://api.zoom.us/v2/users/${encodeURIComponent(host)}`, { headers: { Authorization: `Bearer ${token}` } }, 'PROFILE');
+      if (!user?.id) throw new ServiceUnavailableException({ code: 'ZOOM_S2S_HOST_NOT_FOUND' });
+      const sameUser = !!account && account.id === user.id;
+      account = {
+        id: user.id,
+        name: user.display_name || [user.first_name, user.last_name].filter(Boolean).join(' ') || 'Zoom host',
+        email: user.email,
+        clientId,
+        access: '', refresh: '', expires: 0,
+        ...(sameUser ? { meetings: account!.meetings, pendingKey: account!.pendingKey } : {}),
+      };
+      await this.save(S2S_OWNER, account);
+    }
+    return { ...account, access: token, refresh: '', expires };
+  }
+
   private async account(owner: string) {
+    if (this.s2sMode()) return this.s2sAccount();
     const account = await this.read(owner);
     if (!account || account.clientId !== this.clientId()) throw new BadRequestException({ code: 'ZOOM_CONNECT_REQUIRED' });
     if (account.expires < Date.now() + 60000) {
@@ -256,13 +334,23 @@ export class ZoomHostService implements OnModuleDestroy {
   // store is keyed by owner hash — so hand back the token of any connected account. There
   // is one Zoom host per workspace in practice; refreshing happens inside account().
   async anyAccessToken(): Promise<string | null> {
+    if (this.s2sMode()) {
+      try { return (await this.s2sAccessToken()).token; } catch { return null; }
+    }
     let files: string[];
     try { files = await readdir(this.directory); } catch { return null; }
     for (const file of files) {
-      if (file === 'encryption.key') continue;
+      if (file === 'encryption.key' || file === S2S_OWNER) continue;
       try { return (await this.account(file)).access; } catch { /* unusable account; try the next */ }
     }
     return null;
+  }
+
+  /** The Zoom user RTMS is started for: the configured S2S host, or the OAuth token's own user. */
+  async rtmsParticipantUserId(token: string): Promise<string> {
+    if (this.s2sMode()) return (await this.exclusive(S2S_OWNER, () => this.s2sAccount())).id;
+    const profile = await this.call('https://api.zoom.us/v2/users/me', { headers: { Authorization: `Bearer ${token}` } }, 'PROFILE');
+    return typeof profile?.id === 'string' ? profile.id : '';
   }
 
   // Creates the meeting for one key on first use (never repeats a create whose outcome is
@@ -288,7 +376,7 @@ export class ZoomHostService implements OnModuleDestroy {
       auto_recording: 'none',
       ...(account.email ? { meeting_invitees: [{ email: account.email }] } : {}),
     };
-    const meeting = await this.call('https://api.zoom.us/v2/users/me/meetings', { method: 'POST', headers, body: JSON.stringify({ topic, type: 2, settings }) }, 'CREATE').catch(async error => {
+    const meeting = await this.call(this.meetingsUrl(account), { method: 'POST', headers, body: JSON.stringify({ topic, type: 2, settings }) }, 'CREATE').catch(async error => {
       const status = error.getResponse?.().providerStatus;
       if (status >= 400 && status < 500) { account.pendingKey = undefined; await this.save(owner, account); }
       throw error;
@@ -304,23 +392,32 @@ export class ZoomHostService implements OnModuleDestroy {
   // `key` defaults to the account's own "default" meeting (Live Interview opened on its
   // own, no specific round in mind); passing a real InterviewRound.id instead joins —
   // and, if Schedule already generated one, reuses — that round's own meeting, so joining
-  // from a round's "Join link" always lands in the same room that link points to. Joins as
-  // a host (role 1 + a ZAK from this same OAuth account), so Zoom recognizes HireOS as the
-  // account owner inside the meeting and can authorize RTMS content access.
+  // from a round's "Join link" always lands in the same room that link points to.
+  //
+  // By default the interviewer joins as an ordinary attendee (role 0, no ZAK): only the one
+  // connected (licensed) account owns and hosts every meeting, so interviewers need no Zoom
+  // license or authorization of their own. That relies on join_before_host + no waiting room
+  // (see ensureMeeting) and on Zoom accepting an RTMS start with the host's token while the
+  // host is absent. ZOOM_INTERVIEWER_JOIN_AS=host restores the previous behaviour — joining
+  // as the host (role 1 + a ZAK from the connected account) — if RTMS turns out to need it.
   async start(identity: Identity, key?: string, topic?: string) {
-    this.enabled(); const owner = this.owner(identity);
+    this.enabled(); const owner = this.store(identity);
     return this.exclusive(owner, async () => {
       const account = await this.account(owner);
       const meeting = await this.ensureMeeting(owner, account, key?.trim() || DEFAULT_MEETING_KEY, topic?.trim() || 'HireOS Interview');
-      const zak = await this.zak(account);
-      return { ...this.signatures.hostConfig(meeting.id, meeting.password, account.name, zak), joinUrl: meeting.joinUrl };
+      // Host join needs the host's own ZAK, which S2S mode doesn't fetch — always attendee there.
+      if (!this.s2sMode() && this.config.get<string>('ZOOM_INTERVIEWER_JOIN_AS')?.trim() === 'host') {
+        const zak = await this.zak(account);
+        return { ...this.signatures.hostConfig(meeting.id, meeting.password, account.name, zak), joinUrl: meeting.joinUrl };
+      }
+      return { ...this.signatures.attendeeConfig(meeting.id, meeting.password, 'HireOS Interviewer'), joinUrl: meeting.joinUrl };
     });
   }
 
   /** Ensures the meeting for `roundId` exists and returns just its link. Each round gets
    * its own independent Zoom meeting, created once and reused on every subsequent call. */
   async link(identity: Identity, roundId: string, topic?: string) {
-    this.enabled(); const owner = this.owner(identity);
+    this.enabled(); const owner = this.store(identity);
     return this.exclusive(owner, async () => {
       const account = await this.account(owner);
       const meeting = await this.ensureMeeting(owner, account, roundId, topic?.trim() || 'HireOS Interview');
@@ -334,14 +431,21 @@ export class ZoomHostService implements OnModuleDestroy {
    * without Zoom ever having been in play for it. */
   async endMeeting(identity: Identity, key: string): Promise<{ ended: boolean }> {
     if (this.config.get('NODE_ENV') === 'production' || this.config.get('ZOOM_DEV_ENABLED') !== 'true') return { ended: false };
-    const owner = this.owner(identity);
+    const owner = this.store(identity);
     return this.exclusive(owner, async () => {
       const account = await this.read(owner);
       const meeting = account?.meetings?.[key];
       if (!account || !meeting) return { ended: false };
       try {
-        const fresh = account.expires < Date.now() + 60000 ? await this.account(owner) : account;
-        await fetch(`https://api.zoom.us/v2/meetings/${meeting.id}`, { method: 'DELETE', headers: { Authorization: `Bearer ${fresh.access}` }, signal: AbortSignal.timeout(20000) });
+        const fresh = this.s2sMode() || account.expires < Date.now() + 60000 ? await this.account(owner) : account;
+        const headers = { Authorization: `Bearer ${fresh.access}`, 'Content-Type': 'application/json' };
+        // Zoom refuses to delete a meeting that is still in progress (3002), and an attendee-only
+        // room has nobody who can end it for everyone — so end it first (needs the
+        // meeting:update:status scope; a meeting that isn't running just rejects this), then delete.
+        await fetch(`https://api.zoom.us/v2/meetings/${meeting.id}/status`, { method: 'PUT', headers, body: JSON.stringify({ action: 'end' }), signal: AbortSignal.timeout(20000) })
+          .then(async (response) => { if (!response.ok && response.status !== 404) this.logger.warn(`Zoom meeting end for key ${key} (meeting ${meeting.id}) -> ${response.status}: ${(await response.text()).slice(0, 200)}`); });
+        const deleted = await fetch(`https://api.zoom.us/v2/meetings/${meeting.id}`, { method: 'DELETE', headers, signal: AbortSignal.timeout(20000) });
+        if (!deleted.ok && deleted.status !== 404) this.logger.warn(`Zoom meeting delete for key ${key} (meeting ${meeting.id}) -> ${deleted.status}: ${(await deleted.text()).slice(0, 200)}`);
       } catch (error) {
         this.logger.warn(`Zoom meeting delete failed for key ${key} (meeting ${meeting.id}): ${error instanceof Error ? error.message : error}`);
       }
@@ -351,10 +455,33 @@ export class ZoomHostService implements OnModuleDestroy {
     });
   }
 
+  /** Ends the meeting for one key right away (everyone is removed) once the interviewer leaves,
+   * instead of waiting for the last participant to go. The meeting itself is kept, so the same
+   * round can be rejoined; it is only deleted when the round is completed (endMeeting).
+   * Needs the meeting:update:status scope; a meeting that isn't running is reported, not thrown. */
+  async endMeetingNow(identity: Identity, key?: string): Promise<{ ended: boolean; reason?: string }> {
+    this.enabled(); const owner = this.store(identity);
+    return this.exclusive(owner, async () => {
+      const account = await this.account(owner);
+      const meeting = account.meetings?.[key?.trim() || DEFAULT_MEETING_KEY];
+      if (!meeting) return { ended: false, reason: 'NO_MEETING' };
+      const response = await fetch(`https://api.zoom.us/v2/meetings/${meeting.id}/status`, {
+        method: 'PUT',
+        headers: { Authorization: `Bearer ${account.access}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'end' }),
+        signal: AbortSignal.timeout(20000),
+      }).catch(() => null);
+      if (response?.ok) return { ended: true };
+      const detail = response ? `${response.status}: ${(await response.text()).slice(0, 200)}` : 'request failed';
+      this.logger.warn(`Zoom meeting end for key ${key || DEFAULT_MEETING_KEY} (meeting ${meeting.id}) -> ${detail}`);
+      return { ended: false, reason: response ? `ZOOM_END_${response.status}` : 'ZOOM_END_UNCERTAIN' };
+    });
+  }
+
   /** Clears one meeting so the next `start`/`link` for that key creates a fresh one.
    * Defaults to the account's own "default" (Live Interview) meeting when no key is given. */
   async resetMeeting(identity: Identity, key?: string) {
-    this.enabled(); const owner = this.owner(identity);
+    this.enabled(); const owner = this.store(identity);
     return this.exclusive(owner, async () => {
       const account = await this.read(owner);
       if (!account) throw new BadRequestException({ code: 'ZOOM_CONNECT_REQUIRED' });

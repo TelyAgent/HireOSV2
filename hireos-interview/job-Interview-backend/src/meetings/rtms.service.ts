@@ -63,12 +63,8 @@ export class RtmsService {
         }
         let participantUserId = '';
         try {
-          const profileResponse = await fetch('https://api.zoom.us/v2/users/me', {
-            headers: { Authorization: `Bearer ${token}` },
-            signal: AbortSignal.timeout(15000),
-          });
-          const profile = await profileResponse.json().catch(() => ({}));
-          if (profileResponse.ok && typeof profile?.id === 'string') participantUserId = profile.id;
+          // The meeting's host: the configured S2S host user, or the OAuth token's own user.
+          participantUserId = await this.zoomHost.rtmsParticipantUserId(token);
         } catch (error) {
           this.logger.warn(`RTMS start could not resolve participant_user_id for meeting ${meetingId}: ${error instanceof Error ? error.message : error}`);
         }
@@ -115,6 +111,22 @@ export class RtmsService {
     }).catch((dbError) => {
       this.logger.warn(`Failed to persist RTMS error for round ${roundId}: ${dbError instanceof Error ? dbError.message : dbError}`);
     });
+  }
+
+  /**
+   * Point the round at the meeting the interviewer actually joined. The round's meetingLink is
+   * what RTMS start and incoming rtms_started events are matched on, but the meeting itself is
+   * owned by ZoomHostService (per host account) — after switching host accounts or auth mode
+   * (e.g. OAuth -> S2S) a round can still carry an older meeting's link while the interviewer is
+   * in a newly created one, so the stream is requested for, and matched against, the wrong room.
+   */
+  async syncRoundMeetingLink(workspaceId: string, roundId: string, joinUrl: string) {
+    if (!joinUrl) return;
+    const updated = await this.db.interviewRound.updateMany({
+      where: { id: roundId, workspaceId, NOT: { meetingLink: joinUrl } },
+      data: { meetingLink: joinUrl, version: { increment: 1 } },
+    });
+    if (updated.count) this.logger.log(`Round ${roundId} meetingLink updated to the meeting the interviewer joined`);
   }
 
   /** Start the round's stream after the host has actually joined.

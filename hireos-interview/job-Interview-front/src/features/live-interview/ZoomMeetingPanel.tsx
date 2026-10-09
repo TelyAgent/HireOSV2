@@ -19,6 +19,26 @@ export function ZoomMeetingPanel({ lang, onActive, host = false, onInvitation, r
   const [elapsed, setElapsed] = useState(0);
   const started = useRef<number | null>(null);
   const rtmsStartedForRound = useRef<string | null>(null);
+  // Latest props for the window message listener (registered once per language).
+  const meetingContext = useRef({ host, roundId });
+  meetingContext.current = { host, roundId };
+  // Interviews run with the host account absent, so nobody in the room can "end for all": when
+  // the interviewer leaves, end the meeting through the backend instead of waiting for the last
+  // participant to go. Once per join — the HireOS button and Zoom's own leave both land here.
+  const endRequested = useRef(false);
+  const endMeetingForAll = () => {
+    const { host: isHost, roundId: currentRound } = meetingContext.current;
+    if (!isHost || endRequested.current) return;
+    endRequested.current = true;
+    void fetch(`${API_BASE_URL}api/meetings/host/end`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'x-hireos-zoom': '1' },
+      body: JSON.stringify({ roundId: currentRound }),
+    }).then(async response => {
+      const body = await response.json().catch(() => ({}));
+      if (!response.ok || !body.ended) setDiagnostic(body.code || body.reason || 'ZOOM_END_FAILED');
+    }).catch(() => setDiagnostic('ZOOM_END_FAILED'));
+  };
   const active = status === 'loading' || status === 'joining' || status === 'joined' || status === 'reconnecting';
 
   useEffect(() => { onActive(active); return () => onActive(false); }, [active, onActive]);
@@ -73,6 +93,7 @@ export function ZoomMeetingPanel({ lang, onActive, host = false, onInvitation, r
         if (event.data.type === 'failed' && detail && ['load', 'init', 'join'].includes(detail.stage)) {
           setDiagnostic([detail.stage, detail.code, detail.reason].filter(value => typeof value === 'string').join(' · ').slice(0, 320));
         }
+        if (event.data.type === 'closed') endMeetingForAll();
         setStatus(event.data.type === 'closed' ? 'left' : 'error');
         setError(event.data.type === 'failed' ? 'failed' : '');
         started.current = null;
@@ -84,6 +105,10 @@ export function ZoomMeetingPanel({ lang, onActive, host = false, onInvitation, r
   }, [lang]);
 
   const leave = () => {
+    if (host && status === 'joined' && !window.confirm(lang === 'zh'
+      ? '离开后会结束本场会议，候选人也会被移出会议。确定离开吗？'
+      : 'Leaving ends this meeting for everyone, including the candidate. Leave now?')) return;
+    if (status === 'joined' || status === 'reconnecting') endMeetingForAll();
     request.current?.abort(); request.current = null; config.current = null;
     frame.current?.contentWindow?.postMessage({ channel: 'hireos-zoom', type: 'leave' }, window.location.origin);
     // Removing the isolated browsing context also releases its media tracks.
@@ -91,6 +116,7 @@ export function ZoomMeetingPanel({ lang, onActive, host = false, onInvitation, r
   };
   const join = async () => {
     if (request.current || active) return;
+    endRequested.current = false;
     if (!window.isSecureContext || matchMedia('(pointer: coarse)').matches) { setError('unsupported'); setStatus('error'); return; }
     const controller = new AbortController(); request.current = controller;
     setError(''); setDiagnostic(''); setStatus('loading'); setElapsed(0);
@@ -133,12 +159,15 @@ export function ZoomMeetingPanel({ lang, onActive, host = false, onInvitation, r
   return <div className="zoom-panel">
     <div className="zoom-status" role="status">
       <span>{t[status]}</span><span>{Math.floor(elapsed / 60).toString().padStart(2, '0')}:{(elapsed % 60).toString().padStart(2, '0')}</span>
-      <button onClick={active ? leave : join}>{active ? t.leave : status === 'error' ? t.retry : host ? (lang === 'zh' ? '创建 / 加入会议' : 'Create / join meeting') : t.join}</button>
+      {/* Interviewers join automatically when they open a scheduled round (autoJoin); there is
+          no manual "create / join" — a meeting created here would belong to no round. Leave and
+          retry stay. */}
+      {(!host || active || status === 'error') && <button onClick={active ? leave : join}>{active ? t.leave : status === 'error' ? t.retry : t.join}</button>}
     </div>
     <div className="zoom-stage">
       {mounted && diagnostic && <div role="alert">{diagnostic}</div>}
       {mounted && <iframe key={attempt} ref={frame} src={`${API_BASE_URL}zoom-meeting/index.html`} title="Zoom meeting" allow="camera; microphone; display-capture; fullscreen; autoplay" />}
-      {!mounted && <div className="zoom-placeholder"><strong>Zoom</strong><p>{error ? t[error as keyof typeof t] : t.idle}</p>{diagnostic && <p role="alert">{diagnostic}</p>}</div>}
+      {!mounted && <div className="zoom-placeholder"><strong>Zoom</strong><p>{error ? t[error as keyof typeof t] : host && !roundId ? (lang === 'zh' ? '请从面试排期中的轮次进入，系统会自动加入该轮面试的会议。' : 'Open an interview round from the schedule to join its meeting automatically.') : t[status === 'left' ? 'left' : 'idle']}</p>{diagnostic && <p role="alert">{diagnostic}</p>}</div>}
     </div>
   </div>;
 }
