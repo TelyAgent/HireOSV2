@@ -31,7 +31,12 @@ export function FlowNav({ task }: { task: Task | null }) {
     >
       {flowIds.map((id) => {
         const active = state.screen === id;
-        const lockedReason = flowGateReason(task, id, state.lang === "zh");
+        // Live Interview is entered only through Brief's "Start this round" (which picks the
+        // round), never straight from the tab.
+        const lockedReason = flowGateReason(task, id, state.lang === "zh")
+          ?? (id === "live" && !active
+            ? (state.lang === "zh" ? "请在「面试提要」底部点击「开始本轮面试」进入。" : "Open Live Interview from “Start this round” at the bottom of Interview Brief.")
+            : null);
         return (
           <button
             key={id}

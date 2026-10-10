@@ -80,7 +80,6 @@ export const initialState: AppState = {
 
   offerState: "none",
 
-  inviteFailed: false,
 
   dupResolved: false,
   triResolved: false,

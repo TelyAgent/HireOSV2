@@ -73,6 +73,7 @@ export class TasksService {
       rounds: { orderBy: { sequence: 'asc' }, select: {
         id: true, sequence: true, name: true, format: true, duration: true, competencies: true,
         questions: true, mandatory: true, notes: true, status: true, version: true, createdAt: true,
+        scheduledAt: true, timezone: true, completedAt: true,
         interviewer: { select: { id: true, name: true, title: true } },
       } },
     } });

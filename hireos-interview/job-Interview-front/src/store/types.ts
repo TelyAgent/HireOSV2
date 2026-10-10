@@ -137,7 +137,6 @@ export interface AppState {
   offerState: "none" | "failed" | "sent";
 
   // invites
-  inviteFailed: boolean;
 
   // side navigation: icon-only rail (collapsed) vs icon + label (expanded)
   sidenavCollapsed: boolean;

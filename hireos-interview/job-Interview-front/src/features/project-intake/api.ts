@@ -47,6 +47,7 @@ export type Task = {
   materials: { kind: string; material: Material }[];
   parseJobs: ParseJob[];
   rounds: Round[];
+  decision: Decision | null; hrConfirmedAt: string | null; hmConfirmedAt: string | null;
   // Flow progress computed by the backend (intake/task-stages.ts): a stage is unlocked only
   // once every earlier stage is done. FlowNav/flowGate read this and nothing else.
   stages: { stage: string; done: boolean; unlocked: boolean }[];

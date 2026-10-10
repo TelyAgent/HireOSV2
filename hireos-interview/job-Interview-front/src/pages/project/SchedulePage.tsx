@@ -171,7 +171,7 @@ export function SchedulePage() {
       await api(`/rounds/${round.id}/schedule`, { method: "POST", body: JSON.stringify({
         version: round.version, scheduledAt: new Date(draftAt).toISOString(), timezone: draftTz.trim() || "UTC", meetingLink: draftLink.trim(),
       }) });
-      say(zh ? `${round.name} 已排期。邀请与日历占用为模拟操作，已明确标注。` : `${round.name} scheduled. Invitation and calendar hold are simulated and clearly labeled.`);
+      say(zh ? `${round.name} 已排期。` : `${round.name} scheduled.`);
       closeDrawer();
       loadRounds();
       void reloadTask();
@@ -364,46 +364,9 @@ export function SchedulePage() {
         {t.addMakeupRound}
       </button>
 
-      {state.inviteFailed && (
-        <div className="flex items-center gap-2.5 rounded-xl border border-[var(--bad)] bg-[var(--bad-soft)] px-[15px] py-3">
-          <div className="flex-1 text-[12.5px] leading-[1.45]">
-            {zh ? "投递失败：elena.torres@example.com 邮箱已满，未创建日历占用。" : "Delivery failed: elena.torres@example.com bounced (mailbox full). No calendar hold was created."}
-          </div>
-          <button
-            onClick={() => { set({ inviteFailed: false }); say(zh ? "已重试 — 模拟邀请已送达。" : "Retried — simulated invitation delivered."); }}
-            className="h-7 cursor-pointer rounded-lg border border-[var(--line-strong)] bg-[var(--surface)] px-[11px] text-xs"
-          >
-            {t.retry}
-          </button>
-          <button
-            onClick={() => { set({ inviteFailed: true }); say(zh ? "模拟投递失败：邮箱已满，未创建日历占用。" : "Simulated delivery failure: mailbox full. No calendar hold was created."); }}
-            className="h-7 cursor-pointer rounded-lg border border-[var(--line)] bg-transparent px-[11px] text-xs text-[var(--ink-3)]"
-          >
-            {t.simulateAgain}
-          </button>
-        </div>
-      )}
-
-      <div className="flex items-center gap-2.5 rounded-xl border border-[var(--ai)] bg-[var(--ai-soft)] px-[15px] py-3">
-        <span>+</span>
-        <div className="text-[12.5px] leading-[1.45]">
-          <b>{t.simulatedForPrototype}</b> {zh ? "以 Google Meet 为主，Zoom 作为备选，本原型不会发送真实邀请。" : "Google Meet primary, Zoom supported as an alternative — no real invitations are sent."}{" "}
-          <button
-            onClick={() => { set({ inviteFailed: true }); say(zh ? "模拟投递失败：邮箱已满，未创建日历占用。" : "Simulated delivery failure: mailbox full. No calendar hold was created."); }}
-            className="cursor-pointer border-0 bg-transparent p-0 text-[12.5px] text-[var(--ink)] underline"
-          >
-            {t.simulateBounce}
-          </button>
-          .
-        </div>
-      </div>
-
       {!isDone("schedule") && (
         <div className="flex flex-wrap items-center gap-2.5 rounded-[14px] border border-[var(--line)] bg-[var(--surface-2)] px-4 py-[13px]">
           <div className="flex-1" />
-          <button onClick={() => set({ screen: "plan" })} className="h-[34px] cursor-pointer rounded-[11px] border border-transparent bg-transparent px-3 text-[12.5px] text-[var(--ink-2)]">
-            {t.backToPlan}
-          </button>
           <button onClick={() => void advance("brief")} className="h-[34px] cursor-pointer rounded-[11px] border border-[var(--brand)] bg-[var(--brand)] px-[15px] text-[12.5px] font-semibold text-[var(--brand-ink)]">
             {t.continueToBrief}
           </button>

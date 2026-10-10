@@ -1,7 +1,7 @@
 import { useEffect } from "react";
 import { useStore } from "../../store/StoreContext";
-import { Pill, compName, type Tone } from "../../utils/status";
-import { COMPS } from "../../data/comps";
+import { Pill, type Tone } from "../../utils/status";
+import { useDebriefSummary } from "../../features/project-intake/useDebriefSummary";
 import { useProjectTask } from "../../features/project-intake/useTask";
 import { useBrief } from "../../features/project-intake/useBrief";
 import { errorText } from "../../features/project-intake/i18n";
@@ -10,11 +10,12 @@ type CardPriority = "Card-P0" | "Card-P1" | "Card-P2";
 const PRIORITY_TONE: Record<CardPriority, Tone> = { "Card-P0": "bad", "Card-P1": "warn", "Card-P2": "unknown" };
 
 export function BriefPage() {
-  const { state, set, say, evidence, r1Scores, t } = useStore();
+  const { state, set, say, evidence, t } = useStore();
   const zh = state.lang === "zh";
   const { task, reload: reloadTask, advance, isDone } = useProjectTask();
   const liveDone = !!task?.stages.find((s) => s.stage === "live")?.done;
   const jobId = task?.job.id ?? null;
+  const summary = useDebriefSummary(state.currentTaskId);
   const { state: briefState, loading: briefLoading, error: briefError, generate: generateQuestions, reload: reloadBrief } = useBrief(jobId);
 
   const isGenerating = briefState?.generation?.status === "queued" || briefState?.generation?.status === "parsing";
@@ -85,42 +86,61 @@ export function BriefPage() {
     },
   ];
 
-  const unknownComps = COMPS.filter((c) => {
-    const human = c.round === "r1" ? r1Scores[c.id] ?? null : state.r2Scores[c.id] ?? null;
-    return human == null;
-  });
-  const anyUnknown = unknownComps.length > 0;
-  const gapOpen = (state.jdOnlyDraft && !state.candidateLinked) || !state.r1Done || anyUnknown;
+  // Evidence gaps — confirmed capability cards with no human score yet, from the same
+  // per-card roll-up Debrief uses. Must-haves (P0) lead the recommended focus.
+  const openCards = (summary?.cards ?? []).filter((c) => c.score == null)
+    .sort((a, b) => a.cardPriority.localeCompare(b.cardPriority));
+  const gapOpen = !summary || openCards.length > 0;
   const gapTone: Tone = gapOpen ? "warn" : "ok";
-  const gapLabel = state.jdOnlyDraft && !state.candidateLinked
-    ? (zh ? "待补充候选人证据" : "Candidate evidence needed")
-    : !state.r1Done
+  const gapLabel = !summary
+    ? (zh ? "加载中" : "Loading")
+    : !liveDone
       ? (zh ? "待补充面试证据" : "Interview evidence needed")
-      : anyUnknown
-        ? (zh ? "证据缺口" : "Evidence gap")
+      : openCards.length
+        ? (zh ? `证据缺口 ${openCards.length} / ${summary.totalCards}` : `Evidence gaps ${openCards.length} / ${summary.totalCards}`)
         : (zh ? "证据已完整" : "Evidence complete");
-  const unknownNote = state.jdOnlyDraft && !state.candidateLinked
-    ? (zh ? "六项能力都需要候选人证据。请先关联候选人再排期。" : "All six competencies need candidate evidence. Link a candidate before scheduling.")
-    : !state.r1Done
-      ? (zh ? "尚无面试证据。请使用计划中的问题验证每项要求。" : "No interview evidence yet. Use the planned questions to verify each requirement.")
-      : !state.r2Done
-        ? (zh ? "第二轮能力仍待验证：生产责任与事故响应、安全与合规意识、协作与辅导。" : "Round 2 competencies remain open: Production Ownership, Security & Compliance, and Collaboration & Mentorship.")
-        : anyUnknown
-          ? (zh
-              ? unknownComps.map((c) => compName(c, "zh")).join("、") + " 仍需要更强证据。"
-              : unknownComps.map((c) => compName(c, "en")).join(", ") + " still need stronger evidence.")
-          : (zh ? "当前快照没有开放的证据缺口。" : "No open evidence gaps in the current snapshot.");
+  const unknownNote = !summary
+    ? ""
+    : !liveDone
+      ? (zh ? `尚无面试证据。${summary.totalCards} 项要求都需要在面试中用上面的问题验证。` : `No interview evidence yet. All ${summary.totalCards} requirements need to be verified with the questions above.`)
+      : openCards.length
+        ? (zh ? `以下要求还没有人工评分：${openCards.map((c) => c.requirement).join("、")}。` : `No human score yet for: ${openCards.map((c) => c.requirement).join(", ")}.`)
+        : (zh ? "所有要求都已有人工评分。" : "Every requirement has a human score.");
 
-  const nextActionHeading = !liveDone
-    ? (zh ? "完成 Round 1 面试" : "Complete Round 1 interview")
-    : (zh ? "复核当前证据" : "Review current evidence");
-  const nextActionLabel = !liveDone
+  // The next round to run: the first unfinished one. Only a scheduled round has a meeting the
+  // candidate was invited to — an unscheduled one must go through Schedule first, otherwise
+  // joining would silently create a fresh Zoom room nobody else knows about.
+  const nextRound = (task?.rounds ?? []).find((r) => r.status !== "completed") ?? null;
+  const hasOpenRound = !!nextRound;
+  const nextUnscheduled = !!nextRound && !nextRound.scheduledAt;
+  const nextActionHeading = nextUnscheduled
+    ? (zh ? `${nextRound!.name} 尚未排期` : `${nextRound!.name} isn't scheduled yet`)
+    : hasOpenRound
+    ? (liveDone ? (zh ? "开始下一轮面试" : "Start the next round") : (zh ? "开始面试" : "Start the interview"))
+    : openCards.length
+      ? (zh ? "补齐缺失证据" : "Close the evidence gaps")
+      : (zh ? "复核当前证据" : "Review current evidence");
+  const nextActionLabel = nextUnscheduled
+    ? (zh ? "前往排期" : "Go to schedule")
+    : hasOpenRound
     ? (zh ? "开始本轮面试" : "Start this round")
     : (zh ? "进入评审" : "Go to review");
-  const nextAction = () => void advance(liveDone ? "review" : "live");
-  const focusComps = !state.r1Done
-    ? (zh ? "分布式系统设计、后端工程深度、技术沟通" : "Distributed Systems Design, Backend Engineering Depth, Technical Communication")
-    : (zh ? "生产责任与事故响应、安全与合规意识、协作与辅导" : "Production Ownership & Incident Response, Security & Compliance Awareness, Collaboration & Mentorship");
+  // "Start this round" opens Live Interview on the next round and auto-joins its meeting, the
+  // same way Schedule's "Join meeting" link does — but only once that round is scheduled.
+  const startRound = async () => {
+    if (!nextRound) { void advance("review"); return; }
+    if (!nextRound.scheduledAt) {
+      say(zh ? `${nextRound.name} 还没有排期，请先在「排期」安排时间并发出会议邀请。` : `${nextRound.name} isn't scheduled yet — schedule it first so the candidate gets the meeting invite.`);
+      set({ screen: "schedule" });
+      return;
+    }
+    set({ liveJoinRound: { roundId: nextRound.id, topic: `HireOS Interview — ${nextRound.name}` }, roundView: nextRound.sequence === 2 ? "r2" : "r1" });
+    if (!(await advance("live"))) set({ liveJoinRound: null });
+  };
+  const nextAction = () => void (hasOpenRound ? startRound() : advance("review"));
+  const focusComps = openCards.length
+    ? openCards.slice(0, 3).map((c) => c.requirement).join(zh ? "、" : ", ")
+    : (zh ? "暂无待验证的要求" : "No open requirements");
 
   // Brief is done once its questions exist — refresh the nav so Live Interview unlocks.
   const questionCount = briefState?.questions.length ?? 0;
@@ -282,11 +302,8 @@ export function BriefPage() {
       {!isDone("brief") && (
         <div className="flex flex-wrap items-center gap-2.5 rounded-[14px] border border-[var(--line)] bg-[var(--surface-2)] px-4 py-[13px]">
           <div className="flex-1" />
-          <button onClick={() => set({ screen: "schedule" })} className="h-[34px] cursor-pointer rounded-[11px] border border-transparent bg-transparent px-3 text-[12.5px] text-[var(--ink-2)]">
-            {t.backToSchedule}
-          </button>
           <button
-            onClick={() => void advance("live")}
+            onClick={() => void startRound()}
             className="h-[34px] cursor-pointer rounded-[11px] border border-[var(--brand)] bg-[var(--brand)] px-[15px] text-[12.5px] font-semibold text-[var(--brand-ink)]"
           >
             {t.startLiveInterview}

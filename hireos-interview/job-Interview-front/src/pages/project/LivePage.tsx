@@ -7,6 +7,7 @@ import { MeetingRecordPanel } from '../../features/live-interview/MeetingRecordP
 import { api } from '../../features/project-intake/api';
 import { useProjectTask } from '../../features/project-intake/useTask';
 import { errorText } from '../../features/project-intake/i18n';
+import { ArrowRightSvg } from '../../components/ui/Icons';
 
 export function LivePage() {
   const { state, set, t } = useStore();
@@ -56,10 +57,12 @@ export function LivePage() {
 
   return <div ref={root} className="live-page">
     <div style={{ display: 'flex', alignItems: 'center', gap: 14, minHeight: 44, padding: '0 14px', flexWrap: 'wrap' }}>
-      <button onClick={() => {
+      <button aria-label={zh ? '返回面试提要' : 'Back to Interview Brief'} title={zh ? '返回面试提要' : 'Back to Interview Brief'} onClick={() => {
         if ((active || dirty) && !window.confirm(copy.confirmLeave + '\n' + copy.draft)) return;
-        set({ screen: 'plan' });
-      }} style={{ border: 0, background: 'transparent', color: 'var(--ink-2)', cursor: 'pointer', padding: 0 }}>{t.exitToPlan}</button>
+        set({ screen: 'brief' });
+      }} style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 32, height: 32, border: '1px solid var(--line)', borderRadius: 9, background: 'var(--surface)', color: 'var(--ink-2)', cursor: 'pointer', padding: 0 }}>
+        <span style={{ display: 'inline-flex', transform: 'rotate(180deg)' }}><ArrowRightSvg size={16} /></span>
+      </button>
       <div style={{ flex: 1, minWidth: 180 }}>
         <div style={{ fontSize: 15, fontWeight: 700 }}>{copy.title}</div>
         <div style={{ marginTop: 2, fontSize: 10.5, color: 'var(--ink-3)' }}>{copy.subtitle}</div>
@@ -73,7 +76,7 @@ export function LivePage() {
         {isCompleted
           ? <div className="zoom-panel"><div className="zoom-stage"><div className="zoom-placeholder"><strong>Zoom</strong><p>{zh ? '本轮面试已完成，会议已结束，无法再加入。' : 'This round is complete; the meeting has ended and can no longer be joined.'}</p></div></div></div>
           : <ZoomHostPanel lang={state.lang} onActive={setActive} round={joinRound} autoJoin={!!joinRound} />}
-        <LiveQuestionPanel />
+        <LiveQuestionPanel key={roundId ?? round} />
       </div>
       <MeetingRecordPanel lang={state.lang} dirty={dirty} onDirty={setDirty} taskId={state.currentTaskId} round={round} roundId={roundId} />
     </div>

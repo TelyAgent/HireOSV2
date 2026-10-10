@@ -304,7 +304,6 @@ export function ReviewPage() {
       {!isDone("review") && (
         <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "13px 16px", border: "1px solid var(--line)", borderRadius: 14, background: "var(--surface-2)", flexWrap: "wrap" }}>
           <div style={{ flex: 1 }} />
-          <button onClick={() => set({ screen: "live" })} style={{ height: 34, padding: "0 12px", border: "1px solid transparent", borderRadius: 11, background: "transparent", color: "var(--ink-2)", fontSize: 12.5, cursor: "pointer" }}>{t.backToRecord}</button>
           {allRoundsDone
             ? <button disabled={continuing} onClick={() => void continueToDebrief()} style={{ height: 34, padding: "0 15px", border: "1px solid var(--brand)", borderRadius: 11, background: "var(--brand)", color: "var(--brand-ink)", fontSize: 12.5, fontWeight: 600, cursor: continuing ? "not-allowed" : "pointer", opacity: continuing ? 0.6 : 1 }}>{continuing ? (zh ? "正在准备汇总…" : "Preparing debrief…") : t.continueToDebrief}</button>
             : <span style={{ fontSize: 11.5, color: "var(--ink-3)" }}>{zh ? "所有轮次的面试都完成后，这里才会出现「继续到汇总评估」。" : "“Continue to debrief” appears here once every round is completed."}</span>}

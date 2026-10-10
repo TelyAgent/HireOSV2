@@ -158,11 +158,6 @@ export function PackagePage() {
         </div>
       </div>
 
-      <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "13px 16px", border: "1px solid var(--line)", borderRadius: 14, background: "var(--surface-2)", flexWrap: "wrap" }}>
-        <div style={{ flex: 1 }} />
-        <button onClick={() => set({ screen: "decision" })} style={{ height: 34, padding: "0 12px", border: "1px solid transparent", borderRadius: 11, background: "transparent", color: "var(--ink-2)", fontSize: 12.5, cursor: "pointer" }}>{t.backToDecision}</button>
-        <button onClick={() => set({ screen: "home" })} style={{ height: 34, padding: "0 15px", border: "1px solid var(--brand)", borderRadius: 11, background: "var(--brand)", color: "var(--brand-ink)", fontSize: 12.5, fontWeight: 600, cursor: "pointer" }}>{t.backToProjects}</button>
-      </div>
     </>
   );
 }

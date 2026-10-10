@@ -277,9 +277,6 @@ export function RubricPage() {
                 {t.rubricConfirmCta}
               </button>
             )}
-            <button onClick={() => set({ screen: "overview" })} className="h-[34px] cursor-pointer rounded-[11px] border border-transparent bg-transparent px-3 text-[12.5px] text-[var(--ink-2)]">
-              {t.backToOverview}
-            </button>
             <button onClick={() => void advance("plan")} className="h-[34px] cursor-pointer rounded-[11px] border border-[var(--brand)] bg-[var(--brand)] px-[15px] text-[12.5px] font-semibold text-[var(--brand-ink)]">
               {t.continueToPlan}
             </button>

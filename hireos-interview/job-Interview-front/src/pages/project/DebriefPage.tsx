@@ -50,7 +50,7 @@ function DebriefRow({ card, bar, open, onToggle, zh }: { card: DebriefCard; bar:
 }
 
 export function DebriefPage() {
-  const { state, set, t } = useStore();
+  const { state, t } = useStore();
   const { advance, isDone } = useProjectTask();
   const zh = state.lang === "zh";
   const [summary, setSummary] = useState<DebriefSummary | null>(null);
@@ -195,7 +195,6 @@ export function DebriefPage() {
       {!isDone("debrief") && (
         <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "13px 16px", border: "1px solid var(--line)", borderRadius: 14, background: "var(--surface-2)", flexWrap: "wrap" }}>
           <div style={{ flex: 1 }} />
-          <button onClick={() => set({ screen: "review" })} style={{ height: 34, padding: "0 12px", border: "1px solid transparent", borderRadius: 11, background: "transparent", color: "var(--ink-2)", fontSize: 12.5, cursor: "pointer" }}>{t.backToReview}</button>
           {startError && <span role="alert" style={{ fontSize: 11.5, color: "var(--bad)" }}>{startError}</span>}
           <button disabled={starting} onClick={() => void continueToDecision()} style={{ height: 34, padding: "0 15px", border: "1px solid var(--brand)", borderRadius: 11, background: "var(--brand)", color: "var(--brand-ink)", fontSize: 12.5, fontWeight: 600, cursor: starting ? "not-allowed" : "pointer", opacity: starting ? 0.6 : 1 }}>{starting ? (zh ? "正在准备决定…" : "Preparing decision…") : t.continueToDecision}</button>
         </div>

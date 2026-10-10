@@ -83,7 +83,7 @@ export function useAttachJob() {
         rubricExtracted: false, rubricConfirmed: false, rubricVersion: 1, rubricEditing: false,
         planApproved: false, planEditing: false, candidateLinked: true,
         r1Done: false, r2Done: false, r1Scheduled: false, r2Scheduled: false,
-        inviteFailed: false, decision: null, decHr: false, decHm: false, decRecorded: false,
+        decision: null, decHr: false, decHm: false, decRecorded: false,
         offerState: 'none', followUpRounds: [], transcriptState: 'ok', liveNotes: '',
         notesSavedAt: state.lang === 'zh' ? '刚刚已保存' : 'Saved just now',
         aiSuggestionState: 'idle', r2Scores: { poir: 3, sca: null, cm: 3 },
