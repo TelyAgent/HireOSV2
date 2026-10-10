@@ -5,36 +5,38 @@ import { COMPS } from "../../data/comps";
 
 export function ProjectOverviewPage() {
   const { state, t, set, say, go, role } = useStore();
+  const zh = state.lang === "zh";
+  const L = (en: string, zhText: string) => (zh ? zhText : en);
 
   const overviewMaterials = state.jdOnlyDraft
     ? [
-        { name: "Job Description", tag: "Provided", tone: "ok", hasAction: false },
+        { name: L("Job Description", "职位描述（JD）"), tag: L("Provided", "已提供"), tone: "ok", hasAction: false },
         {
-          name: "Résumé",
-          tag: state.candidateLinked ? "Provided" : "Not provided",
+          name: L("Résumé", "简历"),
+          tag: state.candidateLinked ? L("Provided", "已提供") : L("Not provided", "未提供"),
           tone: state.candidateLinked ? "ok" : "none",
           hasAction: false,
         },
-        { name: "Screening package", tag: "Not provided", tone: "none", hasAction: false },
-        { name: "Assessment results", tag: "Not provided", tone: "none", hasAction: false },
+        { name: L("Screening package", "初筛资料包"), tag: L("Not provided", "未提供"), tone: "none", hasAction: false },
+        { name: L("Assessment results", "测评结果"), tag: L("Not provided", "未提供"), tone: "none", hasAction: false },
       ]
     : [
-        { name: "Job Description", tag: "Provided", tone: "ok", hasAction: false },
-        { name: "Résumé", tag: "Provided", tone: "ok", hasAction: false },
+        { name: L("Job Description", "职位描述（JD）"), tag: L("Provided", "已提供"), tone: "ok", hasAction: false },
+        { name: L("Résumé", "简历"), tag: L("Provided", "已提供"), tone: "ok", hasAction: false },
         {
-          name: "Screening package",
-          tag: state.dupResolved ? "Resolved" : "Duplicate",
+          name: L("Screening package", "初筛资料包"),
+          tag: state.dupResolved ? L("Resolved", "已处理") : L("Duplicate", "重复"),
           tone: state.dupResolved ? "ok" : "warn",
           hasAction: !state.dupResolved,
-          actionLabel: "Resolve",
+          actionLabel: L("Resolve", "处理"),
         },
-        { name: "Assessment results", tag: "Provided", tone: "ok", hasAction: false },
+        { name: L("Assessment results", "测评结果"), tag: L("Provided", "已提供"), tone: "ok", hasAction: false },
         {
-          name: "Unlabeled attachment",
-          tag: state.triResolved ? "Matched" : "Needs triage",
+          name: L("Unlabeled attachment", "未标记附件"),
+          tag: state.triResolved ? L("Matched", "已匹配") : L("Needs triage", "待分类"),
           tone: state.triResolved ? "ok" : "warn",
           hasAction: !state.triResolved,
-          actionLabel: "Triage",
+          actionLabel: L("Triage", "分类"),
         },
       ];
 
@@ -43,34 +45,37 @@ export function ProjectOverviewPage() {
       ? []
       : [
           {
-            name: "Round 1 — System Design & Architecture",
+            name: L("Round 1 — System Design & Architecture", "第 1 轮 — 系统设计与架构"),
             meta: state.r1Done
               ? state.jdOnlyDraft
-                ? "Completed just now · David Kim"
-                : "Aug 26, 2:00 PM UTC+8 · David Kim"
+                ? L("Completed just now · David Kim", "刚刚完成 · David Kim")
+                : L("Aug 26, 2:00 PM UTC+8 · David Kim", "8月26日 14:00 UTC+8 · David Kim")
               : state.r1Scheduled
-                ? "Sep 15, 10:00 AM UTC+8 · David Kim"
-                : "Not scheduled · David Kim",
+                ? L("Sep 15, 10:00 AM UTC+8 · David Kim", "9月15日 10:00 UTC+8 · David Kim")
+                : L("Not scheduled · David Kim", "未排期 · David Kim"),
             status: state.r1Done ? "completed" : state.r1Scheduled ? "Scheduled" : "Planned",
           },
           {
-            name: "Round 2 — Technical Deep Dive & Collaboration",
+            name: L("Round 2 — Technical Deep Dive & Collaboration", "第 2 轮 — 技术深挖与协作"),
             meta: state.r2Done
               ? state.jdOnlyDraft
-                ? "Completed just now · Priya Nair"
-                : "Aug 29, 3:30 PM UTC+8 · Priya Nair"
+                ? L("Completed just now · Priya Nair", "刚刚完成 · Priya Nair")
+                : L("Aug 29, 3:30 PM UTC+8 · Priya Nair", "8月29日 15:30 UTC+8 · Priya Nair")
               : state.r2Scheduled
-                ? "Sep 17, 3:30 PM UTC+8 · Priya Nair"
-                : "Not scheduled · Priya Nair",
+                ? L("Sep 17, 3:30 PM UTC+8 · Priya Nair", "9月17日 15:30 UTC+8 · Priya Nair")
+                : L("Not scheduled · Priya Nair", "未排期 · Priya Nair"),
             status: state.r2Done ? "completed" : state.r2Scheduled ? "Scheduled" : "Planned",
           },
         ];
 
   const overviewPeople = [
-    { initials: "SC", name: "Sarah Chen", role: "HR Partner" },
-    { initials: "DK", name: "David Kim", role: "Hiring Manager" },
-    { initials: "PN", name: "Priya Nair", role: "Interviewer, Round 2" },
+    { initials: "SC", name: "Sarah Chen", role: L("HR Partner", "HR 伙伴") },
+    { initials: "DK", name: "David Kim", role: L("Hiring Manager", "招聘经理") },
+    { initials: "PN", name: "Priya Nair", role: L("Interviewer, Round 2", "第 2 轮面试官") },
   ];
+
+  const roundStatusLabel = (status: string) =>
+    status === "completed" ? L("Completed", "已完成") : status === "Scheduled" ? L("Scheduled", "已排期") : L("Planned", "已规划");
 
   const draftBanner = state.jdOnlyDraft && (!state.rubricConfirmed || !state.candidateLinked || !state.planApproved);
   const evidencePending = state.followUpRounds.some((r) => r.status !== "completed");
@@ -86,7 +91,7 @@ export function ProjectOverviewPage() {
               <button
                 onClick={() => {
                   set({ candidateLinked: true });
-                  say(state.lang === "zh" ? "已将 Elena Torres 关联为该项目候选人。" : "Elena Torres linked as the candidate for this project.");
+                  say(zh ? "已将 Elena Torres 关联为该项目候选人。" : "Elena Torres linked as the candidate for this project.");
                 }}
                 style={{
                   height: 32,
@@ -99,22 +104,20 @@ export function ProjectOverviewPage() {
                   cursor: "pointer",
                 }}
               >
-                {state.lang === "zh" ? "关联候选人" : "Link candidate"}
+                {L("Link candidate", "关联候选人")}
               </button>
             )
           }
         >
           {!state.rubricExtracted
-            ? state.lang === "zh"
-              ? "草稿项目。当前只有 JD，候选人未关联，要求尚未从 JD 中提取。"
-              : "Draft project. Only the JD is in — no candidate is linked and requirements have not been extracted yet."
+            ? L("Draft project. Only the JD is in — no candidate is linked and requirements have not been extracted yet.", "草稿项目。当前只有 JD，候选人未关联，要求尚未从 JD 中提取。")
             : !state.rubricConfirmed
-              ? "Requirements are ready for review. Confirm the rubric before planning interviews."
+              ? L("Requirements are ready for review. Confirm the rubric before planning interviews.", "要求已可审阅。请先确认评分标准，再规划面试。")
               : !state.candidateLinked
-                ? "Rubric confirmed. Link a candidate before scheduling or starting an interview."
+                ? L("Rubric confirmed. Link a candidate before scheduling or starting an interview.", "评分标准已确认。排期或开始面试前，请先关联候选人。")
                 : !state.planApproved
-                  ? "Candidate linked. Approve the interview plan before scheduling."
-                  : "Project setup is ready."}
+                  ? L("Candidate linked. Approve the interview plan before scheduling.", "候选人已关联。排期前请先确认面试计划。")
+                  : L("Project setup is ready.", "项目设置已就绪。")}
         </Banner>
       )}
       {confirmBanner && (
@@ -131,7 +134,11 @@ export function ProjectOverviewPage() {
         >
           <span>⏱</span>
           <div style={{ flex: 1, fontSize: 12.5 }}>
-            Awaiting confirmation. {state.decHr ? "Sarah Chen (HR) has confirmed." : "Sarah Chen (HR) has not confirmed yet."} Waiting on Hiring Manager.{" "}
+            {L("Awaiting confirmation.", "等待确认。")}{" "}
+            {state.decHr
+              ? L("Sarah Chen (HR) has confirmed.", "Sarah Chen（HR）已确认。")
+              : L("Sarah Chen (HR) has not confirmed yet.", "Sarah Chen（HR）尚未确认。")}{" "}
+            {L("Waiting on Hiring Manager.", "等待招聘经理确认。")}{" "}
             <a
               href="#"
               onClick={(e) => {
@@ -178,17 +185,15 @@ export function ProjectOverviewPage() {
             }}
           >
             {state.jdOnlyDraft
-              ? state.lang === "zh"
-                ? "只需要 JD 即可启动项目。其他资料可以现在或以后再链接，不会阻塞项目建立。"
-                : "A JD alone is enough to start. Other materials can be linked now or later; missing ones never block project creation."
-              : "Created via folder import on Aug 18, 2026. Missing items never block this project — they show as Unknown."}
+              ? L("A JD alone is enough to start. Other materials can be linked now or later; missing ones never block project creation.", "只需要 JD 即可启动项目。其他资料可以现在或以后再链接，不会阻塞项目建立。")
+              : L("Created via folder import on Aug 18, 2026. Missing items never block this project — they show as Unknown.", "于 2026 年 8 月 18 日通过文件夹导入创建。缺失的资料不会阻塞此项目，会显示为「未知」。")}
           </div>
         </OverviewCard>
 
         <OverviewCard title={t.overviewReqCoverage}>
           {state.jdOnlyDraft && !state.rubricExtracted ? (
             <div style={{ padding: "11px 16px", fontSize: 13, color: "var(--ink-3)" }}>
-              {state.lang === "zh" ? "尚未从 JD 中提取要求" : "Requirements have not been extracted from the JD yet"}
+              {L("Requirements have not been extracted from the JD yet", "尚未从 JD 中提取要求")}
             </div>
           ) : (
             COMPS.map((c, i) => (
@@ -204,7 +209,7 @@ export function ProjectOverviewPage() {
               >
                 <div style={{ flex: 1, fontSize: 13 }}>{compName(c, state.lang)}</div>
                 <Pill
-                  label={c.must ? "Must-have" : "Standard"}
+                  label={c.must ? L("Must-have", "必须项") : L("Standard", "标准项")}
                   tone={c.must ? "bad" : "unknown"}
                 />
               </div>
@@ -216,13 +221,13 @@ export function ProjectOverviewPage() {
           title={t.overviewInterviewRounds}
           extra={
             <div style={{ fontSize: 11.5, color: "var(--ink-3)" }}>
-              {state.planMode === "all" ? "Planned all at once" : "One round at a time"}
+              {state.planMode === "all" ? L("Planned all at once", "一次性规划") : L("One round at a time", "逐轮规划")}
             </div>
           }
         >
           {overviewRounds.length === 0 ? (
             <div style={{ padding: "11px 16px", fontSize: 13, color: "var(--ink-3)" }}>
-              {state.lang === "zh" ? "尚未规划轮次" : "No rounds planned yet"}
+              {L("No rounds planned yet", "尚未规划轮次")}
             </div>
           ) : (
             overviewRounds.map((r, i) => (
@@ -243,7 +248,7 @@ export function ProjectOverviewPage() {
                   </div>
                 </div>
                 <Pill
-                  label={r.status}
+                  label={roundStatusLabel(r.status)}
                   tone={r.status === "completed" ? "ok" : "warn"}
                 />
               </div>

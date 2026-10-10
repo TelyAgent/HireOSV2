@@ -123,7 +123,10 @@ export function CreateProjectModal() {
                 <div>
                   <div style={{ fontSize: 13.5, fontWeight: 700 }}>{job.title}</div>
                   <div style={{ marginTop: 2, fontSize: 11.5, color: "var(--ink-3)" }}>
-                    {[job.team, job.location, job.seniority].filter(Boolean).join(" · ") || job.status}
+                    {[job.team, job.location, job.seniority]
+                      .filter(Boolean)
+                      .map((v) => (state.lang === "zh" && v === "Unassigned" ? "未分配" : state.lang === "zh" && v === "Unspecified" ? "未指定" : v))
+                      .join(" · ") || job.status}
                   </div>
                 </div>
                 <ArrowRightSvg />

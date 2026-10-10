@@ -32,7 +32,9 @@ export function ProjectShell({ children }: { children: React.ReactNode }) {
   const roleTitle2 = task?.job.title || (state.jdOnlyDraft
     ? (state.jdText.split("\n").map((s) => s.trim()).find((s) => s.length > 0) || "New role").slice(0, 60)
     : "Senior Backend Engineer");
-  const jobMeta = task ? [task.job.department, task.job.location, task.job.level].filter(Boolean).join(" · ") : "Platform Engineering · Remote — APAC / EU overlap · L5 / Senior";
+  // Screening stores "Unassigned"/"Unspecified" as placeholder values for empty job fields.
+  const jobField = (v: string) => (zh && v === "Unassigned" ? "未分配" : zh && v === "Unspecified" ? "未指定" : v);
+  const jobMeta = task ? [task.job.department, task.job.location, task.job.level].filter((v): v is string => !!v).map(jobField).join(" · ") : "Platform Engineering · Remote — APAC / EU overlap · L5 / Senior";
   const candName = task?.candidate.name || (zh ? "未关联候选人" : "Candidate not linked");
 
   // Debrief/decision/package are now real, API-backed stages (see TasksService), so a real
