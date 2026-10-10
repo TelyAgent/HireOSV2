@@ -17,8 +17,6 @@ import { SubmissionInboxPage } from "./pages/SubmissionInboxPage";
 import { SubmissionDetailPage } from "./pages/SubmissionDetailPage";
 import { EvaluationReviewPage } from "./pages/EvaluationReviewPage";
 import { ReleasePage } from "./pages/ReleasePage";
-import { RevisionPage } from "./pages/RevisionPage";
-import { DeliveryPage } from "./pages/DeliveryPage";
 import { ComparisonsListPage } from "./pages/ComparisonsListPage";
 import { ComparisonDetailPage } from "./pages/ComparisonDetailPage";
 import { SettingsPage } from "./pages/SettingsPage";
@@ -84,8 +82,6 @@ function ShellRoutes({ openTaskCount }: { openTaskCount: number }) {
         <Route path="/attempts/:id/submission" element={<SubmissionDetailPage />} />
         <Route path="/attempts/:id/review" element={<EvaluationReviewPage />} />
         <Route path="/results/:id/release" element={<ReleasePage />} />
-        <Route path="/cases/:id/revisions/:round" element={<RevisionPage />} />
-        <Route path="/deliveries/:id" element={<DeliveryPage />} />
         <Route path="/comparisons" element={<ComparisonsListPage />} />
         <Route path="/comparisons/:id" element={<ComparisonDetailPage />} />
         <Route path="/settings" element={<SettingsPage />} />

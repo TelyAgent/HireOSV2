@@ -6,7 +6,7 @@
  * a real, backend-persisted one.
  */
 import {
-  ATTEMPTS, CASES, EVALUATIONS, PLANS, QUESTIONS, RELEASES, RESULTS,
+  ATTEMPTS, EVALUATIONS, PLANS, QUESTIONS, RELEASES, RESULTS,
   type Attempt, type Criterion, type Evaluation, type PlanItem, type Question,
 } from "./fixtures";
 import type { QuestionSnapshot, RealEvaluation, RealFinalCriterion, RealInvitation, RealPlanItem, RealSubmission } from "./writtenApi";
@@ -156,7 +156,6 @@ export function applyRealEvaluation(caseId: string, questionId: string, submissi
     RESULTS[resultId] = { id: resultId, caseId, evaluationId, overall: final.overall, status: released ? "published" : "final_not_released", releaseId: released ? relId : null };
     if (released) {
       RELEASES[relId] = { ...RELEASES[relId], id: relId, caseId, ...submission.release!, publishedAt: submission.releasedAt! };
-      if (CASES[caseId]) CASES[caseId].status = "released";
     }
     return attemptId;
   }

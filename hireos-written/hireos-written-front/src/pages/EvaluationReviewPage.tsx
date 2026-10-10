@@ -113,6 +113,8 @@ export function EvaluationReviewContent({
       }).catch(() => say(t("Could not save to the server. Please refresh and try again."), { type: "danger" }));
     }
     updateEvaluation((prev) => ({ ...prev, status: "final", finalizedBy: state.currentUser, finalizedAt: new Date().toISOString() }));
+    // Mirrors the backend's finalize transition so the page header updates without a reload.
+    CASES[att.caseId].status = "finalized";
     RESULTS[`result_${att.caseId}`] = { id: `result_${att.caseId}`, caseId: att.caseId, evaluationId: ev.id, overall, status: "final_not_released", releaseId: null };
     setConfirmOpen(false);
     say(`Evaluation finalized. Overall: ${overall}`, { type: "success" });

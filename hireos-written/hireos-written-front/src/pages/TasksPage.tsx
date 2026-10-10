@@ -8,6 +8,7 @@ import { Icon } from "../components/ui/Icon";
 import { roundsForCase } from "../utils/cases";
 import { loadRealWrittenTasksIntoFixtures } from "../data/realTasksMerge";
 import { isWrittenTestTask, taskCountsFor, writtenTaskJob, writtenTaskStatus, writtenTestTasks, type WrittenTaskStatus } from "../utils/writtenTasks";
+import { fetchCaseAiContext } from "../data/writtenApi";
 import {
   PROJECT, INVITATIONS, MAIL, RESULTS, EVALUATIONS, TASKS, CASES, CORE_CANDIDATES, CORE_JOBS, COMPARISONS,
   fmtDateShort, nowISO, type CoreCandidate, type CoreJob, type Task,
@@ -39,11 +40,15 @@ function hasScoreForCase(caseId: string): boolean {
 type FilterKey = "all" | WrittenTaskStatus;
 const FILTER_DEFS: { key: FilterKey; label: string }[] = [
   { key: "all", label: "All tasks" },
-  { key: "written_completed", label: "Written completed" },
   { key: "pending_test", label: "Pending test" },
   { key: "test_sent", label: "Test sent" },
   { key: "pending_submission", label: "Pending submission" },
   { key: "pending_result_review", label: "Pending result review" },
+  { key: "pending_release", label: "Pending release" },
+  { key: "awaiting_next_step", label: "Awaiting next step" },
+  { key: "handed_off", label: "Handed off to interview" },
+  { key: "on_hold", label: "On hold" },
+  { key: "closed", label: "Testing closed" },
 ];
 
 export function TasksPage() {
@@ -279,21 +284,32 @@ function WrittenTaskRow({
  * templated placeholders (this app has no real resume-parsing pipeline), same as the prototype;
  * what's real is the linkage: which case/result this candidate maps to, and the profileNote flag when
  * present, are both read live off the shared candidate/case/result records. */
+/**
+ * Shows the résumé text Screening handed over with the candidate (hireos-written-backend
+ * Case.resumeText, via GET /cases/:id/context) -- not a generated profile summary.
+ */
 function CandidateResumeModal({ entry, onClose }: { entry: { candidate: CoreCandidate; job: CoreJob } | null; onClose: () => void }) {
   const { t } = useStore();
+  const caseEntry = entry ? Object.values(CASES).find((c) => c.candidateId === entry.candidate.id) : undefined;
+  const caseId = caseEntry?.id;
+  const [resume, setResume] = useState<{ caseId: string; text: string | null } | null>(null);
+
+  useEffect(() => {
+    if (!caseId) return;
+    let cancelled = false;
+    fetchCaseAiContext(caseId)
+      .then((ctx) => { if (!cancelled) setResume({ caseId, text: ctx?.resumeText ?? null }); })
+      .catch(() => { if (!cancelled) setResume({ caseId, text: null }); });
+    return () => { cancelled = true; };
+  }, [caseId]);
+
   if (!entry) return null;
   const { candidate, job } = entry;
-  const caseEntry = Object.values(CASES).find((c) => c.candidateId === candidate.id);
-  const result = caseEntry && Object.values(RESULTS).find((r) => r.caseId === caseEntry.id);
-  const sections = [
-    { title: "Professional summary", body: `${candidate.name} is being assessed for the ${job.title} role. The structured profile is ready for recruiter and reviewer use.` },
-    { title: "Experience", body: `Relevant experience aligned to ${job.title}; verify detailed employment dates and achievements against the source resume before making a decision.` },
-    { title: "Core skills", body: "Written communication · Problem solving · Role-specific analysis · Stakeholder collaboration" },
-    { title: "Education", body: "Education history is available in the candidate profile record." },
-  ];
+  const loading = !!caseId && resume?.caseId !== caseId;
+  const resumeText = resume?.caseId === caseId ? resume?.text : null;
 
   return (
-    <Modal open onCancel={onClose} footer={null} title={t("Candidate resume")} width={560}>
+    <Modal open onCancel={onClose} footer={null} title={t("Candidate resume")} width={640}>
       <div className="flex-col gap-3" style={{ display: "flex", flexDirection: "column", gap: 12 }}>
         <div className="card card-pad">
           <div className="flex items-center gap-3" style={{ display: "flex", alignItems: "center", gap: 12 }}>
@@ -303,29 +319,18 @@ function CandidateResumeModal({ entry, onClose }: { entry: { candidate: CoreCand
               <div className="muted">{candidate.email}</div>
             </div>
           </div>
+          <div className="tiny" style={{ marginTop: 10 }}>{t("Target role")}: <b>{job.title}</b></div>
         </div>
         <div className="card card-pad">
-          <div className="tiny">{t("Target role")}</div>
-          <div style={{ fontWeight: 600 }}>{job.title}</div>
-          <div className="tiny" style={{ marginTop: 8 }}>Profile {candidate.profileVersion || "v1"}</div>
+          {loading ? (
+            <div className="muted">{t("Loading…")}</div>
+          ) : resumeText ? (
+            <div style={{ whiteSpace: "pre-wrap", lineHeight: 1.7, fontSize: 13, maxHeight: "60vh", overflow: "auto" }}>{resumeText}</div>
+          ) : (
+            <div className="muted">{t("No resume text was handed over from Screening for this candidate.")}</div>
+          )}
         </div>
-        {sections.map((s) => (
-          <div key={s.title} className="card card-pad">
-            <h4 style={{ marginBottom: 6 }}>{t(s.title)}</h4>
-            {/* body text is dynamically interpolated with the candidate/job name, so — same as the
-               prototype — it's shown as-is rather than run through the static i18n dictionary. */}
-            <div className="muted" style={{ lineHeight: 1.55 }}>{s.body}</div>
-          </div>
-        ))}
-        <div className="card card-pad">
-          <div className="tiny">{t("Assessment result")}</div>
-          <div style={{ fontSize: 28, fontWeight: 700, marginTop: 6 }}>
-            {result?.overall != null ? `${result.overall} / 100` : t("Waiting for result")}
-          </div>
-          <div className="tiny" style={{ marginTop: 6 }}>{result ? <StatusBadge status={result.status} /> : t("No result has been returned yet.")}</div>
-        </div>
-        {candidate.profileNote && <div className="banner info">{candidate.profileNote}</div>}
-        <div className="banner info">{t("Resume preview is linked to the shared candidate record.")}</div>
+        <div className="banner info">{t("Resume text handed over from Resume Screening.")}</div>
       </div>
     </Modal>
   );

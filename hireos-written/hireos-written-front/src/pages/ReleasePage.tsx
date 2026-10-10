@@ -1,6 +1,6 @@
 import { useReducer, useState } from "react";
+import { Modal, Radio } from "antd";
 import { useParams, useNavigate } from "react-router-dom";
-import { Modal, Input } from "antd";
 import { useStore } from "../store/StoreContext";
 import { PageHeader, Button, EmptyState } from "../components/ui/Primitives";
 import { getUser } from "../data/users";
@@ -9,7 +9,14 @@ import {
   fmtDate, type Release,
 } from "../data/fixtures";
 import type { UserId } from "../store/types";
-import { releaseCaseResult } from "../data/writtenApi";
+import { closeCase, handoffCaseToInterview, holdCase, releaseCaseResult, resumeCase, type CaseLifecycleState } from "../data/writtenApi";
+
+type CloseReason = "passed" | "rejected" | "withdrawn";
+const CLOSE_REASONS: { value: CloseReason; label: string }[] = [
+  { value: "passed", label: "Passed" },
+  { value: "rejected", label: "Not passed" },
+  { value: "withdrawn", label: "Candidate withdrew" },
+];
 
 /**
  * Ported from the prototype's pageRelease(caseId, opts). `inline` drops the breadcrumb/title (used
@@ -20,9 +27,14 @@ import { releaseCaseResult } from "../data/writtenApi";
  * objects on every render rather than cached in useState — this tab is mounted at the same time as
  * "Comprehensive evaluation", so when that sibling tab finalizes an evaluation (writing straight into
  * those same module objects) this one picks the change up on its next render without a page reload.
- * `forceTick` re-renders this component after a mutation *it* makes itself (publish, request revision).
+ * `forceTick` re-renders this component after a mutation *it* makes itself (publish, and the
+ * post-release lifecycle actions); `onChanged` tells the host page the case status changed.
+ *
+ * Post-release actions (all persisted by hireos-written-backend's CaseLifecycleService):
+ * hand off to Interview (a real call that creates the interview task), hold / resume, and close
+ * testing with a reason. Handed-off and closed are terminal -- no further actions are offered.
  */
-export function ReleaseContent({ caseId, inline = false, onGoToPlan, onPublished }: { caseId: string; inline?: boolean; onGoToPlan?: () => void; onPublished?: () => void }) {
+export function ReleaseContent({ caseId, inline = false, onGoToPlan, onChanged }: { caseId: string; inline?: boolean; onGoToPlan?: () => void; onChanged?: () => void }) {
   const { t, say } = useStore();
   const navigate = useNavigate();
   const [, forceTick] = useReducer((n: number) => n + 1, 0);
@@ -33,8 +45,10 @@ export function ReleaseContent({ caseId, inline = false, onGoToPlan, onPublished
 
   const [chk1, setChk1] = useState(false);
   const [chk2, setChk2] = useState(false);
-  const [revisionOpen, setRevisionOpen] = useState(false);
-  const [revisionHint, setRevisionHint] = useState("Please revisit the variance analysis section with more detail on the root cause.");
+  const [handoffOpen, setHandoffOpen] = useState(false);
+  const [closeOpen, setCloseOpen] = useState(false);
+  const [closeReason, setCloseReason] = useState<CloseReason | null>(null);
+  const [busy, setBusy] = useState(false);
 
   if (!c || !result) return <EmptyState title="No finalized result for this case yet." />;
 
@@ -67,15 +81,41 @@ export function ReleaseContent({ caseId, inline = false, onGoToPlan, onPublished
         .catch(() => say(t("Could not save to the server. Please refresh and try again."), { type: "danger" }));
     }
     forceTick();
-    onPublished?.();
+    onChanged?.();
     say("Result finalized and published. Candidate portal and notification queued.", { type: "success" });
   }
 
-  function requestRevision() {
-    if (release) release.nextAction = "revision";
-    setRevisionOpen(false);
-    forceTick();
-    say("Revision round 1 created with a new invitation and candidate thread.", { type: "success" });
+  /** Runs a lifecycle action against the backend and mirrors the resulting state onto CASES. */
+  async function runAction(action: () => Promise<CaseLifecycleState>, successMsg: string): Promise<boolean> {
+    setBusy(true);
+    try {
+      const next = await action();
+      Object.assign(c, {
+        status: next.status, closeReason: next.closeReason, closedAt: next.closedAt,
+        handedOffAt: next.handedOffAt, interviewTaskId: next.interviewTaskId,
+      });
+      forceTick();
+      onChanged?.();
+      say(t(successMsg), { type: "success" });
+      return true;
+    } catch (error) {
+      say(`${t("Action failed:")} ${error instanceof Error ? error.message : ""}`, { type: "danger" });
+      return false;
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function confirmHandoff() {
+    if (await runAction(() => handoffCaseToInterview(caseId), "Interview task created. The candidate is now in Interview.")) setHandoffOpen(false);
+  }
+
+  async function confirmClose() {
+    if (!closeReason) {
+      say(t("Choose why testing is ending."), { type: "danger" });
+      return;
+    }
+    if (await runAction(() => closeCase(caseId, closeReason), "Testing closed.")) setCloseOpen(false);
   }
 
   function goToPlan() {
@@ -134,33 +174,57 @@ export function ReleaseContent({ caseId, inline = false, onGoToPlan, onPublished
           <div className="card card-pad" style={{ marginTop: 16 }}>
             <h4 style={{ marginBottom: 8 }}>{t("Next action")}</h4>
             <div className="tiny" style={{ marginBottom: 12 }}>{t("A proposal is prepared first; sending only happens after approval — sorting or comparing candidates never triggers a send.")}</div>
-            <div className="flex gap-2 wrap" style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-              <Button disabled={!!release.nextAction} onClick={() => setRevisionOpen(true)}>{t("Request revision")}</Button>
-              <Button onClick={goToPlan}>{t("Add supplemental test")}</Button>
-              <Button onClick={() => navigate(`/deliveries/del_${caseId}`)}>{t("Prepare Interview handoff")}</Button>
-              <Button variant="ghost" onClick={() => say("Case placed on hold (demo).")}>{t("Hold")}</Button>
-              <Button variant="ghost" onClick={() => say("Testing closed for this case (demo).")}>{t("Close testing")}</Button>
-            </div>
-            {release.nextAction === "revision" && (
-              <div className="banner info" style={{ marginTop: 12 }}>
-                {t("Revision round")} 1 {t("requested — candidate has been notified.")}{" "}
-                <a style={{ cursor: "pointer" }} onClick={() => navigate(`/cases/${caseId}/revisions/1`)}>{t("Open revision workspace →")}</a>
+            {c.status === "handed_off" ? (
+              <div className="banner success">
+                {t("Handed off to interview")} {fmtDate(c.handedOffAt ?? null)}. {t("The interview task was created in Interview.")}
+              </div>
+            ) : c.status === "closed" ? (
+              <div className="banner info">
+                {t("Testing closed")} {fmtDate(c.closedAt ?? null)} · {t("Reason:")} {t(CLOSE_REASONS.find((r) => r.value === c.closeReason)?.label ?? "—")}
+              </div>
+            ) : c.status === "on_hold" ? (
+              <div className="banner warning" style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                <span style={{ flex: 1 }}>{t("This case is on hold. Resume it to continue.")}</span>
+                <Button size="sm" disabled={busy} onClick={() => void runAction(() => resumeCase(caseId), "Case resumed.")}>{t("Resume testing")}</Button>
+              </div>
+            ) : (
+              <div className="flex gap-2 wrap" style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                <Button onClick={goToPlan}>{t("Add supplemental test")}</Button>
+                <Button disabled={busy} onClick={() => setHandoffOpen(true)}>{t("Prepare Interview handoff")}</Button>
+                <Button variant="ghost" disabled={busy} onClick={() => void runAction(() => holdCase(caseId), "Case placed on hold.")}>{t("Hold")}</Button>
+                <Button variant="ghost" disabled={busy} onClick={() => { setCloseReason(null); setCloseOpen(true); }}>{t("Close testing")}</Button>
               </div>
             )}
           </div>
         </>
       )}
 
-      <Modal open={revisionOpen} onCancel={() => setRevisionOpen(false)} onOk={requestRevision} title={t("Request revision")} okText={t("Send revision request (demo)")}>
-        <div className="field" style={{ marginBottom: 12 }}>
-          <label>{t("Feedback shown to candidate")}</label>
-          <Input.TextArea rows={3} value={revisionHint} onChange={(e) => setRevisionHint(e.target.value)} />
-        </div>
-        <div className="field">
-          <label>{t("New deadline")}</label>
-          <input className="input" type="datetime-local" defaultValue="2026-09-20T23:59" />
-        </div>
-        <div className="tiny" style={{ marginTop: 8 }}>{t("The prior round stays locked and visible; this creates a new round with its own invitation and thread.")}</div>
+      <Modal
+        open={handoffOpen}
+        title={t("Hand off to Interview")}
+        okText={t("Create interview task")}
+        cancelText={t("Cancel")}
+        confirmLoading={busy}
+        onOk={() => void confirmHandoff()}
+        onCancel={() => setHandoffOpen(false)}
+      >
+        {t("This creates an interview task for")} <b>{cand.name}</b> {t("in Interview and ends this written test. It cannot be undone here.")}
+      </Modal>
+
+      <Modal
+        open={closeOpen}
+        title={t("Close testing")}
+        okText={t("Close testing")}
+        okButtonProps={{ danger: true }}
+        cancelText={t("Cancel")}
+        confirmLoading={busy}
+        onOk={() => void confirmClose()}
+        onCancel={() => setCloseOpen(false)}
+      >
+        <div style={{ marginBottom: 12 }}>{t("Why is testing ending for")} <b>{cand.name}</b>{t("? This cannot be undone.")}</div>
+        <Radio.Group value={closeReason} onChange={(e) => setCloseReason(e.target.value as CloseReason)} style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+          {CLOSE_REASONS.map((r) => <Radio key={r.value} value={r.value}>{t(r.label)}</Radio>)}
+        </Radio.Group>
       </Modal>
     </div>
   );

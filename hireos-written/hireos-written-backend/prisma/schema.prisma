@@ -46,12 +46,24 @@ model Job {
 
 // One candidate's written-test case for one job — the handoff's upsert key is (candidate, job), so a
 // repeated "send assessment" decision for the same pairing updates this record instead of duplicating it.
+//
+// `status` is the single source of truth for where the case is, written by CaseLifecycleService at
+// every transition (see its doc comment for the full state machine):
+//   linked -> invited -> awaiting_submission -> review_pending -> finalized -> released
+//   released -> handed_off | closed      any non-terminal <-> on_hold (statusBeforeHold restores it)
 model Case {
   id                  String   @id @default(uuid())
   workspaceId         String
   candidateId         String
   jobId               String
   status              String   @default("linked")
+  statusBeforeHold    String?
+  // closed: why testing ended -- 'passed' | 'rejected' | 'withdrawn'
+  closeReason         String?
+  closedAt            DateTime?
+  // handed_off: the hireos-interview InterviewTask this case was handed to
+  handedOffAt         DateTime?
+  interviewTaskId     String?
   coreMaterialId      String?
   resumeText          String?
   matchScore          Int?

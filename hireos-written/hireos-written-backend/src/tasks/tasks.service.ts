@@ -18,6 +18,10 @@ export interface WrittenTaskDto {
   createdAt: string;
   caseId: string;
   caseStatus: string;
+  closeReason: string | null;
+  closedAt: string | null;
+  handedOffAt: string | null;
+  interviewTaskId: string | null;
   candidateId: string;
   candidateName: string;
   candidateEmail: string | null;
@@ -27,32 +31,6 @@ export interface WrittenTaskDto {
   jobLocation: string | null;
 }
 
-/**
- * Case.status itself is only ever written once ('linked', at handoff) -- the real progress lives on
- * the case's invitations. Derive the status the task list shows from the latest invitation, in the
- * case-status vocabulary the frontend's writtenTaskStatus() already maps:
- *   no invitation -> case.status ('linked' -> Pending test)
- *   sent          -> 'invited'             (Test sent)
- *   opened        -> 'awaiting_submission' (Pending submission)
- *   submitted     -> 'review_pending'      (Pending result review -- the AI draft, or a manual score
- *                                           when auto-evaluation failed, still needs a human)
- *   submitted + result published -> 'released' (Written completed)
- */
-function deriveCaseStatus(caseStatus: string, latestInvitationStatus: string | undefined, released: boolean): string {
-  switch (latestInvitationStatus) {
-    case undefined:
-      return caseStatus;
-    case 'sent':
-      return 'invited';
-    case 'opened':
-      return 'awaiting_submission';
-    case 'submitted':
-      return released ? 'released' : 'review_pending';
-    default:
-      return caseStatus;
-  }
-}
-
 @Injectable()
 export class TasksService {
   constructor(private readonly db: PrismaService) {}
@@ -60,19 +38,7 @@ export class TasksService {
   async list(identity: Identity): Promise<WrittenTaskDto[]> {
     const tasks = await this.db.task.findMany({
       where: { workspaceId: identity.workspaceId },
-      include: {
-        case: {
-          include: {
-            candidate: true,
-            job: true,
-            invitations: {
-              orderBy: { createdAt: 'desc' },
-              take: 1,
-              select: { status: true, submission: { select: { releasedAt: true } } },
-            },
-          },
-        },
-      },
+      include: { case: { include: { candidate: true, job: true } } },
       orderBy: { createdAt: 'desc' },
     });
     return tasks.map((t) => ({
@@ -84,7 +50,12 @@ export class TasksService {
       dueAt: t.dueAt ? t.dueAt.toISOString() : null,
       createdAt: t.createdAt.toISOString(),
       caseId: t.caseId,
-      caseStatus: deriveCaseStatus(t.case.status, t.case.invitations[0]?.status, !!t.case.invitations[0]?.submission?.releasedAt),
+      // Persisted at every transition by CaseLifecycleService -- see its state-machine comment.
+      caseStatus: t.case.status,
+      closeReason: t.case.closeReason,
+      closedAt: t.case.closedAt?.toISOString() ?? null,
+      handedOffAt: t.case.handedOffAt?.toISOString() ?? null,
+      interviewTaskId: t.case.interviewTaskId,
       candidateId: t.case.candidate.id,
       candidateName: t.case.candidate.name,
       candidateEmail: t.case.candidate.email,

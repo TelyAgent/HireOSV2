@@ -18,6 +18,10 @@ export interface RealWrittenTask {
   createdAt: string;
   caseId: string;
   caseStatus: string;
+  closeReason: "passed" | "rejected" | "withdrawn" | null;
+  closedAt: string | null;
+  handedOffAt: string | null;
+  interviewTaskId: string | null;
   candidateId: string;
   candidateName: string;
   candidateEmail: string | null;
@@ -185,7 +189,7 @@ export interface RealSubmission {
   finalEvaluation?: { overall: number; criteria: RealFinalCriterion[] } | null;
   finalizedBy?: string | null;
   finalizedAt?: string | null;
-  /** Set once the result is published (Evaluation result tab) -- the case is then "Written completed". */
+  /** Set once the result is published (Evaluation result tab) -- the case then awaits HR's next step (hand off / close / hold). */
   release?: RealReleaseInput | null;
   releasedAt?: string | null;
 }
@@ -236,6 +240,32 @@ export async function createInvitation(
   if (!response.ok) throw new Error(`Request failed (${response.status})`);
   return response.json() as Promise<{ id: string; token: string; emailSent: boolean; emailError?: string }>;
 }
+
+/** What a lifecycle action (hold / resume / close / interview handoff) leaves the case as. */
+export interface CaseLifecycleState {
+  status: string;
+  statusBeforeHold: string | null;
+  closeReason: "passed" | "rejected" | "withdrawn" | null;
+  closedAt: string | null;
+  handedOffAt: string | null;
+  interviewTaskId: string | null;
+}
+
+async function caseAction(caseId: string, action: string, body?: unknown): Promise<CaseLifecycleState> {
+  const response = await fetch(`${BASE}/cases/${encodeURIComponent(caseId)}/${action}`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: body === undefined ? undefined : JSON.stringify(body),
+  });
+  if (!response.ok) await throwWithMessage(response);
+  return response.json() as Promise<CaseLifecycleState>;
+}
+
+export const holdCase = (caseId: string) => caseAction(caseId, "hold");
+export const resumeCase = (caseId: string) => caseAction(caseId, "resume");
+export const closeCase = (caseId: string, reason: "passed" | "rejected" | "withdrawn") => caseAction(caseId, "close", { reason });
+/** Creates the candidate's interview task in hireos-interview (real cross-service call, via this backend). */
+export const handoffCaseToInterview = (caseId: string) => caseAction(caseId, "interview-handoff");
 
 export interface MailAccount {
   id: string;

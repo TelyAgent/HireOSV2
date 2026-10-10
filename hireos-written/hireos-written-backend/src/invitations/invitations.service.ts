@@ -5,6 +5,7 @@ import { PrismaService } from '../persistence/prisma.service';
 import type { Identity } from '../auth/workspace.guard';
 import { MailAccountsService } from '../mail-accounts/mail-accounts.service';
 import { AiEvaluatorService } from '../ai/ai-evaluator.service';
+import { CaseLifecycleService } from '../cases/case-lifecycle.service';
 import type { CreateInvitationDto, QuestionSnapshotDto } from './create-invitation.dto';
 import type { SubmitAnswersDto } from './submit-answers.dto';
 import type { FinalizeEvaluationDto, ReleaseResultDto } from './case-result.dto';
@@ -22,6 +23,7 @@ export class InvitationsService {
     private readonly mailAccounts: MailAccountsService,
     private readonly config: ConfigService,
     private readonly evaluator: AiEvaluatorService,
+    private readonly lifecycle: CaseLifecycleService,
   ) {}
 
   async create(identity: Identity, caseId: string, dto: CreateInvitationDto) {
@@ -40,6 +42,7 @@ export class InvitationsService {
         disclosurePolicy: dto.disclosurePolicy,
       },
     });
+    await this.lifecycle.advance(caseId, 'invited');
 
     const appBaseUrl = this.config.get<string>('PUBLIC_APP_BASE_URL', 'http://127.0.0.1:5178/written/').replace(/\/$/, '');
     const link = `${appBaseUrl}/apply/${invitation.token}`;
@@ -106,6 +109,7 @@ export class InvitationsService {
         finalizedAt: new Date(),
       },
     });
+    await this.lifecycle.advance(caseId, 'finalized');
     return { finalizedAt: updated.finalizedAt!.toISOString() };
   }
 
@@ -117,6 +121,7 @@ export class InvitationsService {
       where: { id: submission.id },
       data: { release: { ...dto } as unknown as object, releasedAt: new Date() },
     });
+    await this.lifecycle.advance(caseId, 'released');
     return { releasedAt: updated.releasedAt!.toISOString() };
   }
 
@@ -129,6 +134,7 @@ export class InvitationsService {
 
     if (invitation.status === 'sent') {
       await this.db.invitation.update({ where: { id: invitation.id }, data: { status: 'opened', openedAt: new Date() } });
+      await this.lifecycle.advance(invitation.caseId, 'awaiting_submission');
     }
 
     return {
@@ -156,6 +162,7 @@ export class InvitationsService {
       }),
       this.db.invitation.update({ where: { id: invitation.id }, data: { status: 'submitted' } }),
     ]);
+    await this.lifecycle.advance(invitation.caseId, 'review_pending');
 
     // Best-effort, right after the candidate's real answer lands -- never blocks the submission
     // itself (a candidate's reply must be accepted regardless of whether the AI is configured or

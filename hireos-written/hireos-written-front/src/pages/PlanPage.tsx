@@ -11,14 +11,14 @@ import { SubmissionDetailContent, RealSubmissionContent } from "./SubmissionDeta
 import { EvaluationReviewContent } from "./EvaluationReviewPage";
 import { ReleaseContent } from "./ReleasePage";
 import {
-  ATTEMPTS, CASES, CORE_APPLICATIONS, CORE_CANDIDATES, CORE_JOBS, INVITATIONS, PLANS, PROJECT, QUESTIONS, RELEASES, fmtDateShort,
+  ATTEMPTS, CASES, CORE_APPLICATIONS, CORE_CANDIDATES, CORE_JOBS, INVITATIONS, PLANS, PROJECT, QUESTIONS, fmtDateShort,
   type PlanItem, type Question,
 } from "../data/fixtures";
 import {
   createPlanItem, deletePlanItem, listCaseInvitations, listPlanItems, updatePlanItem,
   type RealInvitation,
 } from "../data/writtenApi";
-import { writtenStatusFromInvitation } from "../utils/writtenTasks";
+import { writtenStatusFromCase } from "../utils/writtenTasks";
 import { applyRealEvaluation, applyRealPlanItems, synthesizeOrphanedInvitationItems } from "../data/realPlanItemsMerge";
 
 type TabKey = "plan" | "submission" | "evaluation" | "result";
@@ -139,8 +139,9 @@ export function PlanPage() {
   const realAttemptId = realSubmittedInvite?.submission
     ? applyRealEvaluation(caseId, realSubmittedInvite.questions[0]?.questionId ?? "", realSubmittedInvite.submission)
     : null;
-  const released = Object.values(RELEASES).some((r) => r.caseId === caseId);
-  const overallStatus = writtenStatusFromInvitation(latestInvite?.status, released);
+  // Case.status is persisted by the backend at every transition (and updated locally right after
+  // an action on this page), so it is the one status shown here -- same as My Tasks.
+  const overallStatus = writtenStatusFromCase(c.status) ?? "pending_test";
   const attempts = Object.values(ATTEMPTS).filter((a) => a.caseId === caseId);
   const primaryAttempt = (realAttemptId && ATTEMPTS[realAttemptId]) || attempts[0];
 
@@ -299,7 +300,7 @@ export function PlanPage() {
       </div>
 
       <div style={{ display: activeTab === "result" ? "block" : "none" }}>
-        <ReleaseContent caseId={caseId} inline onGoToPlan={() => setActiveTab("plan")} onPublished={forceTick} />
+        <ReleaseContent caseId={caseId} inline onGoToPlan={() => setActiveTab("plan")} onChanged={forceTick} />
       </div>
 
       <AssessmentQuestionDrawer

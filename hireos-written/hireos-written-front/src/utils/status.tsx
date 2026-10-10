@@ -14,9 +14,10 @@ const STATUS_MAP: Record<string, [BadgeTone, string]> = {
   internal_only: ["neutral", "Internal only"], final_not_released: ["warning", "Final — not released"], awaiting_ack: ["warning", "Awaiting confirmation"],
   released: ["success", "Released"], linked: ["neutral", "Linked — no plan yet"],
   planned: ["neutral", "Planned"], ready_to_release: ["info", "Ready to release"], invited: ["info", "Invited"],
-  written_completed: ["success", "Written completed"], pending_test: ["info", "Pending test"],
+  awaiting_next_step: ["warning", "Awaiting next step"], pending_test: ["info", "Pending test"],
   pending_submission: ["warning", "Pending submission"], test_sent: ["info", "Test sent"],
-  pending_result_review: ["danger", "Pending result review"], waiting_result: ["neutral", "Waiting for result"],
+  pending_result_review: ["danger", "Pending result review"], pending_release: ["warning", "Pending release"],
+  handed_off: ["success", "Handed off to interview"], on_hold: ["neutral", "On hold"], closed: ["neutral", "Testing closed"], waiting_result: ["neutral", "Waiting for result"],
 };
 
 export function StatusBadge({ status }: { status: string }) {

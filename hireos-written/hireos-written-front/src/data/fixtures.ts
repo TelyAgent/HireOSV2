@@ -88,6 +88,11 @@ export interface Case {
    * flags the candidate's task as needing another look (pending_submission) until the new round
    * clears. Only ever written by the "add assessment question" drawer. */
   supplementalPending?: boolean;
+  /** Real cases only (hireos-written-backend Case): set once testing ended / was handed to Interview. */
+  closeReason?: "passed" | "rejected" | "withdrawn" | null;
+  closedAt?: string | null;
+  handedOffAt?: string | null;
+  interviewTaskId?: string | null;
 }
 
 export const CASES: Record<string, Case> = {};
@@ -127,19 +132,11 @@ export const RESULTS: Record<string, Result> = {};
 
 export interface Release {
   id: string; caseId: string; overall: number; showScore: boolean; outcomeText: string; feedbackText: string; nextStepText: string; publishedAt: string;
-  /** Set once "Request revision" is confirmed — mirrors the prototype's release.nextAction. */
-  nextAction?: "revision";
 }
 export const RELEASES: Record<string, Release> = {};
 
 export interface Comparison { id: string; caseIds: string[]; mode: string; createdAt: string; note: string }
 export const COMPARISONS: Record<string, Comparison> = {};
-
-// A revision round requested after a Release (see ReleasePage's "Request revision" flow).
-// Empty in the seed — none of the demo cases has an open revision yet; RevisionPage
-// handles the "not yet requested" state explicitly.
-export interface Revision { id: string; caseId: string; round: number; status: string; acceptedAt: string | null; revisionHint?: string }
-export const REVISIONS: Record<string, Revision> = {};
 
 export interface Mail { id: string; from: string; subject: string; receivedAt: string; authStatus: string; threadStatus: string; matchReason: string; classification: string; caseId: string | null; attachments: string[]; missing?: string[] }
 export const MAIL: Record<string, Mail> = {};
@@ -147,10 +144,6 @@ export const MAIL: Record<string, Mail> = {};
 export interface Task { id: string; title: string; type: string; assignee: string | null; queue?: string; status: string; waitingReason?: string; waitingUntil?: string; dueAt: string; link: string; sourceRef: string }
 // Filled only with real tasks from hireos-written-backend at runtime (see data/realTasksMerge.ts).
 export const TASKS: Record<string, Task> = {};
-
-export interface DeliveryStep { label: string; state: "done" | "pending"; at: string | null }
-export interface Delivery { id: string; caseId: string; target: string; status: string; timeline: DeliveryStep[] }
-export const DELIVERIES: Record<string, Delivery> = {};
 
 export const FILES_LIST: string[] = [];
 export interface FileConnection { id: string; name: string; kind: string; scope: string; status: string; lastSync: string }

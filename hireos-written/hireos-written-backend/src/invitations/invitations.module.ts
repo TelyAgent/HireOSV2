@@ -3,13 +3,14 @@ import { AuthModule } from '../auth/auth.module';
 import { PrismaService } from '../persistence/prisma.service';
 import { MailAccountsModule } from '../mail-accounts/mail-accounts.module';
 import { AiModule } from '../ai/ai.module';
+import { CasesModule } from '../cases/cases.module';
 import { CaseResultController } from './case-result.controller';
 import { InvitationsController } from './invitations.controller';
 import { PublicInvitationsController } from './public-invitations.controller';
 import { InvitationsService } from './invitations.service';
 
 @Module({
-  imports: [AuthModule, MailAccountsModule, AiModule],
+  imports: [AuthModule, MailAccountsModule, AiModule, CasesModule],
   providers: [PrismaService, InvitationsService],
   controllers: [InvitationsController, CaseResultController, PublicInvitationsController],
 })

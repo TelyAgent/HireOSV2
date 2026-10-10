@@ -7,12 +7,12 @@
  * literal (JS takes the last one); those are resolved here the same way.
  */
 export const ZH: Record<string, string> = {
-  "My Tasks": "我的任务", "My Focus": "我的关注", "Task Feed": "任务动态", "Assessments": "测评项目", "Jobs": "职位",
-  "Overview": "概览", "Question Bank": "题库", "Comparisons": "候选人对比", "Files & Integrations": "文件与集成",
-  "Settings": "设置", "Workspace": "工作区", "Command": "指挥台", "Assessment (embedded)": "测评（嵌入模式）",
+  "My Tasks": "我的任务", "Task Feed": "任务动态", "Assessments": "测评项目", "Jobs": "职位",
+  "Overview": "概览", "Question Bank": "题库", "Comparisons": "候选人对比",
+  "Settings": "设置", "Workspace": "工作区", "Command": "指挥台",
   "HireOS · Written Test": "HireOS · 笔试测评", "Written Test": "笔试测评",
   "Search projects, candidates...": "搜索项目、候选人…", "Toggle navigation": "切换导航", "Expand navigation": "展开导航", "Collapse navigation": "收起导航", "Search": "搜索",
-  "Notifications": "通知", "Appearance": "外观", "Demo tools": "演示工具", "Switch demo role": "切换演示角色",
+  "Notifications": "通知", "Appearance": "外观", "Switch demo role": "切换演示角色",
   "Demo role": "演示角色",
   "Language": "语言",
 
@@ -22,7 +22,7 @@ export const ZH: Record<string, string> = {
   "Reviews awaiting me": "待我评审", "Same filter as list view": "与列表视图筛选条件一致", "Due today": "今日截止",
   "Available to claim": "可认领", "Active projects": "进行中项目", "Awaiting acceptance": "待接受邀请",
   "Awaiting submission": "待提交", "Submission issues": "提交异常", "Results to release": "待发布结果",
-  "Delivery issues": "交付问题", "Unavailable": "不可用", "More statistics": "更多统计", "Tasks": "任务",
+  "More statistics": "更多统计", "Tasks": "任务",
   "Assigned to me": "分配给我", "Team Tasks": "团队任务", "Created or followed": "由我创建或关注",
   "Completed": "已完成", "Nothing here.": "暂无内容。", "No action cards for you right now.": "当前没有需要你处理的事项。",
   "Claim": "认领", "Start": "开始", "Wait": "等待", "Open →": "打开 →", "Due": "截止",
@@ -36,7 +36,7 @@ export const ZH: Record<string, string> = {
   "Full resume preview is coming in a later phase — this shows the candidate's basic profile for now.":
     "完整简历预览将在后续阶段上线——目前先展示候选人的基本信息。",
   "No scored candidates to compare yet.": "暂无已评分的候选人可供对比。",
-  "Written completed": "已完成", "Pending test": "待测试", "Pending submission": "待提交",
+  "Awaiting next step": "待处理后续", "Pending test": "待测试", "Pending submission": "待提交",
   "Test sent": "已发送测试", "Pending result review": "待审核结果", "Waiting for result": "等待返回结果",
   "Invite pending": "待发送邀请", "Test pending": "待测试", "Submission pending": "待提交",
 
@@ -65,7 +65,7 @@ export const ZH: Record<string, string> = {
     "确认后，本演示会展示解析预览：1 个题目、2 份材料、1 份内部评分标准。ZIP 中发现的旧候选人提交内容不会被重新导出。",
   "Parse (demo)": "解析（演示）",
 
-  "Question not found.": "未找到该题目。", "Preview candidate view": "预览候选人视图", "Edit / Builder": "编辑 / 编排器",
+  "Question not found.": "未找到该题目。", "Preview candidate view": "预览候选人视图",
   "Prompt": "题目描述", "Materials": "材料", "Rubric": "评分标准", "Usage": "使用情况", "Versions": "版本记录",
   "Required deliverables": "要求提交的内容", "None specified": "未指定",
   "No materials attached.": "未附加材料。", "Candidate-visible materials": "候选人可见的材料", "Preview": "预览",
@@ -139,7 +139,7 @@ export const ZH: Record<string, string> = {
   "Verification goal": "验证目标",
   "Verify whether the candidate can demonstrate, through this role assessment:": "通过岗位评测验证候选人是否体现：",
   "role capability —": "岗位能力边界 ——", "role's core capability and delivery level.": "岗位所需的核心能力与交付水平。",
-  "Owner": "负责人", "Submission deadline": "提交截止时间",
+  "Owner": "负责人",
   "Assessment questions": "测评题目",
   "Confirming freezes this into a pending-send version; it is not sent to the candidate immediately.":
     "确认后冻结为待发送版本，不会立即发送给候选人。",
@@ -167,7 +167,6 @@ export const ZH: Record<string, string> = {
     "答案已上传 —— 等待候选人提交。此次作答仍在进行中且尚未评分；HR 负责人与用人经理已收到通知。",
   "Ownership": "责任人", "Routes notifications only — not required to act (Startup Team Access)": "仅用于通知路由 —— 并非行动前提（初创团队权限）",
   "HR owner": "HR 负责人", "Hiring manager": "用人经理", "Review assignee": "评审负责人",
-  "— Not set (defaults to initiator) —": "— 未设置（默认为发起人）—",
   "No HR owner or Hiring manager set — this doesn't block sending; the initiator is the default contact.":
     "尚未设置 HR 负责人或用人经理 —— 这不会阻止发送；发起人将作为默认联系人。",
   "Plan structure": "方案结构", "Single round": "单轮次", "Multiple rounds": "多轮次",
@@ -251,7 +250,6 @@ export const ZH: Record<string, string> = {
   "Thank you — your submission has been received.": "感谢提交，我们已收到您的作答内容。",
   "The hiring team will review your answers and follow up with next steps.": "招聘团队将审阅您的作答内容，并与您沟通后续安排。",
   "Your answer": "你的作答", "Submitting…": "提交中…", "Submit": "提交",
-  "Opened": "已查看", "View candidate's reply →": "查看候选人回复 →", "Candidate's submission": "候选人提交内容", "Submitted at": "提交时间",
   "Delivery": "发送情况", "Sent": "已发送", "Simulated bounce": "模拟退信",
 
   "Submission Inbox": "提交收件箱",
@@ -302,29 +300,26 @@ export const ZH: Record<string, string> = {
   "Next action": "下一步操作",
   "A proposal is prepared first; sending only happens after approval — sorting or comparing candidates never triggers a send.":
     "系统会先准备好方案；只有获批后才会发送 —— 排序或对比候选人本身不会触发发送。",
-  "Request revision": "请求修改", "Add supplemental test": "添加补充测试",
+  "Add supplemental test": "添加补充测试",
   "Prepare Interview handoff": "准备面试交接", "Hold": "暂缓", "Close testing": "结束测评",
-  "Revision round": "修改轮次", "requested — candidate has been notified.": "已发起 —— 候选人已收到通知。",
-  "Open revision workspace →": "打开修改工作区 →",
-  "Feedback shown to candidate": "展示给候选人的反馈", "New deadline": "新截止时间",
-  "The prior round stays locked and visible; this creates a new round with its own invitation and thread.":
-    "上一轮保持锁定并可见；本操作会创建一个拥有独立邀请与邮件线程的新轮次。",
-  "Send revision request (demo)": "发送修改请求（演示）",
+  "No resume text was handed over from Screening for this candidate.": "该候选人从简历筛选流转时没有附带简历文本。",
+  "Resume text handed over from Resume Screening.": "简历内容来自简历筛选流转。",
+  "Pending release": "待发布结果", "Handed off to interview": "已转面试", "On hold": "已暂缓", "Testing closed": "已结束",
+  "Passed": "通过", "Not passed": "不通过", "Candidate withdrew": "候选人放弃",
+  "Action failed:": "操作失败：", "Choose why testing is ending.": "请选择结束测评的原因。",
+  "Interview task created. The candidate is now in Interview.": "面试任务已创建，候选人已转入面试。",
+  "Testing closed.": "测评已结束。", "Case placed on hold.": "已暂缓。", "Case resumed.": "已恢复。",
+  "The interview task was created in Interview.": "已在面试系统中创建面试任务。", "Reason:": "原因：",
+  "This case is on hold. Resume it to continue.": "该候选人已暂缓，恢复后可继续操作。", "Resume testing": "恢复",
+  "Hand off to Interview": "转入面试", "Create interview task": "创建面试任务",
+  "This creates an interview task for": "将为", "in Interview and ends this written test. It cannot be undone here.": "在面试系统中创建面试任务，并结束本次笔试，此操作不可撤销。",
+  "Why is testing ending for": "请选择", "? This cannot be undone.": " 结束测评的原因，此操作不可撤销。",
 
-  "Revision": "修改", "Not yet accepted by candidate": "候选人尚未接受",
-  "Not comparable yet — no revised answers received. Original stays available below.": "暂时无法对比 —— 尚未收到修改后的答案。下方仍可查看原始版本。",
-  "Not comparable — awaiting revised submission.": "暂时无法对比 —— 等待修改后的提交。",
-  "Improved": "有提升", "No change": "无变化",
-  "Original": "原始版本", "Feedback": "反馈", "Revised": "修改后",
-  "Approve revised scores": "批准修改后的分数",
+  "Original": "原始版本", "Feedback": "反馈",
 
-  "Delivery not found.": "未找到该交付记录。", "Handoff": "交接", "Handoff to": "交接至",
-  "Interview not enabled in this workspace — export still works; nothing here is a real cross-service call.":
-    "本工作区尚未启用 Interview 模块 —— 导出功能仍可使用；此处不涉及任何真实的跨系统调用。",
-  "Advance next step (demo)": "推进下一步（演示）", "Export report-only package": "导出仅报告版数据包",
+  "Handoff": "交接",
   "Result finalized": "结果已定稿", "Preparing shared artifact": "正在准备共享文件",
   "File ready": "文件已就绪", "Event queued": "事件已排队",
-  "Intake received": "已接收", "Imported": "已导入",
 
   "New comparison": "新建对比",
   "Comparison not found.": "未找到该对比记录。", "Compare": "对比详情", "Refresh": "刷新", "Export": "导出",
@@ -335,14 +330,11 @@ export const ZH: Record<string, string> = {
   "Key differences": "主要差异", "Unknown": "未知",
   "Dimension": "维度", "Overall": "总分", "AI draft": "AI 草稿", "Not provided": "未提供",
 
-  "Drag files here, or": "将文件拖到此处，或", "browse": "浏览",
-  "— registers a FileVersion, not a per-module copy.": "—— 会登记为一个文件版本，而非各模块各自留存一份副本。",
+  "browse": "浏览",
   "File": "文件", "Size": "大小", "Used by": "使用于",
-  "Attempt": "作答记录", "Question material": "题目材料", "Unassigned": "未分配",
+  "Attempt": "作答记录",
   "Download": "下载",
-  "last sync": "上次同步", "Reauthorize": "重新授权", "Auth required": "需要重新授权",
-  "Read now": "立即读取", "Pause": "暂停", "Connected": "已连接",
-  "Files": "文件", "Connections": "连接", "Activity": "动态",
+  "Connected": "已连接",
 
   "Theme": "主题", "Accent": "强调色", "Text size": "文字大小",
   "Light": "浅色", "Dark": "深色", "Deep": "深邃", "System": "跟随系统",
@@ -388,8 +380,7 @@ export const ZH: Record<string, string> = {
   "Could not delete this question. Please try again.": "题目删除失败，请重试。",
   "Add to favorites": "收藏", "Remove from favorites": "取消收藏", "Could not save this question. Please try again.": "题目保存失败，请重试。",
   "Could not load the question bank.": "题库加载失败。",
-  "Could not generate competencies. Please try again.": "能力项生成失败，请重试。", "Generating competencies…": "正在生成能力项…",
-  "Scoring competencies are generated automatically from the content when you create the question.": "创建题目时会根据题目内容自动生成评分能力项。",
+  "Could not generate competencies. Please try again.": "能力项生成失败，请重试。",
   "e.g. Design a high-throughput sorting module": "例如：设计一个高吞吐的排序模块",
   "Type or pick a role, press Enter to add": "输入或选择岗位，回车添加", "Add": "添加",
   "Published questions are offered as presets when adding questions for candidates of these roles.": "已发布的题目会在为这些岗位的候选人添加测评题目时作为预设题出现。",

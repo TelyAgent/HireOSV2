@@ -8,7 +8,11 @@
 import { CASES, CORE_APPLICATIONS, CORE_JOBS, INVITATIONS, PROJECT, RESULTS, TASKS, type CoreJob, type Task } from "../data/fixtures";
 
 export type WrittenTaskStatus =
-  | "written_completed"
+  | "handed_off"
+  | "closed"
+  | "on_hold"
+  | "pending_release"
+  | "awaiting_next_step"
   | "pending_result_review"
   | "waiting_result"
   | "pending_submission"
@@ -34,7 +38,12 @@ export function writtenTaskStatus(task: Task): WrittenTaskStatus {
     c?.status === "submitted";
 
   if (c?.supplementalPending) return "pending_submission";
-  if (task.status === "completed" || (c && ["completed", "released"].includes(c.status))) return "written_completed";
+  // Real cases: hireos-written-backend persists Case.status at every transition (see its
+  // CaseLifecycleService) -- that is authoritative. The derivation below is the fallback for
+  // fixture-only demo cases.
+  const persisted = c ? writtenStatusFromCase(c.status) : null;
+  if (persisted) return persisted;
+  if (task.status === "completed" || (c && ["completed", "released"].includes(c.status))) return "awaiting_next_step";
   if (task.type === "evaluation_review" || task.type === "result_release" || (c && ["review_pending", "evaluated"].includes(c.status))) return "pending_result_review";
   if (submitted && !result) return "waiting_result";
   if ((latestInvite && ["accepted", "started"].includes(latestInvite.status)) || (c && ["awaiting_submission", "started"].includes(c.status))) return "pending_submission";
@@ -43,16 +52,25 @@ export function writtenTaskStatus(task: Task): WrittenTaskStatus {
 }
 
 /**
- * The overall status of a case's assessment, derived from its latest invitation -- all of a case's
- * questions go out together in one invitation, so there is exactly one status for the whole batch
- * (never per question). Same mapping hireos-written-backend's TasksService uses for the task list,
- * so the candidate detail page and My Tasks always agree.
+ * Case.status (persisted by hireos-written-backend's CaseLifecycleService) -> the status shown in
+ * My Tasks and on the candidate detail page. All of a case's questions go out in one invitation, so
+ * there is exactly one status per case. Returns null for a status outside that state machine.
  */
-export function writtenStatusFromInvitation(invitationStatus: string | undefined, released = false): WrittenTaskStatus {
-  if (invitationStatus === "submitted") return released ? "written_completed" : "pending_result_review";
-  if (invitationStatus === "opened" || invitationStatus === "accepted" || invitationStatus === "started") return "pending_submission";
-  if (invitationStatus === "sent") return "test_sent";
-  return "pending_test";
+const CASE_STATUS_TO_WRITTEN: Record<string, WrittenTaskStatus> = {
+  linked: "pending_test",
+  invited: "test_sent",
+  awaiting_submission: "pending_submission",
+  review_pending: "pending_result_review",
+  finalized: "pending_release",
+  // Published, but not the end: HR still has to hand off to Interview, hold, or close testing.
+  released: "awaiting_next_step",
+  handed_off: "handed_off",
+  on_hold: "on_hold",
+  closed: "closed",
+};
+
+export function writtenStatusFromCase(caseStatus: string | undefined): WrittenTaskStatus | null {
+  return (caseStatus && CASE_STATUS_TO_WRITTEN[caseStatus]) || null;
 }
 
 export function writtenTaskJob(task: Task): CoreJob {
