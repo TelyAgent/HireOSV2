@@ -10,32 +10,45 @@ import { Modal } from "./ui/Overlays";
 /* ---------------------------------------------------------------
    Nav config — ported from the prototype's NAV_ITEMS/isActiveRoute.
    --------------------------------------------------------------- */
+const NAV_WORKSPACE_ITEMS = [
+  { to: "/settings/preferences", icon: "tune", label: "Settings", isActive: (p: string) => p.startsWith("/settings") },
+];
+
 interface NavItem {
   to: string;
   icon: string;
   label: string;
+  /** Pages that belong to this section only. */
   isActive: (pathname: string) => boolean;
 }
 const NAV_PRIMARY: NavItem[] = [
-  {
-    to: "/jobs",
-    icon: "work_outline",
-    label: "Jobs",
-    // Comparisons only exist in the context of a job's shortlist (entered from that job's
-    // screening workspace) -- there's no standalone "the comparison" to link to from a
-    // global nav item, so it highlights Jobs instead of getting its own entry.
-    isActive: (p) => p.startsWith("/jobs") || p.startsWith("/applications") || p.startsWith("/deliveries") || p.startsWith("/comparisons"),
-  },
-  {
-    to: "/library",
-    icon: "folder_shared",
-    label: "Resume Library",
-    isActive: (p) => p.startsWith("/library") || p.startsWith("/imports") || p.startsWith("/duplicates") || p.startsWith("/candidates"),
-  },
+  { to: "/jobs", icon: "work_outline", label: "Jobs", isActive: (p) => p.startsWith("/jobs") },
+  { to: "/library", icon: "folder_shared", label: "Resume Library", isActive: (p) => p.startsWith("/library") || p.startsWith("/imports") },
 ];
-const NAV_WORKSPACE: NavItem[] = [
-  { to: "/settings/preferences", icon: "tune", label: "Settings", isActive: (p) => p.startsWith("/settings") },
+
+/**
+ * Detail pages reachable from both Jobs and the Resume Library (a candidate, an application,
+ * a comparison...). They keep the section they were opened from highlighted instead of
+ * flipping the nav to a fixed owner; the value here is only used when opened directly.
+ */
+const SHARED_DETAIL_OWNER: Array<[prefix: string, owner: string]> = [
+  ["/candidates", "/library"],
+  ["/duplicates", "/library"],
+  ["/applications", "/jobs"],
+  ["/comparisons", "/jobs"],
+  ["/deliveries", "/jobs"],
 ];
+
+let lastSection: string | null = null;
+function activeSection(pathname: string): string | null {
+  const own = [...NAV_PRIMARY, ...NAV_WORKSPACE_ITEMS].find((item) => item.isActive(pathname));
+  if (own) {
+    lastSection = own.to;
+    return own.to;
+  }
+  const shared = SHARED_DETAIL_OWNER.find(([prefix]) => pathname.startsWith(prefix));
+  return shared ? (lastSection ?? shared[1]) : null;
+}
 
 export function TopBar() {
   const { state, t, toggleLang, toggleAppearance, toggleRoleSwitcher, person } = useStore();
@@ -80,7 +93,7 @@ export function TopBar() {
 function NavLinkItem({ item, collapsed }: { item: NavItem; collapsed: boolean }) {
   const { pathname } = useLocation();
   const { t } = useStore();
-  const active = item.isActive(pathname);
+  const active = activeSection(pathname) === item.to;
   const label = t(item.label);
   return (
     <Link
@@ -109,7 +122,7 @@ export function SideNav() {
       </div>
       <div className="sidenav-section">
         {!collapsed && <div className="sidenav-label">{t("Workspace")}</div>}
-        {NAV_WORKSPACE.map((item) => (
+        {NAV_WORKSPACE_ITEMS.map((item) => (
           <NavLinkItem key={item.to} item={item} collapsed={collapsed} />
         ))}
       </div>

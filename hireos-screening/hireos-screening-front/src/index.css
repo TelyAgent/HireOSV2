@@ -76,10 +76,6 @@ button{ font-family:inherit; }
 .tiny{ font-size:var(--fs-xs); color:var(--text-tertiary); }
 .mono{ font-family:var(--font-mono); font-variant-numeric:tabular-nums; }
 
-.breadcrumbs{ display:flex; align-items:center; gap:6px; font-size:var(--fs-sm); color:var(--text-secondary); margin-bottom:10px; flex-wrap:wrap; }
-.breadcrumbs a{ color:var(--text-secondary); }
-.breadcrumbs .sep{ color:var(--text-tertiary); }
-.breadcrumbs .current{ color:var(--text); font-weight:500; }
 
 .page-header{ display:flex; align-items:flex-start; justify-content:space-between; gap:16px; margin-bottom:18px; flex-wrap:wrap; }
 .page-header .actions{ display:flex; gap:8px; flex-wrap:wrap; }

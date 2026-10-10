@@ -1,7 +1,7 @@
 import { useEffect } from "react";
-import type { ButtonHTMLAttributes, ReactNode } from "react";
-import { Link as RouterLink } from "react-router-dom";
+import type { ButtonHTMLAttributes, CSSProperties, ReactNode } from "react";
 import { Icon } from "./Icons";
+import { useGoBack } from "../../lib/navigation";
 import { useStore } from "../../store/StoreContext";
 import { initialsOf, type Person } from "../../data/fixtures/people";
 import type { Task } from "../../data/fixtures/tasks";
@@ -157,24 +157,14 @@ export function CandidateAvatar({ id, name, size }: { id: string; name: string; 
 /* ---------------------------------------------------------------
    Page chrome
    --------------------------------------------------------------- */
-export interface CrumbItem {
-  label: string;
-  href?: string;
-}
-export function Breadcrumbs({ items }: { items: CrumbItem[] }) {
+/** History-aware back arrow — see `useGoBack`. `fallback` is used only without in-app history. */
+export function BackButton({ fallback, style }: { fallback: string; style?: CSSProperties }) {
+  const { t } = useStore();
+  const goBack = useGoBack(fallback);
   return (
-    <div className="breadcrumbs">
-      {items.map((it, i) => {
-        const isLast = i === items.length - 1;
-        if (isLast) return <span className="current" key={it.label}>{it.label}</span>;
-        return (
-          <span key={it.label} style={{ display: "contents" }}>
-            {it.href ? <RouterLink to={it.href}>{it.label}</RouterLink> : <span>{it.label}</span>}
-            <span className="sep">/</span>
-          </span>
-        );
-      })}
-    </div>
+    <button type="button" className="breadcrumb-back" style={{ marginBottom: 10, ...style }} title={t("Back")} aria-label={t("Back")} onClick={goBack}>
+      <Icon name="arrow_back" />
+    </button>
   );
 }
 
@@ -182,16 +172,17 @@ export function PageHeader({
   title,
   subtitle,
   actions,
-  crumbs,
+  back,
 }: {
   title: string;
   subtitle?: ReactNode;
   actions?: ReactNode;
-  crumbs?: CrumbItem[];
+  /** Shows a back arrow; the value is the fallback parent route when there's no history. */
+  back?: string;
 }) {
   return (
     <>
-      {crumbs && <Breadcrumbs items={crumbs} />}
+      {back && <BackButton fallback={back} />}
       <div className="page-header">
         <div>
           <h1 className="page-title">{title}</h1>

@@ -37,13 +37,12 @@ export async function updateJobCriteria(id: string, patch: UpdateJobCriteriaPatc
 }
 
 /** Confirming locks requirements/weights as the active scoring baseline —
- * screening can only run against a confirmed version. Existing evaluations
- * are NOT silently recomputed; they're left as-is (freshness is handled
- * elsewhere) and a fresh auto-match run is kicked off for the library. */
+ * screening can only run against a confirmed version. Existing evaluations and
+ * matches are NOT recomputed: re-matching the library is an explicit, background
+ * action (`runJobMatch`) so tweaking and re-confirming criteria stays instant. */
 export async function confirmJobCriteria(id: string, confirmedBy: "emma" | "daniel" | "morgan" = "daniel"): Promise<Job> {
   const job = await apiFetch<Job>(`/jobs/${id}/criteria/confirm`, { method: "POST", body: JSON.stringify({ confirmedBy }) });
   db.jobs[job.id] = job;
-  await apiFetch(`/jobs/${id}/match`, { method: "POST" });
   return job;
 }
 
@@ -71,7 +70,8 @@ export async function listJobBelowThreshold(id: string): Promise<BelowThresholdC
   return apiFetch(`/jobs/${id}/below-threshold`);
 }
 
-/** Re-runs auto-match of the resume library against this job's confirmed criteria. */
-export async function runJobMatch(id: string): Promise<{ status: string; candidatesScanned: number; recommendationsCreated: number }> {
+/** Queues a background re-match of the resume library against this job's confirmed
+ * criteria; returns immediately. New suggestions appear as each candidate finishes. */
+export async function runJobMatch(id: string): Promise<{ status: "queued"; candidatesQueued: number; alreadyPending: number }> {
   return apiFetch(`/jobs/${id}/match`, { method: "POST" });
 }

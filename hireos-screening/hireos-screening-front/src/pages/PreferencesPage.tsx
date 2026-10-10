@@ -553,7 +553,6 @@ export function PreferencesPage() {
       <PageHeader
         title={t("Preferences")}
         subtitle={t("Organization and Team layers govern official scoring. Personal views never change team results.")}
-        crumbs={[{ label: t("Settings"), href: "/settings/preferences" }, { label: t("Preferences") }]}
       />
 
       <CorporateMailboxSection />

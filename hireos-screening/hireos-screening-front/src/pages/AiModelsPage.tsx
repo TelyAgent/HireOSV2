@@ -137,7 +137,7 @@ export function AiModelsPage() {
       <PageHeader
         title={t("AI Models")}
         subtitle={t("Model routing, budgets and quality gates for every AI-assisted task in Screening.")}
-        crumbs={[{ label: t("Settings"), href: "/settings/preferences" }, { label: t("AI Models") }]}
+        back="/settings/preferences"
       />
       <UnderlineTabs
         tabs={[

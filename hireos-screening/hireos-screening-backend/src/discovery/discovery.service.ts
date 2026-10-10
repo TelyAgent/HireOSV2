@@ -123,6 +123,11 @@ export class DiscoveryService implements OnModuleInit, OnModuleDestroy {
     return result;
   }
 
+  /**
+   * Re-match the resume library against this job's confirmed criteria. Each candidate is an
+   * AI call, so this only queues one job-scoped auto-match per candidate on the background
+   * queue and returns right away; results show up as recommendations when each run finishes.
+   */
   async matchJob(identity: Identity, jobId: string) {
     const job = await this.db.job.findFirst({
       where: { id: jobId, workspaceId: identity.workspaceId, status: 'open' },
@@ -132,32 +137,25 @@ export class DiscoveryService implements OnModuleInit, OnModuleDestroy {
     if (!job.criteriaVersions[0]) throw new BadRequestException({ code: 'CRITERIA_NOT_CONFIRMED' });
     const candidates = await this.db.candidate.findMany({
       where: { workspaceId: identity.workspaceId, libraryStatus: 'available' },
-      include: CANDIDATE_MATCH_INCLUDE,
+      select: { id: true },
     });
-    const summaries = [];
-    for (const candidate of candidates) {
-      const run = await this.db.jobDiscoveryRun.create({
-        data: { workspaceId: identity.workspaceId, candidateId: candidate.id, jobId: job.id, status: 'running' },
-      });
-      const result = await this.matchCandidateForJob(identity.workspaceId, candidate, job, run.id);
-      const completed = await this.db.jobDiscoveryRun.update({
-        where: { id: run.id },
-        data: {
-          status: result.status,
-          jobsScanned: 1,
-          completedAt: new Date(),
-          reason: reasonFor(result.status),
-        },
-      });
-      summaries.push({ ...result, run: completed });
-    }
-    return {
-      jobId,
-      status: summaries.some((item) => item.status === 'recommendations_ready') ? 'recommendations_ready' : 'no_match',
-      candidatesScanned: candidates.length,
-      recommendationsCreated: summaries.reduce((sum, item) => sum + item.recommendationsCreated, 0),
-    };
+    // Clicking again while a run is still pending shouldn't stack duplicate work.
+    const pending = await this.db.processingJob.findMany({
+      where: {
+        workspaceId: identity.workspaceId,
+        type: AUTO_MATCH_JOB,
+        status: { in: ['queued', 'running'] },
+        candidateId: { in: candidates.map((c) => c.id) },
+        input: { path: ['jobId'], equals: jobId },
+      },
+      select: { candidateId: true },
+    });
+    const alreadyPending = new Set(pending.map((p) => p.candidateId));
+    const toQueue = candidates.filter((c) => !alreadyPending.has(c.id));
+    for (const candidate of toQueue) await this.enqueueAutoMatch(identity.workspaceId, candidate.id, jobId);
+    return { jobId, status: 'queued', candidatesQueued: toQueue.length, alreadyPending: alreadyPending.size };
   }
+
 
   async listJobRecommendations(identity: Identity, jobId: string) {
     const job = await this.db.job.findFirst({ where: { id: jobId, workspaceId: identity.workspaceId }, select: { id: true } });

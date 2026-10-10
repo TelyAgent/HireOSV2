@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { Link, useParams } from "react-router-dom";
+import { useParams } from "react-router-dom";
 import { useStore } from "../store/StoreContext";
 import { confirmJobCriteria, getJobDetail, reopenJobCriteriaForEdit, updateJobCriteria } from "../data/api/jobs";
 import { DIMENSION_POOL } from "../data/fixtures/jobs";
@@ -70,7 +70,12 @@ export function JobCriteriaPage() {
   const [requirements, setRequirements] = useState<Requirement[]>([]);
   const [dimensions, setDimensions] = useState<Dimension[]>([]);
   const [touched, setTouched] = useState(false);
-  const [confirmStep, setConfirmStep] = useState<"none" | "touched-warning" | "confirm-version" | "reopen">("none");
+  const [confirmStep, setConfirmStep] = useState<"none" | "touched-warning" | "confirm-version">("none");
+  // Edits stay in the page until "Confirm this version" -- nothing is saved as a draft on the
+  // server, so backing out of the page leaves nothing behind. `editingNew` = editing a new
+  // version of an already-confirmed one.
+  const [editingNew, setEditingNew] = useState(false);
+  const [confirming, setConfirming] = useState(false);
 
   const load = useCallback(() => {
     getJobDetail(id)
@@ -79,6 +84,7 @@ export function JobCriteriaPage() {
         setRequirements(j.requirements);
         setDimensions(j.dimensions);
         setTouched(false);
+        setEditingNew(false);
       })
       .catch(() => setJob(null));
   }, [id]);
@@ -90,7 +96,7 @@ export function JobCriteriaPage() {
   if (job === undefined) return null;
   if (job === null) return <EmptyState icon="work_off" title={t("Job not found")} />;
 
-  const editable = job.criteriaStatus !== "confirmed";
+  const editable = job.criteriaStatus !== "confirmed" || editingNew;
   const weightSum = dimensions.reduce((s, d) => s + d.weight, 0);
   const weightOk = Math.abs(weightSum - 1) < 0.001;
   const countOk = dimensions.length >= 3 && dimensions.length <= 8;
@@ -99,31 +105,27 @@ export function JobCriteriaPage() {
   const usedNames = new Set(dimensions.map((d) => d.name));
   const remainingPool = DIMENSION_POOL.filter((n) => !usedNames.has(n));
 
-  const persist = (nextReq: Requirement[], nextDims: Dimension[]) => {
-    setTouched(true);
-    void updateJobCriteria(job.id, { requirements: nextReq, dimensions: nextDims });
-  };
 
   const addRequirement = () => {
     const next = [...requirements, { id: uid("req"), label: "", dimension: dimensions[0]?.id || "", priority: "must_have" as const, hard: true, kind: "other" as const }];
     setRequirements(next);
-    persist(next, dimensions);
+    setTouched(true);
   };
   const removeRequirement = (reqId: string) => {
     const next = requirements.filter((r) => r.id !== reqId);
     setRequirements(next);
-    persist(next, dimensions);
+    setTouched(true);
   };
   const updateRequirement = (reqId: string, patch: Partial<Requirement>) => {
     const next = requirements.map((r) => (r.id === reqId ? { ...r, ...patch } : r));
     setRequirements(next);
-    persist(next, dimensions);
+    setTouched(true);
   };
   const addDimension = (name: string) => {
     if (!name || dimensions.length >= 8 || dimensions.some((d) => d.name === name)) return;
     const next = [...dimensions, { id: uid("dim"), name, weight: 0, rubric: t("Describe how this dimension should be evaluated for this role.") }];
     setDimensions(next);
-    persist(requirements, next);
+    setTouched(true);
   };
   const removeDimension = (dimId: string) => {
     if (dimensions.length <= 3) {
@@ -132,18 +134,18 @@ export function JobCriteriaPage() {
     }
     const next = dimensions.filter((d) => d.id !== dimId);
     setDimensions(next);
-    persist(requirements, next);
+    setTouched(true);
   };
   const updateDimensionWeight = (dimId: string, pctValue: string) => {
     const v = parseFloat(pctValue);
     const next = dimensions.map((d) => (d.id === dimId ? { ...d, weight: isNaN(v) ? 0 : Math.max(0, v) / 100 } : d));
     setDimensions(next);
-    persist(requirements, next);
+    setTouched(true);
   };
   const updateDimensionRubric = (dimId: string, text: string) => {
     const next = dimensions.map((d) => (d.id === dimId ? { ...d, rubric: text } : d));
     setDimensions(next);
-    persist(requirements, next);
+    setTouched(true);
   };
   const distributeEvenly = () => {
     const n = dimensions.length;
@@ -151,16 +153,35 @@ export function JobCriteriaPage() {
     const even = Math.floor((1 / n) * 1000) / 1000;
     const next = dimensions.map((d, i) => ({ ...d, weight: i === n - 1 ? round2(1 - even * (n - 1)) : even }));
     setDimensions(next);
-    persist(requirements, next);
+    setTouched(true);
     say(t("Weights distributed evenly"));
   };
 
   const doConfirm = async () => {
-    await updateJobCriteria(job.id, { requirements, dimensions });
-    const updated = await confirmJobCriteria(job.id, state.currentUser);
-    setJob(updated);
-    setConfirmStep("none");
-    say(t("Requirements confirmed"), { type: "success" });
+    setConfirming(true);
+    try {
+      if (editingNew) await reopenJobCriteriaForEdit(job.id);
+      await updateJobCriteria(job.id, { requirements, dimensions });
+      const updated = await confirmJobCriteria(job.id, state.currentUser);
+      setJob(updated);
+      setRequirements(updated.requirements);
+      setDimensions(updated.dimensions);
+      setEditingNew(false);
+      setTouched(false);
+      say(t("Requirements confirmed — use “Match again” in the screening workspace to re-match the library against this version"), { type: "success" });
+    } catch {
+      say(t("Could not confirm this version — please try again"), { type: "error" });
+    } finally {
+      setConfirming(false);
+      setConfirmStep("none");
+    }
+  };
+
+  const cancelEditing = () => {
+    setRequirements(job.requirements);
+    setDimensions(job.dimensions);
+    setTouched(false);
+    setEditingNew(false);
   };
 
   const handleConfirmClick = () => {
@@ -168,15 +189,6 @@ export function JobCriteriaPage() {
     const wasFirstConfirm = !job.criteriaVersion || job.criteriaVersion === 0;
     if (wasFirstConfirm && !touched) setConfirmStep("touched-warning");
     else setConfirmStep("confirm-version");
-  };
-
-  const doReopen = async () => {
-    const updated = await reopenJobCriteriaForEdit(job.id);
-    setJob(updated);
-    setRequirements(updated.requirements);
-    setDimensions(updated.dimensions);
-    setConfirmStep("none");
-    say(t("Draft opened — edit and confirm to publish a new version"));
   };
 
   return (
@@ -188,31 +200,51 @@ export function JobCriteriaPage() {
             {job.team} · {job.location} · <JobStatusBadge status={job.status} />
           </>
         }
-        crumbs={[{ label: t("Jobs"), href: "/jobs" }, { label: job.title }]}
+        back={`/jobs/${job.id}/screening`}
         actions={
           <>
-            {job.criteriaStatus === "confirmed" ? (
+            {job.criteriaStatus === "confirmed" && !editingNew ? (
               <>
                 <span className="badge badge-success" style={{ padding: "7px 14px" }}>
                   {t("Confirmed")} v{job.criteriaVersion}
                 </span>
-                <Button variant="secondary" onClick={() => setConfirmStep("reopen")}>
+                <Button variant="secondary" onClick={() => setEditingNew(true)}>
                   {t("Edit as new version")}
                 </Button>
               </>
             ) : (
-              <Button variant="primary" disabled={!canConfirm} onClick={handleConfirmClick}>
-                {t("Confirm this version")}
-              </Button>
+              <>
+                {editingNew && (
+                  <Button variant="secondary" onClick={cancelEditing} disabled={confirming}>
+                    {t("Cancel editing")}
+                  </Button>
+                )}
+                <Button
+                  variant="primary"
+                  disabled={!canConfirm || confirming || (editingNew && !touched)}
+                  title={editingNew && !touched ? t("Make a change before confirming a new version") : undefined}
+                  onClick={handleConfirmClick}
+                >
+                  {t("Confirm this version")}
+                </Button>
+              </>
             )}
-            <Link className="btn btn-secondary" to={`/jobs/${job.id}/screening`}>
-              {t("Open screening workspace")}
-            </Link>
           </>
         }
       />
 
-      {editable && !touched && (
+      {editingNew && (
+        <div className="card card-pad" style={{ marginBottom: 16, background: "var(--info-bg, var(--surface-alt))" }}>
+          <div className="flex items-center gap-8">
+            <Icon name="edit_note" />
+            <p style={{ fontSize: "var(--fs-sm)", margin: 0 }}>
+              {t("Editing a new version of v{n}. Changes are not saved until you confirm — v{n} stays in effect until then.").replace(/\{n\}/g, String(job.criteriaVersion))}
+            </p>
+          </div>
+        </div>
+      )}
+
+      {editable && !editingNew && !touched && !job.criteriaVersion && (
         <div className="card card-pad" style={{ marginBottom: 16, background: "var(--warning-bg)", borderColor: "var(--warning-border)" }}>
           <div className="flex items-center gap-8">
             <Icon name="info" style={{ color: "var(--warning-text)" }} />
@@ -235,7 +267,7 @@ export function JobCriteriaPage() {
           </div>
           {editable && (
             <Button variant="secondary" size="sm" icon="add" onClick={addRequirement}>
-              Add requirement
+              {t("Add requirement")}
             </Button>
           )}
         </div>
@@ -257,7 +289,7 @@ export function JobCriteriaPage() {
                 editable ? (
                   <tr key={r.id}>
                     <td>
-                      <input type="text" value={r.label} placeholder="e.g. 5+ years relevant experience" style={{ width: "100%" }} onChange={(e) => updateRequirement(r.id, { label: e.target.value })} />
+                      <input type="text" value={r.label} placeholder={t("e.g. 5+ years relevant experience")} style={{ width: "100%" }} onChange={(e) => updateRequirement(r.id, { label: e.target.value })} />
                     </td>
                     <td>
                       <select value={r.priority} onChange={(e) => updateRequirement(r.id, { priority: e.target.value as Requirement["priority"] })}>
@@ -360,9 +392,9 @@ export function JobCriteriaPage() {
         <ConfirmDialog
           open
           onClose={() => setConfirmStep("none")}
-          title="Scoring dimensions are still the default starting point"
-          body="These dimensions and weights have not been adjusted for this role yet — they're the system's neutral default, not a reviewed rubric. Confirm anyway?"
-          confirmLabel="Confirm anyway"
+          title={t("Scoring dimensions are still the default starting point")}
+          body={t("These dimensions and weights have not been adjusted for this role yet — they're the system's neutral default, not a reviewed rubric. Confirm anyway?")}
+          confirmLabel={t("Confirm anyway")}
           danger
           onConfirm={() => setConfirmStep("confirm-version")}
         />
@@ -375,16 +407,6 @@ export function JobCriteriaPage() {
           body={t("Confirming locks these requirements and weights as the active scoring baseline for this job. Screening can only run against a confirmed version.")}
           confirmLabel={t("Confirm version")}
           onConfirm={doConfirm}
-        />
-      )}
-      {confirmStep === "reopen" && (
-        <ConfirmDialog
-          open
-          onClose={() => setConfirmStep("none")}
-          title="Edit as new version"
-          body="This opens a new draft based on the currently confirmed requirements. The confirmed version stays in effect for existing evaluations until the new draft is confirmed."
-          confirmLabel="Start new draft"
-          onConfirm={doReopen}
         />
       )}
     </>
@@ -401,7 +423,7 @@ function DimensionPicker({ options, onAdd, disabled }: { options: string[]; onAd
   return (
     <div className="flex items-center gap-8">
       <select value={value} onChange={(e) => setValue(e.target.value)} disabled={options.length === 0}>
-        {options.length ? options.map((n) => <option value={n} key={n}>{n}</option>) : <option>All pool dimensions in use</option>}
+        {options.length ? options.map((n) => <option value={n} key={n}>{n}</option>) : <option>{t("All pool dimensions in use")}</option>}
       </select>
       <Button variant="secondary" size="sm" icon="add" disabled={disabled || !options.length} onClick={() => onAdd(value)}>
         {t("Add dimension")}

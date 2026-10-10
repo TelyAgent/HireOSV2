@@ -56,7 +56,7 @@ export function DuplicateDetailPage() {
     const resolver = review.resolutionBy ? getPerson(review.resolutionBy) : null;
     return (
       <>
-        <PageHeader title={t("Duplicate review — resolved")} crumbs={[{ label: t("Resume Library"), href: "/library" }, { label: t("Duplicate review") }]} />
+        <PageHeader title={t("Duplicate review — resolved")} back="/library" />
         <div className="card card-pad">
           <div className="badge badge-success" style={{ marginBottom: 10 }}>
             {t("Resolved:")} {t(review.resolutionLabel || (review.resolutionOutcome ? RESOLUTION_LABEL[review.resolutionOutcome] : ""))}
@@ -75,7 +75,7 @@ export function DuplicateDetailPage() {
 
   return (
     <>
-      <PageHeader title={t("Duplicate review")} subtitle={t(kindCopy.desc)} crumbs={[{ label: t("Resume Library"), href: "/library" }, { label: t("Duplicate review") }]} />
+      <PageHeader title={t("Duplicate review")} subtitle={t(kindCopy.desc)} back="/library" />
       <div className={`badge ${review.kind === "exact_file" ? "badge-neutral" : "badge-warning"}`} style={{ marginBottom: 16, fontSize: "var(--fs-sm)", padding: "6px 14px" }}>
         {t(kindCopy.title)}
       </div>

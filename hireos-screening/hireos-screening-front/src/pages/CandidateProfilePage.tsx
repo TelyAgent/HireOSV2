@@ -335,7 +335,7 @@ export function CandidateProfilePage() {
       <PageHeader
         title={candidate.displayName}
         subtitle={`${state.lang === "zh" ? `入库时间：${fmtDate(candidate.createdAt, state.lang)}` : `In library since ${fmtDate(candidate.createdAt, state.lang)}`} · ${t("Owner:")} ${owner?.name}`}
-        crumbs={[{ label: t("Resume Library"), href: "/library" }, { label: candidate.displayName }]}
+        back="/library"
         actions={
           <>
             <Button variant="secondary" icon="edit" onClick={() => setShowCorrect(true)}>

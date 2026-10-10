@@ -83,12 +83,16 @@ export class JobCriteriaFacade {
   }
 
   async reopen(identity: Identity, jobId: string): Promise<RemoteCriteriaProjection> {
+    // JD records reopen idempotency per job, so the key must be unique per confirmed version
+    // being reopened: a fixed per-job key makes every later reopen of the same job collide with
+    // the first one (IDEMPOTENCY_CONFLICT), while retrying the same reopen stays idempotent.
+    const current = await this.get(identity, jobId);
     const response = await this.request(
       `/jobs/${jobId}/drafts/current/reopen`,
       identity,
       'POST',
       {},
-      `screening:criteria:reopen:${identity.workspaceId}:${jobId}`,
+      `screening:criteria:reopen:${identity.workspaceId}:${jobId}:v${current?.versionNo ?? 0}`,
     );
     const body = await parseBody(response);
     if (!response.ok) throw this.toException(response.status, body);

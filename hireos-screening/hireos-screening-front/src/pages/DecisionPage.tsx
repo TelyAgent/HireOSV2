@@ -76,12 +76,7 @@ function AlreadyDecidedView({ app }: { app: Application }) {
       <PageHeader
         title={`${t("Decision —")} ${cand.displayName}`}
         subtitle={job.title}
-        crumbs={[{ label: t("Jobs"), href: "/jobs" }, { label: job.title, href: `/jobs/${job.id}/screening` }, { label: cand.displayName, href: `/applications/${app.id}` }, { label: t("Decision") }]}
-        actions={
-          <Link className="btn btn-secondary" to={`/applications/${app.id}`}>
-            {t("Back to screening")}
-          </Link>
-        }
+        back={`/applications/${app.id}`}
       />
       <div className="card card-pad" style={{ marginBottom: 16 }}>
         <div className="flex items-center gap-10" style={{ marginBottom: 8 }}>
@@ -246,12 +241,7 @@ export function DecisionPage() {
       <PageHeader
         title={`${t("Decision & next steps —")} ${cand.displayName}`}
         subtitle={`${job.title} · ${t("This candidate’s decision only — Comparison and other candidates are unaffected.")}`}
-        crumbs={[{ label: t("Jobs"), href: "/jobs" }, { label: job.title, href: `/jobs/${job.id}/screening` }, { label: cand.displayName, href: `/applications/${app.id}` }, { label: t("Decision") }]}
-        actions={
-          <Link className="btn btn-secondary" to={`/applications/${app.id}`}>
-            {t("Back to screening")}
-          </Link>
-        }
+        back={`/applications/${app.id}`}
       />
 
       <div className="two-col" style={{ gridTemplateColumns: "340px 1fr" }}>

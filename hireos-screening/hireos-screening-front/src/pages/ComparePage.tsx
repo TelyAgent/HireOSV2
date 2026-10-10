@@ -428,7 +428,7 @@ export function ComparePage() {
       <PageHeader
         title={t("Compare candidates")}
         subtitle={`${job.title} · ${cmp.purpose}`}
-        crumbs={[{ label: t("Jobs"), href: "/jobs" }, { label: job.title, href: `/jobs/${job.id}/screening` }, { label: t("Compare") }]}
+        back={`/jobs/${job.id}/screening`}
         actions={
           <>
             <Button variant="secondary" icon="person_add" onClick={() => setShowAdd(true)}>

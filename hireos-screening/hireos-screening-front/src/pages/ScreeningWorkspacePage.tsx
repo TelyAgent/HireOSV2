@@ -14,6 +14,7 @@ import { Icon } from "../components/ui/Icons";
 import { ResumeImportModal, type ImportTab } from "../features/imports/ResumeImportPanel";
 import { confidenceLabel, inferRecommendation } from "../lib/scoring";
 import {
+  BackButton,
   Badge,
   Button,
   CandidateAvatar,
@@ -177,9 +178,13 @@ export function ScreeningWorkspacePage() {
     if (!job) return;
     setMatching(true);
     try {
-      await runJobMatch(job.id);
-      say(t("Matching started — new suggestions will appear here"), { type: "success" });
-      await load();
+      const result = await runJobMatch(job.id);
+      say(
+        result.candidatesQueued > 0 || result.alreadyPending > 0
+          ? t("Matching started in the background — new suggestions will appear here as each resume finishes")
+          : t("No resumes in the library to match"),
+        { type: "success" },
+      );
     } catch {
       say(t("Could not start matching."), { type: "error" });
     } finally {
@@ -205,9 +210,7 @@ export function ScreeningWorkspacePage() {
     <div className="screening-workspace">
       <div className="screening-toolbar ws-head">
         <div>
-          <button type="button" className="breadcrumb-back" style={{ marginBottom: 10 }} title={t("Back to jobs")} aria-label={t("Back to jobs")} onClick={() => navigate("/jobs")}>
-            <Icon name="arrow_back" />
-          </button>
+          <BackButton fallback="/jobs" />
           <div className="job-title-line">
             <h2 style={{ margin: 0, fontSize: "var(--fs-h1)", lineHeight: 1.2 }}>{job.title}</h2>
           </div>
@@ -221,9 +224,21 @@ export function ScreeningWorkspacePage() {
 
       <div className="candidate-section-heading">
         {t("AI Suggested candidates")} <span className="cnt">{suggested.length}</span>
-        <Link className="btn btn-sm btn-secondary heading-action" to={`/jobs/${job.id}/criteria`}>
-          {t("Requirements & rubric")}
-        </Link>
+        <span className="heading-action flex gap-8">
+          <Button
+            size="sm"
+            variant="secondary"
+            icon="refresh"
+            onClick={handleMatchAgain}
+            disabled={matching || job.criteriaStatus !== "confirmed"}
+            title={job.criteriaStatus !== "confirmed" ? t("Confirm the job criteria before matching") : t("Re-match the resume library against the current criteria")}
+          >
+            {t("Match again")}
+          </Button>
+          <Link className="btn btn-sm btn-secondary" to={`/jobs/${job.id}/criteria`}>
+            {t("Requirements & rubric")}
+          </Link>
+        </span>
       </div>
       <div className="card ws-card">
         {suggested.length ? (

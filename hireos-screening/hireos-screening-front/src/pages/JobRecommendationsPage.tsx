@@ -219,7 +219,7 @@ export function JobRecommendationsPage() {
         <PageHeader
           title={t("Job recommendations")}
           subtitle={candidate.displayName}
-          crumbs={[{ label: t("Resume Library"), href: "/library" }, { label: candidate.displayName, href: `/candidates/${candidate.id}` }, { label: t("Job recommendations") }]}
+          back={`/candidates/${candidate.id}`}
         />
         <div className="card">
           <NoJobState
@@ -245,7 +245,7 @@ export function JobRecommendationsPage() {
       <PageHeader
         title={t("Job recommendations")}
         subtitle={subtitle}
-        crumbs={[{ label: t("Resume Library"), href: "/library" }, { label: candidate.displayName, href: `/candidates/${candidate.id}` }, { label: t("Job recommendations") }]}
+        back={`/candidates/${candidate.id}`}
       />
       <div className="flex-col gap-16">
         {recommendations.map((rec) => {

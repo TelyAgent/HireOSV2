@@ -363,7 +363,7 @@ export function ScreeningDetailPage() {
         <PageHeader
           title={`${candidate.displayName} — ${job.title}`}
           subtitle={inProgress || running ? t("Linked, screening in progress.") : t("Linked, screening not yet run.")}
-          crumbs={[{ label: t("Jobs"), href: "/jobs" }, { label: job.title, href: `/jobs/${job.id}/screening` }, { label: candidate.displayName }]}
+          back={`/jobs/${job.id}/screening`}
         />
         <div className="card">
           <EmptyState
@@ -400,7 +400,7 @@ export function ScreeningDetailPage() {
             {application.assessmentStatus === "completed" ? t("Assessment: completed") : t("Assessment: not administered")}
           </>
         }
-        crumbs={[{ label: t("Jobs"), href: "/jobs" }, { label: job.title, href: `/jobs/${job.id}/screening` }, { label: candidate.displayName }]}
+        back={`/jobs/${job.id}/screening`}
         actions={
           <>
             {evaluation.freshness === "stale" && (

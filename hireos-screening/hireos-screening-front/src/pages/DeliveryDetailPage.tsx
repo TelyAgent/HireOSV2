@@ -124,12 +124,9 @@ export function DeliveryDetailPage() {
       <PageHeader
         title={`${t("Package —")} ${cand.displayName}`}
         subtitle={job.title}
-        crumbs={[{ label: t("Deliveries"), href: "/deliveries" }, { label: cand.displayName }]}
+        back="/deliveries"
         actions={
           <>
-            <Link className="btn btn-secondary" to="/deliveries">
-              {t("All deliveries")}
-            </Link>
             {app && (
               <Link className="btn btn-secondary" to={`/applications/${app.id}`}>
                 {t("Open screening")}
