@@ -37,6 +37,17 @@ const RESTRICTED_VIEWERS = ["emma", "daniel"];
 function cap(s: string): string {
   return s ? s.charAt(0).toUpperCase() + s.slice(1) : s;
 }
+/** Concern titles and verification questions are generated server-side in English around the
+ * requirement text (which is already in the job's language) -- translate the fixed wrapper. */
+function concernTitle(title: string, t: (s: string) => string) {
+  const m = /^(.*) is not confirmed$/s.exec(title);
+  return m ? t("{label} is not confirmed").replace("{label}", m[1]) : title;
+}
+function verificationQuestion(question: string, t: (s: string) => string) {
+  const m = /^Please confirm: (.*)$/s.exec(question);
+  return m ? t("Please confirm: {label}").replace("{label}", m[1]) : question;
+}
+
 function severityTone(sev: Concern["severity"]): "danger" | "warning" | "outline" {
   if (sev === "blocker" || sev === "high") return "danger";
   if (sev === "medium") return "warning";
@@ -114,7 +125,7 @@ function ConcernRow({ concern, onResolve }: { concern: Concern; onResolve: (id: 
       <div className="flex items-center justify-between flex-wrap gap-8">
         <div>
           <div style={{ fontWeight: 500, fontSize: "var(--fs-sm)" }}>
-            {restricted ? t("Restricted concern — visible to authorized HR/HM roles only") : concern.title}{" "}
+            {restricted ? t("Restricted concern — visible to authorized HR/HM roles only") : concernTitle(concern.title, t)}{" "}
             <Badge tone={severityTone(concern.severity)}>{t(cap(concern.severity))}</Badge>
           </div>
           <div className="tiny">
@@ -168,19 +179,24 @@ function VerificationRow({
     <div className="card-pad" style={{ borderBottom: "1px solid var(--border)" }}>
       <div className="flex items-center justify-between flex-wrap gap-8">
         <div>
-          <div style={{ fontWeight: 500, fontSize: "var(--fs-sm)" }}>{item.question}</div>
+          <div style={{ fontWeight: 500, fontSize: "var(--fs-sm)" }}>{verificationQuestion(item.question, t)}</div>
           <div className="tiny">
             {t("Method:")} {t(cap(item.method.replace(/_/g, " ")))} · {t("Target:")} {t(cap(item.targetStage))} · {t("Priority")}: {t(cap(item.priority))}
             {owner ? ` · ${t("Owner:")} ${owner.name}` : ""}
           </div>
         </div>
         <div className="flex gap-6 items-center">
-          <Badge tone={item.status === "resolved" ? "success" : item.status === "open" ? "info" : "outline"}>{t(cap(item.status.replace(/_/g, " ")))}</Badge>
+          <Badge tone={item.status === "resolved" ? (item.outcome === "not_met" ? "danger" : "success") : item.status === "open" ? "info" : "outline"}>
+            {t(cap(item.status.replace(/_/g, " ")))}
+            {item.status === "resolved" && item.outcome ? ` — ${t(cap(item.outcome.replace(/_/g, " ")))}` : ""}
+          </Badge>
           {item.status === "open" && (
+            <Button variant="secondary" size="sm" onClick={() => onAssign(item.id)}>
+              {t("Assign to me")}
+            </Button>
+          )}
+          {(item.status === "open" || item.status === "assigned") && (
             <>
-              <Button variant="secondary" size="sm" onClick={() => onAssign(item.id)}>
-                {t("Assign to me")}
-              </Button>
               <Button variant="secondary" size="sm" onClick={() => onResolve(item.id, "met")}>
                 {t("Mark met")}
               </Button>
@@ -482,7 +498,7 @@ export function ScreeningDetailPage() {
               <ul style={{ margin: 0, paddingLeft: 18, fontSize: "var(--fs-sm)" }}>
                 {openConcerns.slice(0, 3).map((c) => (
                   <li key={c.id}>
-                    {c.title} <Badge tone={severityTone(c.severity)}>{t(cap(c.severity))}</Badge>
+                    {concernTitle(c.title, t)} <Badge tone={severityTone(c.severity)}>{t(cap(c.severity))}</Badge>
                   </li>
                 ))}
               </ul>

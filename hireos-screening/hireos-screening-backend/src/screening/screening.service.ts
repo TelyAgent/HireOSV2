@@ -199,11 +199,52 @@ export class ScreeningService {
       where: { id: itemId, workspaceId: identity.workspaceId },
     });
     if (!item) throw new NotFoundException({ code: 'NOT_FOUND' });
-    const updated = await this.db.verificationItem.update({
-      where: { id: itemId },
-      data: { status: 'resolved', outcome, resolvedBy: identity.actorId, resolvedAt: new Date() },
+    const updated = await this.db.$transaction(async (tx) => {
+      const resolved = await tx.verificationItem.update({
+        where: { id: itemId },
+        data: { status: 'resolved', outcome, resolvedBy: identity.actorId, resolvedAt: new Date() },
+      });
+      await this.applyVerificationOutcome(tx, item.workspaceId, item.evaluationId, itemId, outcome as 'met' | 'not_met');
+      return resolved;
     });
     return serializeVerificationItem(updated);
+  }
+
+  /**
+   * A verification item exists because a hard requirement came back `unknown`. Resolving it
+   * answers that requirement: write the outcome into the evaluation's eligibility results,
+   * re-aggregate eligibility, and close the matching "not confirmed" concern -- otherwise the
+   * evaluation keeps saying "needs verification" after everything was verified.
+   */
+  private async applyVerificationOutcome(
+    tx: Prisma.TransactionClient,
+    workspaceId: string,
+    evaluationId: string,
+    itemId: string,
+    outcome: 'met' | 'not_met',
+  ) {
+    const concerns = await tx.screeningConcern.findMany({ where: { workspaceId, evaluationId } });
+    const linked = concerns.filter((c) => asStringArray(c.verificationItemIds).includes(itemId));
+    const requirementIds = new Set(linked.flatMap((c) => asStringArray(c.requirementIds)));
+    for (const concern of linked) {
+      if (concern.status !== 'open') continue;
+      const resolution = outcome === 'met' ? 'dismissed' : 'confirmed';
+      await tx.screeningConcern.update({ where: { id: concern.id }, data: { status: resolution, resolution } });
+    }
+    if (!requirementIds.size) return;
+
+    const evaluation = await tx.screeningEvaluation.findUnique({ where: { id: evaluationId }, select: { eligibilityResults: true } });
+    if (!evaluation) return;
+    const results = (Array.isArray(evaluation.eligibilityResults) ? evaluation.eligibilityResults : []) as Array<Record<string, unknown> & { requirementId?: string; status?: string }>;
+    const next = results.map((r) =>
+      r.requirementId && requirementIds.has(r.requirementId)
+        ? { ...r, status: outcome, reason: outcome === 'met' ? 'Confirmed by a reviewer during verification.' : 'Not met, per reviewer verification.' }
+        : r,
+    );
+    await tx.screeningEvaluation.update({
+      where: { id: evaluationId },
+      data: { eligibilityResults: json(next), eligibilityStatus: aggregateEligibility(next as Array<{ status: string }>) },
+    });
   }
 
   private async createEvaluation(
@@ -657,6 +698,10 @@ function evaluateRequirement(requirement: RequirementInput, profile: any, corpus
     return { requirementId: requirement.id, status: 'met' as const, reason: 'The source corpus contains a matching skill term.' };
   }
   return { requirementId: requirement.id, status: 'unknown' as const, reason: 'The available material does not establish this requirement conclusively.' };
+}
+
+function asStringArray(value: unknown): string[] {
+  return Array.isArray(value) ? value.filter((v): v is string => typeof v === 'string') : [];
 }
 
 function aggregateEligibility(results: Array<{ status: string }>) {
