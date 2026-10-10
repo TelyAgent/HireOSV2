@@ -1,4 +1,5 @@
 import { BadRequestException, Body, Controller, Delete, Get, Headers, Param, Patch, Query, Req, UseGuards } from '@nestjs/common';
+import { z } from 'zod';
 import { WorkspaceGuard, type Identity } from '../auth/workspace.guard';
 import { CoreRecordClient } from '../core/core-record.client';
 
@@ -9,6 +10,19 @@ import { CoreRecordClient } from '../core/core-record.client';
  * hiring manager, approval state, active role version, ...) with sensible defaults where this response
  * doesn't have them.
  */
+/** Job fields edited in place under the document title (Core Record's own field names). */
+const updateFieldsSchema = z
+  .object({
+    title: z.string().trim().min(1).max(200),
+    team: z.string().trim().max(200),
+    location: z.string().trim().min(1).max(200),
+    employmentType: z.string().trim().max(80),
+    seniority: z.string().trim().min(1).max(80),
+    openings: z.number().int().positive().max(10000),
+  })
+  .partial()
+  .refine((x) => Object.keys(x).length > 0, { message: 'Nothing to update.' });
+
 @Controller('jobs')
 @UseGuards(WorkspaceGuard)
 export class JobsController {
@@ -47,6 +61,20 @@ export class JobsController {
       { status: coreStatus, reason: body.status === 'published' ? 'published' : 'unpublished' },
       idempotencyKey,
     );
+  }
+
+  @Patch(':id')
+  updateFields(
+    @Req() req: { identity: Identity },
+    @Headers() headers: Record<string, string | undefined>,
+    @Param('id') id: string,
+    @Body() body: unknown,
+  ) {
+    const idempotencyKey = headers['idempotency-key']?.trim();
+    if (!idempotencyKey) throw new BadRequestException({ code: 'IDEMPOTENCY_KEY_REQUIRED' });
+    const parsed = updateFieldsSchema.safeParse(body);
+    if (!parsed.success) throw new BadRequestException({ code: 'INVALID_JOB_FIELDS', message: parsed.error.message });
+    return this.coreRecord.updateJob(req.identity, id, parsed.data, idempotencyKey);
   }
 
   @Delete(':id')

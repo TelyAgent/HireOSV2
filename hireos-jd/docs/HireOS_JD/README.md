@@ -17,7 +17,7 @@ python3 -m http.server 8847
 ## 当前功能（编辑页 `#/jobs/:id/document`）
 1. **块编辑器**：章节（h2）+ 段落/要点；每块有可见范围 Public / Internal / Confidential；可拖拽排序、删除；章节默认顺序：标题概述 → Responsibilities → Requirements → Preferred → Compensation → Success in the first 90 days。
 2. **标题下字段**：Location / Headcount / Level 为必填（空时红色虚线标记）；"Add field" 可按需添加选填字段（部门、团队、雇佣类型、工作方式、用人经理、招聘负责人、汇报对象、招聘原因、优先级、到岗/截止日期）。
-3. **必填检查（按完整性标准）**：共 10 项必填：职位名称、级别、地点、招聘人数、职位概述、核心职责、任职要求、每块有可见范围、JD 唯一 ID、语言版本。
+3. **必填检查（按完整性标准）**：共 11 项必填：职位名称、级别、地点、招聘人数、职位概述、核心职责、任职要求、对外薪资范围、每块有可见范围、JD 唯一 ID、语言版本。
    - 缺失：文档内红色占位块（按章节默认顺序出现在应在的位置），提供 "AI draft" / "Fill in"。
    - **待修改（Weak）**：已填写但命中常见缺陷（营销词/内部编号、Junior 要求 5 年+、Remote 无地区、概述少于 2 句、职责少于 3 条或以 "Responsible for" 开头、要求少于 3 条/含无法验证的词如 "strong communication"/通用技能），文档内黄色提示条，提供 "AI fix"。
 4. **Analyze / Analysis**：工具栏 Analyze 按钮（带状态圆标）运行分析并切到右侧 Analysis 标签：状态摘要、按"合格"计算的进度、To complete / To revise / Suggestions（选填章节建议）/ Completed。

@@ -1,8 +1,10 @@
+import type { AiAnalysis } from "../features/workspace/documentsApi";
+import type { JdVersions } from "../features/workspace/versions";
 import type {
   ActivityItem,
   Approval,
-  Audience,
   CommentThread,
+  DocBlock,
   DocumentDraft,
   FileItem,
   Job,
@@ -18,8 +20,7 @@ export type Lang = "en" | "zh";
 export type ThemeMode = "light" | "dark" | "deep" | "system";
 export type Accent = "blue" | "teal" | "violet";
 export type TextSize = "small" | "medium" | "large";
-export type WsMode = "editing" | "suggesting" | "viewing";
-export type SideTab = "copilot" | "comments" | "changes";
+export type SideTab = "copilot" | "analysis";
 
 /** A text selection inside the document editor, used to scope Copilot actions. */
 export interface DocSelection {
@@ -86,8 +87,6 @@ export interface AppState {
   // job workspace editor state
   wsSelection: DocSelection | null;
   wsSideTab: SideTab;
-  wsMode: WsMode;
-  wsAudience: Audience;
   wsCurrentJob: string | null;
   wsCopilotThread: CopilotMsg[];
   /** A Copilot document rewrite request is in flight. */
@@ -96,6 +95,18 @@ export interface AppState {
   wsFocusBlockId: string | null;
   /** Bumped to ask the open document to save itself (e.g. after accepting a suggestion). */
   wsSaveRequest: number;
+  /** When Analyze was last run per job (shows optional-section suggestions). */
+  wsAnalyzedAt: Record<string, number>;
+  /** Ask the open document to focus a block (from the Analysis panel's "Fill in"); `n` makes repeats distinct. */
+  wsFocusRequest: { blockId: string; n: number } | null;
+  /** Latest AI analysis per job, with the document revision it was run on (to flag it as outdated). */
+  wsAiAnalysis: Record<string, { at: number; revision: number; result: AiAnalysis }>;
+  /** Completeness-AI requests in flight, keyed `${jobId}:${what}`. */
+  wsAiBusy: Record<string, boolean>;
+  /** Document before the last AI edit, for Undo. */
+  wsAiUndo: { jobId: string; blocks: DocBlock[]; label: string } | null;
+  /** JD ID and published versions per job, as loaded from the backend. */
+  wsVersions: Record<string, JdVersions>;
 
   // Ask Copilot (Gemini-style) panel
   geminiChats: Record<string, GeminiMsg[]>;

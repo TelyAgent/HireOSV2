@@ -4,6 +4,7 @@ import { Icon } from "../../components/ui/Icons";
 import { Button } from "../../components/ui/Primitives";
 import { useStore } from "../../store/StoreContext";
 import { mkBlock } from "../../data/fixtures/documents";
+import { docKey, normalizeBlocks } from "../workspace/docHelpers";
 import { nowISO, uid } from "../../lib/format";
 import {
   autoCompleteCopilotConversation,
@@ -344,22 +345,22 @@ export function GeminiPanel({ ctx }: { ctx: GeminiCtx }) {
       ];
       let n = 1;
       const bid = () => "g" + newId.slice(-4) + "-" + n++;
-      draft.drafts[newId + ":internal"] = {
-        id: "doc-" + newId + "-internal",
+      draft.drafts[docKey(newId)] = {
+        id: "doc-" + newId,
         jobId: newId,
         audience: "internal",
         language: "en",
         revision: 1,
         saveState: "saved",
-        blocks: [
-          mkBlock(bid(), "h2", `${d.title} — ${d.department}`),
+        blocks: normalizeBlocks([
+          mkBlock(bid(), "h2", d.title),
           mkBlock(bid(), "p", d.summary || "Drafted live with Ask Copilot from a spoken/typed description."),
           mkBlock(bid(), "h2", "Responsibilities"),
           mkBlock(bid(), "ul", d.responsibilities),
-          mkBlock(bid(), "h2", "Requirements — Must-have"),
+          mkBlock(bid(), "h2", "Requirements"),
           mkBlock(bid(), "ul", d.must),
           ...(d.pref && d.pref.length ? [mkBlock(bid(), "h2", "Preferred"), mkBlock(bid(), "ul", d.pref)] : []),
-        ],
+        ]),
       };
       (draft.activity[newId] = draft.activity[newId] || []).unshift({
         at: nowISO(),

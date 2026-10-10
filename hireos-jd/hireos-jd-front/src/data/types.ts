@@ -149,6 +149,9 @@ export interface RestrictedItem {
 
 export type BlockKind = "h2" | "h3" | "p" | "ul";
 
+/** Who may see a block (JD completeness standard §1.3). */
+export type BlockLevel = "public" | "internal" | "confidential";
+
 export interface DocBlock {
   id: string;
   kind: BlockKind;
@@ -160,6 +163,17 @@ export interface DocBlock {
   stale: boolean;
   role?: string;
   req?: string;
+  /** Visibility; older documents have none and get one assigned when loaded (see `normalizeBlocks`). */
+  level?: BlockLevel;
+  /** Written by Copilot and not yet reviewed (shows an "AI draft" tag until edited or kept). */
+  aiDraft?: boolean;
+}
+
+/** Optional job fields held with the document (Core Record has no column for them). */
+export interface DocMeta {
+  values: Record<string, string>;
+  /** Optional fields the user added under the title, in display order. */
+  shown: string[];
 }
 
 export interface DocumentDraft {
@@ -174,6 +188,7 @@ export interface DocumentDraft {
   serverRevision?: number;
   reviewStatus?: string;
   blocks: DocBlock[];
+  meta?: DocMeta;
 }
 
 export interface CommentReply {

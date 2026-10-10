@@ -19,7 +19,7 @@ export function coreJobToLocalJob(core: CoreJobDto, existing?: Job): Job {
     location: core.location ?? existing?.location ?? "—",
     employmentType: core.employmentType ?? existing?.employmentType ?? "—",
     workplaceType: existing?.workplaceType ?? "—",
-    level: existing?.level ?? core.seniority ?? "—",
+    level: core.seniority ?? existing?.level ?? "—",
     priority: existing?.priority ?? "normal",
     headcount: core.openings ?? existing?.headcount ?? 1,
     hiringManager: existing?.hiringManager ?? "",

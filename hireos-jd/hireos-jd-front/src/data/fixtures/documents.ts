@@ -1,12 +1,12 @@
 /** Document drafts, comment threads and Copilot suggestions — from the prototype. */
 import { daysAgo } from "../../lib/format";
-import type { BlockKind, CommentThread, DocBlock, DocumentDraft, Suggestion } from "../types";
+import type { BlockLevel, BlockKind, CommentThread, DocBlock, DocumentDraft, Suggestion } from "../types";
 
 export function mkBlock(
   id: string,
   kind: BlockKind,
   text: string | string[],
-  opts: { req?: string; role?: string; comment?: string | null; stale?: boolean } = {},
+  opts: { req?: string; role?: string; comment?: string | null; stale?: boolean; level?: BlockLevel } = {},
 ): DocBlock {
   return {
     id,

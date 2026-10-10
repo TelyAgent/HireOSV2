@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { useNavigate, useParams, useSearchParams } from "react-router-dom";
+import { useNavigate, useParams } from "react-router-dom";
 import { MainInner } from "../components/AppShell";
 import { Icon } from "../components/ui/Icons";
 import { Button, ErrorState, PersonAvatar, StatusBadge } from "../components/ui/Primitives";
@@ -11,12 +11,14 @@ import { AttachmentsTab } from "../features/workspace/AttachmentsTab";
 import { ActivityTab } from "../features/workspace/ActivityTab";
 import { VersionsTab } from "../features/workspace/VersionsTab";
 import { BlueprintDrawer } from "../features/workspace/BlueprintDrawer";
-import { VersionHistoryModal } from "../features/workspace/VersionHistoryModal";
+import { PublishModal, VersionHistoryDrawer } from "../features/workspace/VersionHistory";
+import { diffBlocks, getVersions } from "../features/workspace/versions";
+import { selectDraft } from "../features/workspace/docHelpers";
+import { useCompleteness } from "../features/workspace/useCompleteness";
+import { issueCount } from "../features/workspace/completeness";
 import { useSubmitForApproval, useActivateVersion } from "../features/workspace/approvalActions";
-import { nowISO } from "../lib/format";
-import { getJob, updateJobStatus } from "../features/jobs/jobsApi";
+import { getJob } from "../features/jobs/jobsApi";
 import { coreJobToLocalJob } from "../features/jobs/jobsMapping";
-import type { Audience } from "../data/types";
 
 const TABS = [
   { key: "document", label: "Document", icon: "description" },
@@ -35,15 +37,14 @@ const VISIBLE_TABS = TABS.filter((x) => x.key === "document");
 type TabKey = (typeof TABS)[number]["key"];
 
 /** Aliases the prototype routed separately but rendered as the Document tab. */
-const DOC_ALIASES: Record<string, { tab: TabKey; audience?: Audience; blueprint?: boolean }> = {
+const DOC_ALIASES: Record<string, { tab: TabKey; blueprint?: boolean }> = {
   requirements: { tab: "document", blueprint: true },
-  "internal-jd": { tab: "document", audience: "internal" },
-  "external-jd": { tab: "document", audience: "external" },
+  "internal-jd": { tab: "document" },
+  "external-jd": { tab: "document" },
 };
 
 export function JobWorkspacePage() {
   const { id = "", tab: rawTab = "document" } = useParams();
-  const [params] = useSearchParams();
   const { state, t, set, mutate, say, openModal, openDrawer } = useStore();
   const navigate = useNavigate();
   const submitForApproval = useSubmitForApproval();
@@ -51,17 +52,15 @@ export function JobWorkspacePage() {
 
   const alias = DOC_ALIASES[rawTab];
   const tab: TabKey = alias ? alias.tab : (TABS.find((x) => x.key === rawTab)?.key ?? "document");
-  const audience: Audience = alias?.audience ?? ((params.get("audience") as Audience) || state.wsAudience);
 
   const job = state.jobs[id];
+  const completeness = useCompleteness(id);
 
-  // Keep the editor's job/audience context in sync with the URL.
+  // Keep the editor's job context in sync with the URL.
   useEffect(() => {
     if (!job) return;
-    if (state.wsCurrentJob !== id || state.wsAudience !== audience) {
-      set({ wsCurrentJob: id, wsAudience: audience, wsSelection: null });
-    }
-  }, [id, audience, job, state.wsCurrentJob, state.wsAudience, set]);
+    if (state.wsCurrentJob !== id) set({ wsCurrentJob: id, wsSelection: null });
+  }, [id, job, state.wsCurrentJob, set]);
 
   // `/jobs/:id/requirements` opens the Requirements Blueprint on arrival.
   useEffect(() => {
@@ -73,7 +72,20 @@ export function JobWorkspacePage() {
   // store after a reload — it's real, backend-held data, so fall back to fetching it by id before
   // giving up and showing "Job not found".
   const [remoteChecked, setRemoteChecked] = useState(false);
-  const [publishing, setPublishing] = useState(false);
+  // JD ID and published versions.
+  useEffect(() => {
+    if (!job) return;
+    let cancelled = false;
+    getVersions(id)
+      .then((v) => {
+        if (!cancelled) mutate((d) => void (d.wsVersions = { ...d.wsVersions, [id]: v }));
+      })
+      .catch((error) => console.warn("Failed to load JD versions:", error));
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [id, !!job]);
   useEffect(() => {
     if (job || !id) {
       setRemoteChecked(true);
@@ -107,17 +119,21 @@ export function JobWorkspacePage() {
   }
 
   const approval = state.approvals[id];
-  const activeVer = job.activeRoleVersionRef ? state.roleVersions[job.activeRoleVersionRef] : null;
+  // Publishing needs every required item filled, nothing left to revise and no blocking issue.
+  const issues = completeness ? issueCount(completeness) : 0;
+  const versionInfo = state.wsVersions[id];
+  const latestVersion = versionInfo?.versions[versionInfo.versions.length - 1];
+  const unpublished = latestVersion ? diffBlocks(latestVersion.blocks, selectDraft(state, id).blocks).count : 0;
+  const publishBlockedReason = !versionInfo
+    ? t("Loading…")
+    : issues
+      ? `${issues} ${t("item(s) to complete or revise before publishing — see Analysis")}`
+      : latestVersion && !unpublished
+        ? t("No changes since v{n}.").replace("{n}", String(latestVersion.versionNo))
+        : undefined;
   const collaborators = [job.owner, job.hiringManager].filter((v, i, a) => v && a.indexOf(v) === i);
 
   const primaryAction = () => {
-    if (job.hiringStatus === "draft" && !job.activeRoleVersionRef) {
-      return (
-        <Button variant="primary" onClick={() => openDrawer(<BlueprintDrawer jobId={id} />, { wide: true })}>
-          {t("Review missing details")}
-        </Button>
-      );
-    }
     if (approval?.status === "pending") {
       return (
         <Button variant="primary" onClick={() => navigate(`/jobs/${id}/approval`)}>
@@ -143,35 +159,20 @@ export function JobWorkspacePage() {
     return null;
   };
 
-  const publishJob = async () => {
-    setPublishing(true);
-    let updated;
-    try {
-      updated = await updateJobStatus(id, "published");
-    } catch (error) {
-      say(error instanceof Error ? error.message : t("Couldn't publish this job. Please try again."), { type: "error" });
-      return;
-    } finally {
-      setPublishing(false);
-    }
-    mutate((draft) => {
-      const j = draft.jobs[id];
-      if (!j) return;
-      draft.jobs[id] = coreJobToLocalJob(updated, j);
-      (draft.activity[id] = draft.activity[id] || []).unshift({
-        at: nowISO(),
-        actor: draft.currentUserId,
-        text: "Published this job.",
-      });
-    });
-    say(t("Job published"));
-  };
-
   return (
     <MainInner variant="flush">
       <div className="jw-shell">
         <div className="jw-header">
           <div className="breadcrumbs" style={{ marginBottom: 6 }}>
+            <button
+              type="button"
+              className="jw-back-btn"
+              title={t("Back")}
+              aria-label={t("Back")}
+              onClick={() => (window.history.length > 1 ? navigate(-1) : navigate("/jobs"))}
+            >
+              <Icon name="arrow_back" />
+            </button>
             <a
               href={`#/jobs`}
               onClick={(e) => {
@@ -189,16 +190,30 @@ export function JobWorkspacePage() {
           <div className="jw-header-top">
             <h1 className="jw-title">{job.title}</h1>
             <StatusBadge kind="hiring_status" value={job.hiringStatus} />
-            {activeVer ? (
-              <span className="badge badge-info">
-                {t("Active")} v{activeVer.versionNo}
+            {versionInfo && (
+              <button
+                type="button"
+                className="jd-id"
+                title={t("Unique JD ID — click to copy")}
+                onClick={() => {
+                  void navigator.clipboard?.writeText(versionInfo.jdCode);
+                  say(`${t("Copied")} ${versionInfo.jdCode}`);
+                }}
+              >
+                <Icon name="tag" />
+                {versionInfo.jdCode}
+              </button>
+            )}
+            {latestVersion ? (
+              <span className="badge badge-success" title={t("Latest published version")}>
+                v{latestVersion.versionNo} {t("published")}
               </span>
             ) : (
-              <span className="badge badge-neutral">{t("No active standard")}</span>
+              versionInfo && <span className="badge badge-neutral">{t("Not published")}</span>
             )}
-            {job.collaborationStatus === "in_collaboration" && (
-              <span className="badge badge-warning">
-                {t("Draft")} v{job.draftRevision} {t("in progress")}
+            {latestVersion && unpublished > 0 && (
+              <span className="badge badge-warning" title={t("The draft differs from v{n}").replace("{n}", String(latestVersion.versionNo))}>
+                {t("Unpublished changes")}
               </span>
             )}
             <div style={{ flex: 1 }} />
@@ -207,20 +222,19 @@ export function JobWorkspacePage() {
                 <PersonAvatar key={p} id={p} />
               ))}
             </div>
-            <Button variant="icon" title={t("Version history")} onClick={() => openModal(<VersionHistoryModal jobId={id} />, { wide: true })}>
+            <Button variant="icon" title={t("Version history")} onClick={() => openDrawer(<VersionHistoryDrawer jobId={id} />, { wide: true })}>
               <Icon name="history" />
             </Button>
-            <Button size="sm" onClick={() => openDrawer(<BlueprintDrawer jobId={id} />, { wide: true })}>
-              <Icon name="checklist_rtl" />
-              {t("Check requirements")}
-            </Button>
             {primaryAction()}
-            {job.hiringStatus === "draft" && (
-              <Button variant="primary" disabled={publishing} onClick={() => void publishJob()}>
-                <Icon name="public" />
-                {t("Publish")}
-              </Button>
-            )}
+            <Button
+              variant="primary"
+              disabled={!!publishBlockedReason}
+              title={publishBlockedReason}
+              onClick={() => openModal(<PublishModal jobId={id} />)}
+            >
+              <Icon name="public" />
+              {t("Publish")}
+            </Button>
           </div>
           {job.qualityNote && (
             <div className="warning-inline" style={{ margin: "8px 0 0" }}>
@@ -234,7 +248,7 @@ export function JobWorkspacePage() {
                 <div
                   key={x.key}
                   className={`u-tab${tab === x.key ? " active" : ""}`}
-                  onClick={() => navigate(`/jobs/${id}/${x.key}?audience=${audience}`)}
+                  onClick={() => navigate(`/jobs/${id}/${x.key}`)}
                 >
                   <Icon name={x.icon} size={15} style={{ verticalAlign: -3 }} /> {t(x.label)}
                 </div>
@@ -243,7 +257,7 @@ export function JobWorkspacePage() {
           </div>
         </div>
 
-        {tab === "document" && <DocumentTab jobId={id} audience={audience} />}
+        {tab === "document" && <DocumentTab jobId={id} />}
         {tab === "approval" && <ApprovalTab jobId={id} />}
         {tab === "publication" && <PublicationTab jobId={id} />}
         {tab === "attachments" && <AttachmentsTab jobId={id} />}

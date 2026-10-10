@@ -1,18 +1,37 @@
-import { Fragment, useEffect, useReducer, useRef, useState, type ReactNode } from "react";
+import { Fragment, useEffect, useRef, useState, type DragEvent, type ReactNode } from "react";
 import type { Editor } from "@tiptap/react";
+import { Dropdown } from "antd";
 import { Icon } from "../../components/ui/Icons";
 import { Button } from "../../components/ui/Primitives";
 import { useStore } from "../../store/StoreContext";
-import { selectDraft, selectSuggestions, selectThreads, pendingSuggestionsFor, ensureDraft, stripHtml, docKey, buildDraftFromBackend } from "./docHelpers";
-import { COMMIT_DEBOUNCE_MS, RichBlockEditor } from "./RichBlockEditor";
-import { getCurrentDraft, getJobDocument, listSuggestions, saveJobDocument } from "./documentsApi";
+import {
+  BLOCK_LEVELS,
+  BLOCK_LEVEL_KEYS,
+  DOC_AUDIENCE,
+  blockLevel,
+  buildDraftFromBackend,
+  docKey,
+  ensureDraft,
+  groupSections,
+  normalizeBlocks,
+  pendingSuggestionsFor,
+  sectionBlockIds,
+  selectDraft,
+  selectSuggestions,
+  stripHtml,
+} from "./docHelpers";
+import { BLOCK_DRAG_MIME, RichBlockEditor } from "./RichBlockEditor";
+import { getCurrentDraft, getJobDocument, listSuggestions } from "./documentsApi";
 import { getPerson } from "../../data/fixtures/people";
+import { updateJobFields } from "../jobs/jobsApi";
+import { coreJobToLocalJob } from "../jobs/jobsMapping";
 import { SidePanel } from "./SidePanel";
+import { JobMetaFields } from "./JobMetaFields";
 import { useDocActions } from "./docActions";
-import type { Audience, DocBlock, Suggestion } from "../../data/types";
-import type { WsMode } from "../../store/types";
-
-const MODES: WsMode[] = ["editing", "suggesting", "viewing"];
+import { useCompleteness } from "./useCompleteness";
+import { useDocumentSaver } from "./useDocumentSaver";
+import { issueCount, sectionRank, type ComplianceFlag, type Evaluation, type ReqRow } from "./completeness";
+import type { BlockLevel, DocBlock, Suggestion } from "../../data/types";
 
 export function scrollToBlock(blockId: string) {
   const el = document.querySelector(`.doc-block[data-block-id="${blockId}"]`);
@@ -29,9 +48,19 @@ interface PendingSel {
   left: number;
 }
 
-export function DocumentTab({ jobId, audience }: { jobId: string; audience: Audience }) {
+/** What is being dragged: one block, or a whole section (its heading plus everything under it). */
+interface DragState {
+  type: "block" | "section";
+  ids: string[];
+}
+interface DropTarget {
+  id: string;
+  after: boolean;
+}
+
+export function DocumentTab({ jobId }: { jobId: string }) {
   const { state, t, set, mutate, say } = useStore();
-  const draft = selectDraft(state, jobId, audience);
+  const draft = selectDraft(state, jobId);
   const latestDraft = useRef(draft);
   latestDraft.current = draft;
   // Bumped whenever the document is replaced wholesale (loaded from the backend), so the per-block
@@ -41,29 +70,34 @@ export function DocumentTab({ jobId, audience }: { jobId: string; audience: Audi
   const docRef = useRef<HTMLDivElement>(null);
   const wrapRef = useRef<HTMLDivElement>(null);
   const [pendingSel, setPendingSel] = useState<PendingSel | null>(null);
-  const actions = useDocActions(jobId, audience);
+  const actions = useDocActions(jobId);
 
-  // Rich-text editing is scoped to the Internal document's Editing mode for now (see RichBlockEditor) —
-  // Suggesting/Viewing and the External audience keep the existing static, read-only rendering.
-  const isRichEditable = state.wsMode === "editing" && audience === "internal";
   const editorsRef = useRef(new Map<string, Editor>());
   const [activeBlockId, setActiveBlockId] = useState<string | null>(null);
-  const [, bumpTick] = useReducer((c: number) => c + 1, 0);
-  const activeEditor = activeBlockId ? editorsRef.current.get(activeBlockId) : undefined;
-  const canFormat = isRichEditable && !!activeEditor;
-  // Suggesting mode: clicking a block opens it for editing; on blur the edit becomes a proposal.
-  const canSuggest = state.wsMode === "suggesting" && audience === "internal";
-  const [suggestEditingId, setSuggestEditingId] = useState<string | null>(null);
-  useEffect(() => setSuggestEditingId(null), [jobId, audience, state.wsMode]);
+  // A block created by Enter / "Add block" gets focus as soon as its editor mounts.
+  const pendingFocus = useRef<{ id: string; at: "start" | "end" } | null>(null);
+  const focusBlock = (id: string, at: "start" | "end") => {
+    const editor = editorsRef.current.get(id);
+    if (editor) editor.commands.focus(at);
+    else pendingFocus.current = { id, at };
+  };
 
-  // Clear the floating toolbar whenever the document identity changes.
-  useEffect(() => setPendingSel(null), [jobId, audience, state.wsMode]);
-  // Each RichBlockEditor registers/unregisters itself in editorsRef via its own mount/unmount effect
-  // (whichever blocks exist for the new jobId/audience naturally (de)register themselves) — this only
-  // needs to drop the now-stale "focused block" pointer from the previous document.
-  useEffect(() => setActiveBlockId(null), [jobId, audience]);
+  const dragRef = useRef<DragState | null>(null);
+  const [dropTarget, setDropTarget] = useState<DropTarget | null>(null);
+
+  useEffect(() => setPendingSel(null), [jobId]);
+  useEffect(() => setActiveBlockId(null), [jobId]);
   // Mirror the focused block into the store so the Copilot panel can act on it without a selection.
   useEffect(() => set({ wsFocusBlockId: activeBlockId }), [activeBlockId, set]);
+  // "Fill in" from the Analysis panel asks for a block to be focused.
+  const focusRequest = state.wsFocusRequest;
+  useEffect(() => {
+    if (!focusRequest) return;
+    focusBlock(focusRequest.blockId, "start");
+    // Scroll after the block has rendered.
+    setTimeout(() => document.querySelector(`.doc-block[data-block-id="${focusRequest.blockId}"]`)?.scrollIntoView({ block: "center" }), 50);
+  }, [focusRequest]);
+  const ev = useCompleteness(jobId);
 
   // Load the saved document, or — for a job whose document was never saved — seed it from the
   // structured JD content Copilot stored when the job was created. Unsaved local edits win.
@@ -75,15 +109,18 @@ export function DocumentTab({ jobId, audience }: { jobId: string; audience: Audi
     let cancelled = false;
     setLoading(true);
     (async () => {
-      const saved = await getJobDocument(jobId, audience);
+      const saved = await getJobDocument(jobId, DOC_AUDIENCE);
       if (cancelled) return;
       if (saved) {
         mutate((d) => {
-          d.drafts[docKey(jobId, audience)] = {
-            ...ensureDraft(d, jobId, audience),
-            blocks: saved.blocks,
+          const blocks = normalizeBlocks(saved.blocks);
+          d.drafts[docKey(jobId)] = {
+            ...ensureDraft(d, jobId),
+            blocks,
+            meta: saved.meta ?? undefined,
             serverRevision: saved.revision,
-            saveState: "saved",
+            // Documents saved before per-block visibility get migrated here; save that once.
+            saveState: blocks === saved.blocks ? "saved" : "dirty",
           };
         });
       } else {
@@ -91,7 +128,7 @@ export function DocumentTab({ jobId, audience }: { jobId: string; audience: Audi
         if (cancelled || !content) return;
         mutate((d) => {
           const title = d.jobs[jobId]?.title ?? "";
-          d.drafts[docKey(jobId, audience)] = buildDraftFromBackend(title, content, jobId, audience);
+          d.drafts[docKey(jobId)] = buildDraftFromBackend(title, content, jobId);
         });
       }
       setDocEpoch((n) => n + 1);
@@ -104,16 +141,16 @@ export function DocumentTab({ jobId, audience }: { jobId: string; audience: Audi
       cancelled = true;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [jobId, audience]);
+  }, [jobId]);
 
   // Suggestions live server-side so they survive reloads and are shared with the team.
   useEffect(() => {
     let cancelled = false;
-    listSuggestions(jobId, audience)
+    listSuggestions(jobId, DOC_AUDIENCE)
       .then((list) => {
         if (cancelled) return;
         mutate((d) => {
-          d.suggestions[docKey(jobId, audience)] = list;
+          d.suggestions[docKey(jobId)] = list;
         });
       })
       .catch((error) => console.warn("Failed to load document suggestions:", error));
@@ -121,30 +158,10 @@ export function DocumentTab({ jobId, audience }: { jobId: string; audience: Audi
       cancelled = true;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [jobId, audience]);
+  }, [jobId]);
 
   const isDirty = draft.saveState === "dirty";
-  const saveDocument = async () => {
-    if (latestDraft.current.saveState === "saving") return;
-    mutate((d) => void (ensureDraft(d, jobId, audience).saveState = "saving"));
-    // Editors commit keystrokes on a short debounce — wait it out so the last edit is included.
-    await new Promise((resolve) => window.setTimeout(resolve, COMMIT_DEBOUNCE_MS + 50));
-    const doc = latestDraft.current;
-    const sentRevision = doc.revision;
-    try {
-      const saved = await saveJobDocument(jobId, audience, doc.blocks, doc.serverRevision);
-      mutate((d) => {
-        const target = ensureDraft(d, jobId, audience);
-        target.serverRevision = saved.revision;
-        // Edits made while the request was in flight stay unsaved.
-        target.saveState = target.revision === sentRevision ? "saved" : "dirty";
-      });
-      say(t("Document saved"), { type: "success" });
-    } catch (error) {
-      mutate((d) => void (ensureDraft(d, jobId, audience).saveState = "dirty"));
-      say(error instanceof Error ? error.message : t("Couldn't save the document. Please try again."), { type: "error" });
-    }
-  };
+  const saveDocument = useDocumentSaver(jobId);
 
   // Cmd/Ctrl+S saves; leaving the page with unsaved edits asks first.
   const saveRef = useRef(saveDocument);
@@ -174,27 +191,38 @@ export function DocumentTab({ jobId, audience }: { jobId: string; audience: Audi
     };
   }, []);
 
+  // The document's title heading is the job title: editing it renames the job (debounced).
+  const titleTimer = useRef<number | undefined>(undefined);
+  useEffect(() => () => window.clearTimeout(titleTimer.current), []);
+  const syncJobTitle = (text: string) => {
+    window.clearTimeout(titleTimer.current);
+    const title = stripHtml(text).replace(/\s+/g, " ").trim();
+    if (!title || title === state.jobs[jobId]?.title) return;
+    titleTimer.current = window.setTimeout(async () => {
+      try {
+        const updated = await updateJobFields(jobId, { title });
+        mutate((d) => {
+          const j = d.jobs[jobId];
+          if (j) d.jobs = { ...d.jobs, [jobId]: { ...coreJobToLocalJob(updated, j), title } };
+        });
+      } catch (error) {
+        say(error instanceof Error ? error.message : t("Couldn't rename the job. Please try again."), { type: "error" });
+      }
+    }, 800);
+  };
+
   const commitBlockText = (blockId: string, text: string | string[]) => {
+    const first = latestDraft.current.blocks[0];
+    if (first?.id === blockId && first.kind === "h2" && typeof text === "string") syncJobTitle(text);
     mutate((d) => {
-      const doc = ensureDraft(d, jobId, audience);
+      const doc = ensureDraft(d, jobId);
       const block = doc.blocks.find((b) => b.id === blockId);
       if (!block) return;
       block.text = text;
+      // Editing an AI-written block counts as reviewing it.
+      block.aiDraft = false;
       doc.revision++;
       if (doc.saveState !== "saving") doc.saveState = "dirty";
-    });
-  };
-
-  const convertActiveBlockToList = () => {
-    if (!activeBlockId) return;
-    mutate((d) => {
-      const doc = ensureDraft(d, jobId, audience);
-      const block = doc.blocks.find((b) => b.id === activeBlockId);
-      if (!block || block.kind === "ul") return;
-      block.kind = "ul";
-      block.text = [typeof block.text === "string" ? stripHtml(block.text) : ""];
-      doc.revision++;
-      doc.saveState = "dirty";
     });
   };
 
@@ -203,7 +231,7 @@ export function DocumentTab({ jobId, audience }: { jobId: string; audience: Audi
     setTimeout(() => {
       const sel = window.getSelection();
       const txt = sel?.toString().trim();
-      if (!txt || txt.length < 2 || state.wsMode === "viewing") return setPendingSel(null);
+      if (!txt || txt.length < 2) return setPendingSel(null);
       const doc = docRef.current;
       if (!sel || !sel.rangeCount || !doc || !sel.getRangeAt(0).intersectsNode(doc)) return setPendingSel(null);
       const range = sel.getRangeAt(0);
@@ -212,6 +240,9 @@ export function DocumentTab({ jobId, audience }: { jobId: string; audience: Audi
       if (!wrap) return;
       const wrapRect = wrap.getBoundingClientRect();
       const { blockId, text } = selectionInBlock(doc, range, txt);
+      // Confidential content never goes to Copilot (completeness standard V5).
+      const block = blockId ? latestDraft.current.blocks.find((b) => b.id === blockId) : undefined;
+      if (block && blockLevel(block) === "confidential") return setPendingSel(null);
       setPendingSel({
         text,
         blockId,
@@ -221,78 +252,137 @@ export function DocumentTab({ jobId, audience }: { jobId: string; audience: Audi
     }, 5);
   };
 
-  const outline = draft.blocks.filter((b) => b.kind === "h2");
+  /* ---------------- drag & drop ---------------- */
+  const startDrag = (e: DragEvent, blockId: string, isHead: boolean) => {
+    const ids = isHead ? sectionBlockIds(latestDraft.current.blocks, blockId) : [blockId];
+    dragRef.current = { type: isHead ? "section" : "block", ids };
+    e.dataTransfer.effectAllowed = "move";
+    // A private type (not text/plain), so dropping onto an editor never pastes the id as text.
+    e.dataTransfer.setData(BLOCK_DRAG_MIME, blockId);
+    const el = (e.target as HTMLElement).closest(isHead ? ".doc-section" : ".doc-block");
+    if (el) e.dataTransfer.setDragImage(el, 24, 16);
+  };
+  const dropTargetFrom = (e: DragEvent): DropTarget | null => {
+    const drag = dragRef.current;
+    if (!drag) return null;
+    const target = e.target as HTMLElement;
+    if (drag.type === "section") {
+      const el = target.closest<HTMLElement>(".doc-section");
+      const id = el?.dataset.sectionId;
+      if (!el || !id || drag.ids.includes(id)) return null;
+      const r = el.getBoundingClientRect();
+      return { id, after: e.clientY - r.top > r.height / 2 };
+    }
+    const el = target.closest<HTMLElement>(".doc-block");
+    const id = el?.dataset.blockId;
+    if (!el || !id || drag.ids.includes(id)) return null;
+    const r = el.getBoundingClientRect();
+    // Dropping on a heading puts the block at the top of that section.
+    return { id, after: el.classList.contains("sec-head") || e.clientY - r.top > r.height / 2 };
+  };
+  const onDragOver = (e: DragEvent) => {
+    const target = dropTargetFrom(e);
+    if (!target) return setDropTarget(null);
+    e.preventDefault();
+    e.dataTransfer.dropEffect = "move";
+    if (target.id !== dropTarget?.id || target.after !== dropTarget?.after) setDropTarget(target);
+  };
+  const endDrag = () => {
+    dragRef.current = null;
+    setDropTarget(null);
+  };
+  const onDrop = (e: DragEvent) => {
+    const drag = dragRef.current;
+    const target = dropTargetFrom(e);
+    endDrag();
+    if (!drag || !target) return;
+    e.preventDefault();
+    if (drag.type === "section") {
+      // Drop before a section's heading, or after its last block.
+      const targetIds = sectionBlockIds(latestDraft.current.blocks, target.id);
+      actions.moveBlocks(drag.ids, target.after ? targetIds[targetIds.length - 1] : targetIds[0], target.after);
+    } else {
+      actions.moveBlocks(drag.ids, target.id, target.after);
+    }
+  };
+
+  // Use the evaluation's own sections so its rows can be matched to them by identity.
+  const sections = ev?.sections ?? groupSections(draft.blocks);
+  // Missing required sections show as placeholders where they would go in the default section order.
+  const slotsBefore = new Map<number, ReqRow[]>();
+  ev?.rows
+    .filter((r) => !r.ok && r.item.heading && !r.section)
+    .forEach((r) => {
+      const rank = sectionRank(r.item.heading!.en);
+      let at = sections.length;
+      for (let i = 1; i < sections.length; i++) {
+        const head = sections[i].head;
+        if (head && sectionRank(stripHtml(head.text as string)) > rank) {
+          at = i;
+          break;
+        }
+      }
+      slotsBefore.set(at, [...(slotsBefore.get(at) ?? []), r]);
+    });
+  const levelCounts = BLOCK_LEVEL_KEYS.map((k) => ({ level: k, count: draft.blocks.filter((b) => blockLevel(b) === k).length }));
+
+  const renderBlock = (b: DocBlock, isHead: boolean) => (
+    <DocBlockView
+      key={b.id}
+      block={b}
+      jobId={jobId}
+      isHead={isHead}
+      isActive={activeBlockId === b.id}
+      flags={ev?.flags.filter((f) => f.blockId === b.id) ?? []}
+      drop={dropTarget?.id === b.id && dragRef.current?.type === "block" ? (dropTarget.after ? "after" : "before") : null}
+      onDragStart={(e) => startDrag(e, b.id, isHead)}
+      onDragEnd={endDrag}
+      onTextChange={(text) => commitBlockText(b.id, text)}
+      onFocusBlock={() => setActiveBlockId(b.id)}
+      onEditorReady={(editor) => {
+        editorsRef.current.set(b.id, editor);
+        if (pendingFocus.current?.id === b.id) {
+          const at = pendingFocus.current.at;
+          pendingFocus.current = null;
+          // Let the editor finish mounting into the DOM first.
+          setTimeout(() => editor.commands.focus(at), 0);
+        }
+      }}
+      onEditorDestroy={() => editorsRef.current.delete(b.id)}
+      onSplit={(before, after) => focusBlock(actions.splitBullet(b.id, before, after), "start")}
+      onRemoveEmpty={() => {
+        const prev = actions.removeEmptyBlock(b.id);
+        if (prev) focusBlock(prev, "end");
+      }}
+    />
+  );
 
   return (
     <>
       <div className="jw-toolbar">
-        <div className="jw-mode-tabs">
-          {MODES.map((m) => (
-            <button
-              key={m}
-              className={`jw-mode-tab${state.wsMode === m ? " active" : ""}`}
-              onClick={() => set({ wsMode: m })}
-            >
-              {t(m.charAt(0).toUpperCase() + m.slice(1))}
-            </button>
+        <div className="lvl-legend">
+          {levelCounts.map(({ level, count }) => (
+            <span key={level} className={`lvl-tag lvl-${level} static`} title={t(BLOCK_LEVELS[level].hint)}>
+              <Icon name={BLOCK_LEVELS[level].icon} />
+              {t(BLOCK_LEVELS[level].label)}
+              <b>{count}</b>
+            </span>
           ))}
         </div>
-        <div className="tb-sep" />
-        <div className="jw-mode-tabs">
-          <button
-            className={`jw-mode-tab${audience === "internal" ? " active" : ""}`}
-            onClick={() => actions.setAudience("internal")}
-          >
-            {t("Internal")}
-          </button>
-          <button
-            className={`jw-mode-tab${audience === "external" ? " active" : ""}`}
-            onClick={() => actions.setAudience("external")}
-          >
-            {t("External")}
-          </button>
-        </div>
-        <div className="tb-sep" />
-        <button
-          className={`tb-btn${activeEditor?.isActive("bold") ? " active" : ""}`}
-          title={t("Bold")}
-          disabled={!canFormat}
-          onMouseDown={(e) => e.preventDefault()}
-          onClick={() => activeEditor?.chain().focus().toggleBold().run()}
-        >
-          <Icon name="format_bold" />
-        </button>
-        <button
-          className={`tb-btn${activeEditor?.isActive("italic") ? " active" : ""}`}
-          title={t("Italic")}
-          disabled={!canFormat}
-          onMouseDown={(e) => e.preventDefault()}
-          onClick={() => activeEditor?.chain().focus().toggleItalic().run()}
-        >
-          <Icon name="format_italic" />
-        </button>
-        <button
-          className={`tb-btn${activeEditor?.isActive("bulletList") ? " active" : ""}`}
-          title={t("Bulleted list")}
-          disabled={!canFormat || activeEditor?.isActive("bulletList")}
-          onMouseDown={(e) => e.preventDefault()}
-          onClick={convertActiveBlockToList}
-        >
-          <Icon name="format_list_bulleted" />
-        </button>
-        <button
-          className="tb-btn"
-          title={t("Undo")}
-          disabled={!canFormat}
-          onMouseDown={(e) => e.preventDefault()}
-          onClick={() => activeEditor?.chain().focus().undo().run()}
-        >
-          <Icon name="undo" />
-        </button>
-        <button className="tb-btn" title={t("Find")}>
-          <Icon name="search" />
-        </button>
         <div style={{ flex: 1 }} />
+        {state.wsAiUndo?.jobId === jobId && (
+          <span className="ai-undo">
+            <Icon name="auto_awesome" />
+            {t("Copilot updated")} “{t(state.wsAiUndo.label)}”
+            <button type="button" className="req-link" onClick={() => actions.undoAi()}>
+              {t("Undo")}
+            </button>
+            <button type="button" className="ai-undo-x" title={t("Dismiss")} onClick={() => actions.dismissAiUndo()}>
+              <Icon name="close" />
+            </button>
+          </span>
+        )}
+        {ev && <AnalyzeButton ev={ev} busy={!!state.wsAiBusy[`${jobId}:analyze`]} onClick={() => actions.analyze()} />}
         {loading ? (
           <span className="jw-save-state">
             <Icon name="sync" />
@@ -315,63 +405,85 @@ export function DocumentTab({ jobId, audience }: { jobId: string; audience: Audi
       </div>
 
       <div className="jw-body">
-        <div className="jw-outline">
-          <div
-            className="tiny"
-            style={{ fontWeight: 600, textTransform: "uppercase", letterSpacing: ".04em", padding: "0 10px 8px" }}
-          >
-            {t("Outline")}
-          </div>
-          {outline.map((b) => (
-            <div key={b.id} className="jw-outline-item" onClick={() => scrollToBlock(b.id)}>
-              {typeof b.text === "string" ? stripHtml(b.text) : ""}
-            </div>
-          ))}
-        </div>
-
         <div className="jw-doc-wrap" ref={wrapRef}>
-          <div className="jw-doc" ref={docRef} onMouseUp={onMouseUp} key={docEpoch}>
-            {audience === "external" && (
-              <div className="info-inline" style={{ marginBottom: 18 }}>
-                {t("Candidate-facing version")} • {t("source")}: {t("role")} v
-                {state.jobs[jobId].activeRoleVersionRef
-                  ? state.roleVersions[state.jobs[jobId].activeRoleVersionRef!]?.versionNo
-                  : "—"}{" "}
-                • {draft.reviewStatus === "reviewed" ? t("Reviewed") : t("Needs review")}
-              </div>
-            )}
-            {canSuggest && (
-              <div className="info-inline" style={{ marginBottom: 18 }}>
-                {t("Suggesting: click a paragraph or list to edit it. Your edits are saved as suggestions and only change the document once accepted.")}
-              </div>
-            )}
-            {draft.blocks.map((b) => (
-              <DocBlockView
-                key={b.id}
-                block={b}
-                jobId={jobId}
-                audience={audience}
-                editable={isRichEditable}
-                suggestMode={canSuggest}
-                suggestEditing={canSuggest && suggestEditingId === b.id}
-                onStartSuggest={() => setSuggestEditingId(b.id)}
-                onSuggestBlur={(text) => {
-                  setSuggestEditingId(null);
-                  void actions.proposeEdit(b.id, text);
-                }}
-                isActive={activeBlockId === b.id}
-                onTextChange={(text) => commitBlockText(b.id, text)}
-                onFocusBlock={() => setActiveBlockId(b.id)}
-                onEditorReady={(editor) => {
-                  editorsRef.current.set(b.id, editor);
-                  if (activeBlockId === b.id) bumpTick();
-                }}
-                onEditorDestroy={() => editorsRef.current.delete(b.id)}
-                onActivity={() => {
-                  if (activeBlockId === b.id) bumpTick();
-                }}
-              />
+          <div
+            className="jw-doc"
+            ref={docRef}
+            onMouseUp={onMouseUp}
+            onDragOver={onDragOver}
+            onDrop={onDrop}
+            onDragLeave={(e) => {
+              if (!e.currentTarget.contains(e.relatedTarget as Node | null)) setDropTarget(null);
+            }}
+            key={docEpoch}
+          >
+            {sections.map((sec, si) => {
+              const sectionDrop =
+                sec.head && dropTarget?.id === sec.head.id && dragRef.current?.type === "section"
+                  ? dropTarget.after
+                    ? " drop-after"
+                    : " drop-before"
+                  : "";
+              return (
+                <Fragment key={sec.head?.id ?? "__lead"}>
+                {(slotsBefore.get(si) ?? []).map((r) => (
+                  <MissingSlot
+                    key={r.item.id}
+                    row={r}
+                    busy={!!state.wsAiBusy[`${jobId}:${r.item.id}`]}
+                    onAi={r.item.noAi ? undefined : () => actions.aiDraft(r.item)}
+                    onFill={() => (r.item.id === "F1" ? actions.openSalaryForm() : actions.fillRequired(r.item))}
+                  />
+                ))}
+                <section
+                  className={`doc-section${sec.head ? "" : " headless"}${sectionDrop}`}
+                  data-section-id={sec.head?.id ?? "__lead"}
+                >
+                  {sec.head && renderBlock(sec.head, true)}
+                  {si === 0 && <JobMetaFields jobId={jobId} ev={ev} />}
+                  {sec.blocks.map((b) => renderBlock(b, false))}
+                  {ev?.rows
+                    .filter((r) => r.section === sec && r.ok && r.weak)
+                    .map((r) => (
+                      <WeakBar
+                        key={r.item.id}
+                        row={r}
+                        busy={!!state.wsAiBusy[`${jobId}:${r.item.id}`]}
+                        onAi={r.item.heading && !r.item.noAi ? () => actions.aiFix(r) : undefined}
+                        onFormat={r.item.id === "F1" ? () => actions.openSalaryForm() : undefined}
+                      />
+                    ))}
+                  {ev?.rows
+                    .filter((r) => r.section === sec && !r.ok)
+                    .map((r) => (
+                      <MissingSlot
+                    key={r.item.id}
+                    row={r}
+                    busy={!!state.wsAiBusy[`${jobId}:${r.item.id}`]}
+                    onAi={r.item.noAi ? undefined : () => actions.aiDraft(r.item)}
+                    onFill={() => (r.item.id === "F1" ? actions.openSalaryForm() : actions.fillRequired(r.item))}
+                  />
+                    ))}
+                  <AddBlockButton
+                    onAdd={(kind) => focusBlock(actions.addBlock(sec.head?.id ?? null, kind), "start")}
+                  />
+                </section>
+                </Fragment>
+              );
+            })}
+            {(slotsBefore.get(sections.length) ?? []).map((r) => (
+              <MissingSlot
+                    key={r.item.id}
+                    row={r}
+                    busy={!!state.wsAiBusy[`${jobId}:${r.item.id}`]}
+                    onAi={r.item.noAi ? undefined : () => actions.aiDraft(r.item)}
+                    onFill={() => (r.item.id === "F1" ? actions.openSalaryForm() : actions.fillRequired(r.item))}
+                  />
             ))}
+            <button type="button" className="blk-add" onClick={() => focusBlock(actions.addSection(), "start")}>
+              <Icon name="add" />
+              {t("Add section")}
+            </button>
           </div>
           {pendingSel && (
             <div className="sel-toolbar" style={{ position: "absolute", top: pendingSel.top, left: pendingSel.left }}>
@@ -396,22 +508,147 @@ export function DocumentTab({ jobId, audience }: { jobId: string; audience: Audi
                   {t(kind.charAt(0).toUpperCase() + kind.slice(1))}
                 </button>
               ))}
-              <button
-                onClick={() => {
-                  actions.addCommentFromSelection(pendingSel.blockId, pendingSel.text);
-                  setPendingSel(null);
-                }}
-              >
-                <Icon name="add_comment" />
-                {t("Comment")}
-              </button>
             </div>
           )}
         </div>
 
-        <SidePanel jobId={jobId} audience={audience} />
+        <SidePanel jobId={jobId} />
       </div>
     </>
+  );
+}
+
+function AddBlockButton({ onAdd }: { onAdd: (kind: "p" | "ul") => void }) {
+  const { t } = useStore();
+  return (
+    <Dropdown
+      trigger={["click"]}
+      menu={{
+        items: [
+          { key: "p", label: t("Paragraph"), icon: <Icon name="notes" size={16} /> },
+          { key: "ul", label: t("Bullet point"), icon: <Icon name="format_list_bulleted" size={16} /> },
+        ],
+        onClick: ({ key }) => onAdd(key as "p" | "ul"),
+      }}
+    >
+      <button type="button" className="sec-add">
+        <Icon name="add" />
+        {t("Add block")}
+      </button>
+    </Dropdown>
+  );
+}
+
+function LevelTag({ level, onChange }: { level: BlockLevel; onChange: (level: BlockLevel) => void }) {
+  const { t } = useStore();
+  return (
+    <Dropdown
+      trigger={["click"]}
+      placement="bottomRight"
+      menu={{
+        selectedKeys: [level],
+        items: [
+          { type: "group", label: t("Content visibility") },
+          ...BLOCK_LEVEL_KEYS.map((k) => ({
+            key: k,
+            label: (
+              <span className="lvl-menu-item">
+                <span className="lvl-menu-label">{t(BLOCK_LEVELS[k].label)}</span>
+                <span className="lvl-menu-hint">{t(BLOCK_LEVELS[k].hint)}</span>
+              </span>
+            ),
+            icon: <Icon name={BLOCK_LEVELS[k].icon} size={18} className={`lvl-${k} lvl-menu-icon`} />,
+          })),
+        ],
+        onClick: ({ key }) => onChange(key as BlockLevel),
+      }}
+    >
+      <button type="button" className={`lvl-tag lvl-${level}`} title={t("Change visibility")}>
+        <Icon name={BLOCK_LEVELS[level].icon} />
+        {t(BLOCK_LEVELS[level].label)}
+        <Icon name="expand_more" className="lvl-caret" />
+      </button>
+    </Dropdown>
+  );
+}
+
+function AnalyzeButton({ ev, busy, onClick }: { ev: Evaluation; busy: boolean; onClick: () => void }) {
+  const { t } = useStore();
+  const n = issueCount(ev);
+  const kind = ev.missing || ev.blockers ? "bad" : ev.weakCount ? "warn" : "ok";
+  return (
+    <button
+      type="button"
+      className="btn btn-secondary btn-sm js-analyze"
+      disabled={busy}
+      onClick={onClick}
+      title={t("Check this JD against the completeness standard")}
+    >
+      <Icon name={busy ? "autorenew" : "auto_awesome"} className={busy ? "req-spin" : undefined} />
+      {busy ? t("Analyzing…") : t("Analyze")}
+      <span className={`an-badge ${kind}`}>{n ? n : <Icon name="check" />}</span>
+    </button>
+  );
+}
+
+/** Placeholder for a required item that has no content yet. */
+function MissingSlot({ row, onFill, onAi, busy }: { row: ReqRow; onFill: () => void; onAi?: () => void; busy: boolean }) {
+  const { t } = useStore();
+  const level = row.item.level ?? "public";
+  return (
+    <div className="req-slot" data-req={row.item.id}>
+      <Icon name="error" className="req-ic" />
+      <div className="req-slot-txt">
+        <div className="req-slot-t">
+          {t(row.item.label)}
+          <span className="req-pill">{t("Required")}</span>
+          <span className={`lvl-tag lvl-${level} static`}>
+            <Icon name={BLOCK_LEVELS[level].icon} />
+            {t(BLOCK_LEVELS[level].label)}
+          </span>
+        </div>
+        <div className="req-slot-h">{t(row.item.hint)}</div>
+      </div>
+      {onAi && (
+        <button type="button" className="req-fill req-ai" disabled={busy} onClick={onAi}>
+          <Icon name={busy ? "autorenew" : "auto_awesome"} className={busy ? "req-spin" : undefined} />
+          {busy ? t("Drafting…") : t("AI draft")}
+        </button>
+      )}
+      <button type="button" className="req-fill" onClick={onFill}>
+        <Icon name="edit" />
+        {t("Fill in")}
+      </button>
+    </div>
+  );
+}
+
+/** A required item that is filled in but hits a known defect ("Needs revision"). */
+function WeakBar({ row, onAi, onFormat, busy }: { row: ReqRow; onAi?: () => void; onFormat?: () => void; busy: boolean }) {
+  const { t } = useStore();
+  return (
+    <div className="req-weak" data-req={row.item.id}>
+      <Icon name="warning" className="req-ic" />
+      <div>
+        <div className="req-slot-t">
+          {t(row.item.label)}
+          <span className="req-pill warn">{t("Needs revision")}</span>
+        </div>
+        <div className="req-slot-h">{t(row.weak)}</div>
+      </div>
+      {onAi && (
+        <button type="button" className="req-fill req-ai" disabled={busy} onClick={onAi}>
+          <Icon name={busy ? "autorenew" : "auto_awesome"} className={busy ? "req-spin" : undefined} />
+          {busy ? t("Revising…") : t("AI fix")}
+        </button>
+      )}
+      {onFormat && (
+        <button type="button" className="req-fill" onClick={onFormat}>
+          <Icon name="edit_note" />
+          {t("Fill in by format")}
+        </button>
+      )}
+    </div>
   );
 }
 
@@ -435,133 +672,124 @@ function renderInlineHtml(html: string): ReactNode {
   return Array.from(parsed.body.childNodes).map((node, i) => <Fragment key={i}>{convert(node)}</Fragment>);
 }
 
+const PLACEHOLDERS: Record<string, string> = {
+  h2: "Section title",
+  p: "Write a paragraph…",
+  ul: "Write a bullet point…",
+};
+
 /* ---------------------------------------------------------------
-   One document block, with inline suggestion marks and comment anchors.
+   One document block: drag handle, content, delete, visibility tag.
    --------------------------------------------------------------- */
 function DocBlockView({
   block,
   jobId,
-  audience,
-  editable,
-  suggestMode,
-  suggestEditing,
-  onStartSuggest,
-  onSuggestBlur,
+  isHead,
   isActive,
+  flags,
+  drop,
+  onDragStart,
+  onDragEnd,
   onTextChange,
   onFocusBlock,
   onEditorReady,
   onEditorDestroy,
-  onActivity,
+  onSplit,
+  onRemoveEmpty,
 }: {
   block: DocBlock;
   jobId: string;
-  audience: Audience;
-  editable: boolean;
-  suggestMode: boolean;
-  suggestEditing: boolean;
-  onStartSuggest: () => void;
-  onSuggestBlur: (text: string | string[]) => void;
+  isHead: boolean;
   isActive: boolean;
+  flags: ComplianceFlag[];
+  drop: "before" | "after" | null;
+  onDragStart: (e: DragEvent) => void;
+  onDragEnd: () => void;
   onTextChange: (text: string | string[]) => void;
   onFocusBlock: () => void;
   onEditorReady: (editor: Editor) => void;
   onEditorDestroy: () => void;
-  onActivity: () => void;
+  onSplit: (before: string, after: string) => void;
+  onRemoveEmpty: () => void;
 }) {
   const { state, t } = useStore();
-  const actions = useDocActions(jobId, audience);
-  const suggestions = pendingSuggestionsFor(state, jobId, audience, block.id);
-  const threads = selectThreads(state, jobId, audience).filter((x) => x.anchorBlock === block.id);
-  const openThreadCount = threads.filter((x) => x.status === "open").length;
-  const hasStale = selectSuggestions(state, jobId, audience).some(
-    (s) => s.status === "stale" && s.anchorBlock === block.id,
-  );
+  const actions = useDocActions(jobId);
+  const suggestions = pendingSuggestionsFor(state, jobId, block.id);
+  const hasStale = selectSuggestions(state, jobId).some((s) => s.status === "stale" && s.anchorBlock === block.id);
+  const level = blockLevel(block);
 
-  // Pending proposals are shown inline (Suggesting / Viewing); the first one per block is marked, the
-  // rest are reviewed from the Changes tab.
+  // A block with a pending Copilot proposal shows the proposal inline and is edited by accepting /
+  // rejecting it (in the Copilot panel) rather than by typing.
   const active = suggestions[0];
-  const badge = active ? <SuggestionBadge s={active} onClick={() => actions.setSideTab("changes")} /> : null;
+  const badge = active ? <SuggestionBadge s={active} onClick={() => actions.setSideTab("copilot")} /> : null;
   const markedText = (text: string) => (active ? markFragment(text, active, badge) : renderInlineHtml(text));
 
-  const richEditorProps = { onTextChange, onFocusBlock, onEditorReady, onEditorDestroy, onActivity };
-  const richWrapClass = `rich-block-editor kind-${block.kind}${isActive ? " is-focused" : ""}`;
-
-  if (suggestEditing) {
-    // Start from your own pending proposal for this block, if there is one.
-    const own = suggestions.find((x) => x.author === "human" && x.initiatedBy === state.currentUserId);
-    const startText = own ? (Array.isArray(block.text) ? (own.newItems ?? own.newText.split("\n")) : own.newText) : block.text;
-    return (
-      <div className="doc-block" data-block-id={block.id}>
-        <div className={`rich-block-editor kind-${block.kind} is-focused is-suggesting`}>
-          <RichBlockEditor
-            key={`${block.id}-suggest`}
-            block={{ ...block, text: startText }}
-            {...richEditorProps}
-            onTextChange={() => undefined}
-            onBlurBlock={onSuggestBlur}
-            autoFocus
-          />
-        </div>
+  let body: ReactNode;
+  if (!active) {
+    body = (
+      <div className={`rich-block-editor kind-${block.kind}${isActive ? " is-focused" : ""}`}>
+        <RichBlockEditor
+          block={block}
+          placeholder={t(PLACEHOLDERS[block.kind] ?? "")}
+          onTextChange={onTextChange}
+          onFocusBlock={onFocusBlock}
+          onEditorReady={onEditorReady}
+          onEditorDestroy={onEditorDestroy}
+          onActivity={() => undefined}
+          onSplit={block.kind === "ul" ? onSplit : undefined}
+          onRemoveEmpty={isHead ? undefined : onRemoveEmpty}
+        />
       </div>
     );
-  }
-
-  const startSuggest = () => {
-    // A drag-selection is for the Copilot toolbar, not for opening the block.
-    if (!suggestMode || !window.getSelection()?.isCollapsed) return;
-    onStartSuggest();
-  };
+  } else if (block.kind === "h2") body = <h2 className="docH">{markedText(block.text as string)}</h2>;
+  else if (block.kind === "h3") body = <h3 className="docH3">{markedText(block.text as string)}</h3>;
+  else if (block.kind === "p") body = <p className="docP">{markedText(block.text as string)}</p>;
+  else body = <ul className="docList">{renderListItems(block.text as string[], active, badge)}</ul>;
 
   return (
     <div
-      className={`doc-block${openThreadCount > 0 ? " has-comment" : ""}${suggestMode ? " suggestable" : ""}`}
+      className={`doc-block kind-${block.kind}${isHead ? " sec-head" : ""} lvl-${level}${drop ? ` drop-${drop}` : ""}${flags.some((f) => f.severity === "blocker") ? " has-blocker" : ""}`}
       data-block-id={block.id}
-      onClick={startSuggest}
     >
-      {block.kind === "h2" &&
-        (editable ? (
-          <div className={richWrapClass}>
-            <RichBlockEditor block={block} {...richEditorProps} />
+      <span
+        className="blk-handle"
+        draggable
+        title={isHead ? t("Drag to move this section") : t("Drag to reorder")}
+        onDragStart={onDragStart}
+        onDragEnd={onDragEnd}
+      >
+        <Icon name="drag_indicator" />
+      </span>
+      <div className="blk-body">
+        {body}
+        {block.aiDraft && (
+          <button type="button" className="ai-draft-pill" title={t("Written by Copilot — click to keep as is")} onClick={() => actions.keepAiDraft(block.id)}>
+            <Icon name="auto_awesome" />
+            {t("AI draft")}
+            <Icon name="check" />
+          </button>
+        )}
+        {flags.map((f) => (
+          <div key={f.rule} className={`blk-flag ${f.severity}`}>
+            <Icon name={f.severity === "blocker" ? "block" : "warning"} />
+            <span>{t(f.message)}</span>
+            {f.shouldBe && (
+              <button type="button" className="req-link" onClick={() => actions.fixVisibility(block.id, f.shouldBe!)}>
+                {t("Mark Confidential")}
+              </button>
+            )}
           </div>
-        ) : (
-          <h2 className="docH">{markedText(block.text as string)}</h2>
         ))}
-      {block.kind === "h3" &&
-        (editable ? (
-          <div className={richWrapClass}>
-            <RichBlockEditor block={block} {...richEditorProps} />
-          </div>
-        ) : (
-          <h3 className="docH3">{markedText(block.text as string)}</h3>
-        ))}
-      {block.kind === "p" &&
-        (editable ? (
-          <div className={richWrapClass}>
-            <RichBlockEditor block={block} {...richEditorProps} />
-          </div>
-        ) : (
-          <p className={`docP${block.role === "requirement" ? "" : " presentation-only"}`}>
-            {markedText(block.text as string)}
-          </p>
-        ))}
-      {block.kind === "ul" &&
-        (editable ? (
-          <div className={richWrapClass}>
-            <RichBlockEditor block={block} {...richEditorProps} />
-          </div>
-        ) : (
-          <ul className="docList">{renderListItems(block.text as string[], active, badge)}</ul>
-        ))}
-      {openThreadCount > 0 && (
-        <span
-          className="comment-anchor"
-          title={`${openThreadCount} ${t("comment(s)")}`}
-          onClick={() => actions.openCommentsFor(block.id)}
-        >
-          {openThreadCount}
-        </span>
-      )}
+      </div>
+      <button
+        type="button"
+        className="blk-del"
+        title={isHead ? t("Delete section") : t("Delete block")}
+        onClick={() => (isHead ? actions.deleteSection(block.id) : actions.deleteBlock(block.id))}
+      >
+        <Icon name="delete_outline" />
+      </button>
+      <LevelTag level={level} onChange={(next) => actions.setBlockLevel(block.id, next)} />
       {hasStale && (
         <span className="stale-flag">
           <Icon name="restore" size={11} />
@@ -574,9 +802,9 @@ function DocBlockView({
 
 /**
  * Resolves which document block a selection belongs to. Reading only `anchorNode` misses selections
- * that start on a container element (e.g. selecting a whole list, or dragging from the margin), so
- * this takes the first block the range actually intersects. A selection spanning several blocks is
- * clipped to that first block, since a suggestion always targets exactly one block.
+ * that start on a container element (e.g. dragging from the margin), so this takes the first block the
+ * range actually intersects. A selection spanning several blocks is clipped to that first block, since
+ * a suggestion always targets exactly one block.
  */
 function selectionInBlock(root: HTMLElement, range: Range, fallbackText: string): { blockId: string | null; text: string } {
   const blocks = Array.from(root.querySelectorAll<HTMLElement>(".doc-block"));
@@ -603,7 +831,7 @@ function SuggestionBadge({ s, onClick }: { s: Suggestion; onClick: () => void })
   return (
     <span
       className={`mark-badge ${s.author === "ai" ? "ai" : "human"}`}
-      title={t("Review in Changes")}
+      title={t("Review in Copilot")}
       onClick={(e) => {
         e.stopPropagation();
         onClick();
@@ -653,20 +881,12 @@ function markFragment(text: string, s: Suggestion, badge: ReactNode): ReactNode 
 function renderListItems(items: string[], s: Suggestion | undefined, badge: ReactNode): ReactNode {
   if (!s) return items.map((x, i) => <li key={i}>{renderInlineHtml(x)}</li>);
   if (!s.newItems) {
-    // Fragment inside one item: mark the first item that contains it.
     const hit = items.findIndex((x) => stripHtml(x).includes(s.oldText));
     return items.map((x, i) => <li key={i}>{i === hit ? markFragment(x, s, badge) : renderInlineHtml(x)}</li>);
   }
+  // A bullet rewritten into one or more bullets: old struck through, then the proposal.
   const next = s.newItems.map(stripHtml);
-  if (next.length === items.length) {
-    // Same shape: show a per-item diff, unchanged items as-is.
-    const last = next.reduce((acc, x, i) => (x !== stripHtml(items[i]) ? i : acc), -1);
-    return items.map((x, i) => {
-      const old = stripHtml(x);
-      return <li key={i}>{old === next[i] ? renderInlineHtml(x) : renderDiff(old, next[i], i === last ? badge : null)}</li>;
-    });
-  }
-  // Items added or removed: show the whole old list struck through, then the proposed list.
+  if (next.length === 1 && items.length === 1) return <li>{renderDiff(stripHtml(items[0]), next[0], badge)}</li>;
   return (
     <>
       {items.map((x, i) => (

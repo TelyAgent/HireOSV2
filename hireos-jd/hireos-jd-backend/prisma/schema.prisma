@@ -105,6 +105,9 @@ model JobDocument {
   jobId       String
   audience    String
   blocks      Json
+  /// Optional job fields that Core Record doesn't hold (department, reports to, hiring reason, …)
+  /// plus which of them are shown under the title. Edited together with the document.
+  meta        Json?
   revision    Int      @default(1)
   updatedBy   String
   createdAt   DateTime @default(now())
@@ -139,4 +142,38 @@ model JobDocumentSuggestion {
   updatedAt   DateTime  @updatedAt
 
   @@index([workspaceId, jobId, audience])
+}
+
+/// The job's human-readable JD ID (completeness standard I2): JD-<year>-<4-digit number>, unique per
+/// workspace, assigned the first time the job's versions are read.
+model JdCode {
+  id          String   @id @default(uuid())
+  workspaceId String
+  jobId       String
+  code        String
+  year        Int
+  seq         Int
+  createdAt   DateTime @default(now())
+
+  @@unique([workspaceId, jobId])
+  @@unique([workspaceId, code])
+}
+
+/// Immutable snapshot written on every Publish: v1, v2, … of the job document.
+model JobDocumentVersion {
+  id          String   @id @default(uuid())
+  workspaceId String
+  jobId       String
+  versionNo   Int
+  /// e.g. JD-2026-0012@v3
+  code        String
+  title       String
+  blocks      Json
+  meta        Json?
+  note        String   @default("")
+  publishedBy String
+  createdBy   String
+  publishedAt DateTime @default(now())
+
+  @@unique([workspaceId, jobId, versionNo])
 }

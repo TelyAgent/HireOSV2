@@ -19,6 +19,7 @@ const blockSchema = z
 
 const saveSchema = z.object({
   blocks: z.array(blockSchema).max(500),
+  meta: z.record(z.string(), z.unknown()).optional(),
   /** Revision the client started editing from; omitted for the very first save. */
   baseRevision: z.number().int().positive().optional(),
 });
@@ -43,7 +44,14 @@ export class DocumentsService {
       const current = await tx.jobDocument.findUnique({ where });
       if (!current) {
         const created = await tx.jobDocument.create({
-          data: { workspaceId: identity.workspaceId, jobId, audience: aud, blocks: json(input.blocks), updatedBy: identity.actorId },
+          data: {
+            workspaceId: identity.workspaceId,
+            jobId,
+            audience: aud,
+            blocks: json(input.blocks),
+            meta: input.meta ? json(input.meta) : undefined,
+            updatedBy: identity.actorId,
+          },
         });
         return serialize(created);
       }
@@ -54,7 +62,12 @@ export class DocumentsService {
       }
       const changed = await tx.jobDocument.updateMany({
         where: { id: current.id, revision: current.revision },
-        data: { blocks: json(input.blocks), revision: { increment: 1 }, updatedBy: identity.actorId },
+        data: {
+          blocks: json(input.blocks),
+          meta: input.meta ? json(input.meta) : undefined,
+          revision: { increment: 1 },
+          updatedBy: identity.actorId,
+        },
       });
       if (changed.count !== 1) throw new ConflictException({ code: 'DOCUMENT_CONFLICT', message: '文档已被他人更新，请刷新后再保存。' });
       return serialize(await tx.jobDocument.findUniqueOrThrow({ where: { id: current.id } }));
@@ -67,11 +80,20 @@ function parseAudience(value: string): DocumentAudience {
   throw new BadRequestException({ code: 'INVALID_AUDIENCE', message: 'audience must be "internal" or "external".' });
 }
 
-function serialize(row: { jobId: string; audience: string; blocks: unknown; revision: number; updatedBy: string; updatedAt: Date }) {
+function serialize(row: {
+  jobId: string;
+  audience: string;
+  blocks: unknown;
+  meta: unknown;
+  revision: number;
+  updatedBy: string;
+  updatedAt: Date;
+}) {
   return {
     jobId: row.jobId,
     audience: row.audience,
     blocks: row.blocks,
+    meta: row.meta ?? null,
     revision: row.revision,
     updatedBy: row.updatedBy,
     updatedAt: row.updatedAt.toISOString(),

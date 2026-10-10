@@ -1,30 +1,27 @@
 import { useEffect, useRef, useState } from "react";
 import { Icon } from "../../components/ui/Icons";
-import { Button, EmptyState, PersonAvatar } from "../../components/ui/Primitives";
+import { Button } from "../../components/ui/Primitives";
 import { useStore } from "../../store/StoreContext";
-import { getPerson } from "../../data/fixtures/people";
 import { fmtRelative } from "../../lib/format";
-import { blockPlainText, selectDraft, selectSuggestions, selectThreads, stripHtml } from "./docHelpers";
+import { blockLevel, blockPlainText, selectDraft, selectSuggestions } from "./docHelpers";
 import { useDocActions } from "./docActions";
+import { useCompleteness } from "./useCompleteness";
+import { issueCount } from "./completeness";
+import { AnalysisPanel } from "./AnalysisPanel";
 import { scrollToBlock } from "./DocumentTab";
-import type { Audience, Suggestion } from "../../data/types";
+import type { Suggestion } from "../../data/types";
 import type { CopilotMsg, SideTab } from "../../store/types";
 
-export function SidePanel({ jobId, audience }: { jobId: string; audience: Audience }) {
+export function SidePanel({ jobId }: { jobId: string }) {
   const { state, t } = useStore();
-  const actions = useDocActions(jobId, audience);
-  const activeTab = state.wsSideTab;
-
-  const openComments = selectThreads(state, jobId, audience).filter((x) => x.status === "open").length;
-  const openChanges = selectSuggestions(state, jobId, audience).filter(
-    (x) => x.status === "proposed" || x.status === "stale",
-  ).length;
-
-  const tabs: { key: SideTab; label: string; count?: number }[] = [
+  const actions = useDocActions(jobId);
+  const ev = useCompleteness(jobId);
+  const issues = ev ? issueCount(ev) : 0;
+  const tabs: { key: SideTab; label: string; count?: number; tone?: string }[] = [
     { key: "copilot", label: "Copilot" },
-    { key: "comments", label: "Comments", count: openComments },
-    { key: "changes", label: "Changes", count: openChanges },
+    { key: "analysis", label: "Analysis", count: issues, tone: ev && (ev.missing || ev.blockers) ? "bad" : "warn" },
   ];
+  const activeTab = state.wsSideTab;
 
   return (
     <div className="jw-side">
@@ -36,15 +33,19 @@ export function SidePanel({ jobId, audience }: { jobId: string; audience: Audien
             onClick={() => actions.setSideTab(x.key)}
           >
             {t(x.label)}
-            {x.count != null ? ` (${x.count})` : ""}
+            {x.count ? <span className={`jw-side-cnt ${x.tone}`}>{x.count}</span> : null}
           </div>
         ))}
       </div>
-      <div className={`jw-side-body${activeTab === "copilot" ? " is-copilot" : ""}`}>
-        {activeTab === "copilot" && <CopilotTab jobId={jobId} audience={audience} />}
-        {activeTab === "comments" && <CommentsTab jobId={jobId} audience={audience} />}
-        {activeTab === "changes" && <ChangesTab jobId={jobId} audience={audience} />}
-      </div>
+      {activeTab === "analysis" ? (
+        <div className="jw-side-body">
+          <AnalysisPanel jobId={jobId} />
+        </div>
+      ) : (
+        <div className="jw-side-body is-copilot">
+          <CopilotTab jobId={jobId} />
+        </div>
+      )}
     </div>
   );
 }
@@ -52,20 +53,21 @@ export function SidePanel({ jobId, audience }: { jobId: string; audience: Audien
 /* ---------------------------------------------------------------
    Copilot
    --------------------------------------------------------------- */
-function CopilotTab({ jobId, audience }: { jobId: string; audience: Audience }) {
+function CopilotTab({ jobId }: { jobId: string }) {
   const { state, t } = useStore();
-  const actions = useDocActions(jobId, audience);
+  const actions = useDocActions(jobId);
   const [input, setInput] = useState("");
   const threadRef = useRef<HTMLDivElement>(null);
   const sel = state.wsSelection;
   const busy = state.wsCopilotBusy;
   const focused = state.wsFocusBlockId
-    ? selectDraft(state, jobId, audience).blocks.find((b) => b.id === state.wsFocusBlockId)
+    ? selectDraft(state, jobId).blocks.find((b) => b.id === state.wsFocusBlockId)
     : undefined;
 
-  // The External JD conversation must never carry internal compensation.
-  const restrictedBlocked =
-    audience === "external" && !!sel?.text && /budget|ceiling|\$7,000|internal comp/i.test(sel.text);
+  // Completeness standard V5: Confidential blocks are never sent to Copilot.
+  const targetId = sel ? sel.blockId : focused?.id;
+  const target = targetId ? selectDraft(state, jobId).blocks.find((b) => b.id === targetId) : undefined;
+  const restrictedBlocked = !!target && blockLevel(target) === "confidential";
 
   useEffect(() => {
     const el = threadRef.current;
@@ -120,13 +122,13 @@ function CopilotTab({ jobId, audience }: { jobId: string; audience: Audience }) 
         {restrictedBlocked && (
           <div className="warning-inline" style={{ marginBottom: 12 }}>
             <Icon name="lock" />
-            {t("This looks like internal compensation. It can’t be used in the External JD conversation.")}
+            {t("This block is Confidential — Copilot can’t read or rewrite it.")}
           </div>
         )}
 
         <div>
           {state.wsCopilotThread.map((m, i) => (
-            <CopilotMessage key={i} msg={m} jobId={jobId} audience={audience} />
+            <CopilotMessage key={i} msg={m} jobId={jobId} />
           ))}
           {busy && (
             <div className="copilot-msg">
@@ -165,9 +167,9 @@ function CopilotTab({ jobId, audience }: { jobId: string; audience: Audience }) 
   );
 }
 
-function CopilotMessage({ msg, jobId, audience }: { msg: CopilotMsg; jobId: string; audience: Audience }) {
+function CopilotMessage({ msg, jobId }: { msg: CopilotMsg; jobId: string }) {
   const { state, t, person } = useStore();
-  const actions = useDocActions(jobId, audience);
+  const actions = useDocActions(jobId);
 
   if (msg.kind === "user") {
     return (
@@ -190,7 +192,7 @@ function CopilotMessage({ msg, jobId, audience }: { msg: CopilotMsg; jobId: stri
   }
 
   // Read the live copy so status updates (accepted/rejected) show through.
-  const live = selectSuggestions(state, jobId, audience).find((x) => x.id === msg.suggestion.id) ?? msg.suggestion;
+  const live = selectSuggestions(state, jobId).find((x) => x.id === msg.suggestion.id) ?? msg.suggestion;
   return (
     <div className="copilot-msg">
       <div className="who">
@@ -244,141 +246,4 @@ function SuggestionStatusBadge({ status }: { status: Suggestion["status"] }) {
   const tone = status === "accepted" ? "badge-success" : status === "rejected" ? "badge-neutral" : "badge-warning";
   const label = status.charAt(0).toUpperCase() + status.slice(1);
   return <span className={`badge ${tone}`}>{t(label, `suggestion.${label}`)}</span>;
-}
-
-/* ---------------------------------------------------------------
-   Comments
-   --------------------------------------------------------------- */
-function CommentsTab({ jobId, audience }: { jobId: string; audience: Audience }) {
-  const { state, t } = useStore();
-  const actions = useDocActions(jobId, audience);
-  const threads = selectThreads(state, jobId, audience);
-
-  if (threads.length === 0) {
-    return (
-      <EmptyState
-        icon="forum"
-        title={t("No comments yet")}
-        body={t("Select text in the document and choose Add comment.")}
-      />
-    );
-  }
-
-  return (
-    <>
-      {threads.map((th) => (
-        <div key={th.id} className={`comment-thread${th.status === "resolved" ? " resolved" : ""}`}>
-          <div className="ct-head">
-            <PersonAvatar id={th.author} />
-            <strong style={{ fontSize: "var(--fs-sm)" }}>{getPerson(th.author)?.name}</strong>
-            <span className="tiny">{fmtRelative(th.createdAt)}</span>
-            {th.status === "resolved" && <span className="badge badge-neutral">{t("Resolved")}</span>}
-          </div>
-          <div className="ct-body">{th.body}</div>
-          {th.replies.map((r, i) => (
-            <div key={i} className="ct-reply">
-              <PersonAvatar id={r.author} />
-              <strong style={{ fontSize: "var(--fs-xs)" }}>{getPerson(r.author)?.name}</strong>{" "}
-              <span className="tiny">{fmtRelative(r.createdAt)}</span>
-              <div style={{ marginTop: 3 }}>{r.body}</div>
-            </div>
-          ))}
-          <div className="flex gap-8" style={{ marginTop: 8 }}>
-            <Button variant="text" size="sm" onClick={() => scrollToBlock(th.anchorBlock)}>
-              {t("View in document")}
-            </Button>
-            {th.status === "open" ? (
-              <>
-                <Button variant="text" size="sm" onClick={() => actions.replyThread(th.id)}>
-                  {t("Reply")}
-                </Button>
-                <Button variant="text" size="sm" onClick={() => actions.resolveThread(th.id)}>
-                  {t("Resolve")}
-                </Button>
-              </>
-            ) : (
-              <Button variant="text" size="sm" onClick={() => actions.reopenThread(th.id)}>
-                {t("Reopen")}
-              </Button>
-            )}
-          </div>
-        </div>
-      ))}
-    </>
-  );
-}
-
-/* ---------------------------------------------------------------
-   Changes
-   --------------------------------------------------------------- */
-function ChangesTab({ jobId, audience }: { jobId: string; audience: Audience }) {
-  const { state, t, say } = useStore();
-  const actions = useDocActions(jobId, audience);
-  const list = selectSuggestions(state, jobId, audience).filter((s) => s.status === "proposed" || s.status === "stale");
-
-  if (list.length === 0) {
-    return (
-      <EmptyState
-        icon="rule"
-        title={t("No pending changes")}
-        body={t("Suggested edits and requirement changes will show up here for review.")}
-      />
-    );
-  }
-
-  const acceptAllReady = async () => {
-    // One per block: accepting a block's first proposal changes the text the others were based on.
-    const seen = new Set<string>();
-    const ready = list.filter((s) => s.status === "proposed" && !seen.has(s.anchorBlock) && seen.add(s.anchorBlock));
-    for (const s of ready) await actions.acceptSuggestion(s.id);
-    say(`${ready.length} ${t("change(s) accepted")}`);
-  };
-
-  return (
-    <>
-      <div className="tiny" style={{ marginBottom: 10 }}>
-        {list.length} {t("unresolved")} •{" "}
-        <button className="link-btn" onClick={() => void acceptAllReady()}>
-          {t("Accept all ready")}
-        </button>
-      </div>
-      {list.map((s) => (
-        <div key={s.id} className={`changes-item${s.status === "stale" ? " stale" : ""}`}>
-          <div className="ci-head">
-            <Icon name={s.author === "ai" ? "auto_awesome" : "person"} size={14} />
-            {s.author === "ai" ? t("AI suggestion") : getPerson(s.initiatedBy)?.name} • {fmtRelative(s.createdAt)}{" "}
-            {s.status === "stale" && <span className="badge badge-warning">{t("Needs refresh")}</span>}
-          </div>
-          <div className="ci-diff" style={{ whiteSpace: "pre-line" }}>
-            <span className="ci-old">{s.oldText}</span>
-            <br />
-            <span className="ci-new">{stripHtml(s.newText)}</span>
-          </div>
-          <div className="tiny" style={{ marginBottom: 8 }}>
-            {s.reason}
-          </div>
-          {s.status === "stale" ? (
-            <>
-              <div className="warning-inline" style={{ marginBottom: 8 }}>
-                <Icon name="warning" />
-                {s.staleReason ? t(s.staleReason) : t("Based on an older draft.")}
-              </div>
-              <Button size="sm" onClick={() => actions.reviewLatest(s.id)}>
-                {t("Review latest text")}
-              </Button>
-            </>
-          ) : (
-            <div className="sc-actions">
-              <Button variant="primary" size="sm" onClick={() => actions.acceptSuggestion(s.id)}>
-                {t("Accept")}
-              </Button>
-              <Button size="sm" onClick={() => actions.rejectSuggestion(s.id)}>
-                {t("Reject")}
-              </Button>
-            </div>
-          )}
-        </div>
-      ))}
-    </>
-  );
 }

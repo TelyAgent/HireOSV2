@@ -4,7 +4,7 @@
  * (from Copilot) that seeds a document which has never been saved.
  */
 import { API_BASE_URL } from "../../lib/apiBase";
-import type { Audience, DocBlock, Suggestion } from "../../data/types";
+import type { Audience, DocBlock, DocMeta, Suggestion } from "../../data/types";
 import type { MoneyRange } from "../../lib/format";
 
 const JOBS = `${API_BASE_URL}api/jobs`;
@@ -13,6 +13,7 @@ export interface JobDocumentDto {
   jobId: string;
   audience: Audience;
   blocks: DocBlock[];
+  meta: DocMeta | null;
   revision: number;
   updatedBy: string;
   updatedAt: string;
@@ -46,11 +47,12 @@ export async function saveJobDocument(
   audience: Audience,
   blocks: DocBlock[],
   baseRevision?: number,
+  meta?: DocMeta,
 ): Promise<JobDocumentDto> {
   const response = await fetch(`${JOBS}/${jobId}/documents/${audience}`, {
     method: "PUT",
     headers: { "content-type": "application/json" },
-    body: JSON.stringify({ blocks, baseRevision }),
+    body: JSON.stringify({ blocks, baseRevision, meta }),
   });
   return parseOrThrow<JobDocumentDto>(response);
 }
@@ -126,4 +128,64 @@ export async function updateSuggestion(
     body: JSON.stringify(patch),
   });
   return parseOrThrow<Suggestion>(response);
+}
+
+/* ---------------- completeness-standard AI ---------------- */
+
+export interface AiBlock {
+  id: string;
+  kind: string;
+  level: "public" | "internal" | "confidential";
+  /** Heading of the section the block sits in. */
+  section: string;
+  /** Omitted for Confidential blocks — their text never leaves the browser for AI (standard V5). */
+  text?: string;
+}
+export interface AiContext {
+  jobTitle?: string;
+  level?: string;
+  location?: string;
+  department?: string;
+  headcount?: number;
+  language?: "zh" | "en";
+}
+export interface AiSectionRequest {
+  mode: "draft" | "fix";
+  itemId: string;
+  label: string;
+  hint: string;
+  issue?: string;
+  list: boolean;
+  current?: string[];
+  context: AiContext;
+  blocks: AiBlock[];
+}
+export interface AiFinding {
+  id: string;
+  status: "weak" | "missing";
+  severity: "blocker" | "warning" | "suggestion";
+  evidence: string;
+  reason: string;
+  suggestion: string;
+  blockId: string | null;
+}
+export interface AiAnalysis {
+  verdict: "ready" | "needs_work" | "blocked";
+  summary: string;
+  items: AiFinding[];
+}
+
+async function postJson<T>(url: string, body: unknown): Promise<T> {
+  const response = await fetch(url, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) });
+  return parseOrThrow<T>(response);
+}
+
+/** Drafts a missing section, or revises one that fails a completeness rule. */
+export function aiSection(jobId: string, audience: Audience, body: AiSectionRequest) {
+  return postJson<{ items: string[]; explain: string }>(`${JOBS}/${jobId}/documents/${audience}/ai/section`, body);
+}
+
+/** The judgement-based review against the completeness standard (advisory; the rule check gates publishing). */
+export function aiAnalyze(jobId: string, audience: Audience, body: { context: AiContext; blocks: AiBlock[] }) {
+  return postJson<AiAnalysis>(`${JOBS}/${jobId}/documents/${audience}/ai/analyze`, body);
 }
