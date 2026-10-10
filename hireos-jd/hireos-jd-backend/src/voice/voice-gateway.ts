@@ -33,6 +33,7 @@ const START_MESSAGE = JSON.stringify({ type: 'start', version: 1, sample_rate: 1
 
 export function attachVoiceGateway(httpServer: HttpServer, config: VoiceGatewayConfig): void {
   const wss = new WebSocketServer({ noServer: true });
+  const logger = new Logger('VoiceGateway');
   let activeConnections = 0;
 
   httpServer.on('upgrade', (request: IncomingMessage, socket: Socket, head: Buffer) => {
@@ -44,11 +45,16 @@ export function attachVoiceGateway(httpServer: HttpServer, config: VoiceGatewayC
     try {
       if (!origin || !config.allowedOrigins.has(origin)) throw new VoiceTicketError('origin is invalid');
       verifyVoiceTicket(ticket, config.ticketSecret);
-    } catch {
+    } catch (error) {
+      // The browser only sees "connection closed", so say why here (e.g. a new front-end origin
+      // missing from HIREOS_DOUBAO_ALLOWED_ORIGINS).
+      const reason = error instanceof Error ? error.message : String(error);
+      logger.warn(`Voice connection rejected (${reason}; origin=${origin ?? 'none'})`);
       socket.destroy();
       return;
     }
     if (activeConnections >= config.maxConnections) {
+      logger.warn(`Voice connection rejected (too many connections: ${activeConnections}/${config.maxConnections})`);
       socket.destroy();
       return;
     }

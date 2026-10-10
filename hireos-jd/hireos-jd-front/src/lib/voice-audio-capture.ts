@@ -2,6 +2,8 @@
  * Ported verbatim (module system aside) from the old project's `lib/voice-audio-capture.mts`. Framework
  * agnostic — just browser AudioContext/AudioWorklet APIs — so nothing needed adapting for this project.
  */
+import { API_BASE_URL } from "./apiBase";
+
 export type VoiceAudioCaptureMode = "audio-worklet" | "script-processor";
 
 export type VoiceAudioCapture = {
@@ -68,7 +70,8 @@ function floatToPcm16(sample: number): number {
 }
 
 export async function createVoiceAudioCapture(options: VoiceAudioCaptureOptions): Promise<VoiceAudioCapture> {
-  const moduleUrl = new URL("/doubaoinput-pcm-worklet.mjs", options.pageOrigin).href;
+  // Served from `public/` under the app's base path (e.g. /jd/ behind the local gateway), not the site root.
+  const moduleUrl = new URL(`${API_BASE_URL}doubaoinput-pcm-worklet.mjs`, options.pageOrigin).href;
   const createWorkletNode = options.createWorkletNode
     || ((context: AudioContext) => new AudioWorkletNode(context, "doubaoinput-pcm"));
   try {

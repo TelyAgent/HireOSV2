@@ -5,6 +5,9 @@ import { useStore } from "../../store/StoreContext";
 import { fmtRelative } from "../../lib/format";
 import { blockLevel, blockPlainText, selectDraft, selectSuggestions } from "./docHelpers";
 import { useDocActions } from "./docActions";
+import { Input } from "antd";
+import { VoiceInputButton, type VoiceInputStatus } from "../copilot/VoiceInputButton";
+import { mergeVoiceTranscript } from "../../lib/voice-stream";
 import { useCompleteness } from "./useCompleteness";
 import { issueCount } from "./completeness";
 import { AnalysisPanel } from "./AnalysisPanel";
@@ -54,9 +57,12 @@ export function SidePanel({ jobId }: { jobId: string }) {
    Copilot
    --------------------------------------------------------------- */
 function CopilotTab({ jobId }: { jobId: string }) {
-  const { state, t } = useStore();
+  const { state, t, say } = useStore();
   const actions = useDocActions(jobId);
   const [input, setInput] = useState("");
+  const [voiceStatus, setVoiceStatus] = useState<VoiceInputStatus>("idle");
+  // Text that was already typed when dictation started; transcripts are merged onto it.
+  const voiceBase = useRef<string | null>(null);
   const threadRef = useRef<HTMLDivElement>(null);
   const sel = state.wsSelection;
   const busy = state.wsCopilotBusy;
@@ -95,37 +101,6 @@ function CopilotTab({ jobId }: { jobId: string }) {
           </div>
         </div>
 
-        {sel ? (
-          <div className="chip" style={{ marginBottom: 12 }}>
-            <Icon name="text_fields" size={14} />
-            <span style={{ maxWidth: 230, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-              {t(sel.scopeLabel || "Selected text")}: “{(sel.text || "").slice(0, 60)}
-              {(sel.text || "").length > 60 ? "…" : ""}”
-            </span>
-            <button onClick={actions.clearSelection} aria-label={t("Clear selection")}>
-              <Icon name="close" size={14} />
-            </button>
-          </div>
-        ) : focused ? (
-          <div className="chip" style={{ marginBottom: 12 }}>
-            <Icon name="text_fields" size={14} />
-            <span style={{ maxWidth: 230, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-              {t("Current block")}: “{blockPlainText(focused).slice(0, 60)}”
-            </span>
-          </div>
-        ) : (
-          <div className="tiny" style={{ marginBottom: 12 }}>
-            {t("No text selected — Copilot will work on the paragraph or list your cursor is in.")}
-          </div>
-        )}
-
-        {restrictedBlocked && (
-          <div className="warning-inline" style={{ marginBottom: 12 }}>
-            <Icon name="lock" />
-            {t("This block is Confidential — Copilot can’t read or rewrite it.")}
-          </div>
-        )}
-
         <div>
           {state.wsCopilotThread.map((m, i) => (
             <CopilotMessage key={i} msg={m} jobId={jobId} />
@@ -142,26 +117,83 @@ function CopilotTab({ jobId }: { jobId: string }) {
         </div>
       </div>
 
-      <div className="copilot-composer">
-        <div className="field">
-          <textarea
+      <div className="cp-composer">
+        {sel ? (
+          <div className="chip cp-quote">
+            <Icon name="text_fields" size={14} />
+            <span className="cp-quote-txt">
+              {t(sel.scopeLabel || "Selected text")}: “{(sel.text || "").slice(0, 60)}
+              {(sel.text || "").length > 60 ? "…" : ""}”
+            </span>
+            <button onClick={actions.clearSelection} aria-label={t("Clear selection")}>
+              <Icon name="close" size={14} />
+            </button>
+          </div>
+        ) : (
+          focused && (
+            <div className="chip cp-quote">
+              <Icon name="text_fields" size={14} />
+              <span className="cp-quote-txt">
+                {t("Current block")}: “{blockPlainText(focused).slice(0, 60)}”
+              </span>
+            </div>
+          )
+        )}
+        {restrictedBlocked && (
+          <div className="warning-inline" style={{ marginBottom: 8 }}>
+            <Icon name="lock" />
+            {t("This block is Confidential — Copilot can’t read or rewrite it.")}
+          </div>
+        )}
+        <div className={`cp-box${restrictedBlocked ? " is-disabled" : ""}`}>
+          <Input.TextArea
+            variant="borderless"
+            autoSize={{ minRows: 2, maxRows: 6 }}
             placeholder={t("Ask Copilot to rewrite, explain, or draft something…")}
-            disabled={restrictedBlocked}
-            style={{ minHeight: 60 }}
+            disabled={restrictedBlocked || voiceStatus !== "idle"}
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={(e) => {
-              if (e.key === "Enter" && !e.shiftKey) {
+              // Enter sends; Shift+Enter for a new line; leave Enter alone while an IME is composing.
+              if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) {
                 e.preventDefault();
                 send();
               }
             }}
           />
+          <div className="cp-bar">
+            <VoiceInputButton
+              className="cp-mic"
+              disabled={restrictedBlocked || busy}
+              onPartialTranscript={(text) => {
+                if (voiceBase.current === null) voiceBase.current = input;
+                setInput(mergeVoiceTranscript(voiceBase.current, text));
+              }}
+              onTranscript={(text) => {
+                setInput(mergeVoiceTranscript(voiceBase.current ?? input, text));
+                voiceBase.current = null;
+              }}
+              onError={(message) => {
+                voiceBase.current = null;
+                say(message, { type: "error" });
+              }}
+              onStatusChange={setVoiceStatus}
+            />
+            <span className="cp-listen">
+              {voiceStatus === "connecting" ? t("Connecting…") : voiceStatus === "listening" ? t("Listening…") : ""}
+            </span>
+            <button
+              type="button"
+              className="cp-send"
+              title={t("Send")}
+              aria-label={t("Send to Copilot")}
+              disabled={!input.trim() || busy || restrictedBlocked || voiceStatus !== "idle"}
+              onClick={send}
+            >
+              <Icon name="arrow_upward" />
+            </button>
+          </div>
         </div>
-        <Button variant="primary" className="w-full" disabled={restrictedBlocked || busy} onClick={send}>
-          <Icon name="send" />
-          {t("Ask Copilot")}
-        </Button>
       </div>
     </>
   );

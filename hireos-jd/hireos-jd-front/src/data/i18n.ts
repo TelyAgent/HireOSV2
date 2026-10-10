@@ -275,6 +275,7 @@ export const ZH: Record<string, string> = {
   "The selected text changed after this suggestion was generated.": "生成该建议后，选中的原文已被修改。",
   "Previous proposal": "上一版建议",
   /* ---------- completeness check ---------- */
+  "Send to Copilot": "发送给 Copilot",
   "Range": "范围",
   "Min": "最低",
   "Max": "最高",

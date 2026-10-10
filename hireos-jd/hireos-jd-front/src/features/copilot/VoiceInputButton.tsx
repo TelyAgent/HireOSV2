@@ -36,8 +36,11 @@ export function VoiceInputButton({
   onError,
   onStatusChange,
   onAudioLevelChange,
+  className = "gm-mic-btn",
 }: {
   disabled?: boolean;
+  /** Button style; "listening" is appended while recording. */
+  className?: string;
   onPartialTranscript: (transcript: string) => void;
   onTranscript: (transcript: string) => void;
   onError?: (message: string) => void;
@@ -282,7 +285,7 @@ export function VoiceInputButton({
 
   return (
     <button
-      className={`gm-mic-btn${active ? " listening" : ""}`}
+      className={`${className}${active ? " listening" : ""}`}
       type="button"
       disabled={!supported || (disabled && !active)}
       aria-pressed={active}

@@ -634,8 +634,22 @@ a:focus-visible, button:focus-visible, [tabindex]:focus-visible, input:focus-vis
 /* Copilot tab: only the conversation scrolls; the composer stays pinned to the bottom. */
 .jw-side-body.is-copilot{ display:flex; flex-direction:column; overflow:hidden; padding:0; min-height:0; }
 .copilot-scroll{ flex:1; min-height:0; overflow-y:auto; padding:16px 16px 8px; }
-.copilot-composer{ flex:0 0 auto; padding:12px 16px 16px; border-top:1px solid var(--border); background:var(--surface); }
-.copilot-composer .field{ margin-bottom:10px; }
+/* Copilot composer (design: quote chip + card with mic and round send) */
+.cp-composer{ flex:none; padding:8px 16px 16px; background:var(--surface); }
+.cp-quote{ display:flex; width:fit-content; max-width:100%; box-sizing:border-box; margin:0 0 8px; }
+.cp-quote .cp-quote-txt{ min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.cp-box{ border:1px solid var(--border-strong); border-radius:14px; background:var(--surface); transition:border-color .12s, box-shadow .12s; }
+.cp-box:focus-within{ border-color:var(--accent-500); box-shadow:0 0 0 2px var(--accent-100); }
+.cp-box.is-disabled{ opacity:.6; }
+.cp-box textarea.ant-input{ padding:11px 14px 4px; font-size:var(--fs-sm); line-height:1.5; resize:none; }
+.cp-bar{ display:flex; align-items:center; gap:8px; padding:4px 8px 8px 8px; }
+.cp-mic{ width:32px; height:32px; border:0; border-radius:50%; cursor:pointer; background:var(--surface-alt); color:var(--text-secondary); display:flex; align-items:center; justify-content:center; padding:0; flex:none; }
+.cp-mic .material-icons-o{ font-size:18px; } .cp-mic:hover{ background:var(--ai-bg); color:var(--ai-text); }
+.cp-mic.listening{ animation:gmmicpulse 1.1s infinite; background:linear-gradient(135deg,#ea4335,#d24ba0); color:#fff; }
+.cp-mic:disabled, .cp-send:disabled{ cursor:not-allowed; opacity:.45; }
+.cp-listen{ flex:1; min-width:0; font-size:var(--fs-xs); color:var(--text-secondary); display:flex; align-items:center; gap:6px; }
+.cp-send{ width:32px; height:32px; border:0; border-radius:50%; cursor:pointer; background:var(--accent-500); color:var(--text-on-accent,#fff); display:flex; align-items:center; justify-content:center; padding:0; flex:none; }
+.cp-send .material-icons-o{ font-size:19px; } .cp-send:not(:disabled):hover{ background:var(--accent-600); }
 
 .chip{ display:inline-flex; align-items:center; gap:6px; background:var(--accent-50); color:var(--accent-700); border:1px solid var(--accent-100); border-radius:14px; padding:4px 10px; font-size:var(--fs-xs); font-weight:500; }
 .chip button{ background:none; border:none; color:var(--accent-700); cursor:pointer; display:flex; padding:0; }
