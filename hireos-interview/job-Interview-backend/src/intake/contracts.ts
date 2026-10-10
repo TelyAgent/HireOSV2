@@ -86,6 +86,7 @@ export const decisionSchema = z.enum(['continue_next_round', 'hold', 'request_mo
 export const setDecisionSchema = z.object({ decision: decisionSchema.nullable() }).strict();
 // Evaluation Package sign-off: HR and Hiring Manager confirm independently of each other —
 // see TasksService.confirmPackage.
+export const confirmPlanSchema = z.object({ confirmed: z.boolean() }).strict();
 export const confirmPackageSchema = z.object({ role: z.enum(['hr', 'hm']), confirmed: z.boolean() }).strict();
 
 export type Segment = { id: string; text: string; page?: number };

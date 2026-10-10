@@ -1,10 +1,11 @@
 import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../persistence/prisma.service';
-import { attachTaskMaterialSchema, confirmPackageSchema, createTaskSchema, reviewTaskSchema, setDecisionSchema, validate, type ParseInput } from './contracts';
+import { attachTaskMaterialSchema, confirmPackageSchema, confirmPlanSchema, createTaskSchema, reviewTaskSchema, setDecisionSchema, validate, type ParseInput } from './contracts';
 import { CandidatesService } from './candidates.service';
 import { RoundsService } from './rounds.service';
 import { advanceTaskStatus } from './task-status';
+import { taskStages } from './task-stages';
 import { mergeTranscriptLines } from '../rubric/summary-contracts';
 import type { Identity } from './workspace.guard';
 
@@ -76,7 +77,19 @@ export class TasksService {
       } },
     } });
     if (!task) throw new NotFoundException({ code: 'NOT_FOUND' });
-    return task;
+    return { ...task, stages: await taskStages(this.db, workspaceId, id) };
+  }
+
+  /** "Confirm interview plan" — unlocks Schedule and freezes the plan's rounds. Can be undone
+   * only while no round has been scheduled yet; past that the plan is part of the record. */
+  async confirmPlan(identity: Identity, taskId: string, raw: unknown) {
+    const input = validate(confirmPlanSchema, raw);
+    const stages = await taskStages(this.db, identity.workspaceId, taskId);
+    if (!stages.find((s) => s.stage === 'plan')!.unlocked) throw new BadRequestException({ code: 'RUBRIC_NOT_CONFIRMED' });
+    if (!input.confirmed && stages.find((s) => s.stage === 'schedule')!.done) throw new ConflictException({ code: 'PLAN_ALREADY_SCHEDULED' });
+    await this.db.interviewTask.update({ where: { id: taskId }, data: { planConfirmedAt: input.confirmed ? new Date() : null } });
+    if (input.confirmed) await advanceTaskStatus(this.db, identity.workspaceId, taskId, 'ready_to_schedule');
+    return this.get(identity.workspaceId, taskId);
   }
 
   async review(identity: Identity, id: string, raw: unknown) {
@@ -172,6 +185,9 @@ export class TasksService {
     if (!task) throw new NotFoundException({ code: 'NOT_FOUND' });
     const rounds = await this.db.interviewRound.findMany({ where: { taskId, workspaceId: identity.workspaceId }, orderBy: { sequence: 'asc' }, select: { id: true, sequence: true, name: true, status: true } });
     if (!rounds.length || rounds.some((r) => r.status !== 'completed')) throw new BadRequestException({ code: 'ROUNDS_NOT_COMPLETED' });
+    // "Continue to debrief" is Review's confirmation — recorded before the AI draft's own
+    // preconditions, since Debrief opens (and can retry the draft) regardless of them.
+    await this.db.interviewTask.updateMany({ where: { id: taskId, reviewConfirmedAt: null }, data: { reviewConfirmedAt: new Date() } });
     const rubric = await this.db.rubricVersion.findFirst({
       where: { workspaceId: identity.workspaceId, jobId: task.jobId, status: 'confirmed' }, orderBy: { versionNumber: 'desc' },
       select: { cards: { orderBy: { createdAt: 'asc' }, select: { id: true, requirement: true, cardPriority: true, levelAnchors: true } } },
@@ -236,6 +252,8 @@ export class TasksService {
     const segments = await this.decisionSegments(identity.workspaceId, taskId, task.jobId);
     if (!segments.length) throw new BadRequestException({ code: 'NO_CONFIRMED_RUBRIC' });
     if (!segments.some((s) => !s.text.includes('人工评分：未评分'))) throw new BadRequestException({ code: 'NO_SCORES' });
+    // "Continue to decision" is Debrief's confirmation.
+    await this.db.interviewTask.updateMany({ where: { id: taskId, debriefConfirmedAt: null }, data: { debriefConfirmedAt: new Date() } });
     const inFlight = await this.db.parseJob.findFirst({ where: { workspaceId: identity.workspaceId, taskId, type: 'decision_summary', status: { in: ['queued', 'parsing'] } }, select: { id: true, status: true } });
     if (inFlight) return inFlight;
     const existingCount = await this.db.parseJob.count({ where: { workspaceId: identity.workspaceId, taskId, type: 'decision_summary' } });
@@ -277,6 +295,7 @@ export class TasksService {
     const input = validate(setDecisionSchema, raw);
     const existing = await this.db.interviewTask.findFirst({ where: { id: taskId, workspaceId: identity.workspaceId } });
     if (!existing) throw new NotFoundException({ code: 'NOT_FOUND' });
+    if (existing.debriefConfirmedAt == null && existing.decision == null) throw new BadRequestException({ code: 'DEBRIEF_NOT_CONFIRMED' });
     await this.db.interviewTask.update({ where: { id: taskId }, data: { decision: input.decision, decisionAt: input.decision ? new Date() : null } });
     await this.syncPackageStatus(identity.workspaceId, taskId);
     return this.decision(identity.workspaceId, taskId);

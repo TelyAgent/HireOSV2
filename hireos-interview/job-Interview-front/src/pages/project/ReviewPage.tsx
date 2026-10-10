@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { useStore } from "../../store/StoreContext";
+import { useProjectTask } from "../../features/project-intake/useTask";
 import { Pill, toneBg, toneFg, type Tone } from "../../utils/status";
 import { api, type CardScoreEntry, type Recommendation, type Round, type RoundScoresState, type RoundSummaryState } from "../../features/project-intake/api";
 import { useRounds } from "../../features/project-intake/useRounds";
@@ -174,6 +175,7 @@ function TranscriptSummary({ roundId, zh }: { roundId: string; zh: boolean }) {
 
 export function ReviewPage() {
   const { state, set, t } = useStore();
+  const { advance, isDone } = useProjectTask();
   const zh = state.lang === "zh";
   const { rounds, loading: roundsLoading } = useRounds(state.currentTaskId);
   const round: Round | null = rounds.find((r) => r.sequence === (state.roundView === "r2" ? 2 : 1)) ?? null;
@@ -243,7 +245,9 @@ export function ReviewPage() {
     setContinuing(true);
     try { await api(`/tasks/${state.currentTaskId}/debrief-draft`, { method: "POST" }); }
     catch { /* surfaced on Debrief */ }
-    finally { setContinuing(false); set({ screen: "debrief" }); }
+    // The call above records Review as confirmed (even if the AI draft itself can't start),
+    // which is what unlocks Debrief.
+    finally { await advance("debrief"); setContinuing(false); }
   };
 
   return (
@@ -296,15 +300,16 @@ export function ReviewPage() {
         <ScoreCard key={entry.card.id} roundId={round!.id} entry={entry} t={t} zh={zh}
           onSaved={(score, note) => setEntries((previous) => previous?.map((e) => (e.card.id === entry.card.id ? { ...e, score, note } : e)) ?? previous)} />
       ))}
-      {round && started && entries?.length === 0 && <div style={{ padding: "15px 17px", border: "1px solid var(--line)", borderRadius: 14, background: "var(--surface)", fontSize: 12.5, color: "var(--ink-3)" }}>{zh ? "该职位尚无已确认的评分标准。" : "No confirmed rubric for this role yet."}</div>}
 
-      <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "13px 16px", border: "1px solid var(--line)", borderRadius: 14, background: "var(--surface-2)", flexWrap: "wrap" }}>
-        <div style={{ flex: 1 }} />
-        <button onClick={() => set({ screen: "live" })} style={{ height: 34, padding: "0 12px", border: "1px solid transparent", borderRadius: 11, background: "transparent", color: "var(--ink-2)", fontSize: 12.5, cursor: "pointer" }}>{t.backToRecord}</button>
-        {allRoundsDone
-          ? <button disabled={continuing} onClick={() => void continueToDebrief()} style={{ height: 34, padding: "0 15px", border: "1px solid var(--brand)", borderRadius: 11, background: "var(--brand)", color: "var(--brand-ink)", fontSize: 12.5, fontWeight: 600, cursor: continuing ? "not-allowed" : "pointer", opacity: continuing ? 0.6 : 1 }}>{continuing ? (zh ? "正在准备汇总…" : "Preparing debrief…") : t.continueToDebrief}</button>
-          : <span style={{ fontSize: 11.5, color: "var(--ink-3)" }}>{zh ? "所有轮次的面试都完成后，这里才会出现「继续到汇总评估」。" : "“Continue to debrief” appears here once every round is completed."}</span>}
-      </div>
+      {!isDone("review") && (
+        <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "13px 16px", border: "1px solid var(--line)", borderRadius: 14, background: "var(--surface-2)", flexWrap: "wrap" }}>
+          <div style={{ flex: 1 }} />
+          <button onClick={() => set({ screen: "live" })} style={{ height: 34, padding: "0 12px", border: "1px solid transparent", borderRadius: 11, background: "transparent", color: "var(--ink-2)", fontSize: 12.5, cursor: "pointer" }}>{t.backToRecord}</button>
+          {allRoundsDone
+            ? <button disabled={continuing} onClick={() => void continueToDebrief()} style={{ height: 34, padding: "0 15px", border: "1px solid var(--brand)", borderRadius: 11, background: "var(--brand)", color: "var(--brand-ink)", fontSize: 12.5, fontWeight: 600, cursor: continuing ? "not-allowed" : "pointer", opacity: continuing ? 0.6 : 1 }}>{continuing ? (zh ? "正在准备汇总…" : "Preparing debrief…") : t.continueToDebrief}</button>
+            : <span style={{ fontSize: 11.5, color: "var(--ink-3)" }}>{zh ? "所有轮次的面试都完成后，这里才会出现「继续到汇总评估」。" : "“Continue to debrief” appears here once every round is completed."}</span>}
+        </div>
+      )}
     </>
   );
 }

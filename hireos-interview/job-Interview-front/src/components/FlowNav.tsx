@@ -31,10 +31,17 @@ export function FlowNav({ task }: { task: Task | null }) {
     >
       {flowIds.map((id) => {
         const active = state.screen === id;
+        const lockedReason = flowGateReason(task, id, state.lang === "zh");
         return (
           <button
             key={id}
+            title={lockedReason ?? undefined}
+            aria-disabled={!!lockedReason}
             onClick={() => {
+              if (lockedReason) { say(lockedReason); return; }
+              // The checks below only gate the fully-simulated demo flow; a real task is
+              // gated entirely by its backend stages above.
+              if (task) { go(id as any); return; }
               if (state.jdOnlyDraft && id === "plan" && !state.rubricConfirmed) {
                 say(
                   state.lang === "zh"
@@ -76,8 +83,6 @@ export function FlowNav({ task }: { task: Task | null }) {
                 );
                 return;
               }
-              const blocked = flowGateReason(task, id, state.lang === "zh");
-              if (blocked) { say(blocked); return; }
               go(id as any);
             }}
             style={{
@@ -87,10 +92,11 @@ export function FlowNav({ task }: { task: Task | null }) {
               border: 0,
               borderBottom: `2px solid ${active ? "var(--brand)" : "transparent"}`,
               background: "transparent",
-              color: active ? "var(--brand)" : "var(--ink-2)",
+              color: active ? "var(--brand)" : lockedReason ? "var(--ink-3)" : "var(--ink-2)",
               fontSize: 12.5,
               fontWeight: active ? 600 : 500,
-              cursor: "pointer",
+              cursor: lockedReason ? "not-allowed" : "pointer",
+              opacity: lockedReason ? 0.55 : 1,
               whiteSpace: "nowrap",
             }}
           >

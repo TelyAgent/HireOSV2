@@ -4,6 +4,7 @@ import { PrismaService } from '../persistence/prisma.service';
 import { ZoomHostService } from '../meetings/zoom-host.service';
 import { createRoundSchema, updateRoundSchema, scheduleRoundSchema, setCardScoreSchema, setRecommendationSchema, validate, type ParseInput } from './contracts';
 import { advanceTaskStatus } from './task-status';
+import { taskStages } from './task-stages';
 import { mergeTranscriptLines } from '../rubric/summary-contracts';
 import type { Identity } from './workspace.guard';
 
@@ -47,7 +48,8 @@ export class RoundsService {
 
   async createForTask(identity: { workspaceId: string }, taskId: string, raw: unknown) {
     const input = validate(createRoundSchema, raw);
-    await this.getTask(identity.workspaceId, taskId);
+    const task = await this.getTask(identity.workspaceId, taskId);
+    if (task.planConfirmedAt) throw new ConflictException({ code: 'PLAN_CONFIRMED' });
     if (input.interviewerId) await this.getInterviewer(identity.workspaceId, input.interviewerId);
     const questions = input.questions ?? 3;
     const mandatory = Math.min(questions, input.mandatory ?? 2);
@@ -70,8 +72,9 @@ export class RoundsService {
 
   async update(identity: { workspaceId: string }, roundId: string, raw: unknown) {
     const input = validate(updateRoundSchema, raw);
-    const existing = await this.db.interviewRound.findFirst({ where: { id: roundId, workspaceId: identity.workspaceId } });
+    const existing = await this.db.interviewRound.findFirst({ where: { id: roundId, workspaceId: identity.workspaceId }, include: { task: { select: { planConfirmedAt: true } } } });
     if (!existing) throw new NotFoundException({ code: 'NOT_FOUND' });
+    if (existing.task.planConfirmedAt) throw new ConflictException({ code: 'PLAN_CONFIRMED' });
     if (input.interviewerId) await this.getInterviewer(identity.workspaceId, input.interviewerId);
     const mandatory = Math.min(input.questions, input.mandatory);
     const updated = await this.db.interviewRound.updateMany({
@@ -89,8 +92,9 @@ export class RoundsService {
   /** Sets or moves a round's meeting time — distinct from `update`, which edits round content. */
   async schedule(identity: { workspaceId: string }, roundId: string, raw: unknown) {
     const input = validate(scheduleRoundSchema, raw);
-    const existing = await this.db.interviewRound.findFirst({ where: { id: roundId, workspaceId: identity.workspaceId } });
+    const existing = await this.db.interviewRound.findFirst({ where: { id: roundId, workspaceId: identity.workspaceId }, include: { task: { select: { planConfirmedAt: true } } } });
     if (!existing) throw new NotFoundException({ code: 'NOT_FOUND' });
+    if (!existing.task.planConfirmedAt) throw new BadRequestException({ code: 'PLAN_NOT_CONFIRMED' });
     const updated = await this.db.interviewRound.updateMany({
       where: { id: roundId, workspaceId: identity.workspaceId, version: input.version },
       data: { scheduledAt: new Date(input.scheduledAt), timezone: input.timezone, meetingLink: input.meetingLink || null, version: { increment: 1 } },
@@ -212,6 +216,8 @@ export class RoundsService {
   async complete(identity: Identity, roundId: string) {
     const existing = await this.db.interviewRound.findFirst({ where: { id: roundId, workspaceId: identity.workspaceId } });
     if (!existing) throw new NotFoundException({ code: 'NOT_FOUND' });
+    const stages = await taskStages(this.db, identity.workspaceId, existing.taskId);
+    if (!stages.find((s) => s.stage === 'live')!.unlocked) throw new BadRequestException({ code: 'BRIEF_NOT_READY' });
     const updated = await this.db.interviewRound.update({ where: { id: roundId }, data: { status: 'completed', completedAt: new Date() }, select: ROUND_SELECT });
     await this.zoomHost.endMeeting(identity, roundId).catch(() => {});
     // Summarize the transcript for Review. A round with no transcript simply gets no summary;

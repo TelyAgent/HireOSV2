@@ -35,6 +35,7 @@ export class RubricService {
   async generate(workspaceId: string, jobId: string) {
     const job = await this.getJobWithParseJobs(workspaceId, jobId);
     if (!job.jdText) throw new BadRequestException({ code: 'JD_REQUIRED' });
+    if (await this.isLocked(workspaceId, jobId)) throw new ConflictException({ code: 'RUBRIC_LOCKED' });
     const existing = job.parseJobs.find((j) => j.type === 'capability_cards' && j.inputVersion === job.jdVersion && j.status !== 'failed');
     if (existing) return existing;
     const input: ParseInput = { sourceId: `jd:${job.jdVersion}`, segments: splitText(job.jdText) };
@@ -55,7 +56,7 @@ export class RubricService {
     const rubric = await this.db.rubricVersion.findFirst({ where: { workspaceId, jobId }, orderBy: { versionNumber: 'desc' }, select: RUBRIC_SELECT });
     const generationJob = job.parseJobs.find((j) => j.type === 'capability_cards' && j.inputVersion === job.jdVersion) ?? null;
     return {
-      jobId, jdVersion: job.jdVersion,
+      jobId, jdVersion: job.jdVersion, locked: await this.isLocked(workspaceId, jobId),
       generation: generationJob ? { id: generationJob.id, status: generationJob.status, errorCode: generationJob.errorCode } : null,
       rubric,
     };
@@ -100,6 +101,7 @@ export class RubricService {
       where: { workspaceId: identity.workspaceId, jobId }, orderBy: { versionNumber: 'desc' }, select: RUBRIC_SELECT,
     });
     if (!latest || latest.status !== 'confirmed') throw new ConflictException({ code: 'RUBRIC_NOT_CONFIRMED' });
+    if (await this.isLocked(identity.workspaceId, jobId)) throw new ConflictException({ code: 'RUBRIC_LOCKED' });
     return this.db.rubricVersion.create({
       data: {
         workspaceId: identity.workspaceId, jobId, versionNumber: latest.versionNumber + 1, status: 'draft',
@@ -112,6 +114,12 @@ export class RubricService {
       },
       select: RUBRIC_SELECT,
     });
+  }
+
+  /** A confirmed rubric is frozen once any candidate's interview plan has been confirmed on
+   * it — Plan, Brief, Review and Debrief all build on those exact cards from then on. */
+  private async isLocked(workspaceId: string, jobId: string) {
+    return (await this.db.interviewTask.count({ where: { workspaceId, jobId, planConfirmedAt: { not: null } } })) > 0;
   }
 
   private async requireDraft(workspaceId: string, jobId: string) {

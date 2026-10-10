@@ -2,9 +2,10 @@ import { useEffect } from "react";
 import { useStore } from "../../store/StoreContext";
 import { Pill } from "../../utils/status";
 import { FlowNav } from "../../components/FlowNav";
-import { useTask } from "../../features/project-intake/useTask";
+import { ProjectTaskContext, useTask } from "../../features/project-intake/useTask";
 import { TASK_STATUS_META, type TaskStatus } from "../../data/domain";
 import { flowGateReason } from "../../utils/flowGate";
+import type { Screen } from "../../store/types";
 
 export function ProjectShell({ children }: { children: React.ReactNode }) {
   const { state, set, say, t, go } = useStore();
@@ -17,7 +18,7 @@ export function ProjectShell({ children }: { children: React.ReactNode }) {
   // (round/decision progress) doesn't read stale data right after completing a round or
   // recording a decision on another screen.
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  useEffect(() => { reload(); }, [state.screen]);
+  useEffect(() => { void reload(); }, [state.screen]);
 
   // Direct URL / back-forward navigation bypasses FlowNav's click guard entirely — bounce
   // back to Overview with the same explanation FlowNav would have shown.
@@ -54,7 +55,16 @@ export function ProjectShell({ children }: { children: React.ReactNode }) {
   const statusBadge = localOverride?.label ?? (taskStatusMeta ? (zh ? taskStatusMeta.zh : taskStatusMeta.en) : (zh ? "草稿" : "Draft"));
   const statusTone = localOverride?.tone ?? taskStatusMeta?.tone ?? "unknown";
 
+  const advance = async (screen: Screen) => {
+    const fresh = await reload();
+    const reason = flowGateReason(fresh, screen, zh);
+    if (reason) { say(reason); return false; }
+    set({ screen });
+    return true;
+  };
+
   return (
+    <ProjectTaskContext.Provider value={{ task, reload, advance, isDone: (stage) => !!task?.stages.find((s) => s.stage === stage)?.done }}>
     <div
       style={{
         width: "100%",
@@ -102,5 +112,6 @@ export function ProjectShell({ children }: { children: React.ReactNode }) {
       )}
       {children}
     </div>
+    </ProjectTaskContext.Provider>
   );
 }

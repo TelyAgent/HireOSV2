@@ -3,7 +3,7 @@ import { Drawer } from "antd";
 import { useStore } from "../../store/StoreContext";
 import { Pill, type Tone } from "../../utils/status";
 import { PlusSvg, CloseSvg, SpinnerSvg } from "../../components/ui/Icons";
-import { useTask } from "../../features/project-intake/useTask";
+import { useProjectTask } from "../../features/project-intake/useTask";
 import { useRubric } from "../../features/project-intake/useRubric";
 import type { CapabilityCard, CardInput, CardPriority, ResponsibilityType } from "../../features/project-intake/api";
 import { errorText } from "../../features/project-intake/i18n";
@@ -41,7 +41,7 @@ const fieldTextarea = "w-full resize-y rounded-[9px] border border-[var(--line-s
 export function RubricPage() {
   const { state, set, say, t } = useStore();
   const zh = state.lang === "zh";
-  const { task } = useTask(state.currentTaskId);
+  const { task, reload: reloadTask, advance, isDone } = useProjectTask();
   const jobId = task?.job.id ?? null;
   const { state: rubricState, loading, error, generate, updateCards, confirm, newVersion, reload } = useRubric(jobId);
 
@@ -106,6 +106,7 @@ export function RubricPage() {
     if (!rubric) return;
     try {
       await confirm(rubric.version);
+      await reloadTask();
       say(zh ? `评分标准 v${rubric.versionNumber} 已确认，现在可以规划面试。` : `Rubric v${rubric.versionNumber} confirmed. Interview planning is now available.`);
     } catch (e) { say(errorText((e as { code?: string }).code || "REQUEST_FAILED", state.lang)); }
   };
@@ -118,6 +119,8 @@ export function RubricPage() {
 
   const weightTotal = rubric ? rubric.cards.reduce((sum, c) => sum + c.weight, 0) : 0;
   const locked = isConfirmed;
+  // Frozen for good once an interview plan was confirmed on it — no regenerate / new version.
+  const frozen = !!rubricState?.locked;
 
   return (
     <>
@@ -246,35 +249,42 @@ export function RubricPage() {
 
       <div className="flex flex-wrap items-center gap-2.5 rounded-[14px] border border-[var(--line)] bg-[var(--surface-2)] px-4 py-[13px]">
         <div className="max-w-[430px] text-[11.5px] leading-[1.4] text-[var(--ink-3)]">
-          {isConfirmed
+          {isConfirmed && frozen
+            ? (zh ? `评分标准 v${rubric!.versionNumber} 已用于面试计划，不能再重新生成或创建新版本。` : `Rubric v${rubric!.versionNumber} is already in use by an interview plan and can no longer be regenerated or versioned.`)
+            : isConfirmed
             ? (zh ? `已确认的评分标准 v${rubric!.versionNumber} 将作为该岗位后续所有评分的依据。` : `Confirmed rubric v${rubric!.versionNumber} is the version behind every future score in this project.`)
             : (zh ? "AI 从 JD 生成草稿，需人工确认后才能用于评分。" : "AI drafted this from the JD. No score can be recorded until a human confirms it.")}
         </div>
         <div className="flex-1" />
-        {rubric && !isGenerating && (
-          <button
-            onClick={onGenerate}
-            className="h-[34px] cursor-pointer rounded-[11px] border border-[var(--line)] bg-[var(--surface)] px-3 text-[12.5px] text-[var(--ink-2)]"
-          >
-            {t.rubricRegenerate}
-          </button>
-        )}
-        {isDraft && (
-          <button onClick={onConfirm} className="h-[34px] cursor-pointer rounded-[11px] border border-[var(--line-strong)] bg-[var(--surface)] px-3 text-[12.5px] font-semibold text-[var(--ink)]">
-            {t.rubricConfirmCta}
-          </button>
-        )}
-        {isConfirmed && (
+        {/* Like Plan's "Unconfirm": the one way back, until an interview plan builds on it. */}
+        {isConfirmed && !frozen && (
           <button onClick={onNewVersion} className="h-[34px] cursor-pointer rounded-[11px] border border-[var(--line-strong)] bg-[var(--surface)] px-3 text-[12.5px] font-semibold text-[var(--ink)]">
             {t.rubricNewVersionCta}
           </button>
         )}
-        <button onClick={() => set({ screen: "overview" })} className="h-[34px] cursor-pointer rounded-[11px] border border-transparent bg-transparent px-3 text-[12.5px] text-[var(--ink-2)]">
-          {t.backToOverview}
-        </button>
-        <button onClick={() => set({ screen: "plan" })} className="h-[34px] cursor-pointer rounded-[11px] border border-[var(--brand)] bg-[var(--brand)] px-[15px] text-[12.5px] font-semibold text-[var(--brand-ink)]">
-          {t.continueToPlan}
-        </button>
+        {!isDone("rubric") && (
+          <>
+            {rubric && !isGenerating && !frozen && (
+              <button
+                onClick={onGenerate}
+                className="h-[34px] cursor-pointer rounded-[11px] border border-[var(--line)] bg-[var(--surface)] px-3 text-[12.5px] text-[var(--ink-2)]"
+              >
+                {t.rubricRegenerate}
+              </button>
+            )}
+            {isDraft && (
+              <button onClick={onConfirm} className="h-[34px] cursor-pointer rounded-[11px] border border-[var(--line-strong)] bg-[var(--surface)] px-3 text-[12.5px] font-semibold text-[var(--ink)]">
+                {t.rubricConfirmCta}
+              </button>
+            )}
+            <button onClick={() => set({ screen: "overview" })} className="h-[34px] cursor-pointer rounded-[11px] border border-transparent bg-transparent px-3 text-[12.5px] text-[var(--ink-2)]">
+              {t.backToOverview}
+            </button>
+            <button onClick={() => void advance("plan")} className="h-[34px] cursor-pointer rounded-[11px] border border-[var(--brand)] bg-[var(--brand)] px-[15px] text-[12.5px] font-semibold text-[var(--brand-ink)]">
+              {t.continueToPlan}
+            </button>
+          </>
+        )}
       </div>
 
       <Drawer

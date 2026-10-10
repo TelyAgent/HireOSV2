@@ -84,6 +84,8 @@ export class IntakeController {
   setTaskDecision(@Req() req: { identity: Identity }, @Param('id') id: string, @Body() body: unknown) { return this.tasks.setDecision(req.identity, id, body); }
   @Get('tasks/:id/package')
   taskPackage(@Req() req: { identity: Identity }, @Param('id') id: string) { return this.tasks.package(req.identity.workspaceId, id); }
+  @Patch('tasks/:id/plan/confirm')
+  confirmPlan(@Req() req: { identity: Identity }, @Param('id') id: string, @Body() body: unknown) { return this.tasks.confirmPlan(req.identity, id, body); }
   @Patch('tasks/:id/package/confirm')
   confirmPackage(@Req() req: { identity: Identity }, @Param('id') id: string, @Body() body: unknown) { return this.tasks.confirmPackage(req.identity, id, body); }
   @Post('tasks/:id/package/offer')

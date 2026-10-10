@@ -47,6 +47,9 @@ export type Task = {
   materials: { kind: string; material: Material }[];
   parseJobs: ParseJob[];
   rounds: Round[];
+  // Flow progress computed by the backend (intake/task-stages.ts): a stage is unlocked only
+  // once every earlier stage is done. FlowNav/flowGate read this and nothing else.
+  stages: { stage: string; done: boolean; unlocked: boolean }[];
 };
 
 // Requirements & Rubric (see job-Interview-front/docs/prod-plan/HireOS_Interview_Capability_Verification_Card_Implementation_Plan_v1.0.md).
@@ -71,6 +74,9 @@ export type RubricVersion = {
 // null before anything has been generated yet.
 export type RubricState = {
   jobId: string; jdVersion: number;
+  // True once any candidate's interview plan was confirmed on this job's rubric — no more
+  // regenerating or new versions from then on.
+  locked: boolean;
   generation: { id: string; status: 'queued' | 'parsing' | 'needs_review' | 'failed'; errorCode: string | null } | null;
   rubric: RubricVersion | null;
 };

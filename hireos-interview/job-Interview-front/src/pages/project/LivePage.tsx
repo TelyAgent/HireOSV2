@@ -5,7 +5,8 @@ import { liveCopy } from '../../features/live-interview/i18n';
 import { LiveQuestionPanel } from '../../features/live-interview/LiveQuestionPanel';
 import { MeetingRecordPanel } from '../../features/live-interview/MeetingRecordPanel';
 import { api } from '../../features/project-intake/api';
-import { useTask } from '../../features/project-intake/useTask';
+import { useProjectTask } from '../../features/project-intake/useTask';
+import { errorText } from '../../features/project-intake/i18n';
 
 export function LivePage() {
   const { state, set, t } = useStore();
@@ -14,7 +15,7 @@ export function LivePage() {
   const root = useRef<HTMLDivElement>(null);
   const [active, setActive] = useState(false);
   const [dirty, setDirty] = useState(false);
-  const { task } = useTask(state.currentTaskId);
+  const { task, advance } = useProjectTask();
   const [completing, setCompleting] = useState(false);
   const [completeError, setCompleteError] = useState('');
   const complete = async () => {
@@ -23,8 +24,8 @@ export function LivePage() {
     setCompleting(true); setCompleteError('');
     try {
       await api(`/rounds/${roundId}/complete`, { method: 'POST' });
-      set({ screen: 'review' });
-    } catch (e) { setCompleteError(e instanceof Error ? e.message : 'REQUEST_FAILED'); }
+      await advance('review');
+    } catch (e) { setCompleteError(errorText(e instanceof Error ? e.message : 'REQUEST_FAILED', state.lang)); }
     finally { setCompleting(false); }
   };
   // Captured once on arrival (e.g. from Schedule's "Join link") and cleared right away —

@@ -1,7 +1,8 @@
+import { useEffect } from "react";
 import { useStore } from "../../store/StoreContext";
 import { Pill, compName, type Tone } from "../../utils/status";
 import { COMPS } from "../../data/comps";
-import { useTask } from "../../features/project-intake/useTask";
+import { useProjectTask } from "../../features/project-intake/useTask";
 import { useBrief } from "../../features/project-intake/useBrief";
 import { errorText } from "../../features/project-intake/i18n";
 
@@ -11,7 +12,8 @@ const PRIORITY_TONE: Record<CardPriority, Tone> = { "Card-P0": "bad", "Card-P1":
 export function BriefPage() {
   const { state, set, say, evidence, r1Scores, t } = useStore();
   const zh = state.lang === "zh";
-  const { task } = useTask(state.currentTaskId);
+  const { task, reload: reloadTask, advance, isDone } = useProjectTask();
+  const liveDone = !!task?.stages.find((s) => s.stage === "live")?.done;
   const jobId = task?.job.id ?? null;
   const { state: briefState, loading: briefLoading, error: briefError, generate: generateQuestions, reload: reloadBrief } = useBrief(jobId);
 
@@ -109,36 +111,20 @@ export function BriefPage() {
               : unknownComps.map((c) => compName(c, "en")).join(", ") + " still need stronger evidence.")
           : (zh ? "当前快照没有开放的证据缺口。" : "No open evidence gaps in the current snapshot.");
 
-  const nextActionHeading = state.jdOnlyDraft && !state.candidateLinked
-    ? (zh ? "先关联候选人" : "Link a candidate first")
-    : !state.r1Done
-      ? (zh ? "完成 Round 1 面试" : "Complete Round 1 interview")
-      : (zh ? "复核当前证据" : "Review current evidence");
-  const nextActionLabel = state.jdOnlyDraft && !state.candidateLinked
-    ? (zh ? "去关联候选人" : "Link candidate")
-    : !state.r1Done
-      ? (zh ? "开始本轮面试" : "Start this round")
-      : (zh ? "进入评审" : "Go to review");
-  const nextAction = () => {
-    if (state.jdOnlyDraft && !state.candidateLinked) {
-      set({ screen: "overview" });
-      say(zh ? "请先在项目概览中关联候选人。" : "Link a candidate from the project overview first.");
-      return;
-    }
-    if (!state.r1Done) {
-      if (state.jdOnlyDraft && !state.planApproved) { say(zh ? "请先确定面试计划。" : "Approve the interview plan first."); return; }
-      if (state.jdOnlyDraft && !state.r1Scheduled && !state.r2Scheduled) { say(zh ? "请先安排一轮面试。" : "Schedule a round before starting the interview."); return; }
-      set({ screen: "live" });
-      return;
-    }
-    set({ screen: "review" });
-  };
+  const nextActionHeading = !liveDone
+    ? (zh ? "完成 Round 1 面试" : "Complete Round 1 interview")
+    : (zh ? "复核当前证据" : "Review current evidence");
+  const nextActionLabel = !liveDone
+    ? (zh ? "开始本轮面试" : "Start this round")
+    : (zh ? "进入评审" : "Go to review");
+  const nextAction = () => void advance(liveDone ? "review" : "live");
   const focusComps = !state.r1Done
     ? (zh ? "分布式系统设计、后端工程深度、技术沟通" : "Distributed Systems Design, Backend Engineering Depth, Technical Communication")
     : (zh ? "生产责任与事故响应、安全与合规意识、协作与辅导" : "Production Ownership & Incident Response, Security & Compliance Awareness, Collaboration & Mentorship");
 
-  const blocked = state.jdOnlyDraft && (!state.candidateLinked || (!state.r1Scheduled && !state.r2Scheduled));
-  const startLive = () => { if (blocked) return; set({ screen: "live" }); };
+  // Brief is done once its questions exist — refresh the nav so Live Interview unlocks.
+  const questionCount = briefState?.questions.length ?? 0;
+  useEffect(() => { if (questionCount > 0) void reloadTask(); }, [questionCount]); // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
     <>
@@ -293,22 +279,20 @@ export function BriefPage() {
         </div>
       </div>
 
-      <div className="flex flex-wrap items-center gap-2.5 rounded-[14px] border border-[var(--line)] bg-[var(--surface-2)] px-4 py-[13px]">
-        <div className="flex-1" />
-        <button onClick={() => set({ screen: "schedule" })} className="h-[34px] cursor-pointer rounded-[11px] border border-transparent bg-transparent px-3 text-[12.5px] text-[var(--ink-2)]">
-          {t.backToSchedule}
-        </button>
-        <button
-          disabled={blocked}
-          onClick={startLive}
-          className={
-            "h-[34px] cursor-pointer rounded-[11px] border px-[15px] text-[12.5px] font-semibold " +
-            (blocked ? "cursor-not-allowed border-[var(--line)] bg-[var(--surface-3)] text-[var(--ink-3)]" : "border-[var(--brand)] bg-[var(--brand)] text-[var(--brand-ink)]")
-          }
-        >
-          {blocked ? (zh ? "请先完成前置步骤" : "Complete setup before interview") : t.startLiveInterview}
-        </button>
-      </div>
+      {!isDone("brief") && (
+        <div className="flex flex-wrap items-center gap-2.5 rounded-[14px] border border-[var(--line)] bg-[var(--surface-2)] px-4 py-[13px]">
+          <div className="flex-1" />
+          <button onClick={() => set({ screen: "schedule" })} className="h-[34px] cursor-pointer rounded-[11px] border border-transparent bg-transparent px-3 text-[12.5px] text-[var(--ink-2)]">
+            {t.backToSchedule}
+          </button>
+          <button
+            onClick={() => void advance("live")}
+            className="h-[34px] cursor-pointer rounded-[11px] border border-[var(--brand)] bg-[var(--brand)] px-[15px] text-[12.5px] font-semibold text-[var(--brand-ink)]"
+          >
+            {t.startLiveInterview}
+          </button>
+        </div>
+      )}
     </>
   );
 }

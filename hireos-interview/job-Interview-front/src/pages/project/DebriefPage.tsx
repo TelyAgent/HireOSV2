@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { useStore } from "../../store/StoreContext";
+import { useProjectTask } from "../../features/project-intake/useTask";
 import { Pill, toneBg, toneFg, type Tone } from "../../utils/status";
 import { api, type DebriefCard, type DebriefSummary } from "../../features/project-intake/api";
 
@@ -50,6 +51,7 @@ function DebriefRow({ card, bar, open, onToggle, zh }: { card: DebriefCard; bar:
 
 export function DebriefPage() {
   const { state, set, t } = useStore();
+  const { advance, isDone } = useProjectTask();
   const zh = state.lang === "zh";
   const [summary, setSummary] = useState<DebriefSummary | null>(null);
   const [error, setError] = useState("");
@@ -67,7 +69,7 @@ export function DebriefPage() {
     setStarting(true); setStartError("");
     try {
       await api(`/tasks/${state.currentTaskId}/decision-draft`, { method: "POST" });
-      set({ screen: "decision" });
+      await advance("decision");
     } catch (e) {
       const code = e instanceof Error ? e.message : "REQUEST_FAILED";
       setStartError(code === "ROUNDS_NOT_COMPLETED" ? (zh ? "还有轮次未完成，无法生成决定。" : "Some rounds aren't completed yet.")
@@ -128,17 +130,6 @@ export function DebriefPage() {
     { label: zh ? "已评估权重" : "EVALUATED WEIGHT", value: `${summary.evaluatedWeightPct}%`, sub: zh ? "占总评分标准" : "of total rubric" },
     { label: zh ? "总体结果" : "OVERALL SCORE", value: summary.overall == null ? "—" : summary.overall === "pass" ? (zh ? "通过" : "Pass") : (zh ? "未通过" : "Fail"), sub: summary.overall == null ? (zh ? "部分评估 — 见下方" : "partial — see below") : (zh ? "所有需求项已评分" : "all requirements scored") },
   ];
-
-  if (summary.totalCards === 0) {
-    return (
-      <div style={{ ...panel, display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
-        <div style={{ flex: 1, minWidth: 220, fontSize: 12.5, lineHeight: 1.6, color: "var(--ink-2)" }}>
-          {zh ? "汇总评估按「要求与评分标准」里已确认的能力卡片逐项汇总。该职位的评分标准尚未确认，请先确认能力卡片，再回到评审逐项打分。" : "Debrief rolls up the confirmed capability cards from Requirements & Rubric. This role's rubric isn't confirmed yet — confirm the cards first, then score them on Review."}
-        </div>
-        <button onClick={() => set({ screen: "rubric" })} style={{ height: 32, padding: "0 13px", border: "1px solid var(--brand)", borderRadius: 9, background: "var(--brand)", color: "var(--brand-ink)", fontSize: 12.5, fontWeight: 600, cursor: "pointer" }}>{zh ? "前往要求与评分标准" : "Go to Requirements & Rubric"}</button>
-      </div>
-    );
-  }
 
   return (
     <>
@@ -201,12 +192,14 @@ export function DebriefPage() {
         </div>
       )}
 
-      <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "13px 16px", border: "1px solid var(--line)", borderRadius: 14, background: "var(--surface-2)", flexWrap: "wrap" }}>
-        <div style={{ flex: 1 }} />
-        <button onClick={() => set({ screen: "review" })} style={{ height: 34, padding: "0 12px", border: "1px solid transparent", borderRadius: 11, background: "transparent", color: "var(--ink-2)", fontSize: 12.5, cursor: "pointer" }}>{t.backToReview}</button>
-        {startError && <span role="alert" style={{ fontSize: 11.5, color: "var(--bad)" }}>{startError}</span>}
-        <button disabled={starting} onClick={() => void continueToDecision()} style={{ height: 34, padding: "0 15px", border: "1px solid var(--brand)", borderRadius: 11, background: "var(--brand)", color: "var(--brand-ink)", fontSize: 12.5, fontWeight: 600, cursor: starting ? "not-allowed" : "pointer", opacity: starting ? 0.6 : 1 }}>{starting ? (zh ? "正在准备决定…" : "Preparing decision…") : t.continueToDecision}</button>
-      </div>
+      {!isDone("debrief") && (
+        <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "13px 16px", border: "1px solid var(--line)", borderRadius: 14, background: "var(--surface-2)", flexWrap: "wrap" }}>
+          <div style={{ flex: 1 }} />
+          <button onClick={() => set({ screen: "review" })} style={{ height: 34, padding: "0 12px", border: "1px solid transparent", borderRadius: 11, background: "transparent", color: "var(--ink-2)", fontSize: 12.5, cursor: "pointer" }}>{t.backToReview}</button>
+          {startError && <span role="alert" style={{ fontSize: 11.5, color: "var(--bad)" }}>{startError}</span>}
+          <button disabled={starting} onClick={() => void continueToDecision()} style={{ height: 34, padding: "0 15px", border: "1px solid var(--brand)", borderRadius: 11, background: "var(--brand)", color: "var(--brand-ink)", fontSize: 12.5, fontWeight: 600, cursor: starting ? "not-allowed" : "pointer", opacity: starting ? 0.6 : 1 }}>{starting ? (zh ? "正在准备决定…" : "Preparing decision…") : t.continueToDecision}</button>
+        </div>
+      )}
     </>
   );
 }

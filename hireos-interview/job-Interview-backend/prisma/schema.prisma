@@ -121,6 +121,11 @@ model InterviewTask {
   hmConfirmedAt        DateTime?
   offerState           String    @default("none") // none | sent
   offerSentAt          DateTime?
+  // Flow-stage confirmations that have no other durable trace (see intake/task-stages.ts):
+  // Interview Plan "confirm", Review's "Continue to debrief", Debrief's "Continue to decision".
+  planConfirmedAt      DateTime?
+  reviewConfirmedAt    DateTime?
+  debriefConfirmedAt   DateTime?
   createdAt            DateTime  @default(now())
   updatedAt            DateTime  @updatedAt
   job                  Job       @relation(fields: [jobId], references: [id])

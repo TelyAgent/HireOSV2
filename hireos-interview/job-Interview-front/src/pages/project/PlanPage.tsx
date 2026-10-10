@@ -5,6 +5,7 @@ import { Pill } from "../../utils/status";
 import { PlusSvg, CloseSvg, ChevronSvg } from "../../components/ui/Icons";
 import { api, type ApiError, type Interviewer, type Round } from "../../features/project-intake/api";
 import { errorText } from "../../features/project-intake/i18n";
+import { useProjectTask } from "../../features/project-intake/useTask";
 
 const FORMAT_OPTIONS = ["Onsite panel", "Video interview", "1:1 interview", "Work sample"];
 const DURATION_OPTIONS = [30, 45, 50, 60, 90];
@@ -27,6 +28,12 @@ export function PlanPage() {
   const { state, set, say, t } = useStore();
   const zh = state.lang === "zh";
   const taskId = state.currentTaskId;
+  const { task, reload: reloadTask, advance } = useProjectTask();
+  const stage = (s: string) => task?.stages.find((x) => x.stage === s);
+  const planConfirmed = !!stage("plan")?.done;
+  // Undoing the confirmation is only allowed until the first round gets a meeting time.
+  const canUnconfirm = planConfirmed && !stage("schedule")?.done;
+  const [confirming, setConfirming] = useState(false);
 
   const [interviewers, setInterviewers] = useState<Interviewer[]>([]);
   const [rounds, setRounds] = useState<Round[]>([]);
@@ -55,7 +62,7 @@ export function PlanPage() {
 
   const editingRound = openRoundId && openRoundId !== "new" ? rounds.find((r) => r.id === openRoundId) ?? null : null;
   const isNew = openRoundId === "new";
-  const locked = !!editingRound && editingRound.status === "completed";
+  const locked = planConfirmed || (!!editingRound && editingRound.status === "completed");
 
   const openExisting = (r: Round) => {
     setOpenRoundId(r.id);
@@ -85,7 +92,6 @@ export function PlanPage() {
         say(t.roundUpdatedNotice);
       }
       closeDrawer();
-      set({ planApproved: false });
       loadRounds();
     } catch (e) {
       const code = (e as ApiError).code;
@@ -97,24 +103,27 @@ export function PlanPage() {
     }
   };
 
-  const approvePlan = () => {
-    if (!state.rubricConfirmed) {
-      say(zh ? "请先确认评分标准，再批准面试计划。" : "Confirm the rubric before approving the plan.");
-      return;
+  const togglePlanConfirmed = async () => {
+    if (!taskId) return;
+    setConfirming(true);
+    try {
+      await api(`/tasks/${taskId}/plan/confirm`, { method: "PATCH", body: JSON.stringify({ confirmed: !planConfirmed }) });
+      await reloadTask();
+      say(planConfirmed
+        ? (zh ? "已撤销确认，可以继续修改面试计划。" : "Plan unconfirmed. You can edit the rounds again.")
+        : (zh ? "面试计划已确定，现在可以进行排期。" : "Interview plan confirmed. Scheduling is now available."));
+    } catch (e) {
+      say(errorText((e as ApiError).code, state.lang));
+    } finally {
+      setConfirming(false);
     }
-    if (state.planApproved) {
-      say(zh ? "该面试计划已经确定。" : "This plan is already confirmed.");
-      return;
-    }
-    set({ planApproved: true });
-    say(zh ? "面试计划已确定，现在可以进行排期。" : "Interview plan confirmed. Scheduling is now available.");
   };
 
   const footNote = state.followUpRounds.length
     ? (zh ? "补充面试轮次已从评审环节创建，用于补齐安全与合规能力的证据缺口——请先完成排期和面试，再回到决定页。" : "A follow-up round was added from the debrief to close the Security & Compliance evidence gap — schedule and complete it before returning to the decision.")
     : rounds.length > 0 && rounds.every((r) => r.status === "completed")
       ? (zh ? "全部轮次均已完成；该已确认计划现为只读记录。" : "All rounds are complete; this confirmed plan is now a read-only record.")
-      : state.planApproved
+      : planConfirmed
         ? (zh ? "面试计划已确定。候选人和面试官就绪后，为每一轮安排排期。" : "Plan confirmed. Schedule each planned round when the candidate and interviewers are ready.")
         : (zh ? "请检查负责人、能力覆盖和必问问题，然后确定面试计划再进行排期。" : "Review owners, coverage and mandatory questions, then confirm this plan before scheduling.");
 
@@ -125,13 +134,15 @@ export function PlanPage() {
           <div className="text-[15px] font-bold">{t.planRoundsTitle}</div>
           <div className="mt-[3px] text-xs text-[var(--ink-3)]">{t.planRoundsHint}</div>
         </div>
-        <button
-          onClick={openNew}
-          className="flex h-[34px] cursor-pointer items-center gap-1.5 rounded-[10px] border border-[var(--brand)] bg-[var(--brand)] px-[13px] text-[12.5px] font-semibold text-[var(--brand-ink)]"
-        >
-          <PlusSvg size={17} />
-          {t.newInterviewRound}
-        </button>
+        {!planConfirmed && (
+          <button
+            onClick={openNew}
+            className="flex h-[34px] cursor-pointer items-center gap-1.5 rounded-[10px] border border-[var(--brand)] bg-[var(--brand)] px-[13px] text-[12.5px] font-semibold text-[var(--brand-ink)]"
+          >
+            <PlusSvg size={17} />
+            {t.newInterviewRound}
+          </button>
+        )}
       </div>
 
       {loading && <div className="rounded-[14px] border border-[var(--line)] bg-[var(--surface)] px-[17px] py-[15px] text-xs text-[var(--ink-3)]">{zh ? "加载中…" : "Loading…"}</div>}
@@ -216,18 +227,24 @@ export function PlanPage() {
       <div className="flex flex-wrap items-center gap-2.5 rounded-[14px] border border-[var(--line)] bg-[var(--surface-2)] px-4 py-[13px]">
         <div className="max-w-[430px] text-[11.5px] leading-[1.4] text-[var(--ink-3)]">{footNote}</div>
         <div className="flex-1" />
-        <button
-          onClick={approvePlan}
-          className="h-[34px] cursor-pointer rounded-[11px] border border-[var(--line-strong)] bg-[var(--surface)] px-3.5 text-[12.5px] font-semibold text-[var(--ink)]"
-        >
-          {state.planApproved ? t.interviewPlanConfirmed : t.confirmInterviewPlan}
-        </button>
-        <button
-          onClick={() => set({ screen: "schedule" })}
-          className="h-[34px] cursor-pointer rounded-[11px] border border-[var(--brand)] bg-[var(--brand)] px-[15px] text-[12.5px] font-semibold text-[var(--brand-ink)]"
-        >
-          {t.continueToSchedule}
-        </button>
+        {/* Once confirmed, only "Unconfirm" remains — and only until the first round is scheduled. */}
+        {(!planConfirmed || canUnconfirm) && (
+          <button
+            onClick={() => void togglePlanConfirmed()}
+            disabled={confirming}
+            className="h-[34px] cursor-pointer rounded-[11px] border border-[var(--line-strong)] bg-[var(--surface)] px-3.5 text-[12.5px] font-semibold text-[var(--ink)] disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            {planConfirmed ? (zh ? "撤销确认" : "Unconfirm plan") : t.confirmInterviewPlan}
+          </button>
+        )}
+        {!planConfirmed && (
+          <button
+            onClick={() => void advance("schedule")}
+            className="h-[34px] cursor-pointer rounded-[11px] border border-[var(--brand)] bg-[var(--brand)] px-[15px] text-[12.5px] font-semibold text-[var(--brand-ink)]"
+          >
+            {t.continueToSchedule}
+          </button>
+        )}
       </div>
 
       <Drawer
@@ -271,7 +288,9 @@ export function PlanPage() {
             <div className="px-5 pb-6 pt-5">
               {locked && (
                 <div className="mb-4 rounded-[10px] border border-[var(--line)] bg-[var(--surface-2)] p-3 text-xs text-[var(--ink-2)]">
-                  {t.roundLockedNote}
+                  {editingRound?.status === "completed"
+                    ? t.roundLockedNote
+                    : (zh ? "面试计划已确定，轮次只读。如需修改，请先撤销确认（仅在尚未排期时可撤销）。" : "The plan is confirmed, so rounds are read-only. Unconfirm the plan to edit (only possible before any round is scheduled).")}
                 </div>
               )}
               <div className="flex flex-col gap-4">

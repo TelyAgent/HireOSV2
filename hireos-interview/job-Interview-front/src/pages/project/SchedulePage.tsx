@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Drawer } from "antd";
 import { useStore } from "../../store/StoreContext";
+import { useProjectTask } from "../../features/project-intake/useTask";
 import { Pill } from "../../utils/status";
 import { CloseSvg } from "../../components/ui/Icons";
 import { api, type ApiError, type Round } from "../../features/project-intake/api";
@@ -32,6 +33,7 @@ export function SchedulePage() {
   const { state, set, say, t } = useStore();
   const zh = state.lang === "zh";
   const taskId = state.currentTaskId;
+  const { reload: reloadTask, advance, isDone } = useProjectTask();
 
   const [rounds, setRounds] = useState<Round[]>([]);
   const [loading, setLoading] = useState(true);
@@ -172,6 +174,7 @@ export function SchedulePage() {
       say(zh ? `${round.name} 已排期。邀请与日历占用为模拟操作，已明确标注。` : `${round.name} scheduled. Invitation and calendar hold are simulated and clearly labeled.`);
       closeDrawer();
       loadRounds();
+      void reloadTask();
     } catch (e) {
       const code = (e as ApiError).code;
       say(code === "VERSION_CONFLICT"
@@ -290,7 +293,10 @@ export function SchedulePage() {
                     </div>
                   ) : r.meetingLink && isZoomLink(r.meetingLink) ? (
                     <button
-                      onClick={() => set({ liveJoinRound: { roundId: r.id, topic: `HireOS Interview — ${r.name}` }, roundView: r.sequence === 2 ? "r2" : "r1", screen: "live" })}
+                      onClick={async () => {
+                        set({ liveJoinRound: { roundId: r.id, topic: `HireOS Interview — ${r.name}` }, roundView: r.sequence === 2 ? "r2" : "r1" });
+                        if (!(await advance("live"))) set({ liveJoinRound: null });
+                      }}
                       className="inline-flex h-[22px] cursor-pointer items-center rounded-md border-0 bg-[var(--brand-soft)] px-2 text-[11.5px] text-[var(--brand)] underline"
                     >
                       📹 {t.joinMeetingLabel}
@@ -315,7 +321,6 @@ export function SchedulePage() {
                   <button
                     onClick={() => {
                       if (r.status === "completed") { set({ roundView: r.sequence === 2 ? "r2" : "r1", screen: "live" }); return; }
-                      if (!state.planApproved) { say(zh ? "请先确定面试计划，再进行排期。" : "Approve the interview plan before scheduling."); return; }
                       openSchedule(r);
                     }}
                     className="cursor-pointer border-0 bg-transparent p-0 text-[11.5px] text-[var(--brand)] underline"
@@ -393,15 +398,17 @@ export function SchedulePage() {
         </div>
       </div>
 
-      <div className="flex flex-wrap items-center gap-2.5 rounded-[14px] border border-[var(--line)] bg-[var(--surface-2)] px-4 py-[13px]">
-        <div className="flex-1" />
-        <button onClick={() => set({ screen: "plan" })} className="h-[34px] cursor-pointer rounded-[11px] border border-transparent bg-transparent px-3 text-[12.5px] text-[var(--ink-2)]">
-          {t.backToPlan}
-        </button>
-        <button onClick={() => set({ screen: "brief" })} className="h-[34px] cursor-pointer rounded-[11px] border border-[var(--brand)] bg-[var(--brand)] px-[15px] text-[12.5px] font-semibold text-[var(--brand-ink)]">
-          {t.continueToBrief}
-        </button>
-      </div>
+      {!isDone("schedule") && (
+        <div className="flex flex-wrap items-center gap-2.5 rounded-[14px] border border-[var(--line)] bg-[var(--surface-2)] px-4 py-[13px]">
+          <div className="flex-1" />
+          <button onClick={() => set({ screen: "plan" })} className="h-[34px] cursor-pointer rounded-[11px] border border-transparent bg-transparent px-3 text-[12.5px] text-[var(--ink-2)]">
+            {t.backToPlan}
+          </button>
+          <button onClick={() => void advance("brief")} className="h-[34px] cursor-pointer rounded-[11px] border border-[var(--brand)] bg-[var(--brand)] px-[15px] text-[12.5px] font-semibold text-[var(--brand-ink)]">
+            {t.continueToBrief}
+          </button>
+        </div>
+      )}
 
       <Drawer
         open={!!openRoundId}

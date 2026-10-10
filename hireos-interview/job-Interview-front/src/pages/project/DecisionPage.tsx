@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { useStore } from "../../store/StoreContext";
+import { useProjectTask } from "../../features/project-intake/useTask";
 import { Pill } from "../../utils/status";
 import { api, type Decision, type DecisionState } from "../../features/project-intake/api";
 
@@ -16,6 +17,7 @@ const eyebrow = { fontFamily: "'IBM Plex Mono', monospace", fontSize: 10.5, lett
 
 export function DecisionPage() {
   const { state, set, t } = useStore();
+  const { reload: reloadTask, advance, isDone } = useProjectTask();
   const zh = state.lang === "zh";
   const taskId = state.currentTaskId;
   const [data, setData] = useState<DecisionState | null>(null);
@@ -43,7 +45,10 @@ export function DecisionPage() {
     if (!taskId || !data) return;
     const next = data.decision === value ? null : value;
     setSaving(true);
-    try { setData(await api<DecisionState>(`/tasks/${taskId}/decision`, { method: "PATCH", body: JSON.stringify({ decision: next }) })); }
+    try {
+      setData(await api<DecisionState>(`/tasks/${taskId}/decision`, { method: "PATCH", body: JSON.stringify({ decision: next }) }));
+      void reloadTask(); // recording (or clearing) the decision locks/unlocks the package
+    }
     catch (e) { setError(e instanceof Error ? e.message : "REQUEST_FAILED"); }
     finally { setSaving(false); }
   };
@@ -105,13 +110,15 @@ export function DecisionPage() {
         {!generating && !data.conclusion && status !== "failed" && <div style={{ marginTop: 10, fontSize: 12.5, color: "var(--ink-3)" }}>{zh ? "还没有结论草案。" : "No draft yet."}</div>}
       </div>
 
-      <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "13px 16px", border: "1px solid var(--line)", borderRadius: 14, background: "var(--surface-2)", flexWrap: "wrap" }}>
-        <div style={{ flex: 1 }} />
-        <button onClick={() => set({ screen: "debrief" })} style={{ height: 34, padding: "0 12px", border: "1px solid transparent", borderRadius: 11, background: "transparent", color: "var(--ink-2)", fontSize: 12.5, cursor: "pointer" }}>{t.backToDebrief}</button>
-        {data.decision
-          ? <button onClick={() => set({ screen: "package" })} style={{ height: 34, padding: "0 15px", border: "1px solid var(--brand)", borderRadius: 11, background: "var(--brand)", color: "var(--brand-ink)", fontSize: 12.5, fontWeight: 600, cursor: "pointer" }}>{zh ? "前往评估包" : "Go to evaluation package"}</button>
-          : <span style={{ fontSize: 11.5, color: "var(--ink-3)" }}>{zh ? "记录决定后，这里才会出现「前往评估包」。" : "“Go to evaluation package” appears here once a decision is recorded."}</span>}
-      </div>
+      {!isDone("decision") && (
+        <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "13px 16px", border: "1px solid var(--line)", borderRadius: 14, background: "var(--surface-2)", flexWrap: "wrap" }}>
+          <div style={{ flex: 1 }} />
+          <button onClick={() => set({ screen: "debrief" })} style={{ height: 34, padding: "0 12px", border: "1px solid transparent", borderRadius: 11, background: "transparent", color: "var(--ink-2)", fontSize: 12.5, cursor: "pointer" }}>{t.backToDebrief}</button>
+          {data.decision
+            ? <button onClick={() => void advance("package")} style={{ height: 34, padding: "0 15px", border: "1px solid var(--brand)", borderRadius: 11, background: "var(--brand)", color: "var(--brand-ink)", fontSize: 12.5, fontWeight: 600, cursor: "pointer" }}>{zh ? "前往评估包" : "Go to evaluation package"}</button>
+            : <span style={{ fontSize: 11.5, color: "var(--ink-3)" }}>{zh ? "记录决定后，这里才会出现「前往评估包」。" : "“Go to evaluation package” appears here once a decision is recorded."}</span>}
+        </div>
+      )}
     </>
   );
 }
