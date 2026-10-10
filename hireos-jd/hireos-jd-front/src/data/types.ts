@@ -43,7 +43,6 @@ export type PublicationStatus =
   | "withdrawal_pending"
   | "withdrawn";
 export type Priority = "low" | "normal" | "high" | "urgent";
-export type ConnectionStatus = "not_connected" | "connected" | "paused" | "disconnected" | "authorization_required";
 export type FileConsumption = "unassigned" | "pending" | "accepted" | "needs_review" | "rejected" | "failed";
 export type Audience = "internal" | "external";
 
@@ -276,30 +275,6 @@ export interface FileItem {
   uploadedBy: PersonId | null;
   uploadedAt: string;
   consumption: FileConsumption;
-  error?: string;
-}
-
-export interface Connection {
-  id: string;
-  kind: "email" | "folder" | (string & {});
-  name: string;
-  scope: string;
-  owner: PersonId;
-  mode: string;
-  status: ConnectionStatus;
-  lastReadAt: string | null;
-  nextReadAt?: string | null;
-}
-
-export interface OpActivity {
-  id: string;
-  type: "read_run" | "upload" | "download" | "consumption_failed" | (string & {});
-  status: string;
-  at: string;
-  actor: string;
-  connection?: string;
-  file?: string;
-  counts?: { discovered: number; matched: number; succeeded: number; skipped: number; failed: number };
   error?: string;
 }
 

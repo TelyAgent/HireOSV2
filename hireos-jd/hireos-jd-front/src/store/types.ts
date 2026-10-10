@@ -3,11 +3,9 @@ import type {
   Approval,
   Audience,
   CommentThread,
-  Connection,
   DocumentDraft,
   FileItem,
   Job,
-  OpActivity,
   PersonId,
   Publication,
   Requirement,
@@ -84,8 +82,6 @@ export interface AppState {
   publications: Record<string, Publication[]>;
   activity: Record<string, ActivityItem[]>;
   files: FileItem[];
-  connections: Connection[];
-  opActivity: OpActivity[];
 
   // job workspace editor state
   wsSelection: DocSelection | null;

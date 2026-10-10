@@ -2,7 +2,7 @@ import { ROLE_VERSIONS } from "../data/fixtures/roleVersions";
 import { REQUIREMENTS, RESTRICTED } from "../data/fixtures/requirements";
 import { COMMENT_THREADS, DOCUMENTS, SUGGESTIONS } from "../data/fixtures/documents";
 import { APPROVALS, JOB_ACTIVITY, PUBLICATIONS } from "../data/fixtures/approvals";
-import { CONNECTIONS, FILES, OP_ACTIVITY } from "../data/fixtures/files";
+import { FILES } from "../data/fixtures/files";
 import type { AppState } from "./types";
 
 /** Deep clone so edits in the prototype store never mutate the fixture modules. */
@@ -39,8 +39,6 @@ export const initialState: AppState = {
   publications: clone(PUBLICATIONS),
   activity: clone(JOB_ACTIVITY),
   files: clone(FILES),
-  connections: clone(CONNECTIONS),
-  opActivity: clone(OP_ACTIVITY),
 
   wsSelection: null,
   wsSideTab: "copilot",
