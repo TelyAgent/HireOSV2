@@ -7,17 +7,17 @@ import { join } from 'node:path';
 import type { Identity } from '../intake/workspace.guard';
 import { MeetingsService } from './meetings.service';
 
-type MeetingInfo = { id: string; password: string; joinUrl: string };
-// One Zoom account, many meetings — keyed by a caller-chosen string. "default" is the
-// account's original single meeting (Live Interview hosting, unaware of any specific
-// round); a real InterviewRound.id keys that round's own meeting (Schedule's generated
-// link). Each key gets its own independent create-once-then-reuse lifecycle.
 // Fields read from Zoom API responses.
 type ZoomTokenResponse = { access_token?: string; refresh_token?: string; expires_in?: number };
 type ZoomUser = { id?: string; email?: string; first_name?: string; last_name?: string; display_name?: string };
 type ZoomZak = { token?: string };
 type ZoomMeeting = { id?: number; join_url?: string; password?: string };
 
+type MeetingInfo = { id: string; password: string; joinUrl: string };
+// One Zoom account, many meetings — keyed by a caller-chosen string. "default" is the
+// account's original single meeting (Live Interview hosting, unaware of any specific
+// round); a real InterviewRound.id keys that round's own meeting (Schedule's generated
+// link). Each key gets its own independent create-once-then-reuse lifecycle.
 type Account = {
   id: string; name: string; email?: string; clientId: string; access: string; refresh: string; expires: number;
   meetings?: Record<string, MeetingInfo>;

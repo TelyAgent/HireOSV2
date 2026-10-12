@@ -7,12 +7,6 @@ import { ZoomHostService } from './zoom-host.service';
 
 const RTMS_TRANSCRIPT_CHINESE_SIMPLIFIED = 4;
 
-// Bridges Zoom RTMS (Realtime Media Streams) to a round's live transcript. One `rtms.Client`
-// per active stream, keyed by `rtms_stream_id` (mirrors the SDK's own quickstart pattern —
-// a stream id is unique per meeting.rtms_started session, letting multiple rounds stream
-// concurrently). The SDK's `client.join()` performs Zoom's own signaling/media WebSocket
-// handshake and keep-alive internally; we only handle finding the right round and recording
-// what comes back. See https://zoom.github.io/rtms/js/ for the full wire protocol this hides.
 // Zoom RTMS webhook payload. Only the fields this service reads are typed; Zoom sends
 // more (server_urls, signature, ...) which are passed through to the SDK untouched.
 export type ZoomRtmsFields = {
@@ -31,6 +25,12 @@ export type ZoomWebhookBody = {
   __invalidJson?: boolean;
 };
 
+// Bridges Zoom RTMS (Realtime Media Streams) to a round's live transcript. One `rtms.Client`
+// per active stream, keyed by `rtms_stream_id` (mirrors the SDK's own quickstart pattern —
+// a stream id is unique per meeting.rtms_started session, letting multiple rounds stream
+// concurrently). The SDK's `client.join()` performs Zoom's own signaling/media WebSocket
+// handshake and keep-alive internally; we only handle finding the right round and recording
+// what comes back. See https://zoom.github.io/rtms/js/ for the full wire protocol this hides.
 @Injectable()
 export class RtmsService {
   private readonly logger = new Logger(RtmsService.name);
