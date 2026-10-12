@@ -50,7 +50,7 @@ npm test                 # 仅后端：先 build，再 node --test test/*.test.c
 本项目只有一名开发者（仓库管理员），main 允许管理员直接 push。
 
 - **直接修改**：日常小修小改、调试、紧急修复。不需要 Issue 或 PR，按用户指示改代码；是否 commit、push 由用户决定。push 到 main 后 CI 仍会检查全部子项目，但失败不会拦住这次 push。
-- **Issue → PR 流程**：用户说"Execute GitHub Issue #n"时，或者改动属于下面这些情况时，走完整流程：AI 实现的需求、产品经理提的需求、Prisma schema 变更、跨子系统接口变更、`.github/` 和 Agent 规则的变更。拿不准时问用户。
+- **Issue → PR 流程**：Issue 由用户口头描述、Agent 起草并创建（见“创建 Issue”）。用户说"Execute GitHub Issue #n"时，或者改动属于下面这些情况时，走完整流程：AI 实现的需求、产品经理提的需求、Prisma schema 变更、跨子系统接口变更、`.github/` 和 Agent 规则的变更。拿不准时问用户。
 
 ## Issue 和 PR 门槛（走流程时）
 
@@ -59,14 +59,29 @@ npm test                 # 仅后端：先 build，再 node --test test/*.test.c
 - 需求、依赖或验收条件里有影响行为的未决问题时，在 Issue 留 `[AI-QUESTION]`，并停下依赖该信息的实现；不要自己猜产品意图。
 - PR 使用 [pull request template](.github/pull_request_template.md)，在分支上开发，不直接 push main。
 
+## 创建 Issue
+
+Issue 由人描述需求（用户自己的，或用户转述的产品经理需求），由 Agent 起草并创建。用户说“建个 Issue：……”或类似的话时：
+
+1. 读相关代码和文档，弄清现状，确定 Type（Feature / Bug / Design / Tech Debt）和 Subsystem。
+2. 按 `.github/ISSUE_TEMPLATE/<type>.yml` 的字段起草完整的 Issue 正文，包括该表单特有的字段（例如 Bug 的 Reproduction、Severity）。格式必须与表单渲染结果一致：每个字段写成 `### 字段名`，空一行后接内容，否则 CI 的 Issue contract 解析不了。标题沿用表单前缀，例如 `[Feature] `。Owner 默认填 `@JsonSuCoder`。
+3. AC 写成可验证的结果，用 `AC-1`、`AC-2` 编号，覆盖主流程和关键的异常情况。不要把实现方案写成 AC。
+4. **先在对话里给用户看草稿**，单独列出你的假设和不确定的点，等用户确认或修改。不要未经确认就创建。
+5. 用户确认后，用 `gh issue create` 创建：
+   - 用户确认了 AC：`AI Ready` 写 `Yes`，不加 `needs-triage`。
+   - 还有未决问题：`AI Ready` 写 `No`，加 `needs-triage`，并把问题以 `[AI-QUESTION]` 评论到 Issue 里。
+6. 返回 Issue 链接。用户说执行（或一开始就说“建好后直接做”）时才开始实现。
+
+`AI Ready=Yes` 只能来自用户对 AC 的明确确认，Agent 不能自己判定需求已经清楚。
+
 ## 整理 Issue
 
-用户说"整理 Issue #n"时（通常是产品经理提的 Issue，`AI Ready=No`）：
+产品经理直接在 GitHub 上提了 Issue（`AI Ready=No`），用户说“整理 Issue #n”时：
 
-1. 读取 Issue 和全部评论，以及相关代码，弄清现状。
-2. 在 Issue 中起草 Scope、Non-goals 和可验证的 `AC-1..n`，并补全 Subsystem、References、Dependencies、Risk 等字段。不要改动提出人写的 Problem 和 User Outcome。
-3. 产品层面的疑问用 `[AI-QUESTION]` 评论，并 @ 提出人；技术层面的疑问问用户。
-4. 不要自己把 `AI Ready` 改成 Yes，由用户确认 AC 后修改。
+1. 读取 Issue 和全部评论，以及相关代码。
+2. 起草 Scope、Non-goals 和 `AC-1..n`，补全其他字段，同样先在对话里给用户看。不要改动提出人写的 Problem 和 User Outcome。
+3. 用户确认后再更新 Issue；产品层面的疑问用 `[AI-QUESTION]` 评论并 @ 提出人。
+4. 由用户确认 AC 后，才把 `AI Ready` 改为 Yes。
 
 ## 实现和验证
 

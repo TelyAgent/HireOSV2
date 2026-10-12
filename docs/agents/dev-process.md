@@ -27,28 +27,32 @@ GitHub 是研发决策的唯一权威来源。人尽量不要先讲给另一个�
 
 直接 push 后，CI 仍会检查全部子项目。失败不会拦住这次 push，但 Actions 页面会显示红叉并发邮件提醒。
 
-## 产品经理提的 Issue
+## Issue 怎么来
 
-产品经理用表单提 Issue，写清楚 Problem 和 User Outcome，`AI Ready` 保持 No，不要求写 `AC-n`。
+Issue 由人描述、由 Claude 创建，不需要手动填表单：
 
 ```text
-产品经理提 Issue（AI Ready=No）
-   ↓  开发者对 Claude Code 说："整理 Issue #n"
-Claude 读 Issue 和代码，起草 Scope / Non-goals / AC-1..n
-   ↓  产品层面的疑问：[AI-QUESTION] @产品经理
-产品经理在 Issue 里回答
-   ↓  开发者确认 AC，改为 AI Ready=Yes
-"Execute GitHub Issue #n" → PR → CI + Claude Review → 合并
+你描述需求（自己的，或转述产品经理的）："建个 Issue：……"
+   ↓
+Claude 读代码，按表单字段起草 Issue（含 AC-1..n），在对话里给你看，并列出假设和疑问
+   ↓
+你确认或修改 AC
+   ↓
+Claude 用 gh 创建 Issue（AI Ready=Yes）；有未决问题时则 AI Ready=No + [AI-QUESTION]
+   ↓
+"Execute GitHub Issue #n"（或者一开始就说"建好后直接做"）
 ```
+
+产品经理如果直接在 GitHub 上用表单提了 Issue，对 Claude 说“整理 Issue #n”，由 Claude 补全 AC，你确认后再改为 AI Ready=Yes。
 
 ## 一个需求的完整路径
 
 ```text
-产品/需求方填 Issue 表单（Feature / Bug / Design / Tech Debt）
-   │  必填 Problem、Scope、Non-goals、AC-1..n、Risk、Owner
+你描述需求 → Claude 起草 Issue（Feature / Bug / Design / Tech Debt）
+   │  Problem、Scope、Non-goals、AC-1..n、Risk、Owner
    ▼
-监督者分诊：补齐信息 → 去掉 needs-triage → AI Ready=Yes
-   │  信息不足时 Agent 在 Issue 里评论 [AI-QUESTION]
+你确认 AC → Claude 创建 Issue，AI Ready=Yes
+   │  有未决问题时：AI Ready=No + [AI-QUESTION]
    ▼
 开发者让 Claude Code 执行："Execute GitHub Issue #123"
    │  Agent 依次读 Issue+评论 → AGENTS.md → 链接文件 → 代码，实现最小变更并补测试
@@ -83,7 +87,7 @@ Rules:
 
 | 角色 | 主要职责 |
 | --- | --- |
-| 产品经理 | 写 Issue 的 Problem 和 User Outcome，回答 `[AI-QUESTION]`，按 AC 验收业务结果，不审代码细节 |
+| 产品经理 | 描述需求（口头或在 Issue 里），回答 `[AI-QUESTION]`，按 AC 验收业务结果，不审代码细节 |
 | 设计 | 在 Design Issue 里交付；批准的设计放到 `docs/design/<issue>/`（design-spec.md、states.md、handoff/），完成后评论 `[AI-RESULT] design-ready` |
 | 工程师 | 把 Issue 编号交给 Agent，不重新口述需求；审 Agent 的 PR；维护 `AGENTS.md` 和 CI 注册表 |
 | Human Supervisor（目前就是开发者本人） | 分诊、设置 AI Ready、审批例外、最终合并 |
