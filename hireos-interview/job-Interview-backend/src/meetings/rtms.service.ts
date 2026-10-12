@@ -1,7 +1,7 @@
 import { BadRequestException, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { createHmac, timingSafeEqual } from 'node:crypto';
 import { ConfigService } from '@nestjs/config';
-import rtms from '@zoom/rtms';
+import rtms, { type JoinParams } from '@zoom/rtms';
 import { PrismaService } from '../persistence/prisma.service';
 import { ZoomHostService } from './zoom-host.service';
 
@@ -13,6 +13,24 @@ const RTMS_TRANSCRIPT_CHINESE_SIMPLIFIED = 4;
 // concurrently). The SDK's `client.join()` performs Zoom's own signaling/media WebSocket
 // handshake and keep-alive internally; we only handle finding the right round and recording
 // what comes back. See https://zoom.github.io/rtms/js/ for the full wire protocol this hides.
+// Zoom RTMS webhook payload. Only the fields this service reads are typed; Zoom sends
+// more (server_urls, signature, ...) which are passed through to the SDK untouched.
+export type ZoomRtmsFields = {
+  rtms_stream_id?: string;
+  meeting_uuid?: string;
+  meeting_id?: string | number;
+  id?: string | number;
+  uuid?: string;
+  object?: ZoomRtmsFields;
+  [field: string]: unknown;
+};
+
+export type ZoomWebhookBody = {
+  event?: string;
+  payload?: ZoomRtmsFields & { plainToken?: string };
+  __invalidJson?: boolean;
+};
+
 @Injectable()
 export class RtmsService {
   private readonly logger = new Logger(RtmsService.name);
@@ -193,13 +211,13 @@ export class RtmsService {
     return { plainToken, encryptedToken: createHmac('sha256', secret).update(plainToken).digest('hex') };
   }
 
-  async handleEvent(body: { event?: string; payload?: Record<string, any> }) {
+  async handleEvent(body: ZoomWebhookBody) {
     const event = body?.event;
     const inner = body?.payload || {};
     // The RTMS SDK docs put the stream fields straight on the payload; some Zoom event
     // shapes nest them under payload.object instead — accept both, and join with whichever
     // object actually holds the RTMS fields.
-    const object = (inner.object && typeof inner.object === 'object' ? inner.object : {}) as Record<string, any>;
+    const object: ZoomRtmsFields = inner.object && typeof inner.object === 'object' ? inner.object : {};
     const source = inner.rtms_stream_id ? inner : object;
     const streamId = source.rtms_stream_id;
     if (typeof event === 'string' && event.includes('rtms_stopped')) {
@@ -316,7 +334,8 @@ export class RtmsService {
         await this.markStreamError(round.id, 'TRANSCRIPT_CONFIG_FAILED');
         return;
       }
-      const joined = client.join({ ...(source as any), client: rtmsClient, secret: rtmsSecret });
+      // Zoom's webhook payload carries the SDK's join fields (server_urls, signature, ...) verbatim.
+      const joined = client.join({ ...source, client: rtmsClient, secret: rtmsSecret } as JoinParams);
       if (!joined) {
         this.logger.error(`RTMS join returned false for round ${round.id}`);
         this.clients.delete(streamId);

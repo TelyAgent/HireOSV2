@@ -6,7 +6,7 @@
       "dir": "hireos-core-record",
       "prisma": true,
       "checks": ["build", "lint", "typecheck", "test"],
-      "known_failing": ["lint"]
+      "known_failing": []
     },
     {
       "name": "jd-backend",
@@ -27,7 +27,7 @@
       "dir": "hireos-interview/job-Interview-backend",
       "prisma": true,
       "checks": ["build", "lint", "typecheck", "test"],
-      "known_failing": ["lint", "test"]
+      "known_failing": ["test"]
     },
     {
       "name": "interview-front",
@@ -41,7 +41,7 @@
       "dir": "hireos-screening/hireos-screening-backend",
       "prisma": true,
       "checks": ["build", "lint", "typecheck", "test"],
-      "known_failing": ["lint"]
+      "known_failing": []
     },
     {
       "name": "screening-front",

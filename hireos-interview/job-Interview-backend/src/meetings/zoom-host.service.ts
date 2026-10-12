@@ -12,6 +12,12 @@ type MeetingInfo = { id: string; password: string; joinUrl: string };
 // account's original single meeting (Live Interview hosting, unaware of any specific
 // round); a real InterviewRound.id keys that round's own meeting (Schedule's generated
 // link). Each key gets its own independent create-once-then-reuse lifecycle.
+// Fields read from Zoom API responses.
+type ZoomTokenResponse = { access_token?: string; refresh_token?: string; expires_in?: number };
+type ZoomUser = { id?: string; email?: string; first_name?: string; last_name?: string; display_name?: string };
+type ZoomZak = { token?: string };
+type ZoomMeeting = { id?: number; join_url?: string; password?: string };
+
 type Account = {
   id: string; name: string; email?: string; clientId: string; access: string; refresh: string; expires: number;
   meetings?: Record<string, MeetingInfo>;
@@ -66,11 +72,11 @@ export class ZoomHostService implements OnModuleDestroy {
   private async s2sAccessToken() {
     if (this.s2sTokenCache && this.s2sTokenCache.expires > Date.now() + 60000) return this.s2sTokenCache;
     const { accountId, clientId, clientSecret } = this.s2sConfig();
-    const body = await this.call(`https://zoom.us/oauth/token?grant_type=account_credentials&account_id=${encodeURIComponent(accountId)}`, {
+    const body = await this.call<ZoomTokenResponse>(`https://zoom.us/oauth/token?grant_type=account_credentials&account_id=${encodeURIComponent(accountId)}`, {
       method: 'POST',
       headers: { Authorization: `Basic ${Buffer.from(`${clientId}:${clientSecret}`).toString('base64')}` },
     }, 'TOKEN');
-    if (typeof body?.access_token !== 'string' || !Number.isFinite(body.expires_in)) throw new ServiceUnavailableException({ code: 'ZOOM_TOKEN_FAILED' });
+    if (typeof body?.access_token !== 'string' || typeof body.expires_in !== 'number' || !Number.isFinite(body.expires_in)) throw new ServiceUnavailableException({ code: 'ZOOM_TOKEN_FAILED' });
     this.s2sTokenCache = { token: body.access_token, expires: Date.now() + body.expires_in * 1000 };
     return this.s2sTokenCache;
   }
@@ -147,7 +153,9 @@ export class ZoomHostService implements OnModuleDestroy {
     await writeFile(temporary, Buffer.concat([iv, cipher.getAuthTag(), encrypted]), { mode: 0o600 });
     await rename(temporary, path);
   }
-  private async call(url: string, init: RequestInit, operation: string): Promise<any> {
+  // T is the shape the caller reads; fields stay optional because Zoom (or a non-JSON
+  // error body, which becomes {}) may omit them, and callers validate before use.
+  private async call<T>(url: string, init: RequestInit, operation: string): Promise<T> {
     let response: Response;
     try { response = await fetch(url, { ...init, signal: AbortSignal.timeout(20000) }); }
     catch { throw new ServiceUnavailableException({ code: `ZOOM_${operation}_UNCERTAIN` }); }
@@ -156,12 +164,12 @@ export class ZoomHostService implements OnModuleDestroy {
       this.logger.error(`${operation} ${response.status}: ${JSON.stringify(body)}`);
       throw new BadRequestException({ code: `ZOOM_${operation}_FAILED`, providerStatus: response.status });
     }
-    return body;
+    return body as T;
   }
   private async token(parameters: Record<string, string>) {
     const clientSecret = this.clientSecret();
     if (clientSecret) parameters.client_secret = clientSecret;
-    return this.call('https://zoom.us/oauth/token', {
+    return this.call<ZoomTokenResponse>('https://zoom.us/oauth/token', {
       method: 'POST',
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
       // Public Client OAuth uses PKCE and deliberately has no client secret.
@@ -251,8 +259,8 @@ export class ZoomHostService implements OnModuleDestroy {
         };
         if (pending.verifier) parameters.code_verifier = pending.verifier;
         const tokens = await this.token(parameters);
-        if (!tokens.access_token || !tokens.refresh_token || !Number.isFinite(tokens.expires_in)) throw new Error('Invalid token response');
-        const user = await this.call('https://api.zoom.us/v2/users/me', { headers: { Authorization: `Bearer ${tokens.access_token}` } }, 'PROFILE');
+        if (!tokens.access_token || !tokens.refresh_token || typeof tokens.expires_in !== 'number' || !Number.isFinite(tokens.expires_in)) throw new Error('Invalid token response');
+        const user = await this.call<ZoomUser>('https://api.zoom.us/v2/users/me', { headers: { Authorization: `Bearer ${tokens.access_token}` } }, 'PROFILE');
         if (!user.id) throw new Error('Invalid profile');
         const previous = await this.read(pending.owner);
         await this.save(pending.owner, {
@@ -284,7 +292,7 @@ export class ZoomHostService implements OnModuleDestroy {
     let account = await this.read(S2S_OWNER);
     const matchesHost = !!account && account.clientId === clientId && (account.id === host || account.email?.toLowerCase() === host.toLowerCase());
     if (!account || !matchesHost) {
-      const user = await this.call(`https://api.zoom.us/v2/users/${encodeURIComponent(host)}`, { headers: { Authorization: `Bearer ${token}` } }, 'PROFILE');
+      const user = await this.call<ZoomUser>(`https://api.zoom.us/v2/users/${encodeURIComponent(host)}`, { headers: { Authorization: `Bearer ${token}` } }, 'PROFILE');
       if (!user?.id) throw new ServiceUnavailableException({ code: 'ZOOM_S2S_HOST_NOT_FOUND' });
       const sameUser = !!account && account.id === user.id;
       account = {
@@ -306,12 +314,12 @@ export class ZoomHostService implements OnModuleDestroy {
     if (!account || account.clientId !== this.clientId()) throw new BadRequestException({ code: 'ZOOM_CONNECT_REQUIRED' });
     if (account.expires < Date.now() + 60000) {
       const tokens = await this.token({ grant_type: 'refresh_token', client_id: account.clientId, refresh_token: account.refresh });
-      if (!tokens.access_token || !tokens.refresh_token || !Number.isFinite(tokens.expires_in)) throw new BadRequestException({ code: 'ZOOM_CONNECT_REQUIRED' });
+      if (!tokens.access_token || !tokens.refresh_token || typeof tokens.expires_in !== 'number' || !Number.isFinite(tokens.expires_in)) throw new BadRequestException({ code: 'ZOOM_CONNECT_REQUIRED' });
       account.access = tokens.access_token; account.refresh = tokens.refresh_token; account.expires = Date.now() + tokens.expires_in * 1000;
       await this.save(owner, account);
     }
     if (!account.email) {
-      const user = await this.call('https://api.zoom.us/v2/users/me', {
+      const user = await this.call<ZoomUser>('https://api.zoom.us/v2/users/me', {
         headers: { Authorization: `Bearer ${account.access}` },
       }, 'PROFILE');
       if (typeof user?.email === 'string' && user.email) {
@@ -323,7 +331,7 @@ export class ZoomHostService implements OnModuleDestroy {
   }
 
   private async zak(account: Account) {
-    const body = await this.call('https://api.zoom.us/v2/users/me/zak', {
+    const body = await this.call<ZoomZak>('https://api.zoom.us/v2/users/me/zak', {
       headers: { Authorization: `Bearer ${account.access}` },
     }, 'ZAK');
     if (typeof body?.token !== 'string' || !body.token) throw new ServiceUnavailableException({ code: 'ZOOM_ZAK_REQUIRED' });
@@ -349,7 +357,7 @@ export class ZoomHostService implements OnModuleDestroy {
   /** The Zoom user RTMS is started for: the configured S2S host, or the OAuth token's own user. */
   async rtmsParticipantUserId(token: string): Promise<string> {
     if (this.s2sMode()) return (await this.exclusive(S2S_OWNER, () => this.s2sAccount())).id;
-    const profile = await this.call('https://api.zoom.us/v2/users/me', { headers: { Authorization: `Bearer ${token}` } }, 'PROFILE');
+    const profile = await this.call<ZoomUser>('https://api.zoom.us/v2/users/me', { headers: { Authorization: `Bearer ${token}` } }, 'PROFILE');
     return typeof profile?.id === 'string' ? profile.id : '';
   }
 
@@ -376,7 +384,7 @@ export class ZoomHostService implements OnModuleDestroy {
       auto_recording: 'none',
       ...(account.email ? { meeting_invitees: [{ email: account.email }] } : {}),
     };
-    const meeting = await this.call(this.meetingsUrl(account), { method: 'POST', headers, body: JSON.stringify({ topic, type: 2, settings }) }, 'CREATE').catch(async error => {
+    const meeting = await this.call<ZoomMeeting>(this.meetingsUrl(account), { method: 'POST', headers, body: JSON.stringify({ topic, type: 2, settings }) }, 'CREATE').catch(async error => {
       const status = error.getResponse?.().providerStatus;
       if (status >= 400 && status < 500) { account.pendingKey = undefined; await this.save(owner, account); }
       throw error;

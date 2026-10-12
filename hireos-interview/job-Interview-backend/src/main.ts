@@ -3,12 +3,13 @@ import { NestFactory } from '@nestjs/core';
 import { ConfigService } from '@nestjs/config';
 import { AppModule } from './app.module';
 import { NestExpressApplication } from '@nestjs/platform-express';
-import { RtmsService } from './meetings/rtms.service';
+import type { Request, Response } from 'express';
+import { RtmsService, type ZoomWebhookBody } from './meetings/rtms.service';
 
 const RTMS_WEBHOOK_PATH = '/api/meetings/webhooks/zoom';
 const zoomWebhookLogger = new Logger('ZoomWebhook');
 
-async function readZoomWebhookBody(req: any): Promise<Record<string, any>> {
+async function readZoomWebhookBody(req: Request): Promise<ZoomWebhookBody> {
   if (req.body && typeof req.body === 'object') return req.body;
   if (typeof req.body === 'string' && req.body.trim()) {
     try {
@@ -37,7 +38,7 @@ async function bootstrap() {
   // Nest's controller layer): Zoom calls this with no session of ours to authenticate —
   // it proves itself via the signature checked inside, not via our normal auth.
   const rtmsService = app.get(RtmsService);
-  app.getHttpAdapter().getInstance().post(RTMS_WEBHOOK_PATH, async (req: any, res: any) => {
+  app.getHttpAdapter().getInstance().post(RTMS_WEBHOOK_PATH, async (req: Request, res: Response) => {
     // Durable local record of every Zoom call that reaches us. The ngrok inspector rotates its
     // history and the app's own logger is off by default, so without this line "Zoom never called
     // us" and "Zoom called and we mishandled it" are indistinguishable after the fact.
@@ -52,7 +53,8 @@ async function bootstrap() {
     zoomWebhookLogger.log(`received event=${body?.event ?? 'unknown'} signature=${String(req.headers['x-zm-signature'] ?? '-')}`);
     if (body?.event === 'endpoint.url_validation') {
       res.writeHead(200, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify(rtmsService.urlValidationResponse(body.payload?.plainToken)));
+      // Zoom always sends plainToken with url_validation; the cast keeps the previous (untyped) behaviour.
+      res.end(JSON.stringify(rtmsService.urlValidationResponse(body.payload?.plainToken as string)));
       return;
     }
     if (!rtmsService.verifySignature(body, req.headers['x-zm-request-timestamp'] as string, req.headers['x-zm-signature'] as string)) {
