@@ -20,6 +20,8 @@ interface Run {
   id: string;
   fileCount: number;
   batch?: ImportBatch;
+  /** Set when the upload request itself failed, so no batch was ever created. */
+  error?: string;
 }
 
 const POLL_INTERVAL_MS = 700;
@@ -173,6 +175,21 @@ function BatchCard({
   cancelling: boolean;
 }) {
   const { t } = useStore();
+  if (run.error) {
+    return (
+      <div className="card card-pad" style={{ marginTop: 14 }}>
+        <div className="flex items-center justify-between" style={{ marginBottom: 6 }}>
+          <div className="section-title" style={{ margin: 0 }}>
+            {t("Batch")} — {run.fileCount} {t("file(s)")}
+          </div>
+          <Badge tone="danger">{t("Failed")}</Badge>
+        </div>
+        <div className="tiny">
+          {t("The upload was rejected, so none of these files were imported.")} ({run.error})
+        </div>
+      </div>
+    );
+  }
   if (!run.batch) {
     return (
       <div className="card card-pad" style={{ marginTop: 14 }}>
@@ -254,9 +271,17 @@ export function useImportRuns({ jobId, onChanged }: { jobId?: string; onChanged?
   };
 
   const startRun = async (files: File[]) => {
-    const id = "run-" + Date.now();
+    const id = `run-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
     setRuns((prev) => [{ id, fileCount: files.length }, ...prev]);
-    const batch = await runImportBatch(files, { jobId });
+    let batch: ImportBatch;
+    try {
+      batch = await runImportBatch(files, { jobId });
+    } catch (error) {
+      // Without this the card would sit at "Processing…" forever.
+      const message = error instanceof Error ? error.message : String(error);
+      setRuns((prev) => prev.map((r) => (r.id === id ? { ...r, error: message } : r)));
+      return;
+    }
     await finishRun(id, batch);
   };
 

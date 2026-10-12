@@ -3,7 +3,7 @@ import { useStore } from "../../store/StoreContext";
 import { Icon } from "../../components/ui/Icons";
 import { Button } from "../../components/ui/Primitives";
 import { useImportRuns } from "./UploadTab";
-import { selectFolderFiles, skippedTotal, type FolderSelection } from "./folderFiles";
+import { chunkForUpload, selectFolderFiles, skippedTotal, type FolderSelection } from "./folderFiles";
 
 const FOLDER_INPUT_ID = "folder-import-input";
 
@@ -15,14 +15,16 @@ const FOLDER_INPUT_ID = "folder-import-input";
 export function FolderTab({ onChanged, jobId }: { onChanged?: () => void; jobId?: string }) {
   const { t } = useStore();
   const { startRun, runCards } = useImportRuns({ jobId, onChanged });
-  const [selection, setSelection] = useState<{ folder: string; result: FolderSelection } | null>(null);
+  const [selection, setSelection] = useState<{ folder: string; result: FolderSelection; batches: number } | null>(null);
 
   const handleFolder = (fileList: FileList) => {
     const files = Array.from(fileList);
     const folder = files[0]?.webkitRelativePath.split("/")[0] || "";
     const result = selectFolderFiles(files);
-    setSelection({ folder, result });
-    if (result.accepted.length) startRun(result.accepted);
+    // One request can carry only 20 files / ~20 MB, so a folder goes up as several batches.
+    const batches = chunkForUpload(result.accepted);
+    setSelection({ folder, result, batches: batches.length });
+    for (const batch of batches) void startRun(batch);
   };
 
   const summary = selection && (
@@ -30,8 +32,9 @@ export function FolderTab({ onChanged, jobId }: { onChanged?: () => void; jobId?
       <strong>{selection.folder}</strong>
       {" · "}
       {selection.result.accepted.length
-        ? `${t("Found")} ${selection.result.accepted.length} ${t("importable file(s)")}`
-        : t("No PDF, DOCX or TXT files found in this folder — nothing was imported.")}
+        ? `${t("Found")} ${selection.result.accepted.length} ${t("importable file(s)")}` +
+          (selection.batches > 1 ? ` · ${t("Imported in")} ${selection.batches} ${t("batches")}` : "")
+        : t("No importable files in this folder — nothing was imported.")}
       {skippedTotal(selection.result) > 0 && (
         <>
           {" · "}

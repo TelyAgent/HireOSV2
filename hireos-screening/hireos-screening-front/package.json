@@ -9,6 +9,7 @@
     "preview": "vite preview",
     "typecheck": "tsc -b --noEmit",
     "lint": "eslint .",
+    "test": "node --test test/unit/*.test.mjs",
     "test:smoke": "node test/smoke.test.mjs"
   },
   "dependencies": {

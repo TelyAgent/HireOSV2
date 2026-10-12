@@ -41,3 +41,30 @@ export function skippedTotal(selection: FolderSelection): number {
   const { unsupported, hidden, tooLarge } = selection.skipped;
   return unsupported + hidden + tooLarge;
 }
+
+/** Backend accepts at most 20 files per import request (FilesInterceptor in intake.controller). */
+export const MAX_FILES_PER_BATCH = 20;
+/** Gateway caps a request body at 20 MB (gateway/nginx.conf); leave room for multipart overhead. */
+export const MAX_BATCH_BYTES = 18 * 1024 * 1024;
+
+/**
+ * Splits a folder's résumés into upload batches that each fit the backend's file count and
+ * the gateway's body size, keeping the original order. A single file bigger than the byte
+ * budget still gets a batch of its own rather than being dropped here.
+ */
+export function chunkForUpload(files: File[], maxFiles = MAX_FILES_PER_BATCH, maxBytes = MAX_BATCH_BYTES): File[][] {
+  const batches: File[][] = [];
+  let current: File[] = [];
+  let bytes = 0;
+  for (const file of files) {
+    if (current.length && (current.length >= maxFiles || bytes + file.size > maxBytes)) {
+      batches.push(current);
+      current = [];
+      bytes = 0;
+    }
+    current.push(file);
+    bytes += file.size;
+  }
+  if (current.length) batches.push(current);
+  return batches;
+}
