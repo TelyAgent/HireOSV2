@@ -2,7 +2,7 @@
 // Node 24 strips the TypeScript types when importing the .ts module directly.
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { chunkForUpload, selectFolderFiles, skippedTotal, MAX_RESUME_BYTES } from "../../src/features/imports/folderFiles.ts";
+import { chunkForUpload, runWithConcurrency, selectFolderFiles, skippedTotal, MAX_RESUME_BYTES } from "../../src/features/imports/folderFiles.ts";
 
 const MB = 1024 * 1024;
 /** A File as returned by <input webkitdirectory>: name, relative path and a size. */
@@ -45,4 +45,16 @@ test("batches respect the byte budget; an oversized file gets its own batch", ()
   const files = [picked("R/a.pdf", 10 * MB), picked("R/b.pdf", 7 * MB), picked("R/c.pdf", 2 * MB), picked("R/d.pdf", 19 * MB), picked("R/e.pdf", 1 * MB)];
   assert.deepEqual(chunkForUpload(files).map((b) => b.map((f) => f.name)), [["a.pdf", "b.pdf"], ["c.pdf"], ["d.pdf"], ["e.pdf"]]);
   assert.deepEqual(chunkForUpload([]), []);
+});
+
+test("runWithConcurrency never exceeds the limit and runs every item once", async () => {
+  let running = 0, peak = 0; const seen = [];
+  await runWithConcurrency([1, 2, 3, 4, 5], 2, async (n) => {
+    running++; peak = Math.max(peak, running);
+    await new Promise((r) => setTimeout(r, 5 * (6 - n)));
+    seen.push(n); running--;
+  });
+  assert.equal(peak, 2);
+  assert.deepEqual(seen.sort(), [1, 2, 3, 4, 5]);
+  await runWithConcurrency([], 2, async () => assert.fail("no items"));
 });

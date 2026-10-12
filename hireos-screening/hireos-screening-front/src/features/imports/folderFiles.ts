@@ -71,3 +71,15 @@ export function chunkForUpload(files: File[], maxFiles = MAX_FILES_PER_BATCH, ma
   if (current.length) batches.push(current);
   return batches;
 }
+
+/** How many upload batches may be in flight at once, so a large folder doesn't flood the gateway. */
+export const MAX_CONCURRENT_BATCHES = 2;
+
+/** Runs `task` over `items` with at most `limit` running at a time; resolves when all finished. */
+export async function runWithConcurrency<T>(items: T[], limit: number, task: (item: T) => Promise<void>): Promise<void> {
+  let next = 0;
+  const worker = async () => {
+    while (next < items.length) await task(items[next++]);
+  };
+  await Promise.all(Array.from({ length: Math.min(limit, items.length) }, worker));
+}

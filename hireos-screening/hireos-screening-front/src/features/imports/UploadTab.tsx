@@ -15,7 +15,7 @@ import { delay } from "../../data/api/shared";
 import { Icon } from "../../components/ui/Icons";
 import { Badge, Button } from "../../components/ui/Primitives";
 import { describeItem, formatFileSize } from "./importOutcome";
-import { MAX_RESUME_BYTES, chunkForUpload } from "./folderFiles";
+import { MAX_CONCURRENT_BATCHES, MAX_RESUME_BYTES, chunkForUpload, runWithConcurrency } from "./folderFiles";
 
 interface Run {
   id: string;
@@ -338,7 +338,7 @@ export function UploadTab({ onChanged, jobId }: { onChanged?: () => void; jobId?
       say(`${tooLarge.length} ${t("file(s) over 20 MB were skipped")}: ${tooLarge.map((f) => f.name).join(", ")}`, { type: "warning" });
     }
     // Same request limits as folder imports: at most 20 files / ~20 MB per upload.
-    for (const batch of chunkForUpload(files.filter((f) => f.size <= MAX_RESUME_BYTES))) void startRun(batch);
+    void runWithConcurrency(chunkForUpload(files.filter((f) => f.size <= MAX_RESUME_BYTES)), MAX_CONCURRENT_BATCHES, startRun);
   };
 
   return (

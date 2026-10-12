@@ -3,7 +3,7 @@ import { useStore } from "../../store/StoreContext";
 import { Icon } from "../../components/ui/Icons";
 import { Button } from "../../components/ui/Primitives";
 import { useImportRuns } from "./UploadTab";
-import { chunkForUpload, selectFolderFiles, skippedTotal, type FolderSelection } from "./folderFiles";
+import { MAX_CONCURRENT_BATCHES, chunkForUpload, runWithConcurrency, selectFolderFiles, skippedTotal, type FolderSelection } from "./folderFiles";
 
 const FOLDER_INPUT_ID = "folder-import-input";
 
@@ -24,7 +24,7 @@ export function FolderTab({ onChanged, jobId }: { onChanged?: () => void; jobId?
     // One request can carry only 20 files / ~20 MB, so a folder goes up as several batches.
     const batches = chunkForUpload(result.accepted);
     setSelection({ folder, result, batches: batches.length });
-    for (const batch of batches) void startRun(batch);
+    void runWithConcurrency(batches, MAX_CONCURRENT_BATCHES, startRun);
   };
 
   const summary = selection && (
