@@ -1,0 +1,171 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review, edited]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  detect:
+    name: Select changed projects
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      matrix: ${{ steps.select.outputs.matrix }}
+      any: ${{ steps.select.outputs.any }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - run: node --test .github/scripts/automation.test.cjs
+      - id: select
+        env:
+          BASE: ${{ github.event.pull_request.base.sha }}
+          HEAD: ${{ github.event.pull_request.head.sha }}
+        # Push to main and manual runs check every project; PRs check only touched ones.
+        run: node .github/scripts/projects.cjs $BASE $HEAD
+
+  checks:
+    name: ${{ matrix.name }}
+    needs: detect
+    if: needs.detect.outputs.any == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJSON(needs.detect.outputs.matrix) }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: ${{ matrix.dir }}/package-lock.json
+      - run: npm ci --no-audit --no-fund
+        working-directory: ${{ matrix.dir }}
+      - if: matrix.prisma
+        run: npx prisma generate
+        working-directory: ${{ matrix.dir }}
+      - name: Build, lint, typecheck, test
+        env:
+          DIR: ${{ matrix.dir }}
+          CHECKS: ${{ toJSON(matrix.checks) }}
+          KNOWN: ${{ toJSON(matrix.known_failing) }}
+        # Every check runs even after a failure so one run reports all of them.
+        run: |
+          failed=0
+          for check in $(jq -r '.[]' <<<"$CHECKS"); do
+            known=$(jq --arg c "$check" 'index($c) != null' <<<"$KNOWN")
+            echo "::group::$check (known_failing=$known)"
+            .github/scripts/run-check.sh "$DIR" "$check" "$known" || failed=1
+            echo "::endgroup::"
+          done
+          exit $failed
+
+  contract:
+    name: Issue contract
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      issues: read
+      pull-requests: read
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Require linked AI Ready Issue and load discussion
+        uses: actions/github-script@v7
+        with:
+          script: |
+            await require('./.github/scripts/context.cjs')({ github, context });
+      - uses: actions/upload-artifact@v4
+        with:
+          name: contract-context
+          path: evidence/context.json
+          retention-days: 30
+
+  review:
+    needs: [detect, checks, contract]
+    # Spend AI tokens only after the contract holds and the touched projects are green.
+    if: >-
+      always() && github.event_name == 'pull_request' &&
+      needs.contract.result == 'success' &&
+      (needs.checks.result == 'success' || (needs.checks.result == 'skipped' && needs.detect.outputs.any == 'false'))
+    permissions:
+      contents: read
+      pull-requests: read
+    uses: ./.github/workflows/claude-review.yml
+    secrets:
+      ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+      CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+
+  publish-review:
+    name: Publish review comment
+    needs: [contract, review]
+    if: always() && github.event_name == 'pull_request' && needs.contract.result == 'success'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      pull-requests: write
+      issues: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.repository.default_branch }}
+          persist-credentials: false
+      - uses: actions/download-artifact@v4
+        with:
+          name: contract-context
+          path: evidence/context
+      - uses: actions/download-artifact@v4
+        continue-on-error: true
+        with:
+          name: claude-review
+          path: evidence/review
+      - uses: actions/github-script@v7
+        with:
+          script: |
+            await require('./.github/scripts/publish-review.cjs')({ github, context, core,
+              reportPath: 'evidence/review/review.json', contextPath: 'evidence/context/context.json' });
+
+  gate:
+    name: Merge gate
+    if: always()
+    needs: [detect, checks, contract, review]
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Require every applicable stage to pass
+        env:
+          DETECT: ${{ needs.detect.result }}
+          ANY: ${{ needs.detect.outputs.any }}
+          CHECKS: ${{ needs.checks.result }}
+          CONTRACT: ${{ needs.contract.result }}
+          REVIEW: ${{ needs.review.result }}
+          EVENT: ${{ github.event_name }}
+        run: |
+          test "$DETECT" = success
+          # Skipped checks are fine only when no project changed (docs-only PR).
+          if [ "$ANY" = true ]; then test "$CHECKS" = success; fi
+          if [ "$EVENT" = pull_request ]; then
+            test "$CONTRACT" = success
+            test "$REVIEW" = success
+          fi
