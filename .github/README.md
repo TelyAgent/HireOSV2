@@ -20,7 +20,8 @@
 
    两个都缺时，Review 会失败，不会默认放行。
 2. **标签**：创建 `needs-triage`、`urgent`、`incident`、`security`、`blocked`，见 [`triage-labels.md`](../docs/agents/triage-labels.md)。
-3. **分支保护**：给 `main` 配置 Ruleset，要求必需检查 `Merge gate` 通过、至少 1 个人工审批、所有讨论已解决、新提交使旧审批失效。YAML 本身无法开启这些设置。
+3. **分支保护**：给 `main` 配置 Ruleset，要求必需检查 `Merge gate` 通过、至少 1 个人工审批、**Code Owner 审批**、所有讨论已解决、新提交使旧审批失效。YAML 本身无法开启这些设置。
+   Review 的 prompt、schema 和校验脚本都取自被审 PR 本身，PR 可以修改它们来放宽自己的门禁；`CODEOWNERS` 加上“要求 Code Owner 审批”就是用来防止这种情况的。
 4. **工作方式切换**：开启分支保护后，不能再直接 push 到 `main`，所有改动都要走 PR。
 
 ## 运行规则

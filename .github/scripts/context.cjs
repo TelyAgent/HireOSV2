@@ -12,7 +12,7 @@ module.exports = async ({ github, context }) => {
   if (numbers.length !== 1) throw new Error('Use exactly one primary Linked Issue: Closes #<number>.');
   const { data: issue } = await github.rest.issues.get({ ...context.repo, issue_number: numbers[0] });
   if (issue.pull_request) throw new Error('Linked Issue points to a PR.');
-  const fields = ['Type', 'Problem', 'User Outcome', 'Scope', 'Non-goals', 'Acceptance Criteria',
+  const fields = ['Type', 'Subsystem', 'Problem', 'User Outcome', 'Scope', 'Non-goals', 'Acceptance Criteria',
     'References', 'Dependencies', 'Risk', 'Owner', 'AI Ready'];
   const sections = Object.fromEntries([...(issue.body || '').matchAll(/^### (.+)\r?\n+([\s\S]*?)(?=^### |$(?![\s\S]))/gm)]
     .map(m => [m[1].trim(), m[2].trim()]));
