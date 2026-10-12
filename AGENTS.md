@@ -4,7 +4,7 @@
 
 ## 权威上下文
 
-开始工作前按顺序读取：
+按 Issue 执行任务时，开始前按顺序读取：
 
 1. 关联的 GitHub Issue 及全部评论（`gh issue view <n> --comments`）。
 2. 本文件，以及任务涉及目录下更深层的 `AGENTS.md`。
@@ -45,12 +45,28 @@ npm test                 # 仅后端：先 build，再 node --test test/*.test.c
 
 本地启动全部服务：`scripts/dev.sh start`。CI 自动化脚本自测：`node --test .github/scripts/automation.test.cjs`。
 
-## Issue 和 PR 门槛
+## 两种工作方式
 
-- 正常工作必须关联一个主 Issue，PR 正文写 `Closes #<n>`，其他依赖写 `Refs #<n>`。CI 的 `Issue contract` 检查会强制这一条。
+本项目只有一名开发者（仓库管理员），main 允许管理员直接 push。
+
+- **直接修改**：日常小修小改、调试、紧急修复。不需要 Issue 或 PR，按用户指示改代码；是否 commit、push 由用户决定。push 到 main 后 CI 仍会检查全部子项目，但失败不会拦住这次 push。
+- **Issue → PR 流程**：用户说"Execute GitHub Issue #n"时，或者改动属于下面这些情况时，走完整流程：AI 实现的需求、产品经理提的需求、Prisma schema 变更、跨子系统接口变更、`.github/` 和 Agent 规则的变更。拿不准时问用户。
+
+## Issue 和 PR 门槛（走流程时）
+
+- PR 只关联一个主 Issue，正文写 `Closes #<n>`，其他依赖写 `Refs #<n>`。CI 的 `Issue contract` 检查会强制这一条。
 - Issue 必须具备 Type、Subsystem、Problem、User Outcome、Scope、Non-goals、Acceptance Criteria、References、Dependencies、Risk、Owner 和 `AI Ready`。只有 `AI Ready=Yes`、且每项 AC 都有 `AC-1`、`AC-2` 这样的编号时，才开始实现。
 - 需求、依赖或验收条件里有影响行为的未决问题时，在 Issue 留 `[AI-QUESTION]`，并停下依赖该信息的实现；不要自己猜产品意图。
-- PR 使用 [pull request template](.github/pull_request_template.md)。
+- PR 使用 [pull request template](.github/pull_request_template.md)，在分支上开发，不直接 push main。
+
+## 整理 Issue
+
+用户说"整理 Issue #n"时（通常是产品经理提的 Issue，`AI Ready=No`）：
+
+1. 读取 Issue 和全部评论，以及相关代码，弄清现状。
+2. 在 Issue 中起草 Scope、Non-goals 和可验证的 `AC-1..n`，并补全 Subsystem、References、Dependencies、Risk 等字段。不要改动提出人写的 Problem 和 User Outcome。
+3. 产品层面的疑问用 `[AI-QUESTION]` 评论，并 @ 提出人；技术层面的疑问问用户。
+4. 不要自己把 `AI Ready` 改成 Yes，由用户确认 AC 后修改。
 
 ## 实现和验证
 
@@ -71,7 +87,7 @@ npm test                 # 仅后端：先 build，再 node --test test/*.test.c
 
 正式评论使用以下前缀，并留在 GitHub 上：`[AI-PLAN]`、`[AI-QUESTION]`、`[AI-EVIDENCE]`、`[AI-BLOCKED]`、`[HUMAN-DECISION]`、`[AI-RESULT]`。阻塞时说明解除条件；环境问题不要伪装成产品 Bug。
 
-除非任务明确授权，不 push、不 merge、不创建或关闭 Issue。
+除非用户明确要求，不 push、不 merge、不创建或关闭 Issue；任何情况下都不 force push，也不绕过 Merge gate 合并 PR。
 
 ## 完成标准
 

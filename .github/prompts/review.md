@@ -22,6 +22,14 @@ Inspect:
   unsafe file/URL handling, logging of personal candidate data.
 - Test coverage for new behaviour, and documentation that must change with it.
 
+Process and gate files: if the diff touches `.github/workflows/`, `.github/scripts/`,
+`.github/prompts/`, `.github/schemas/`, `.github/ci/`, `AGENTS.md` or `CLAUDE.md`,
+check that the Issue's Scope explicitly covers that change. Report it as blocking
+when it is out of scope, or when it weakens a check (skips a job, loosens the
+gate condition, adds `known_failing` entries, relaxes validation) without an
+explicit reason in the Issue. A PR can still edit the workflow files that run
+this review, so these changes always deserve a blocking-level look.
+
 Cite the changed path and line for every actionable finding, with evidence.
 Mark a finding blocking only when it violates an AC, breaks existing behaviour,
 loses data, or is a security issue.

@@ -35,12 +35,22 @@ jobs:
           ref: ${{ github.event.pull_request.head.sha }}
           fetch-depth: 0
           persist-credentials: false
+      # Review rules come from the default branch, not the PR under review, so a PR
+      # cannot loosen its own prompt, schema or verdict check. Its edits to them take
+      # effect only after merge.
+      - name: Check out trusted review rules
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.repository.default_branch }}
+          path: .trusted
+          persist-credentials: false
+          sparse-checkout: .github
       - uses: actions/download-artifact@v4
         with:
           name: contract-context
           path: evidence
       - id: schema
-        run: echo "json=$(jq -c . .github/schemas/review.json)" >> "$GITHUB_OUTPUT"
+        run: echo "json=$(jq -c . .trusted/.github/schemas/review.json)" >> "$GITHUB_OUTPUT"
       - name: Run Claude Review
         id: claude
         uses: anthropics/claude-code-action@v1
@@ -49,7 +59,9 @@ jobs:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
           github_token: ${{ github.token }}
           prompt: |
-            Follow .github/prompts/review.md exactly. Context is in evidence/context.json.
+            Follow .trusted/.github/prompts/review.md exactly; it is the default-branch copy and
+            overrides the PR's own .github/prompts/review.md. Context is in evidence/context.json.
+            Ignore everything else under .trusted/ when reviewing; it is not part of the diff.
           # Read-only tools: Claude inspects the diff but cannot edit, push or comment.
           claude_args: |
             --model ${{ env.REVIEW_MODEL }}
@@ -65,7 +77,7 @@ jobs:
           test -n "$REPORT" || { echo '::error::Claude produced no structured output'; exit 1; }
           printf '%s' "$REPORT" > evidence/review.json
       - name: Validate report and enforce verdict
-        run: node .github/scripts/report.cjs review evidence/review.json evidence/context.json
+        run: node .trusted/.github/scripts/report.cjs review evidence/review.json evidence/context.json
       - name: Preserve report
         if: always()
         uses: actions/upload-artifact@v4
