@@ -70,7 +70,7 @@ export function JobCriteriaPage() {
   const [requirements, setRequirements] = useState<Requirement[]>([]);
   const [dimensions, setDimensions] = useState<Dimension[]>([]);
   const [touched, setTouched] = useState(false);
-  const [confirmStep, setConfirmStep] = useState<"none" | "touched-warning" | "confirm-version">("none");
+  const [confirmOpen, setConfirmOpen] = useState(false);
   // Edits stay in the page until "Confirm this version" -- nothing is saved as a draft on the
   // server, so backing out of the page leaves nothing behind. `editingNew` = editing a new
   // version of an already-confirmed one.
@@ -173,7 +173,7 @@ export function JobCriteriaPage() {
       say(t("Could not confirm this version — please try again"), { type: "error" });
     } finally {
       setConfirming(false);
-      setConfirmStep("none");
+      setConfirmOpen(false);
     }
   };
 
@@ -185,10 +185,7 @@ export function JobCriteriaPage() {
   };
 
   const handleConfirmClick = () => {
-    if (!canConfirm) return;
-    const wasFirstConfirm = !job.criteriaVersion || job.criteriaVersion === 0;
-    if (wasFirstConfirm && !touched) setConfirmStep("touched-warning");
-    else setConfirmStep("confirm-version");
+    if (canConfirm) setConfirmOpen(true);
   };
 
   return (
@@ -388,21 +385,10 @@ export function JobCriteriaPage() {
         <ScoringMethodologyNote />
       </div>
 
-      {confirmStep === "touched-warning" && (
+      {confirmOpen && (
         <ConfirmDialog
           open
-          onClose={() => setConfirmStep("none")}
-          title={t("Scoring dimensions are still the default starting point")}
-          body={t("These dimensions and weights have not been adjusted for this role yet — they're the system's neutral default, not a reviewed rubric. Confirm anyway?")}
-          confirmLabel={t("Confirm anyway")}
-          danger
-          onConfirm={() => setConfirmStep("confirm-version")}
-        />
-      )}
-      {confirmStep === "confirm-version" && (
-        <ConfirmDialog
-          open
-          onClose={() => setConfirmStep("none")}
+          onClose={() => setConfirmOpen(false)}
           title={t("Confirm this requirements version")}
           body={t("Confirming locks these requirements and weights as the active scoring baseline for this job. Screening can only run against a confirmed version.")}
           confirmLabel={t("Confirm version")}
