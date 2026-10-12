@@ -44,7 +44,10 @@ jobs:
           ref: ${{ github.event.repository.default_branch }}
           path: .trusted
           persist-credentials: false
-          sparse-checkout: .github
+          # Non-cone mode: only .github/, so the old root AGENTS.md/CLAUDE.md are not
+          # checked out and auto-loaded as conflicting instructions.
+          sparse-checkout: /.github/
+          sparse-checkout-cone-mode: false
       - uses: actions/download-artifact@v4
         with:
           name: contract-context
