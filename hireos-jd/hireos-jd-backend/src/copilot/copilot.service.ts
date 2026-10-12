@@ -18,6 +18,8 @@ import {
   llmTurnResultSchema,
   sendMessageInputSchema,
   setFieldsInputSchema,
+  refineDraftInputSchema,
+  refineVariantsInputSchema,
   titleVariantsInputSchema,
   type JdFields,
   type LlmTurnResult,
@@ -304,6 +306,7 @@ export class CopilotService {
   }
 
   async processAttachment(identity: Identity, id: string, file: UploadedAttachment, meta: RequestMeta) {
+    file = { ...file, originalname: decodeUploadName(file.originalname) };
     const conversation = await this.loadConversation(identity, id);
     if (conversation.phase === 'completed') throw new ConflictException({ code: 'CONVERSATION_COMPLETED' });
     const key = meta.idempotencyKey?.trim();
@@ -418,6 +421,91 @@ export class CopilotService {
       }),
     );
     return { title: input.title, variants };
+  }
+
+  /**
+   * Refine every title variant with the same note, in parallel. Like `titleVariants`, nothing is committed —
+   * each version keeps its own writing style and only changes what the note asks for.
+   */
+  async refineVariants(identity: Identity, id: string, raw: unknown) {
+    const input = refineVariantsInputSchema.parse(raw);
+    const conversation = await this.loadConversation(identity, id);
+    if (conversation.phase === 'completed') throw new ConflictException({ code: 'CONVERSATION_COMPLETED' });
+
+    const variants = await Promise.all(
+      input.variants.map(async (variant) => {
+        const fields = await this.runRefineTurn(identity, id, variant.fields, input.note, variant.label);
+        return { ...variant, fields };
+      }),
+    );
+    return { variants };
+  }
+
+  /**
+   * "Refine" on a ready draft: rewrites the current fields with the user's note and keeps the conversation
+   * ready to confirm. The LLM sees the full current JD, so a note never wipes out the parts it didn't mention.
+   */
+  async refineDraft(identity: Identity, id: string, raw: unknown, meta: RequestMeta) {
+    const input = refineDraftInputSchema.parse(raw);
+    const conversation = await this.loadConversation(identity, id);
+    if (conversation.phase === 'completed') throw new ConflictException({ code: 'CONVERSATION_COMPLETED' });
+    const current = asRecord(conversation.fields) as JdFields;
+    const operation = `copilot.refine:${id}`;
+    const key = meta.idempotencyKey?.trim();
+    if (!key) throw new ConflictException({ code: 'IDEMPOTENCY_KEY_REQUIRED' });
+    const existing = await this.db.idempotencyKey.findUnique({
+      where: { workspaceId_operation_key: { workspaceId: identity.workspaceId, operation, key } },
+    });
+    if (existing) {
+      if (existing.requestHash !== requestHash(input)) throw new ConflictException({ code: 'IDEMPOTENCY_CONFLICT' });
+      return existing.responseBody;
+    }
+
+    const fields = await this.runRefineTurn(identity, id, current, input.note);
+    return this.db.$transaction(async (tx) => {
+      const prior = await findIdempotent(tx, identity, operation, meta, input);
+      if (prior.prior) return prior.prior.responseBody;
+      const updated = await tx.copilotConversation.update({
+        where: { id },
+        data: { fields: json(fields), missingFields: json([]), phase: 'ready_to_confirm', stateRevision: { increment: 1 } },
+      });
+      const latest = await tx.copilotMessage.findFirst({ where: { conversationId: id }, orderBy: { sequence: 'desc' } });
+      const sequence = (latest?.sequence ?? 0) + 1;
+      await tx.copilotMessage.create({ data: { conversationId: id, sequence, role: 'user', text: input.note, idempotencyKey: prior.key } });
+      await tx.copilotMessage.create({
+        data: { conversationId: id, sequence: sequence + 1, role: 'assistant', text: '已按你的补充意见更新草稿，改动已在工作区中标出。' },
+      });
+      const messages = await tx.copilotMessage.findMany({ where: { conversationId: id }, orderBy: { sequence: 'asc' } });
+      const result = serializeConversation(updated, messages);
+      await storeIdempotency(tx, identity, operation, prior.key, prior.hash, result);
+      return result;
+    });
+  }
+
+  /**
+   * One refine pass over a complete JD. The model gets the whole current JD and must return every field in
+   * full; a result that lost required content is rejected instead of overwriting a good draft.
+   */
+  private async runRefineTurn(identity: Identity, id: string, current: JdFields, note: string, style?: string): Promise<JdFields> {
+    const turns: ChatTurn[] = [
+      {
+        role: 'user',
+        content: [
+          `以下是当前 JD 草稿（JSON${style ? `，写作风格：${style}` : ''}）：`,
+          JSON.stringify(current),
+          '',
+          `请按我的补充意见修改：${note}`,
+          '要求：只改动与意见相关的内容，其余字段和条目保持原文不变' + (style ? '，写作风格保持不变' : '') + '。',
+          'fields 必须输出修改后的完整 JD：每个字段都要给出，列表字段（responsibilities、mustHave、niceToHave）要列出全部条目，不能只输出改动的条目。',
+        ].join('\n'),
+      },
+    ];
+    const parsed = await this.runAutoCompleteTurn(identity, id, turns);
+    const fields: JdFields = { ...current, ...parsed.fields, title: parsed.fields.title || current.title };
+    if (computeMissingFields(fields).length > 0) {
+      throw new ServiceUnavailableException({ code: 'REFINE_INCOMPLETE', message: '这次修改没有生成完整的 JD，原草稿未改动，请换个说法再试一次。' });
+    }
+    return fields;
   }
 
   /**
@@ -592,6 +680,13 @@ const TITLE_VARIANT_STYLES = [
   { key: 'warm', label: '温暖亲和', description: '直接对候选人说话，突出影响力和团队文化。', instruction: '以“你”称呼候选人，突出这份工作带来的影响、成长和团队氛围，语气友好有温度。' },
   { key: 'detailed', label: '详细结构化', description: '背景和期望完整清晰，适合资深岗位。', instruction: '给出完整的业务背景、明确的工作产出和衡量标准，职责和要求条目更多、更具体。' },
 ] as const;
+
+/** Multer reads multipart filenames as latin1, so UTF-8 names (e.g. Chinese) arrive garbled; re-decode them. */
+function decodeUploadName(name: string): string {
+  if ([...name].some((char) => char.charCodeAt(0) > 0xff)) return name;
+  const decoded = Buffer.from(name, 'latin1').toString('utf8');
+  return decoded.includes('\uFFFD') ? name : decoded;
+}
 
 function serializeConversation(conversation: ConversationRow, messages: MessageRow[]) {
   return {

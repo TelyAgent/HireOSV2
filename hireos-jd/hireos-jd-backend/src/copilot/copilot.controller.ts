@@ -106,6 +106,21 @@ export class CopilotController {
     return this.copilot.importSource(req.identity, id, body, meta(headers));
   }
 
+  @Post(':id/refine')
+  refineDraft(
+    @Req() req: { identity: Identity },
+    @Headers() headers: Record<string, string | undefined>,
+    @Param('id') id: string,
+    @Body() body: unknown,
+  ) {
+    return this.copilot.refineDraft(req.identity, id, body, meta(headers));
+  }
+
+  @Post(':id/refine-variants')
+  refineVariants(@Req() req: { identity: Identity }, @Param('id') id: string, @Body() body: unknown) {
+    return this.copilot.refineVariants(req.identity, id, body);
+  }
+
   @Post(':id/title-variants')
   titleVariants(@Req() req: { identity: Identity }, @Param('id') id: string, @Body() body: unknown) {
     return this.copilot.titleVariants(req.identity, id, body);

@@ -67,16 +67,43 @@ export interface GeminiVariant {
   fields: CopilotJdFields;
 }
 
+/** Where a draft came from — shown as the Workspace's source badge and "Captured inputs". */
+export interface GeminiOrigin {
+  path: GeminiCreatePath;
+  detail?: string;
+}
+
 export type GeminiMsg =
   | { role: "user"; text: string }
   | { role: "thinking" }
   | { role: "ai"; text: string; options?: ConversationActionOption[]; draft?: undefined; kind?: undefined }
-  | { role: "ai"; draft: GeminiDraft; text?: undefined; options?: undefined; kind?: undefined }
+  /** A complete JD draft. `prev` is the draft it refined (for change highlights); `created` once a job was made from it. */
+  | {
+      role: "ai";
+      draft: GeminiDraft;
+      prev?: GeminiDraft;
+      origin?: GeminiOrigin;
+      superseded?: boolean;
+      created?: boolean;
+      text?: undefined;
+      options?: undefined;
+      kind?: undefined;
+    }
   /** Inline prompt card for a path: the upload button or the manual form. `done` once used. */
   | { role: "ai"; kind: "upload"; text: string; done?: boolean }
   | { role: "ai"; kind: "form"; text: string; done?: boolean }
   /** "Start with a job title" result: three styles to pick from. `picked` once a job was created from one. */
-  | { role: "ai"; kind: "variants"; title: string; variants: GeminiVariant[]; picked?: number };
+  | {
+      role: "ai";
+      kind: "variants";
+      title: string;
+      variants: GeminiVariant[];
+      selected?: number;
+      prev?: GeminiVariant[];
+      origin?: GeminiOrigin;
+      superseded?: boolean;
+      picked?: number;
+    };
 
 export interface AppState {
   // appearance / chrome

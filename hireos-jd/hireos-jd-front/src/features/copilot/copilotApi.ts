@@ -195,6 +195,15 @@ export function autoCompleteCopilotConversation(conversationId: string, text?: s
   });
 }
 
+/** "Refine" on a ready draft: the backend rewrites the full current JD with the note and keeps it ready to confirm. */
+export function refineCopilotDraft(conversationId: string, note: string): Promise<CopilotConversationDto> {
+  return request(`${BASE}/${conversationId}/refine`, {
+    method: "POST",
+    body: JSON.stringify({ note }),
+    idempotencyKey: idempotencyKey("copilot-refine"),
+  });
+}
+
 /** "Paste a link or text": the backend reads the posting page (or the pasted JD) and extracts fields from it. */
 export function importCopilotSource(conversationId: string, source: { url: string } | { text: string }): Promise<CopilotConversationDto> {
   return request(`${BASE}/${conversationId}/import`, {
@@ -220,6 +229,19 @@ export function generateCopilotTitleVariants(
     method: "POST",
     body: JSON.stringify({ title }),
     idempotencyKey: idempotencyKey("copilot-variants"),
+  });
+}
+
+/** Applies one refinement note to every title variant, keeping each style. Nothing is saved. */
+export function refineCopilotVariants(
+  conversationId: string,
+  note: string,
+  variants: CopilotTitleVariant[],
+): Promise<{ variants: CopilotTitleVariant[] }> {
+  return request(`${BASE}/${conversationId}/refine-variants`, {
+    method: "POST",
+    body: JSON.stringify({ note, variants: variants.map(({ key, label, description, fields }) => ({ key, label, description, fields })) }),
+    idempotencyKey: idempotencyKey("copilot-refine-variants"),
   });
 }
 

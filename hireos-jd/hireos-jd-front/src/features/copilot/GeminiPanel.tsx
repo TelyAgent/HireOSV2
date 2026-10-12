@@ -14,6 +14,8 @@ import {
   generateCopilotTitleVariants,
   getCopilotConversation,
   importCopilotSource,
+  refineCopilotDraft,
+  refineCopilotVariants,
   listCopilotConversations,
   setCopilotFields,
   streamCopilotMessage,
@@ -26,7 +28,7 @@ import { VoiceInputButton, type VoiceInputStatus } from "./VoiceInputButton";
 import { mergeVoiceTranscript } from "../../lib/voice-stream";
 import { fmtRelative } from "../../lib/format";
 import type { Audience, Requirement } from "../../data/types";
-import type { ConversationActionOption, GeminiCreatePath, GeminiDraft, GeminiMsg } from "../../store/types";
+import type { ConversationActionOption, GeminiCreatePath, GeminiDraft, GeminiMsg, GeminiOrigin, GeminiVariant } from "../../store/types";
 
 /** Converts a fetched conversation's raw messages back into the panel's bubble shapes. There's no
  * per-message phase snapshot server-side, so a conversation that's currently ready to confirm gets its
@@ -149,11 +151,56 @@ const COMPOSER_PLACEHOLDERS: Record<GeminiCreatePath, string> = {
 const JD_FILE_ACCEPT =
   ".pdf,.docx,.txt,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,text/plain";
 
-function resultToMsg(result: CopilotConversationDto): GeminiMsg {
+function resultToMsg(result: CopilotConversationDto, origin?: GeminiOrigin, prev?: GeminiDraft): GeminiMsg {
   const lastReply = result.messages[result.messages.length - 1];
   return result.phase === "ready_to_confirm"
-    ? { role: "ai", draft: jdFieldsToGeminiDraft(result.fields) }
+    ? { role: "ai", draft: jdFieldsToGeminiDraft(result.fields), origin, prev }
     : { role: "ai", text: lastReply?.text || "" };
+}
+
+type ActiveDraftMsg = Extract<GeminiMsg, { draft: GeminiDraft }> | Extract<GeminiMsg, { kind: "variants" }>;
+
+/** The draft the Workspace shows: the latest draft or variant set that is still open (not replaced, not created). */
+function findActiveDraft(msgs: GeminiMsg[]): { index: number; msg: ActiveDraftMsg } | null {
+  for (let i = msgs.length - 1; i >= 0; i--) {
+    const m = msgs[i];
+    if (m.role !== "ai") continue;
+    if (m.kind === "variants") return m.superseded || m.picked !== undefined ? null : { index: i, msg: m };
+    if (m.kind) continue;
+    if (m.draft) return m.superseded || m.created ? null : { index: i, msg: m };
+  }
+  return null;
+}
+
+interface DraftChanges {
+  fields: Partial<Record<"title" | "department" | "summary" | "location" | "employmentType" | "headcount", string>>;
+  responsibilities: Set<number>;
+  must: Set<number>;
+  pref: Set<number>;
+  count: number;
+}
+
+/** Prototype's `geminiDiffDrafts`: changed scalar fields (with their old value) and list items that are new. */
+function diffDrafts(prev: GeminiDraft | undefined, next: GeminiDraft): DraftChanges | null {
+  if (!prev) return null;
+  const changes: DraftChanges = { fields: {}, responsibilities: new Set(), must: new Set(), pref: new Set(), count: 0 };
+  for (const field of ["title", "department", "summary", "location", "employmentType", "headcount"] as const) {
+    const before = String(prev[field] ?? "");
+    if (before !== String(next[field] ?? "")) {
+      changes.fields[field] = before;
+      changes.count++;
+    }
+  }
+  for (const list of ["responsibilities", "must", "pref"] as const) {
+    const old = new Set(prev[list] ?? []);
+    (next[list] ?? []).forEach((item, i) => {
+      if (!old.has(item)) {
+        changes[list].add(i);
+        changes.count++;
+      }
+    });
+  }
+  return changes.count ? changes : null;
 }
 
 /** Splits a textarea into list items, dropping bullets/numbering the user typed. */
@@ -185,6 +232,9 @@ export function GeminiPanel({ ctx }: { ctx: GeminiCtx }) {
   const [historyError, setHistoryError] = useState("");
   const [historyItems, setHistoryItems] = useState<CopilotConversationDto[]>([]);
   const [attaching, setAttaching] = useState(false);
+  const [refining, setRefining] = useState(false);
+  const [wsOpen, setWsOpen] = useState(true);
+  const panelRef = useRef<HTMLDivElement>(null);
   const voiceBaseInputRef = useRef<string | null>(null);
   const messagesRef = useRef<HTMLDivElement>(null);
   const attachFileInputRef = useRef<HTMLInputElement>(null);
@@ -198,6 +248,25 @@ export function GeminiPanel({ ctx }: { ctx: GeminiCtx }) {
     if (el) el.scrollTop = el.scrollHeight;
   }, [msgs.length]);
 
+  const active = findActiveDraft(msgs);
+  const activeIndex = active?.index ?? -1;
+  const narrow = useNarrowScreen();
+  const showWorkspace = !!active && wsOpen && !historyOpen && !narrow;
+
+  // A new draft always opens the Workspace again, even if the previous one was closed.
+  useEffect(() => {
+    if (activeIndex >= 0) setWsOpen(true);
+    else setRefining(false);
+  }, [activeIndex]);
+
+  // The drawer widens to fit the Workspace column (prototype's `gm-has-ws`).
+  useEffect(() => {
+    const drawer = panelRef.current?.closest(".drawer");
+    if (!drawer) return;
+    drawer.classList.toggle("gm-has-ws", showWorkspace);
+    return () => drawer.classList.remove("gm-has-ws");
+  }, [showWorkspace]);
+
   const push = (msg: GeminiMsg) =>
     mutate((draft) => {
       draft.geminiChats = { ...draft.geminiChats, [key]: [...(draft.geminiChats[key] ?? []), msg] };
@@ -210,11 +279,11 @@ export function GeminiPanel({ ctx }: { ctx: GeminiCtx }) {
       draft.geminiChats = { ...draft.geminiChats, [key]: [...list, msg] };
     });
 
-  const updateMsg = (index: number, patch: Partial<Extract<GeminiMsg, { kind: "upload" | "form" | "variants" }>>) =>
+  const updateMsg = (index: number, patch: { done?: boolean; picked?: number; selected?: number; superseded?: boolean; created?: boolean }) =>
     mutate((draft) => {
       const list = [...(draft.geminiChats[key] ?? [])];
       const current = list[index];
-      if (current && current.role === "ai" && current.kind) list[index] = { ...current, ...patch } as GeminiMsg;
+      if (current && current.role === "ai") list[index] = { ...current, ...patch } as GeminiMsg;
       draft.geminiChats = { ...draft.geminiChats, [key]: list };
     });
 
@@ -234,7 +303,7 @@ export function GeminiPanel({ ctx }: { ctx: GeminiCtx }) {
   };
 
   /** Runs one backend step behind the "thinking" dots; `autoFill` finishes an incomplete extraction in a second auto-complete turn. */
-  const runStep = async (step: (conversationId: string) => Promise<CopilotConversationDto>, autoFill = false) => {
+  const runStep = async (step: (conversationId: string) => Promise<CopilotConversationDto>, autoFill = false, origin?: GeminiOrigin) => {
     setBusy(true);
     push({ role: "thinking" });
     try {
@@ -244,7 +313,7 @@ export function GeminiPanel({ ctx }: { ctx: GeminiCtx }) {
       if (autoFill && result.phase !== "ready_to_confirm" && result.fields.title) {
         result = await autoCompleteCopilotConversation(conversationId);
       }
-      resolveThinking(resultToMsg(result));
+      resolveThinking(resultToMsg(result, origin));
       return true;
     } catch (error) {
       resolveThinking({ role: "ai", text: errorText(error) });
@@ -271,7 +340,7 @@ export function GeminiPanel({ ctx }: { ctx: GeminiCtx }) {
         streaming = true;
       });
       // Streamed text is cosmetic — swap in the authoritative committed result (draft card or final text).
-      const finalReply = resultToMsg(result);
+      const finalReply = resultToMsg(result, { path: "home", detail: text });
       mutate((draft) => {
         const list = (draft.geminiChats[key] ?? []).filter((m) => m.role !== "thinking");
         draft.geminiChats = { ...draft.geminiChats, [key]: [...(streaming ? list.slice(0, -1) : list), finalReply] };
@@ -296,7 +365,9 @@ export function GeminiPanel({ ctx }: { ctx: GeminiCtx }) {
       "我的回答：",
       answers,
     ].join("\n");
-    if (await runStep((conversationId) => autoCompleteCopilotConversation(conversationId, brief))) setPath("home");
+    if (await runStep((conversationId) => autoCompleteCopilotConversation(conversationId, brief), false, { path: "questions", detail: answers })) {
+      setPath("home");
+    }
   };
 
   const runTitleVariants = async (title: string) => {
@@ -305,7 +376,7 @@ export function GeminiPanel({ ctx }: { ctx: GeminiCtx }) {
     try {
       const conversationId = await ensureConversation();
       const result = await generateCopilotTitleVariants(conversationId, title);
-      resolveThinking({ role: "ai", kind: "variants", title: result.title, variants: result.variants });
+      resolveThinking({ role: "ai", kind: "variants", title: result.title, variants: result.variants, selected: 0, origin: { path: "title", detail: title } });
       setPath("home");
     } catch (error) {
       resolveThinking({ role: "ai", text: errorText(error) });
@@ -316,14 +387,53 @@ export function GeminiPanel({ ctx }: { ctx: GeminiCtx }) {
 
   const runImport = async (text: string) => {
     if (/^https?:\/\/\S+$/i.test(text)) {
-      if (await runStep((conversationId) => importCopilotSource(conversationId, { url: text }), true)) setPath("home");
+      if (await runStep((conversationId) => importCopilotSource(conversationId, { url: text }), true, { path: "link", detail: text })) setPath("home");
       return;
     }
     if (text.length < 20) {
       push({ role: "ai", text: t("That doesn’t look like a link or a JD. Paste a job posting URL (starting with http:// or https://) or the full JD text.") });
       return;
     }
-    if (await runStep((conversationId) => importCopilotSource(conversationId, { text }), true)) setPath("home");
+    if (await runStep((conversationId) => importCopilotSource(conversationId, { text }), true, { path: "link", detail: text })) setPath("home");
+  };
+
+  /** A note typed while a draft is open rewrites it (every version, for variants); changes get highlighted. */
+  const refineDraft = async (note: string, target: { index: number; msg: ActiveDraftMsg }) => {
+    setBusy(true);
+    push({ role: "thinking" });
+    try {
+      const conversationId = await ensureConversation();
+      const { index, msg } = target;
+      let reply: GeminiMsg;
+      if (msg.kind === "variants") {
+        const result = await refineCopilotVariants(conversationId, note, msg.variants);
+        reply = { ...msg, variants: result.variants, prev: msg.variants, superseded: undefined };
+      } else {
+        reply = resultToMsg(await refineCopilotDraft(conversationId, note), msg.origin, msg.draft);
+      }
+      updateMsg(index, { superseded: true });
+      resolveThinking({
+        role: "ai",
+        text: t(
+          msg.kind === "variants"
+            ? "Updated all versions with your note — the changes are highlighted in the Workspace."
+            : "Updated the draft with your note — the changes are highlighted in the Workspace.",
+        ),
+      });
+      push(reply);
+      setRefining(false);
+      setWsOpen(true);
+    } catch (error) {
+      resolveThinking({ role: "ai", text: errorText(error) });
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const startRefine = () => {
+    setRefining(true);
+    setWsOpen(true);
+    setTimeout(() => composerRef.current?.focus(), 0);
   };
 
   const send = (overrideText?: string) => {
@@ -331,6 +441,7 @@ export function GeminiPanel({ ctx }: { ctx: GeminiCtx }) {
     if (!text || working) return;
     setInput("");
     push({ role: "user", text });
+    if (active && path === "home") return void refineDraft(text, active);
     if (path === "questions") return void runQuickStart(text);
     if (path === "title") return void runTitleVariants(text);
     if (path === "link") return void runImport(text);
@@ -439,7 +550,9 @@ export function GeminiPanel({ ctx }: { ctx: GeminiCtx }) {
     push({ role: "user", text: `[${t("Uploaded file")}] ${file.name}` });
     setAttaching(true);
     try {
-      if (await runStep((conversationId) => uploadCopilotAttachment(conversationId, file), fromUploadPath)) setPath("home");
+      if (await runStep((conversationId) => uploadCopilotAttachment(conversationId, file), fromUploadPath, { path: "upload", detail: file.name })) {
+        setPath("home");
+      }
     } finally {
       setAttaching(false);
     }
@@ -557,6 +670,17 @@ export function GeminiPanel({ ctx }: { ctx: GeminiCtx }) {
     }
   };
 
+  const createFromDraftCard = async (index: number, d: GeminiDraft) => {
+    if (working) return;
+    setBusy(true);
+    try {
+      await createJobFromDraft(d);
+      updateMsg(index, { created: true });
+    } finally {
+      setBusy(false);
+    }
+  };
+
   const pickVariant = async (index: number, variantIndex: number) => {
     const msg = msgs[index];
     if (!msg || msg.role !== "ai" || msg.kind !== "variants") return;
@@ -578,7 +702,9 @@ export function GeminiPanel({ ctx }: { ctx: GeminiCtx }) {
   };
 
   return (
-    <div className="gemini-panel">
+    <div className={`gemini-panel${showWorkspace ? " has-ws" : ""}`} ref={panelRef}>
+     <div className="gemini-body">
+      <div className="gemini-chat-column">
       <div className="gemini-panel-header">
         <span className="gp-icon material-icons-o">auto_awesome</span>
         <div className="gp-title">{historyOpen ? t("History") : t("Ask Copilot")}</div>
@@ -591,6 +717,11 @@ export function GeminiPanel({ ctx }: { ctx: GeminiCtx }) {
             <button className="icon-btn" type="button" disabled={working} onClick={() => void openHistory()} title={t("Conversation history")} aria-label={t("Conversation history")}>
               <Icon name="history" />
             </button>
+            {active && !wsOpen && (
+              <button className="icon-btn" type="button" onClick={() => setWsOpen(true)} title={t("Open Workspace")} aria-label={t("Open Workspace")}>
+                <Icon name="right_panel_open" />
+              </button>
+            )}
           </>
         )}
         {historyOpen && (
@@ -598,9 +729,11 @@ export function GeminiPanel({ ctx }: { ctx: GeminiCtx }) {
             <Icon name="arrow_back" />
           </button>
         )}
-        <button className="close-x" onClick={closeModal} aria-label={t("Close")}>
-          <Icon name="close" />
-        </button>
+        {!showWorkspace && (
+          <button className="close-x" onClick={closeModal} aria-label={t("Close")}>
+            <Icon name="close" />
+          </button>
+        )}
       </div>
       {historyOpen ? (
         <div className="gemini-messages">
@@ -630,7 +763,10 @@ export function GeminiPanel({ ctx }: { ctx: GeminiCtx }) {
                 key={i}
                 msg={m}
                 busy={working}
-                onCreate={createJobFromDraft}
+                wsVisible={showWorkspace}
+                onCreate={(d) => void createFromDraftCard(i, d)}
+                onRefine={startRefine}
+                onSelectVariant={(variantIndex) => updateMsg(i, { selected: variantIndex })}
                 onSelectOption={handleSelectOption}
                 onChooseFile={() => attachFileInputRef.current?.click()}
                 onPickVariant={(variantIndex) => void pickVariant(i, variantIndex)}
@@ -652,7 +788,7 @@ export function GeminiPanel({ ctx }: { ctx: GeminiCtx }) {
             <textarea
               ref={composerRef}
               rows={1}
-              placeholder={t(COMPOSER_PLACEHOLDERS[path])}
+              placeholder={t(refining && active ? "What would you like to change?" : COMPOSER_PLACEHOLDERS[path])}
               value={input}
               disabled={voiceStatus !== "idle"}
               onChange={(e) => setInput(e.target.value)}
@@ -716,8 +852,31 @@ export function GeminiPanel({ ctx }: { ctx: GeminiCtx }) {
           </div>
         </div>
       )}
+      </div>
+      {showWorkspace && active && (
+        <CopilotWorkspace
+          msg={active.msg}
+          onSelectVariant={(variantIndex) => updateMsg(active.index, { selected: variantIndex })}
+          onClose={() => setWsOpen(false)}
+        />
+      )}
+     </div>
     </div>
   );
+}
+
+const NARROW_QUERY = "(max-width: 760px)";
+
+/** Below 760px there's no room for the Workspace column, so drafts stay inline in the chat. */
+function useNarrowScreen() {
+  const [narrow, setNarrow] = useState(() => window.matchMedia(NARROW_QUERY).matches);
+  useEffect(() => {
+    const query = window.matchMedia(NARROW_QUERY);
+    const update = () => setNarrow(query.matches);
+    query.addEventListener("change", update);
+    return () => query.removeEventListener("change", update);
+  }, []);
+  return narrow;
 }
 
 /** The empty-conversation home: "Create a Job" and its five starting points. */
@@ -835,49 +994,236 @@ function DraftBody({ d }: { d: GeminiDraft }) {
 function VariantPicker({
   msg,
   busy,
+  wsVisible,
+  onSelect,
   onPick,
+  onRefine,
 }: {
   msg: Extract<GeminiMsg, { kind: "variants" }>;
   busy: boolean;
+  wsVisible: boolean;
+  onSelect: (variantIndex: number) => void;
   onPick: (variantIndex: number) => void;
+  onRefine: () => void;
 }) {
   const { t } = useStore();
-  const [selected, setSelected] = useState(msg.picked ?? 0);
+  const selected = msg.picked ?? msg.selected ?? 0;
   const done = msg.picked !== undefined;
   const letter = String.fromCharCode(65 + selected);
   return (
     <div className="gm-bubble ai">
-      <div>{t("I’ve drafted “%s” in 3 different styles. Pick the one that fits.").replace("%s", msg.title)}</div>
-      <div className="gm-variants">
-        {msg.variants.map((v, i) => (
-          <button
-            key={v.key}
-            type="button"
-            className={`gm-variant${i === selected ? " active" : ""}`}
-            disabled={done}
-            onClick={() => setSelected(i)}
-          >
-            <span className="gm-variant-radio" />
-            <span className="gm-variant-txt">
-              <b>
-                {String.fromCharCode(65 + i)} · {t(v.label)}
-              </b>
-              <span>{t(v.description)}</span>
-            </span>
-          </button>
-        ))}
+      <div>
+        {t(
+          wsVisible && !msg.superseded && !done
+            ? "I’ve drafted “%s” in 3 different styles — compare them in the Workspace. Pick the one that fits."
+            : "I’ve drafted “%s” in 3 different styles. Pick the one that fits.",
+        ).replace("%s", msg.title)}
       </div>
-      <div className="gm-variant-preview">
-        <DraftBody d={jdFieldsToGeminiDraft(msg.variants[selected].fields)} />
+      {msg.superseded ? (
+        <div className="tiny" style={{ marginTop: 8 }}>{t("Superseded by a newer draft below.")}</div>
+      ) : (
+        <>
+          <div className="gm-variants">
+            {msg.variants.map((v, i) => (
+              <button
+                key={v.key}
+                type="button"
+                className={`gm-variant${i === selected ? " active" : ""}`}
+                disabled={done}
+                onClick={() => onSelect(i)}
+              >
+                <span className="gm-variant-radio" />
+                <span className="gm-variant-txt">
+                  <b>
+                    {String.fromCharCode(65 + i)} · {t(v.label)}
+                  </b>
+                  <span>{t(v.description)}</span>
+                </span>
+              </button>
+            ))}
+          </div>
+          {!wsVisible && (
+            <div className="gm-variant-preview">
+              <DraftBody d={jdFieldsToGeminiDraft(msg.variants[selected].fields)} />
+            </div>
+          )}
+          {!done && (
+            <div className="gm-actions">
+              <Button variant="primary" size="sm" disabled={busy} onClick={() => onPick(selected)}>
+                <Icon name="add_circle" />
+                {t("Create job with version %s").replace("%s", letter)}
+              </Button>
+              <Button size="sm" disabled={busy} onClick={onRefine}>
+                {t("Refine", "gm_action.Refine")}
+              </Button>
+            </div>
+          )}
+        </>
+      )}
+    </div>
+  );
+}
+
+const ORIGIN_LABELS: Record<GeminiCreatePath, string> = {
+  home: "Describe in chat",
+  questions: "Quick Start",
+  title: "Start with a Job Title",
+  upload: "Upload a JD",
+  link: "Paste a Link or Text",
+  form: "Create Manually",
+};
+
+const ORIGIN_DETAIL_LABELS: Record<GeminiCreatePath, string> = {
+  home: "Your description",
+  questions: "Your answers",
+  title: "Job title",
+  upload: "Source file",
+  link: "Source",
+  form: "Your input",
+};
+
+/** The right-hand Workspace column: the open draft as a document, with version tabs and change highlights. */
+function CopilotWorkspace({
+  msg,
+  onSelectVariant,
+  onClose,
+}: {
+  msg: ActiveDraftMsg;
+  onSelectVariant: (variantIndex: number) => void;
+  onClose: () => void;
+}) {
+  const { t, closeModal } = useStore();
+  const isVariants = msg.kind === "variants";
+  const selected = isVariants ? (msg.selected ?? 0) : 0;
+  const draft = isVariants ? jdFieldsToGeminiDraft(msg.variants[selected].fields) : msg.draft;
+  const prevVariant = isVariants ? msg.prev?.[selected] : undefined;
+  const prev = isVariants ? (prevVariant ? jdFieldsToGeminiDraft(prevVariant.fields) : undefined) : msg.prev;
+  const origin = msg.origin;
+  const detail = origin?.detail && origin.detail.length > 600 ? `${origin.detail.slice(0, 600)}…` : origin?.detail;
+  return (
+    <aside className="gemini-expand-column">
+      <div className="gm-ws-head">
+        <div className="gm-ws-title">
+          <Icon name="description" />
+          {t("Workspace")}
+        </div>
+        <button className="close-x" type="button" onClick={onClose} title={t("Close Workspace")} aria-label={t("Close Workspace")}>
+          <Icon name="right_panel_close" />
+        </button>
+        <button className="close-x" type="button" onClick={closeModal} title={t("Close")} aria-label={t("Close")}>
+          <Icon name="close" />
+        </button>
       </div>
-      {!done && (
-        <div className="gm-actions">
-          <Button variant="primary" size="sm" disabled={busy} onClick={() => onPick(selected)}>
-            <Icon name="add_circle" />
-            {t("Create job with version %s").replace("%s", letter)}
-          </Button>
+      <div className="gm-ws-body">
+        {isVariants && (
+          <>
+            <div className="gm-ws-tabs" role="tablist">
+              {msg.variants.map((v: GeminiVariant, i: number) => (
+                <button
+                  key={v.key}
+                  type="button"
+                  role="tab"
+                  aria-selected={i === selected}
+                  className={`gm-ws-tab${i === selected ? " active" : ""}`}
+                  onClick={() => onSelectVariant(i)}
+                >
+                  {String.fromCharCode(65 + i)} · {t(v.label)}
+                </button>
+              ))}
+            </div>
+            <div className="tiny" style={{ margin: "0 0 10px" }}>{t(msg.variants[selected].description)}</div>
+          </>
+        )}
+        <WorkspaceDoc d={draft} changes={diffDrafts(prev, draft)} origin={origin} />
+        {origin && (
+          <details className="gm-ws-inputs">
+            <summary>{t("Captured inputs")}</summary>
+            <div className="gm-snap-row">
+              <span>{t("Creation path")}</span>
+              <strong>{t(ORIGIN_LABELS[origin.path])}</strong>
+            </div>
+            {detail && (
+              <div className="gm-snap-row">
+                <span>{t(ORIGIN_DETAIL_LABELS[origin.path])}</span>
+                <strong style={{ whiteSpace: "pre-wrap" }}>{detail}</strong>
+              </div>
+            )}
+          </details>
+        )}
+      </div>
+    </aside>
+  );
+}
+
+function WorkspaceDoc({ d, changes, origin }: { d: GeminiDraft; changes: DraftChanges | null; origin?: GeminiOrigin }) {
+  const { t } = useStore();
+  const changed = (field: keyof DraftChanges["fields"]) => !!changes && field in changes.fields;
+  const was = (field: keyof DraftChanges["fields"]) =>
+    changed(field) ? t("Was: %s").replace("%s", changes?.fields[field] || "—") : undefined;
+  const tag = (label: "New" | "Updated") => <span className="gm-chg-tag">{t(label, `change_tag.${label}`)}</span>;
+  const meta = (field: keyof DraftChanges["fields"], value: string | undefined) =>
+    value ? (
+      <span className={changed(field) ? "gm-changed" : undefined} title={was(field)}>
+        {value}
+        {changed(field) && tag("Updated")}
+      </span>
+    ) : null;
+  const list = (title: string, items: string[] | undefined, key: "responsibilities" | "must" | "pref") =>
+    items && items.length > 0 ? (
+      <>
+        <h4>{t(title)}</h4>
+        <ul>
+          {items.map((item, i) => {
+            const isNew = !!changes?.[key].has(i);
+            return (
+              <li key={`${i}-${item}`} className={isNew ? "gm-changed" : undefined}>
+                {item}
+                {isNew && tag("New")}
+              </li>
+            );
+          })}
+        </ul>
+      </>
+    ) : null;
+  const sourceNote =
+    origin?.path === "upload" && origin.detail
+      ? t("Source file: %s").replace("%s", origin.detail)
+      : origin?.path === "link" && origin.detail && /^https?:\/\//i.test(origin.detail)
+        ? t("Source: %s").replace("%s", origin.detail)
+        : null;
+  return (
+    <div className="gm-ws-doc">
+      {changes && (
+        <div className="gm-ws-note">
+          <Icon name="edit_note" />
+          <span>{t("Updated draft — %s change(s) highlighted").replace("%s", String(changes.count))}</span>
         </div>
       )}
+      <div className="eyebrow" style={{ marginBottom: 6 }}>{t("Drafted job")}</div>
+      <h3 className={`gm-ws-doc-title${changed("title") ? " gm-changed" : ""}`} title={was("title")}>
+        {d.title}
+        {changed("title") && tag("Updated")}
+      </h3>
+      <div className="tiny" title={was("department")}>
+        {d.department}
+        {changed("department") && tag("Updated")}
+      </div>
+      <div className="gm-draft-meta">
+        {origin && <span className="badge badge-info">{t(ORIGIN_LABELS[origin.path])}</span>}
+        {meta("location", d.location)}
+        {meta("employmentType", d.employmentType ? t(d.employmentType) : undefined)}
+        {meta("headcount", d.headcount ? t("%s openings").replace("%s", String(d.headcount)) : undefined)}
+      </div>
+      {sourceNote && <div className="tiny gm-ws-source">{sourceNote}</div>}
+      {d.summary && (
+        <p className={changed("summary") ? "gm-changed" : undefined} title={was("summary")}>
+          {d.summary}
+          {changed("summary") && tag("Updated")}
+        </p>
+      )}
+      {list("Responsibilities", d.responsibilities, "responsibilities")}
+      {list("Requirements", d.must, "must")}
+      {list("Nice-to-have", d.pref, "pref")}
     </div>
   );
 }
@@ -1014,7 +1360,10 @@ function ManualJobForm({
 function GeminiMessage({
   msg,
   busy,
+  wsVisible,
   onCreate,
+  onRefine,
+  onSelectVariant,
   onSelectOption,
   onChooseFile,
   onPickVariant,
@@ -1022,7 +1371,10 @@ function GeminiMessage({
 }: {
   msg: GeminiMsg;
   busy: boolean;
+  wsVisible: boolean;
   onCreate: (draft: GeminiDraft) => void;
+  onRefine: () => void;
+  onSelectVariant: (variantIndex: number) => void;
   onSelectOption: (option: ConversationActionOption) => void;
   onChooseFile: () => void;
   onPickVariant: (variantIndex: number) => void;
@@ -1040,7 +1392,8 @@ function GeminiMessage({
         </div>
       </div>
     );
-  if (msg.kind === "variants") return <VariantPicker msg={msg} busy={busy} onPick={onPickVariant} />;
+  if (msg.kind === "variants")
+    return <VariantPicker msg={msg} busy={busy} wsVisible={wsVisible} onSelect={onSelectVariant} onPick={onPickVariant} onRefine={onRefine} />;
   if (msg.kind === "form") return <ManualJobForm msg={msg} busy={busy} onSubmit={onSubmitForm} />;
   if (msg.kind === "upload")
     return (
@@ -1058,15 +1411,28 @@ function GeminiMessage({
     );
   if (msg.draft) {
     const d = msg.draft;
+    const open = !msg.superseded && !msg.created;
+    // With the Workspace open the full JD lives there; otherwise (closed, or a narrow screen) it stays inline.
     return (
       <div className="gm-bubble ai">
-        <DraftBody d={d} />
-        <div className="gm-actions">
-          <Button variant="primary" size="sm" disabled={busy} onClick={() => onCreate(d)}>
-            <Icon name="add_circle" />
-            {t("Create job from this draft")}
-          </Button>
-        </div>
+        <div>{t(wsVisible && open ? "I’ve drafted “%s” — review it in the Workspace." : "I’ve drafted “%s”.").replace("%s", d.title)}</div>
+        {open && !wsVisible && (
+          <div className="gm-variant-preview">
+            <DraftBody d={d} />
+          </div>
+        )}
+        {msg.superseded && <div className="tiny" style={{ marginTop: 8 }}>{t("Superseded by a newer draft below.")}</div>}
+        {open && (
+          <div className="gm-actions">
+            <Button variant="primary" size="sm" disabled={busy} onClick={() => onCreate(d)}>
+              <Icon name="add_circle" />
+              {t("Create job from this draft")}
+            </Button>
+            <Button size="sm" disabled={busy} onClick={onRefine}>
+              {t("Refine", "gm_action.Refine")}
+            </Button>
+          </div>
+        )}
       </div>
     );
   }

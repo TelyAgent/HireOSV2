@@ -58,6 +58,31 @@ export const importSourceInputSchema = z
   .strict()
   .refine((input) => Boolean(input.url) !== Boolean(input.text), { message: 'Provide either url or text.' });
 
+export const refineDraftInputSchema = z
+  .object({
+    note: z.string().trim().min(1).max(2000),
+  })
+  .strict();
+
+export const refineVariantsInputSchema = z
+  .object({
+    note: z.string().trim().min(1).max(2000),
+    variants: z
+      .array(
+        z
+          .object({
+            key: z.string().trim().min(1).max(40),
+            label: z.string().trim().min(1).max(40),
+            description: z.string().trim().max(200),
+            fields: jdFieldsSchema,
+          })
+          .strict(),
+      )
+      .min(1)
+      .max(3),
+  })
+  .strict();
+
 export const titleVariantsInputSchema = z
   .object({
     title: z.string().trim().min(1).max(120),
