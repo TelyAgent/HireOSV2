@@ -1,7 +1,7 @@
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const { createServer } = require('node:http');
-const { randomUUID } = require('node:crypto');
+const { randomUUID, createHash } = require('node:crypto');
 const { unlink, readdir, readFile } = require('node:fs/promises');
 const { PrismaClient } = require('@prisma/client');
 const { resolve } = require('node:path');
@@ -13,6 +13,7 @@ const { ParsingService } = require('../dist/intake/parsing.service');
 const { JobsService } = require('../dist/intake/jobs.service');
 const { WorkspaceGuard } = require('../dist/intake/workspace.guard');
 const { AiService } = require('../dist/intake/ai.service');
+const { CoreRecordClient } = require('../dist/core-record/core-record.client');
 
 function pdfFixture(text) {
   const stream = text ? `BT /F1 12 Tf 50 750 Td (${text}) Tj ET` : '';
@@ -59,9 +60,17 @@ test('intake persistence, validation, parsing and recovery', async (t) => {
   process.env.HIREOS_AI_TIMEOUT_SECONDS = '60';
   const workspaceId = `test-${randomUUID()}`;
   const identity = { workspaceId, actorId: 'test-user' };
+  // Core Record is a separate service; stand in for its upload endpoint (hash-deduped like
+  // the real one) so this test doesn't depend on a running core-record instance.
+  const coreRecord = {
+    async uploadMaterial(_identity, file) {
+      const hash = createHash('sha256').update(file.buffer).digest('hex');
+      return { id: `core-${hash.slice(0, 32)}`, name: file.originalname, mime: file.mimetype, size: file.buffer.length, hash, readStatus: 'available', securityStatus: 'clean' };
+    },
+  };
   const module = await Test.createTestingModule({ imports: [AppModule] }).overrideGuard(WorkspaceGuard).useValue({
     canActivate(context) { context.switchToHttp().getRequest().identity = identity; return true; },
-  }).compile();
+  }).overrideProvider(CoreRecordClient).useValue(coreRecord).compile();
   const app = module.createNestApplication({ logger: false });
   app.setGlobalPrefix('api');
   await app.listen(0, '127.0.0.1');
