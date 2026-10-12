@@ -17,9 +17,7 @@ interface NavItem {
   match: string;
 }
 const NAV_PRIMARY: NavItem[] = [
-  { to: "/home", icon: "home", label: "Home", match: "/home" },
   { to: "/jobs", icon: "work", label: "Job Library", match: "/jobs" },
-  { to: "/templates", icon: "dashboard_customize", label: "Templates", match: "/templates" },
 ];
 const NAV_SHARED: NavItem[] = [
   { to: "/settings/overview", icon: "settings", label: "Settings", match: "/settings" },
@@ -37,7 +35,7 @@ function TopBar() {
 
   return (
     <div className="topbar">
-      <div className="brand" onClick={() => navigate("/home")}>
+      <div className="brand" onClick={() => navigate("/jobs")}>
         <span className="logo">H</span>
         <div>
           HireOS Command<small>{t("JD Management")}</small>

@@ -18,6 +18,8 @@ for (const [net, prefix] of [['::', 128], ['::1', 128], ['fc00::', 7], ['fe80::'
   PRIVATE_RANGES.addSubnet(net, prefix, 'ipv6');
 }
 
+const BLOCKED_MESSAGE = '这个网站开启了人机验证，无法自动读取职位内容。请打开链接复制 JD 全文，粘贴到下方。';
+
 function linkError(message: string): BadRequestException {
   return new BadRequestException({ code: 'LINK_UNREADABLE', message });
 }
@@ -56,13 +58,17 @@ export async function extractTextFromLink(rawUrl: string): Promise<string> {
     }
     break;
   }
+  if (response && [401, 403, 429].includes(response.status)) throw linkError(BLOCKED_MESSAGE);
   if (!response || !response.ok) throw linkError(`打开这个链接失败（${response?.status ?? '无响应'}），请改为粘贴 JD 文案。`);
 
   const contentType = response.headers.get('content-type') || '';
   if (!/text\/html|text\/plain|application\/xhtml/i.test(contentType)) throw linkError('这个链接不是网页，请改为粘贴 JD 文案。');
   const body = await readLimited(response);
-  const text = /html/i.test(contentType) ? htmlToText(body) : body;
+  const isHtml = /html/i.test(contentType);
+  // Job boards publish schema.org JobPosting for search engines; it is cleaner than the page chrome around it.
+  const text = (isHtml && jobPostingText(body)) || (isHtml ? htmlToText(body) : body);
   const trimmed = text.trim();
+  if (looksLikeBotChallenge(trimmed)) throw linkError(BLOCKED_MESSAGE);
   if (trimmed.length < 20) throw linkError('没有从这个页面读取到职位内容，请改为粘贴 JD 文案。');
   return trimmed.length > MAX_EXTRACTED_CHARS ? trimmed.slice(0, MAX_EXTRACTED_CHARS) : trimmed;
 }
@@ -102,4 +108,80 @@ function htmlToText(html: string): string {
     .replace(/[ \t\f\v]+/g, ' ')
     .replace(/\s*\n\s*/g, '\n')
     .replace(/\n{3,}/g, '\n\n');
+}
+
+// Anti-bot interstitials (Cloudflare, Jobright, etc.) return 200 with a short "checking your browser" page.
+const CHALLENGE_PATTERNS = [
+  /security check/i, /verify (that )?you are (a )?human/i, /are you a robot/i, /checking your browser/i,
+  /just a moment/i, /captcha/i, /access denied/i, /enable javascript and cookies/i, /人机验证/, /安全验证/, /验证码/,
+];
+
+function looksLikeBotChallenge(text: string): boolean {
+  return text.length < 1500 && CHALLENGE_PATTERNS.some((pattern) => pattern.test(text));
+}
+
+type JsonLdNode = Record<string, unknown>;
+
+function jobPostingText(html: string): string | null {
+  for (const match of html.matchAll(/<script[^>]*type=["']application\/ld\+json["'][^>]*>([\s\S]*?)<\/script>/gi)) {
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(match[1].trim());
+    } catch {
+      continue;
+    }
+    const posting = findJobPosting(parsed);
+    if (!posting) continue;
+    const description = typeof posting.description === 'string' ? htmlToText(decodeEntities(posting.description)).trim() : '';
+    if (description.length < 50) continue;
+    const lines = [
+      field('职位名称', posting.title),
+      field('公司', (posting.hiringOrganization as JsonLdNode | undefined)?.name),
+      field('工作地点', locationText(posting.jobLocation)),
+      field('远程', posting.jobLocationType),
+      field('雇佣类型', posting.employmentType),
+    ].filter(Boolean);
+    return [...lines, '', description].join('\n');
+  }
+  return null;
+}
+
+function findJobPosting(node: unknown): JsonLdNode | null {
+  if (Array.isArray(node)) {
+    for (const item of node) {
+      const found = findJobPosting(item);
+      if (found) return found;
+    }
+    return null;
+  }
+  if (!node || typeof node !== 'object') return null;
+  const record = node as JsonLdNode;
+  const type = record['@type'];
+  if (type === 'JobPosting' || (Array.isArray(type) && type.includes('JobPosting'))) return record;
+  return record['@graph'] ? findJobPosting(record['@graph']) : null;
+}
+
+function locationText(location: unknown): string | undefined {
+  const places = Array.isArray(location) ? location : location ? [location] : [];
+  const names = places
+    .map((place) => {
+      const address = (place as JsonLdNode)?.address as JsonLdNode | string | undefined;
+      if (!address) return '';
+      if (typeof address === 'string') return address;
+      return [address.addressLocality, address.addressRegion, address.addressCountry]
+        .map((part) => (part && typeof part === 'object' ? (part as JsonLdNode).name : part))
+        .filter((part) => typeof part === 'string' && part)
+        .join(', ');
+    })
+    .filter(Boolean);
+  return names.length ? names.join(' / ') : undefined;
+}
+
+function field(label: string, value: unknown): string | null {
+  const text = Array.isArray(value) ? value.filter((item) => typeof item === 'string').join(', ') : value;
+  return typeof text === 'string' && text.trim() ? `${label}：${text.trim()}` : null;
+}
+
+function decodeEntities(text: string): string {
+  return text.replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&amp;/g, '&');
 }

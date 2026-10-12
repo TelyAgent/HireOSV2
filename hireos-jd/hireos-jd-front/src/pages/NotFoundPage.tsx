@@ -13,8 +13,8 @@ export function NotFoundPage() {
         title={t("Page not found")}
         body={t("This route does not exist in the prototype.")}
         actions={
-          <Button variant="primary" onClick={() => navigate("/home")}>
-            {t("Go to Home")}
+          <Button variant="primary" onClick={() => navigate("/jobs")}>
+            {t("Go to Job Library")}
           </Button>
         }
       />

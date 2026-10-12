@@ -929,7 +929,7 @@ export const ZH: Record<string, string> = {
   /* ---------- 404 ---------- */
   "Page not found": "页面未找到",
   "This route does not exist in the prototype.": "该路径在原型中不存在。",
-  "Go to Home": "返回首页",
+  "Go to Job Library": "返回职位库",
 
   /* ================================================================
      Namespaced status labels. The same English word maps to different

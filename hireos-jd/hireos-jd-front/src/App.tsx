@@ -1,11 +1,9 @@
 import { useEffect } from "react";
 import { Navigate, Route, Routes } from "react-router-dom";
 import { AppShell } from "./components/AppShell";
-import { HomePage } from "./pages/HomePage";
 import { JobLibraryPage } from "./pages/JobLibraryPage";
 import { NewJobPage } from "./pages/NewJobPage";
 import { JobWorkspacePage } from "./pages/JobWorkspacePage";
-import { TemplatesPage } from "./pages/TemplatesPage";
 import { SettingsPage } from "./pages/SettingsPage";
 import { NotFoundPage } from "./pages/NotFoundPage";
 import { useStore } from "./store/StoreContext";
@@ -37,13 +35,11 @@ export default function App() {
   return (
     <AppShell>
       <Routes>
-        <Route path="/" element={<Navigate to="/home" replace />} />
-        <Route path="/home" element={<HomePage />} />
+        <Route path="/" element={<Navigate to="/jobs" replace />} />
         <Route path="/jobs" element={<JobLibraryPage />} />
         <Route path="/jobs/new" element={<NewJobPage />} />
         <Route path="/jobs/:id" element={<JobWorkspacePage />} />
         <Route path="/jobs/:id/:tab" element={<JobWorkspacePage />} />
-        <Route path="/templates" element={<TemplatesPage />} />
         <Route path="/settings" element={<Navigate to="/settings/overview" replace />} />
         <Route path="/settings/:section" element={<SettingsPage />} />
         <Route path="*" element={<NotFoundPage />} />
