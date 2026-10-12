@@ -1,5 +1,0 @@
-# Changes to the dev process, CI gates and agent rules need the process owner's review,
-# so a PR cannot loosen its own Review or Merge gate unnoticed.
-/.github/   @JsonSuCoder
-/AGENTS.md  @JsonSuCoder
-/CLAUDE.md  @JsonSuCoder

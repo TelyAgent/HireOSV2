@@ -14,6 +14,33 @@ GitHub 是研发决策的唯一权威来源。人尽量不要先讲给另一个�
 | Comments | AI 与人之间的正式沟通 | Slack 或会议里做的决定不回写 |
 | Slack / 微信 | 只发 urgent / incident / security 提醒，附 GitHub 链接 | 讨论需求、审批方案 |
 
+## 什么时候走流程
+
+本项目只有一名开发者，Issue 主要由开发者自己提，产品经理偶尔会提。main 允许管理员直接 push，所以流程按需使用：
+
+| 直接 push main | 走 Issue → PR |
+| --- | --- |
+| 日常小修小改、调试、紧急修复 | 交给 AI 实现的需求 |
+| | 产品经理提的需求 |
+| | Prisma schema 变更、跨子系统接口变更 |
+| | `.github/`、`AGENTS.md`、`CLAUDE.md` 的变更 |
+
+直接 push 后，CI 仍会检查全部子项目。失败不会拦住这次 push，但 Actions 页面会显示红叉并发邮件提醒。
+
+## 产品经理提的 Issue
+
+产品经理用表单提 Issue，写清楚 Problem 和 User Outcome，`AI Ready` 保持 No，不要求写 `AC-n`。
+
+```text
+产品经理提 Issue（AI Ready=No）
+   ↓  开发者对 Claude Code 说："整理 Issue #n"
+Claude 读 Issue 和代码，起草 Scope / Non-goals / AC-1..n
+   ↓  产品层面的疑问：[AI-QUESTION] @产品经理
+产品经理在 Issue 里回答
+   ↓  开发者确认 AC，改为 AI Ready=Yes
+"Execute GitHub Issue #n" → PR → CI + Claude Review → 合并
+```
+
 ## 一个需求的完整路径
 
 ```text
@@ -56,10 +83,10 @@ Rules:
 
 | 角色 | 主要职责 |
 | --- | --- |
-| 产品 / 需求方 | 写 Issue 和 AC，回答 `[AI-QUESTION]`，按 AC 验收 PR 的业务结果，不审代码细节 |
+| 产品经理 | 写 Issue 的 Problem 和 User Outcome，回答 `[AI-QUESTION]`，按 AC 验收业务结果，不审代码细节 |
 | 设计 | 在 Design Issue 里交付；批准的设计放到 `docs/design/<issue>/`（design-spec.md、states.md、handoff/），完成后评论 `[AI-RESULT] design-ready` |
 | 工程师 | 把 Issue 编号交给 Agent，不重新口述需求；审 Agent 的 PR；维护 `AGENTS.md` 和 CI 注册表 |
-| Human Supervisor | 分诊、设置 AI Ready、审批例外、最终合并 |
+| Human Supervisor（目前就是开发者本人） | 分诊、设置 AI Ready、审批例外、最终合并 |
 
 ## 评论协议
 
