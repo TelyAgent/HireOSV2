@@ -20,6 +20,8 @@ export default [
       '@typescript-eslint': tsPlugin,
     },
     rules: {
+      // TypeScript checks undefined names and unused vars; the JS rules misfire on types and globals.
+      'no-undef': 'off',
       'no-unused-vars': 'off',
       '@typescript-eslint/no-explicit-any': 'error',
       '@typescript-eslint/no-unused-vars': [

@@ -17,7 +17,9 @@ type SourceRef = { segmentId: string; quote: string };
 type ExtractionConfig<T = unknown> = {
   schema: z.ZodType<T>;
   systemPrompt: string;
-  collectRefs: (parsed: T) => SourceRef[];
+  // Method syntax (bivariant parameter) lets a config for a specific T sit in the
+  // ExtractionConfig<unknown> table below; each entry's schema guarantees its own T.
+  collectRefs(parsed: T): SourceRef[];
   // Structured-generation types (e.g. capability_cards: up to a dozen cards, each with
   // five behavioral anchors) genuinely need more wall-clock time than a single-object
   // field extraction; override the shared HIREOS_AI_TIMEOUT_SECONDS default per type
@@ -28,7 +30,7 @@ type ExtractionConfig<T = unknown> = {
   // the whole result is. Types that set this repair or drop just the offending entries
   // instead of failing — `resolve` returns the segmentId the quote verifiably comes from, or null.
   // Types without it (scores, cards, decisions) keep the all-or-nothing rule.
-  repairRefs?: (parsed: T, resolve: (ref: SourceRef) => string | null) => T;
+  repairRefs?(parsed: T, resolve: (ref: SourceRef) => string | null): T;
 };
 
 const RESUME_EXTRACTION_PROMPT =
@@ -45,7 +47,7 @@ function collectFactRefs(parsed: z.infer<typeof extractionSchema>): SourceRef[] 
 // domain modules needing to know about each other. A domain module (e.g. rubric/) owns
 // its own schema, prompt and citation shape; this table is only the lookup — the actual
 // HTTP call, JSON-Schema validation and source-quote verification below are generic.
-const EXTRACTION_TYPES: Record<string, ExtractionConfig<any>> = {
+const EXTRACTION_TYPES: Record<string, ExtractionConfig> = {
   // Empirically, even a single-object multi-field extraction (title/name/email/facts[])
   // regularly exceeds the 60s default with gpt-5-mini once the input has real substantial
   // content (a short/near-empty JD or résumé finishes fast; a real one often doesn't) —

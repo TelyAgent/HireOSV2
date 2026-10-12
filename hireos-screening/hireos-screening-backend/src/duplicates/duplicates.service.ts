@@ -101,7 +101,7 @@ export class DuplicatesService {
       return this.get(identity, id);
     }
 
-    const { resolvedCandidateId, closedBatch, targetJobId } = await this.db.$transaction(async (tx) => {
+    const { closedBatch, targetJobId } = await this.db.$transaction(async (tx) => {
       let resolvedCandidateId: string | null = null;
       let closedBatch: { batchId: string; operationId: string | null } | null = null;
       const claim = await tx.duplicateCheck.updateMany({
@@ -240,7 +240,7 @@ export class DuplicatesService {
         where: { duplicateReviewId: id, workspaceId: identity.workspaceId, status: { notIn: ['completed', 'cancelled'] } },
         data: { status: 'completed', completedAt: new Date(), completionRef: id },
       });
-      return { resolvedCandidateId, closedBatch, targetJobId: item?.batch.targetJobId ?? undefined };
+      return { closedBatch, targetJobId: item?.batch.targetJobId ?? undefined };
     });
 
     if (outcome === 'same_person_new_version' || outcome === 'different_person') {
