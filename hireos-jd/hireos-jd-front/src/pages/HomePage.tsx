@@ -3,11 +3,13 @@ import { MainInner } from "../components/AppShell";
 import { Button, PageHeader, StatusBadge } from "../components/ui/Primitives";
 import { Icon } from "../components/ui/Icons";
 import { useStore } from "../store/StoreContext";
+import { useOpenCreateJob } from "../features/copilot/GeminiPanel";
 import { fmtRelative, nowISO } from "../lib/format";
 
 export function HomePage() {
   const { state, t, set, person } = useStore();
   const navigate = useNavigate();
+  const openCreateJob = useOpenCreateJob();
 
   const wsJobs = Object.values(state.jobs);
   const hiringNow = wsJobs.filter((j) => j.hiringStatus === "published");
@@ -25,7 +27,7 @@ export function HomePage() {
         title={t("Home")}
         subtitle={`${t("Welcome back")}, ${firstName}. ${t("Here's what needs your attention at Sending Labs.")}`}
         actions={
-          <Button variant="primary" onClick={() => navigate("/jobs/new")}>
+          <Button variant="primary" onClick={openCreateJob}>
             <Icon name="add" />
             {t("New job")}
           </Button>

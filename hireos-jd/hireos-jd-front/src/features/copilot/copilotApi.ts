@@ -185,10 +185,49 @@ export function confirmCopilotDraft(conversationId: string): Promise<{ conversat
  * Triggers the "auto-complete and optimize" turn: unlike a normal chat message, this asks the backend
  * to fill in every still-missing required field with reasonable, clearly-editable suggestions in one
  * shot rather than asking another clarifying question, landing straight on `ready_to_confirm`.
+ * `text` replaces the default trigger as the user turn — Quick Start passes the user's answers here.
  */
-export function autoCompleteCopilotConversation(conversationId: string): Promise<CopilotConversationDto> {
+export function autoCompleteCopilotConversation(conversationId: string, text?: string): Promise<CopilotConversationDto> {
   return request(`${BASE}/${conversationId}/auto-complete`, {
     method: "POST",
+    body: JSON.stringify(text ? { text } : {}),
     idempotencyKey: idempotencyKey("copilot-autocomplete"),
+  });
+}
+
+/** "Paste a link or text": the backend reads the posting page (or the pasted JD) and extracts fields from it. */
+export function importCopilotSource(conversationId: string, source: { url: string } | { text: string }): Promise<CopilotConversationDto> {
+  return request(`${BASE}/${conversationId}/import`, {
+    method: "POST",
+    body: JSON.stringify(source),
+    idempotencyKey: idempotencyKey("copilot-import"),
+  });
+}
+
+export interface CopilotTitleVariant {
+  key: string;
+  label: string;
+  description: string;
+  fields: CopilotJdFields;
+}
+
+/** "Start with a job title": three complete drafts in different styles. Nothing is saved until one is picked. */
+export function generateCopilotTitleVariants(
+  conversationId: string,
+  title: string,
+): Promise<{ title: string; variants: CopilotTitleVariant[] }> {
+  return request(`${BASE}/${conversationId}/title-variants`, {
+    method: "POST",
+    body: JSON.stringify({ title }),
+    idempotencyKey: idempotencyKey("copilot-variants"),
+  });
+}
+
+/** Saves user-authored (manual form) or user-picked (title variant) fields as-is; the conversation becomes ready to confirm. */
+export function setCopilotFields(conversationId: string, fields: CopilotJdFields, label: string): Promise<CopilotConversationDto> {
+  return request(`${BASE}/${conversationId}/fields`, {
+    method: "POST",
+    body: JSON.stringify({ fields, label }),
+    idempotencyKey: idempotencyKey("copilot-fields"),
   });
 }

@@ -4,6 +4,7 @@ import { Icon } from "../components/ui/Icons";
 import { Button, EmptyState, PageHeader, PersonChip, StatusBadge } from "../components/ui/Primitives";
 import { ConfirmDialog } from "../components/ui/Overlays";
 import { useStore } from "../store/StoreContext";
+import { useOpenCreateJob } from "../features/copilot/GeminiPanel";
 import { SAVED_VIEWS } from "../data/fixtures/savedViews";
 import { fmtRelative } from "../lib/format";
 import { deleteJob, updateJobStatus } from "../features/jobs/jobsApi";
@@ -26,9 +27,9 @@ const VIEW_LABELS: Record<ViewKind, string> = {
   organization: "Organization",
 };
 
-/** Port of the prototype's `jobsForSavedView(view)`. */
+/** Port of the prototype's `jobsForSavedView(view)`. Every view lists the most recently updated jobs first. */
 export function jobsForSavedView(state: AppState, view: string): Job[] {
-  const all = Object.values(state.jobs);
+  const all = Object.values(state.jobs).sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime());
   const u = state.currentUserId;
   switch (view) {
     case "My Jobs":
@@ -46,8 +47,6 @@ export function jobsForSavedView(state: AppState, view: string): Job[] {
       return all.filter((j) => j.hiringStatus === "draft");
     case "Pending Approval":
       return all.filter((j) => j.approvalStatus === "pending");
-    case "Recently Updated":
-      return all.slice().sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime());
     default:
       return all;
   }
@@ -77,6 +76,7 @@ function QualityFlag({ note }: { note: string }) {
 export function JobLibraryPage() {
   const { state, t, mutate, say, openModal } = useStore();
   const navigate = useNavigate();
+  const openCreateJob = useOpenCreateJob();
   const [params] = useSearchParams();
   const view = (params.get("view") as ViewKind) || "table";
   const savedView = params.get("savedView") || "All Jobs";
@@ -134,7 +134,7 @@ export function JobLibraryPage() {
         title={t("Job Library")}
         subtitle={t("Every requisition at Sending Labs, in one place.")}
         actions={
-          <Button variant="primary" onClick={() => navigate("/jobs/new")}>
+          <Button variant="primary" onClick={openCreateJob}>
             <Icon name="add" />
             {t("New job")}
           </Button>

@@ -41,3 +41,42 @@ export function computeMissingFields(fields: JdFields): string[] {
   if (!fields.mustHave || fields.mustHave.length < 2) missing.push('mustHave');
   return missing;
 }
+
+/** Optional user turn for auto-complete — e.g. the Quick Start answers — instead of the bare "自动补全" trigger. */
+export const autoCompleteInputSchema = z
+  .object({
+    text: z.string().trim().min(1).max(4000).optional(),
+  })
+  .strict();
+
+/** "Paste a link or text": exactly one of a job posting URL or the full JD text. */
+export const importSourceInputSchema = z
+  .object({
+    url: z.string().trim().url().max(2000).optional(),
+    text: z.string().trim().min(20).max(20000).optional(),
+  })
+  .strict()
+  .refine((input) => Boolean(input.url) !== Boolean(input.text), { message: 'Provide either url or text.' });
+
+export const titleVariantsInputSchema = z
+  .object({
+    title: z.string().trim().min(1).max(120),
+  })
+  .strict();
+
+/** Fields the user authored or picked directly (manual form, a chosen title variant) — no LLM turn. */
+export const setFieldsInputSchema = z
+  .object({
+    fields: jdFieldsSchema,
+    label: z.string().trim().min(1).max(200),
+  })
+  .strict();
+
+/** The bar for user-authored fields: a manual JD can skip the summary and ship with a single bullet. */
+export function computeMissingAuthoredFields(fields: JdFields): string[] {
+  const missing: string[] = [];
+  if (!fields.title) missing.push('title');
+  if (!fields.responsibilities || fields.responsibilities.length < 1) missing.push('responsibilities');
+  if (!fields.mustHave || fields.mustHave.length < 1) missing.push('mustHave');
+  return missing;
+}

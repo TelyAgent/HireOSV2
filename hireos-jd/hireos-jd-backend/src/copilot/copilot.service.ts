@@ -2,6 +2,7 @@ import { BadRequestException, ConflictException, Injectable, Logger, NotFoundExc
 import { Prisma } from '@prisma/client';
 import type { Identity } from '../auth/workspace.guard';
 import { extractTextFromFile } from './attachment-extract';
+import { extractTextFromLink } from './link-extract';
 import { CoreRecordClient } from '../core/core-record.client';
 import { DraftsService } from '../drafts/drafts.service';
 import { PrismaService } from '../persistence/prisma.service';
@@ -9,7 +10,18 @@ import { findIdempotent, json, requestHash, storeIdempotency, type RequestMeta }
 import { LlmProvider, type ChatTurn } from './llm-provider';
 import { PromptRegistry } from './prompt-registry';
 import { ReplyStreamExtractor } from './reply-stream-extractor';
-import { computeMissingFields, llmTurnResultSchema, sendMessageInputSchema, type JdFields, type LlmTurnResult } from './types';
+import {
+  autoCompleteInputSchema,
+  computeMissingAuthoredFields,
+  computeMissingFields,
+  importSourceInputSchema,
+  llmTurnResultSchema,
+  sendMessageInputSchema,
+  setFieldsInputSchema,
+  titleVariantsInputSchema,
+  type JdFields,
+  type LlmTurnResult,
+} from './types';
 
 export type UploadedAttachment = { buffer: Buffer; mimetype: string; originalname: string; size: number };
 
@@ -312,25 +324,134 @@ export class CopilotService {
     if (!text) {
       throw new BadRequestException({ code: 'ATTACHMENT_EMPTY', message: '没有从文件中读取到可用的文本内容。' });
     }
+    return this.extractFromSource(identity, id, conversation, {
+      operation,
+      key,
+      hash,
+      llmContent: `[上传文件：${file.originalname}]\n\n${text}`,
+      userMessage: { text: `[已上传文件] ${file.originalname}`, attachments: [attachmentMeta] },
+    });
+  }
 
+  /** "Paste a link or text": reads a public job posting page, or takes pasted JD text, through the same extraction as an upload. */
+  async importSource(identity: Identity, id: string, raw: unknown, meta: RequestMeta) {
+    const input = importSourceInputSchema.parse(raw);
+    const conversation = await this.loadConversation(identity, id);
+    if (conversation.phase === 'completed') throw new ConflictException({ code: 'CONVERSATION_COMPLETED' });
+    const key = meta.idempotencyKey?.trim();
+    if (!key) throw new ConflictException({ code: 'IDEMPOTENCY_KEY_REQUIRED' });
+    const operation = `copilot.import:${id}`;
+    const hash = requestHash(input);
+
+    const existing = await this.db.idempotencyKey.findUnique({
+      where: { workspaceId_operation_key: { workspaceId: identity.workspaceId, operation, key } },
+    });
+    if (existing) {
+      if (existing.requestHash !== hash) throw new ConflictException({ code: 'IDEMPOTENCY_CONFLICT' });
+      return existing.responseBody;
+    }
+
+    if (input.url) {
+      const text = await extractTextFromLink(input.url);
+      return this.extractFromSource(identity, id, conversation, {
+        operation,
+        key,
+        hash,
+        llmContent: `[职位链接：${input.url}]\n\n${text}`,
+        userMessage: { text: input.url, attachments: [{ kind: 'link', url: input.url }] },
+      });
+    }
+    const text = input.text!;
+    return this.extractFromSource(identity, id, conversation, {
+      operation,
+      key,
+      hash,
+      llmContent: `[粘贴的 JD 文案]\n\n${text}`,
+      userMessage: { text },
+    });
+  }
+
+  /** Shared by upload and link/text import: one file-extract turn over the source text. */
+  private async extractFromSource(
+    identity: Identity,
+    id: string,
+    conversation: ConversationRow,
+    source: { operation: string; key: string; hash: string; llmContent: string; userMessage: { text: string; attachments?: unknown } },
+  ) {
     const history = await this.db.copilotMessage.findMany({ where: { conversationId: id }, orderBy: { sequence: 'asc' } });
     const turns: ChatTurn[] = [
       ...history.map((message) => ({ role: message.role as 'user' | 'assistant', content: message.text || '' })),
-      { role: 'user', content: `[上传文件：${file.originalname}]\n\n${text}` },
+      { role: 'user', content: source.llmContent },
     ];
     const parsed = await this.runFileExtractTurn(identity, id, turns);
 
     const prep: Extract<TurnPrep, { cached: null }> = {
       cached: null,
-      operation,
-      key,
-      hash,
-      userMessage: { text: `[已上传文件] ${file.originalname}`, attachments: [attachmentMeta] },
+      operation: source.operation,
+      key: source.key,
+      hash: source.hash,
+      userMessage: source.userMessage,
       capabilityCode: 'jd_file_extract_turn',
       turns,
       currentFields: asRecord(conversation.fields) as JdFields,
     };
     return this.commitTurn(identity, id, prep, parsed);
+  }
+
+  /**
+   * "Start with a job title": three complete drafts of the same role in different writing styles, generated
+   * in parallel. Nothing is committed — the user picks one, which is then saved through `setFields`.
+   */
+  async titleVariants(identity: Identity, id: string, raw: unknown) {
+    const input = titleVariantsInputSchema.parse(raw);
+    const conversation = await this.loadConversation(identity, id);
+    if (conversation.phase === 'completed') throw new ConflictException({ code: 'CONVERSATION_COMPLETED' });
+
+    const variants = await Promise.all(
+      TITLE_VARIANT_STYLES.map(async (style) => {
+        const turns: ChatTurn[] = [
+          { role: 'user', content: `岗位名称：${input.title}\n\n请直接生成一份完整 JD。写作风格：${style.label}——${style.instruction}` },
+        ];
+        const parsed = await this.runAutoCompleteTurn(identity, id, turns);
+        const fields: JdFields = { headcount: 1, ...parsed.fields, title: parsed.fields.title || input.title };
+        return { key: style.key, label: style.label, description: style.description, fields };
+      }),
+    );
+    return { title: input.title, variants };
+  }
+
+  /**
+   * Fields the user authored (manual form) or picked (a title variant): stored as-is with no LLM turn, and the
+   * conversation goes straight to `ready_to_confirm` so the existing confirm-draft creates the job.
+   */
+  async setFields(identity: Identity, id: string, raw: unknown, meta: RequestMeta) {
+    const input = setFieldsInputSchema.parse(raw);
+    const missing = computeMissingAuthoredFields(input.fields);
+    if (missing.length > 0) {
+      throw new BadRequestException({ code: 'FIELDS_INCOMPLETE', message: `缺少必填内容：${missing.join(', ')}` });
+    }
+    const conversation = await this.loadConversation(identity, id);
+    if (conversation.phase === 'completed') throw new ConflictException({ code: 'CONVERSATION_COMPLETED' });
+
+    return this.db.$transaction(async (tx) => {
+      const operation = `copilot.fields:${id}`;
+      const prior = await findIdempotent(tx, identity, operation, meta, input);
+      if (prior.prior) return prior.prior.responseBody;
+      const updated = await tx.copilotConversation.update({
+        where: { id },
+        data: { fields: json(input.fields), missingFields: json([]), phase: 'ready_to_confirm', stateRevision: { increment: 1 } },
+      });
+      const latest = await tx.copilotMessage.findFirst({ where: { conversationId: id }, orderBy: { sequence: 'desc' } });
+      const sequence = (latest?.sequence ?? 0) + 1;
+      await tx.copilotMessage.create({ data: { conversationId: id, sequence, role: 'user', text: input.label, idempotencyKey: prior.key } });
+      await tx.copilotMessage.create({
+        data: { conversationId: id, sequence: sequence + 1, role: 'assistant', text: `好的，已按「${input.fields.title}」整理好 JD 草稿，请确认后创建职位。` },
+      });
+      const messages = await tx.copilotMessage.findMany({ where: { conversationId: id }, orderBy: { sequence: 'asc' } });
+      const result = serializeConversation(updated, messages);
+      await storeIdempotency(tx, identity, operation, prior.key, prior.hash, result);
+      return result;
+    });
   }
 
   /**
@@ -342,13 +463,14 @@ export class CopilotService {
    * before: it only ever asked narrow clarifying questions, even when the user explicitly asked for a
    * complete draft instead.
    */
-  async autoComplete(identity: Identity, id: string, meta: RequestMeta) {
+  async autoComplete(identity: Identity, id: string, raw: unknown, meta: RequestMeta) {
+    const input = autoCompleteInputSchema.parse(raw ?? {});
     const conversation = await this.loadConversation(identity, id);
     if (conversation.phase === 'completed') throw new ConflictException({ code: 'CONVERSATION_COMPLETED' });
     const key = meta.idempotencyKey?.trim();
     if (!key) throw new ConflictException({ code: 'IDEMPOTENCY_KEY_REQUIRED' });
     const operation = `copilot.autocomplete:${id}`;
-    const userText = '自动补全并优化内容';
+    const userText = input.text || '自动补全并优化内容';
     const hash = requestHash({ userText });
 
     const existing = await this.db.idempotencyKey.findUnique({
@@ -464,6 +586,12 @@ export class CopilotService {
       : new ServiceUnavailableException({ code: 'LLM_INVALID_OUTPUT', message });
   }
 }
+
+const TITLE_VARIANT_STYLES = [
+  { key: 'concise', label: '简洁直接', description: '简短易扫读，阅读最快。', instruction: '用短句和精炼的要点，每条职责和要求尽量一句话说清，整体篇幅短。' },
+  { key: 'warm', label: '温暖亲和', description: '直接对候选人说话，突出影响力和团队文化。', instruction: '以“你”称呼候选人，突出这份工作带来的影响、成长和团队氛围，语气友好有温度。' },
+  { key: 'detailed', label: '详细结构化', description: '背景和期望完整清晰，适合资深岗位。', instruction: '给出完整的业务背景、明确的工作产出和衡量标准，职责和要求条目更多、更具体。' },
+] as const;
 
 function serializeConversation(conversation: ConversationRow, messages: MessageRow[]) {
   return {

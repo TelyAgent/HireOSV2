@@ -1,10 +1,10 @@
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { Navigate } from "react-router-dom";
 import { Input } from "antd";
-import { MainInner } from "../components/AppShell";
 import { Icon } from "../components/ui/Icons";
-import { Button, PageHeader } from "../components/ui/Primitives";
+import { Button } from "../components/ui/Primitives";
 import { CancelButton, ModalBody, ModalFooter, ModalHeader } from "../components/ui/Overlays";
-import { chatKey, GeminiPanel, jdFieldsToGeminiDraft } from "../features/copilot/GeminiPanel";
+import { chatKey, GeminiPanel, jdFieldsToGeminiDraft, useOpenCreateJob } from "../features/copilot/GeminiPanel";
 import { createCopilotConversation, uploadCopilotAttachment } from "../features/copilot/copilotApi";
 import { useStore } from "../store/StoreContext";
 import type { GeminiMsg } from "../store/types";
@@ -17,62 +17,22 @@ export function useStartCreate() {
   return (mode: CreateMode) => openModal(<CreateModal mode={mode} />, { wide: mode === "clone" });
 }
 
+/**
+ * "New job" no longer has its own page — it opens the Copilot drawer in place. This route only
+ * keeps old `/jobs/new` links working: it lands on the Job Library with the drawer open.
+ */
 export function NewJobPage() {
-  const { t, openDrawer } = useStore();
-  const startCreate = useStartCreate();
+  const openCreateJob = useOpenCreateJob();
+  const opened = useRef(false);
 
-  const cards: { mode: CreateMode; icon: string; title: string; meta: string }[] = [
-    {
-      mode: "upload",
-      icon: "upload_file",
-      title: "Upload PDF / DOCX / TXT",
-      meta: "We’ll extract structured fields for you to review.",
-    },
-    { mode: "paste", icon: "content_paste", title: "Paste notes", meta: "Drop in rough notes from a meeting or email." },
-    { mode: "template", icon: "dashboard_customize", title: "Use a template", meta: "Start from a saved job template." },
-    {
-      mode: "clone",
-      icon: "content_copy",
-      title: "Clone an existing job",
-      meta: "Copies role content; HC, dates, approvals and restricted content are never inherited.",
-    },
-  ];
+  useEffect(() => {
+    if (opened.current) return;
+    opened.current = true;
+    openCreateJob();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
-  return (
-    <MainInner>
-      <PageHeader
-        title={t("New job")}
-        subtitle={t("Start from a chat, an upload, pasted notes, a template, or by cloning an existing job.")}
-        crumbs={[{ label: t("Job Library"), to: "/jobs" }, { label: t("New job") }]}
-      />
-      <div className="job-card-grid">
-        <div
-          className="job-card gemini-launch-card"
-          onClick={() =>
-            openDrawer(<GeminiPanel ctx={{ mode: "create", jobId: null, audience: "internal", selText: null }} />, {
-              drawerClass: "gemini-drawer-shell",
-              overlayClass: "gemini-overlay",
-            })
-          }
-        >
-          <span className="gemini-launch-icon material-icons-o">auto_awesome</span>
-          <div>
-            <div className="jc-title">{t("Ask Copilot — speak or type")}</div>
-            <div className="jc-meta">
-              {t("Describe the role out loud or in writing; Copilot drafts a structured job for you to review and create.")}
-            </div>
-          </div>
-        </div>
-        {cards.map((c) => (
-          <div key={c.mode} className="job-card" onClick={() => startCreate(c.mode)}>
-            <Icon name={c.icon} size={28} style={{ color: "var(--accent-600)" }} />
-            <div className="jc-title">{t(c.title)}</div>
-            <div className="jc-meta">{t(c.meta)}</div>
-          </div>
-        ))}
-      </div>
-    </MainInner>
-  );
+  return <Navigate to="/jobs" replace />;
 }
 
 /* ---------------------------------------------------------------

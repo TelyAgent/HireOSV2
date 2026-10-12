@@ -1,5 +1,6 @@
 import type { AiAnalysis } from "../features/workspace/documentsApi";
 import type { JdVersions } from "../features/workspace/versions";
+import type { CopilotJdFields } from "../features/copilot/copilotApi";
 import type {
   ActivityItem,
   Approval,
@@ -37,6 +38,9 @@ export type CopilotMsg =
 export interface GeminiDraft {
   title: string;
   department: string;
+  location?: string;
+  headcount?: number;
+  employmentType?: string;
   summary?: string;
   responsibilities: string[];
   must: string[];
@@ -53,11 +57,26 @@ export interface ConversationActionOption {
   href: string;
 }
 
+/** The five ways into "Create a job" on the Copilot home screen; `home` means free-form chat. */
+export type GeminiCreatePath = "home" | "questions" | "title" | "upload" | "link" | "form";
+
+export interface GeminiVariant {
+  key: string;
+  label: string;
+  description: string;
+  fields: CopilotJdFields;
+}
+
 export type GeminiMsg =
   | { role: "user"; text: string }
   | { role: "thinking" }
-  | { role: "ai"; text: string; options?: ConversationActionOption[]; draft?: undefined }
-  | { role: "ai"; draft: GeminiDraft; text?: undefined; options?: undefined };
+  | { role: "ai"; text: string; options?: ConversationActionOption[]; draft?: undefined; kind?: undefined }
+  | { role: "ai"; draft: GeminiDraft; text?: undefined; options?: undefined; kind?: undefined }
+  /** Inline prompt card for a path: the upload button or the manual form. `done` once used. */
+  | { role: "ai"; kind: "upload"; text: string; done?: boolean }
+  | { role: "ai"; kind: "form"; text: string; done?: boolean }
+  /** "Start with a job title" result: three styles to pick from. `picked` once a job was created from one. */
+  | { role: "ai"; kind: "variants"; title: string; variants: GeminiVariant[]; picked?: number };
 
 export interface AppState {
   // appearance / chrome
@@ -112,6 +131,8 @@ export interface AppState {
   geminiChats: Record<string, GeminiMsg[]>;
   // Backend copilot conversation id bound to each gemini chat key (create-mode only for now).
   geminiConversationIds: Record<string, string>;
+  // Which create path each gemini chat is on — decides how the composer's next input is handled.
+  geminiCreatePaths: Record<string, GeminiCreatePath>;
 
   // home page
   homeTrendsOpen: boolean;

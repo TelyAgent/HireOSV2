@@ -56,6 +56,7 @@ export const initialState: AppState = {
 
   geminiChats: {},
   geminiConversationIds: {},
+  geminiCreatePaths: {},
 
   homeTrendsOpen: false,
 
