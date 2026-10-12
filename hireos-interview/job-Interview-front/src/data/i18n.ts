@@ -740,6 +740,10 @@ export const LANG = {
   },
 } as const;
 
+// Same keys as the English dictionary, any string value: lets `zh` be assigned where a
+// dictionary is expected, and makes a key missing from `zh` a type error.
+export type Dictionary = { readonly [K in keyof (typeof LANG)["en"]]: string };
+
 export const STATUS_MAP_EN_ZH: Record<string, string> = {
   "Must-have": "必须项",
   Standard: "标准项",

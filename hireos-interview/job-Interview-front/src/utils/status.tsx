@@ -1,6 +1,6 @@
 import { useStore } from "../store/StoreContext";
 import { COMPS as COMPS_LIST } from "../data/comps";
-import type { Competency } from "../data/comps";
+import type { Competency } from "../store/types";
 
 export type Tone = "ok" | "warn" | "bad" | "unknown";
 

@@ -1,4 +1,4 @@
-import type { RolePerson } from "./types";
+import type { RolePerson } from "../store/types";
 
 export const ROLES: RolePerson[] = [
   {

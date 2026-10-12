@@ -1,4 +1,4 @@
-import { defineConfig, type Plugin } from 'vite';
+import { defineConfig, type Plugin, type PreviewServer, type ViteDevServer } from 'vite';
 import react from '@vitejs/plugin-react';
 import tailwindcss from '@tailwindcss/vite';
 
@@ -11,7 +11,7 @@ const BASE_PATH = process.env.VITE_BASE_PATH || '/interview/';
 
 // Isolate only the SDK document; leave the main app and OAuth popup unchanged.
 const zoomIsolation = (): Plugin => {
-  const install = (server: { middlewares: { use: (handler: (req: { url?: string }, res: { setHeader: (name: string, value: string) => void }, next: () => void) => void) => void } }) => {
+  const install = (server: ViteDevServer | PreviewServer) => {
     server.middlewares.use((req, res, next) => {
       if (req.url?.split('?')[0] === `${BASE_PATH}zoom-meeting/index.html`) {
         res.setHeader('Document-Isolation-Policy', 'isolate-and-credentialless');

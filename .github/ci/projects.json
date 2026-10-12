@@ -34,7 +34,7 @@
       "dir": "hireos-interview/job-Interview-front",
       "prisma": false,
       "checks": ["build", "typecheck"],
-      "known_failing": ["build"]
+      "known_failing": []
     },
     {
       "name": "screening-backend",

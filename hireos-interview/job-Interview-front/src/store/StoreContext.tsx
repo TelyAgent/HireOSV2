@@ -14,7 +14,7 @@ import { initialState } from "./initialState";
 import type { AppState, RolePerson, Screen } from "./types";
 import { ROLES } from "../data/roles";
 import { COMPS, EVIDENCE, R1_SCORES } from "../data/comps";
-import { LANG, ZH_TEXT_MAP, STATUS_MAP_EN_ZH } from "../data/i18n";
+import { LANG, ZH_TEXT_MAP, STATUS_MAP_EN_ZH, type Dictionary } from "../data/i18n";
 
 // ---------------------------------------------------------------------------
 // Routing: screen <-> URL path mapping
@@ -128,7 +128,7 @@ interface StoreValue {
   setTextSize: (s: AppState["textSize"]) => void;
   resetPrefs: () => void;
   role: RolePerson;
-  t: (typeof LANG)["en"];
+  t: Dictionary;
   comps: typeof COMPS;
   evidence: typeof EVIDENCE;
   r1Scores: typeof R1_SCORES;
