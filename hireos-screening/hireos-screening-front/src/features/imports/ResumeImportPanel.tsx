@@ -53,7 +53,7 @@ export function ResumeImportPanel({
           {tab === "upload" && <UploadTab onChanged={bump} jobId={jobId} />}
           {tab === "paste" && <PasteTab onChanged={bump} jobId={jobId} />}
           {tab === "email" && <EmailTab onChanged={bump} jobId={jobId} />}
-          {tab === "folder" && <FolderTab />}
+          {tab === "folder" && <FolderTab onChanged={bump} jobId={jobId} />}
           {tab === "api" && <ApiTab />}
         </div>
       </div>
