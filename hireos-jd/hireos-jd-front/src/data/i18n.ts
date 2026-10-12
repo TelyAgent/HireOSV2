@@ -989,10 +989,7 @@ export const ZH: Record<string, string> = {
   "savedView.All Jobs": "全部职位",
   "savedView.My Jobs": "我的职位",
   "savedView.Published": "已发布",
-  "savedView.Needs My Attention": "需要我处理",
   "savedView.Drafts": "草稿",
-  "savedView.Pending Approval": "待审批",
-  "savedView.Recently Updated": "最近更新",
 
   /* ---------- Ask Copilot — create-a-job home ---------- */
   "Create a Job": "创建职位",

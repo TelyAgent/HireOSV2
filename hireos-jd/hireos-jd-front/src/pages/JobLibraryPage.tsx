@@ -36,17 +36,8 @@ export function jobsForSavedView(state: AppState, view: string): Job[] {
       return all.filter((j) => j.owner === u || j.hiringManager === u || j.recruiter === u);
     case "Published":
       return all.filter((j) => j.hiringStatus === "published");
-    case "Needs My Attention":
-      return all.filter(
-        (j) =>
-          (j.approvalStatus === "pending" &&
-            state.approvals[j.id]?.steps?.find((s) => s.status === "active")?.assignee === u) ||
-          (j.hiringManager === u && j.collaborationStatus === "in_collaboration"),
-      );
     case "Drafts":
       return all.filter((j) => j.hiringStatus === "draft");
-    case "Pending Approval":
-      return all.filter((j) => j.approvalStatus === "pending");
     default:
       return all;
   }
