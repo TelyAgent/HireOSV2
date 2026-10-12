@@ -47,6 +47,16 @@ jobs:
     strategy:
       fail-fast: false
       matrix: ${{ fromJSON(needs.detect.outputs.matrix) }}
+    services:
+      postgres:
+        # An empty image skips the service, so only projects with "database": true get one.
+        image: ${{ matrix.database && 'postgres:17-alpine' || '' }}
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: hireos_test
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd pg_isready --health-interval 5s --health-timeout 5s --health-retries 10
     steps:
       - uses: actions/checkout@v4
         with:
@@ -66,8 +76,11 @@ jobs:
           DIR: ${{ matrix.dir }}
           CHECKS: ${{ toJSON(matrix.checks) }}
           KNOWN: ${{ toJSON(matrix.known_failing) }}
+          DATABASE: ${{ matrix.database }}
         # Every check runs even after a failure so one run reports all of them.
         run: |
+          # Integration tests create their own schema per run inside this throwaway database.
+          if [ "$DATABASE" = true ]; then export DATABASE_URL=postgresql://postgres:postgres@localhost:5432/hireos_test; fi
           failed=0
           for check in $(jq -r '.[]' <<<"$CHECKS"); do
             known=$(jq --arg c "$check" 'index($c) != null' <<<"$KNOWN")

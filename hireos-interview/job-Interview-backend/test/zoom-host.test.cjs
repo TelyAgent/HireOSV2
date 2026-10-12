@@ -34,8 +34,19 @@ test('PKCE callback, encryption, user isolation, host signing and duplicate crea
     assert.equal((await service.status({ ...identity, actorId: 'other' })).connected, false);
     const [a, b] = await Promise.all([service.start(identity), service.start(identity)]);
     assert.equal(creates, 1); assert.equal(a.meetingNumber, b.meetingNumber);
-    assert.equal(JSON.parse(Buffer.from(a.signature.split('.')[1], 'base64url')).role, 1);
-    assert.equal(a.zak, 'private-zak');
+    // Default: interviewers join as attendees (role 0, no ZAK) -- see ZoomHostService.start.
+    assert.equal(JSON.parse(Buffer.from(a.signature.split('.')[1], 'base64url')).role, 0);
+    assert.equal(a.zak, undefined);
+    // ZOOM_INTERVIEWER_JOIN_AS=host restores host join: role 1 plus the account's ZAK,
+    // reusing the meeting already created above.
+    const hostService = new ZoomHostService({ get: key => key === 'ZOOM_INTERVIEWER_JOIN_AS' ? 'host' : config.get(key) }, new MeetingsService(config));
+    hostService.directory = directory; hostService.call = service.call; hostService.token = service.token;
+    try {
+      const host = await hostService.start(identity);
+      assert.equal(creates, 1); assert.equal(host.meetingNumber, a.meetingNumber);
+      assert.equal(JSON.parse(Buffer.from(host.signature.split('.')[1], 'base64url')).role, 1);
+      assert.equal(host.zak, 'private-zak');
+    } finally { hostService.onModuleDestroy(); }
     const publicStatus = JSON.stringify(await service.status(identity));
     for (const secret of ['private-access', 'private-refresh', 'private-zak', 'private-passcode']) assert.ok(!publicStatus.includes(secret));
     for (const file of await readdir(directory)) {

@@ -1,5 +1,5 @@
 {
-  "$comment": "CI 检查的项目注册表。checks 是要跑的 npm script；known_failing 中的检查照常执行但只报警告，修好后必须从这里删除（CI 会提示）。新增子项目时在这里登记。",
+  "$comment": "CI 检查的项目注册表。checks 是要跑的 npm script；database=true 的项目在 CI 中会启动 Postgres 并设置 DATABASE_URL；known_failing 中的检查照常执行但只报警告，修好后必须从这里删除（CI 会提示）。新增子项目时在这里登记。",
   "projects": [
     {
       "name": "core-record",
@@ -26,8 +26,9 @@
       "name": "interview-backend",
       "dir": "hireos-interview/job-Interview-backend",
       "prisma": true,
+      "database": true,
       "checks": ["build", "lint", "typecheck", "test"],
-      "known_failing": ["test"]
+      "known_failing": []
     },
     {
       "name": "interview-front",

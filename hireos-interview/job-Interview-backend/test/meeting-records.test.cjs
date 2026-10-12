@@ -34,7 +34,7 @@ test('persistent meeting notes: authorization, sessions, revisions and recovery'
       method, headers: { 'Content-Type': 'application/json', 'x-hireos-record': '1', ...headers },
       ...(body === undefined ? {} : { body: JSON.stringify(body) }),
     });
-    const job = await db.job.create({ data: { workspaceId: 'test-workspace', createdBy: 'owner', requestKey: randomUUID(), requestHash: 'fixture', title: 'Fixture job', jdText: '' } });
+    const job = await db.job.create({ data: { workspaceId: 'test-workspace', createdBy: 'owner', title: 'Fixture job', jdText: '' } });
     const candidate = await db.candidate.create({ data: { workspaceId: 'test-workspace', name: 'Fixture candidate' } });
     const task = await db.interviewTask.create({ data: { workspaceId: 'test-workspace', createdBy: 'owner', jobId: job.id, candidateId: candidate.id } });
     assert.equal((await (await send('/meeting-record-tasks')).json()).length, 1);

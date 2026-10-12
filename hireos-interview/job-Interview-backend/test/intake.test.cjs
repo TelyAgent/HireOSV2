@@ -69,18 +69,14 @@ test('intake persistence, validation, parsing and recovery', async (t) => {
   await worker.onModuleDestroy();
   const base = `http://127.0.0.1:${app.getHttpServer().address().port}/api`;
   const send = (path, body, key = randomUUID(), method = 'POST') => fetch(base + path, { method, headers: { 'Content-Type': 'application/json', 'Idempotency-Key': key }, body: JSON.stringify(body) });
-  const input = { jd: { text: 'Backend Engineer\n\nBuild reliable APIs.', effectiveSource: 'text' }, resumes: [] };
+  const jdText = 'Backend Engineer\n\nBuild reliable APIs.';
   let job;
   try {
-    await t.test('JD-only persists; concurrent retries deduplicate; changed payload conflicts', async () => {
-      const key = randomUUID();
-      const responses = await Promise.all([send('/jobs', input, key), send('/jobs', input, key)]);
-      assert.ok(responses.every((r) => r.status === 201));
-      const [a, b] = await Promise.all(responses.map((r) => r.json())); job = a;
-      assert.equal(a.id, b.id); assert.equal(a.tasks.length, 0); assert.equal(a.parseJobs.length, 1);
-      assert.equal((await send('/jobs', { ...input, jd: { ...input.jd, text: 'Different' } }, key)).status, 409);
-      assert.equal((await send('/jobs', { jd: { text: '', effectiveSource: 'text' } })).status, 400);
-      const read = await (await fetch(`${base}/jobs/${a.id}`)).json(); assert.equal(read.jdText, input.jd.text);
+    await t.test('an attached job is readable within its workspace', async () => {
+      // Jobs are owned by Core Record and attached via POST /jobs/attach; seed one directly.
+      job = await db.job.create({ data: { workspaceId, createdBy: identity.actorId, coreJobId: randomUUID(), title: 'Backend Engineer', jdText: jdText } });
+      const read = await (await fetch(`${base}/jobs/${job.id}`)).json();
+      assert.equal(read.id, job.id); assert.equal(read.jdText, jdText); assert.equal(read.tasks.length, 0);
     });
     await t.test('workspace isolation and production fail-closed guard', async () => {
       await assert.rejects(app.get(JobsService).get('different-workspace', job.id), (e) => e.getStatus() === 404);
@@ -154,27 +150,18 @@ test('intake persistence, validation, parsing and recovery', async (t) => {
     });
     await t.test('AI extraction is sourced and never silently edits job or candidate fields', async () => {
       await worker.tick(); await worker.tick();
-      const jdParse = await db.parseJob.findFirst({ where: { jobId: job.id, type: 'jd' } });
-      assert.equal(jdParse.status, 'needs_review'); assert.equal(jdParse.result.title.segmentId, 's1');
-      const original = await db.job.findUnique({ where: { id: job.id } });
-      assert.equal(original.reviewed, false); assert.equal(original.title, 'Backend Engineer');
+      const resumeParse = await db.parseJob.findFirst({ where: { workspaceId, type: 'resume', materialId: resumeMaterial.id } });
+      assert.equal(resumeParse.status, 'needs_review'); assert.equal(resumeParse.result.title.segmentId, 's1');
+      assert.equal((await db.job.findUnique({ where: { id: job.id } })).title, 'Backend Engineer');
       const candidate = await db.candidate.findUnique({ where: { id: task.candidate.id } });
       assert.equal(candidate.name, 'Ada Example');
     });
     await t.test('invalid AI responses and missing configuration stay explicit', async () => {
       const ai = app.get(AiService); const source = { sourceId: 'test', segments: [{ id: 's1', text: 'Engineer' }] };
-      mode = 'bad-json'; await assert.rejects(ai.extract('jd', source), (e) => e.code === 'AI_OUTPUT_INVALID');
-      mode = 'bad-source'; await assert.rejects(ai.extract('jd', source), (e) => e.code === 'AI_SOURCE_INVALID');
+      mode = 'bad-json'; await assert.rejects(ai.extract('resume', source), (e) => e.code === 'AI_OUTPUT_INVALID');
+      mode = 'bad-source'; await assert.rejects(ai.extract('resume', source), (e) => e.code === 'AI_SOURCE_INVALID');
       mode = 'ok';
-      await assert.rejects(new AiService({ get: () => undefined }).extract('jd', source), (e) => e.code === 'AI_NOT_CONFIGURED');
-    });
-    await t.test('manual changes use optimistic locking and a separate JD version', async () => {
-      const body = { version: 1, title: 'Reviewed role', department: null, location: null, level: null, recruitingStatus: 'open', jdText: 'Updated role requirements' };
-      let response = await send(`/jobs/${job.id}/intake`, body, '', 'PATCH');
-      assert.equal(response.status, 200); const saved = await response.json();
-      assert.equal(saved.version, 2); assert.equal(saved.jdVersion, 2); assert.equal(saved.reviewed, true);
-      response = await send(`/jobs/${job.id}/intake`, body, '', 'PATCH'); assert.equal(response.status, 409);
-      assert.equal(await db.revision.count({ where: { jobId: job.id } }), 2);
+      await assert.rejects(new AiService({ get: () => undefined }).extract('resume', source), (e) => e.code === 'AI_NOT_CONFIGURED');
     });
     await t.test('task status changes are versioned independently of the job', async () => {
       const body = { version: 1, status: 'ready_to_schedule' };
@@ -184,12 +171,12 @@ test('intake persistence, validation, parsing and recovery', async (t) => {
       assert.equal(await db.revision.count({ where: { taskId: task.id } }), 1);
     });
     await t.test('expired leases recover without overriding human edits', async () => {
-      await db.parseJob.updateMany({ where: { taskId: null, resumeId: { not: null } }, data: { status: 'failed' } });
-      const jdParse = await db.parseJob.findFirst({ where: { jobId: job.id, type: 'jd', inputVersion: 2 } });
-      await db.parseJob.update({ where: { id: jdParse.id }, data: { status: 'parsing', leaseToken: 'dead-worker', leaseUntil: new Date(0) } });
+      const resumeParse = await db.parseJob.findFirst({ where: { workspaceId, type: 'resume', materialId: resumeMaterial.id } });
+      await db.candidate.update({ where: { id: task.candidate.id }, data: { name: 'Ada Reviewed' } });
+      await db.parseJob.update({ where: { id: resumeParse.id }, data: { status: 'parsing', leaseToken: 'dead-worker', leaseUntil: new Date(0) } });
       await worker.tick();
-      assert.equal((await db.parseJob.findUnique({ where: { id: jdParse.id } })).status, 'needs_review');
-      assert.equal((await db.job.findUnique({ where: { id: job.id } })).title, 'Reviewed role');
+      assert.equal((await db.parseJob.findUnique({ where: { id: resumeParse.id } })).status, 'needs_review');
+      assert.equal((await db.candidate.findUnique({ where: { id: task.candidate.id } })).name, 'Ada Reviewed');
     });
   } finally {
     const materials = await db.material.findMany({ where: { workspaceId } });
@@ -197,7 +184,8 @@ test('intake persistence, validation, parsing and recovery', async (t) => {
     await db.candidate.deleteMany({ where: { workspaceId } });
     await db.job.deleteMany({ where: { workspaceId } });
     await db.material.deleteMany({ where: { workspaceId } });
-    for (const material of materials) await unlink(resolve(process.env.STORAGE_DIR || '.local/materials', material.storageKey)).catch(() => {});
+    // Materials referenced from Core Record have no local file (storageKey is null).
+    for (const material of materials.filter((m) => m.storageKey)) await unlink(resolve(process.env.STORAGE_DIR || '.local/materials', material.storageKey)).catch(() => {});
     await app.close(); await new Promise((done) => model.close(done));
     await setupDb.$executeRawUnsafe(`DROP SCHEMA "${schema}" CASCADE`);
     await setupDb.$disconnect();
