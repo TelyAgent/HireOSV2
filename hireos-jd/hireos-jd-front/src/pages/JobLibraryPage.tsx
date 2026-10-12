@@ -43,15 +43,6 @@ export function jobsForSavedView(state: AppState, view: string): Job[] {
   }
 }
 
-/** Port of the prototype's `nextActionFor(job)` — returns an untranslated key. */
-export function nextActionFor(j: Job): string {
-  if (j.hiringStatus === "draft" && !j.activeRoleVersionRef) return "Complete requirements";
-  if (j.approvalStatus === "pending") return "Awaiting approval";
-  if (j.activationStatus === "pending") return "Activation pending";
-  if (j.hiringStatus === "published") return "Hiring in progress";
-  return "No action needed";
-}
-
 function QualityFlag({ note }: { note: string }) {
   return (
     <span
@@ -173,13 +164,10 @@ export function JobLibraryPage() {
                 <th>{t("Job title")}</th>
                 <th>{t("Hiring status")}</th>
                 <th>{t("Active version")}</th>
-                <th>{t("Draft/Approval")}</th>
                 <th>{t("Department")}</th>
-                <th>{t("HM")}</th>
-                <th>{t("Recruiter")}</th>
+                <th>{t("Owner", "jobLibrary.owner")}</th>
                 <th>{t("Location")}</th>
                 <th>{t("HC")}</th>
-                <th>{t("Next action")}</th>
                 <th>{t("Updated")}</th>
                 <th></th>
               </tr>
@@ -196,19 +184,12 @@ export function JobLibraryPage() {
                   <td className="tiny">
                     {j.activeRoleVersionRef ? "v" + state.roleVersions[j.activeRoleVersionRef]?.versionNo : t("None")}
                   </td>
-                  <td>
-                    <StatusBadge kind="approval_status" value={j.approvalStatus} />
-                  </td>
                   <td>{j.department}</td>
                   <td>
-                    <PersonChip id={j.hiringManager} />
-                  </td>
-                  <td>
-                    <PersonChip id={j.recruiter} />
+                    <PersonChip id={j.owner} showUnknownId />
                   </td>
                   <td className="tiny">{j.location}</td>
                   <td className="tiny">{j.headcount}</td>
-                  <td className="tiny">{t(nextActionFor(j))}</td>
                   <td className="tiny">{fmtRelative(j.updatedAt)}</td>
                   <td>
                     <button
@@ -242,11 +223,7 @@ export function JobLibraryPage() {
                 {j.department} • {j.location}
               </div>
               <div className="jc-row">
-                <PersonChip id={j.hiringManager} />
-              </div>
-              <div className="jc-row">
-                <StatusBadge kind="approval_status" value={j.approvalStatus} />
-                <span className="tiny">{t(nextActionFor(j))}</span>
+                <PersonChip id={j.owner} showUnknownId />
               </div>
             </div>
           ))}

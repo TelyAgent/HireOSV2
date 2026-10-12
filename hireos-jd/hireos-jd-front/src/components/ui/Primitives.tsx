@@ -104,11 +104,12 @@ export function PersonAvatar({ id, size = "sm" }: { id?: string | null; size?: "
   );
 }
 
-export function PersonChip({ id }: { id?: string | null }) {
+/** `showUnknownId`: for ids outside the people directory (e.g. Core Record's createdBy), show the raw id instead of "Unknown". */
+export function PersonChip({ id, showUnknownId = false }: { id?: string | null; showUnknownId?: boolean }) {
   const { t } = useStore();
   if (!id) return <span className="tiny">{t("Unassigned")}</span>;
   const p = getPerson(id);
-  if (!p) return <span className="tiny">{t("Unknown")}</span>;
+  if (!p) return <span className="tiny">{showUnknownId ? id : t("Unknown")}</span>;
   return (
     <span className="flex items-center gap-6">
       <PersonAvatar id={id} />
