@@ -28,7 +28,7 @@ test("skips other formats, hidden files and folders, and Office lock files", () 
   assert.deepEqual(r.skipped, { unsupported: 4, hidden: 5, tooLarge: 0 });
 });
 
-test("25 MB is the inclusive limit", () => {
+test("the 20 MB limit (minus multipart headroom) is inclusive", () => {
   const r = selectFolderFiles([picked("R/edge.pdf", MAX_RESUME_BYTES), picked("R/big.pdf", MAX_RESUME_BYTES + 1)]);
   assert.deepEqual(r.accepted.map((f) => f.name), ["edge.pdf"]);
   assert.equal(r.skipped.tooLarge, 1);
@@ -42,7 +42,7 @@ test("batches respect the 20-file limit and keep order", () => {
 });
 
 test("batches respect the byte budget; an oversized file gets its own batch", () => {
-  const files = [picked("R/a.pdf", 10 * MB), picked("R/b.pdf", 7 * MB), picked("R/c.pdf", 2 * MB), picked("R/d.pdf", 24 * MB), picked("R/e.pdf", 1 * MB)];
+  const files = [picked("R/a.pdf", 10 * MB), picked("R/b.pdf", 7 * MB), picked("R/c.pdf", 2 * MB), picked("R/d.pdf", 19 * MB), picked("R/e.pdf", 1 * MB)];
   assert.deepEqual(chunkForUpload(files).map((b) => b.map((f) => f.name)), [["a.pdf", "b.pdf"], ["c.pdf"], ["d.pdf"], ["e.pdf"]]);
   assert.deepEqual(chunkForUpload([]), []);
 });

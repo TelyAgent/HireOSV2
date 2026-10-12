@@ -15,6 +15,7 @@ import { delay } from "../../data/api/shared";
 import { Icon } from "../../components/ui/Icons";
 import { Badge, Button } from "../../components/ui/Primitives";
 import { describeItem, formatFileSize } from "./importOutcome";
+import { MAX_RESUME_BYTES, chunkForUpload } from "./folderFiles";
 
 interface Run {
   id: string;
@@ -326,13 +327,18 @@ export function useImportRuns({ jobId, onChanged }: { jobId?: string; onChanged?
 }
 
 export function UploadTab({ onChanged, jobId }: { onChanged?: () => void; jobId?: string }) {
-  const { t } = useStore();
+  const { t, say } = useStore();
   const [dragOver, setDragOver] = useState(false);
   const { startRun, runCards } = useImportRuns({ jobId, onChanged });
 
   const handleFiles = (fileList: FileList | File[]) => {
     const files = Array.from(fileList);
-    if (files.length) startRun(files);
+    const tooLarge = files.filter((f) => f.size > MAX_RESUME_BYTES);
+    if (tooLarge.length) {
+      say(`${tooLarge.length} ${t("file(s) over 20 MB were skipped")}: ${tooLarge.map((f) => f.name).join(", ")}`, { type: "warning" });
+    }
+    // Same request limits as folder imports: at most 20 files / ~20 MB per upload.
+    for (const batch of chunkForUpload(files.filter((f) => f.size <= MAX_RESUME_BYTES))) void startRun(batch);
   };
 
   return (
@@ -371,8 +377,8 @@ export function UploadTab({ onChanged, jobId }: { onChanged?: () => void; jobId?
         <h3 style={{ margin: "8px 0 4px", fontWeight: 500 }}>{t("Drag files here, or click to choose")}</h3>
         <p className="tiny">
           {jobId
-            ? t("Supports PDF, DOCX, TXT · Up to 25 MB per file · Matched against this job only")
-            : t("Supports PDF, DOCX, TXT · Up to 25 MB per file · No job selection required")}
+            ? t("Supports PDF, DOCX, TXT · Up to 20 MB per file · Matched against this job only")
+            : t("Supports PDF, DOCX, TXT · Up to 20 MB per file · No job selection required")}
         </p>
         <Button
           variant="primary"

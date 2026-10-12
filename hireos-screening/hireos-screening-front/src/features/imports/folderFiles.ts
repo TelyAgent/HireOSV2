@@ -1,5 +1,8 @@
-/** Same limit the upload pipeline enforces server-side; folder imports skip larger files up front. */
-export const MAX_RESUME_BYTES = 25 * 1024 * 1024;
+/**
+ * Per-file limit shown to users as "20 MB". The gateway rejects request bodies over 20 MB
+ * (gateway/nginx.conf), so keep a little headroom for the multipart envelope.
+ */
+export const MAX_RESUME_BYTES = 20 * 1024 * 1024 - 64 * 1024;
 
 const RESUME_EXTENSIONS = [".pdf", ".docx", ".txt"];
 

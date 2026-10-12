@@ -40,7 +40,7 @@ export function FolderTab({ onChanged, jobId }: { onChanged?: () => void; jobId?
           {" · "}
           {t("Skipped")} {skippedTotal(selection.result)}
           {selection.result.skipped.tooLarge > 0 &&
-            ` (${selection.result.skipped.tooLarge} ${t("over 25 MB")})`}
+            ` (${selection.result.skipped.tooLarge} ${t("over 20 MB")})`}
         </>
       )}
     </div>
@@ -65,8 +65,8 @@ export function FolderTab({ onChanged, jobId }: { onChanged?: () => void; jobId?
         <h3 style={{ margin: "8px 0 4px", fontWeight: 500 }}>{t("Import every resume in a folder")}</h3>
         <p className="tiny">
           {jobId
-            ? t("Supports PDF, DOCX, TXT · Up to 25 MB per file · Matched against this job only")
-            : t("Supports PDF, DOCX, TXT · Up to 25 MB per file · No job selection required")}
+            ? t("Supports PDF, DOCX, TXT · Up to 20 MB per file · Matched against this job only")
+            : t("Supports PDF, DOCX, TXT · Up to 20 MB per file · No job selection required")}
         </p>
         <p className="tiny muted">{t("Subfolders are included. The folder itself is not saved or watched.")}</p>
         <Button variant="primary" style={{ marginTop: 10 }} onClick={() => document.getElementById(FOLDER_INPUT_ID)?.click()}>
