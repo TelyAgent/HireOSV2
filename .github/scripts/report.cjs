@@ -25,7 +25,7 @@ function validate(value, schema, location = '$') {
 }
 
 function readReport(kind, filename, expected) {
-  if (kind !== 'review') throw new Error('Unknown report kind');
+  if (!['qa', 'review'].includes(kind)) throw new Error('Unknown report kind');
   const raw = fs.readFileSync(filename, 'utf8');
   if (Buffer.byteLength(raw) > 500000) throw new Error('Report too large');
   const report = JSON.parse(raw);
@@ -34,7 +34,19 @@ function readReport(kind, filename, expected) {
     if (report[key] !== expected[key]) throw new Error(`Mismatched ${key}`);
   }
   if (!/^[a-f0-9]{40}$/.test(report.commit) || report.issue < 1 || report.pr < 1) throw new Error('Invalid identity');
-  if (kind === 'review' && report.result === 'pass' && (report.security === 'fail' || report.findings.some(f => f.blocking))) {
+  if (kind === 'qa') {
+    const criteriaSection = expected.issue_body?.match(/^### Acceptance Criteria\r?\n([\s\S]*?)(?=^### |$(?![\s\S]))/m)?.[1] || '';
+    const ids = [...new Set(criteriaSection.match(/\bAC-\d+\b/g) || [])];
+    const actual = report.acceptance_criteria.map(ac => ac.id);
+    if (!ids.length || ids.length !== actual.length || ids.some(id => !actual.includes(id))) {
+      throw new Error('Report must cover every Acceptance Criterion exactly once');
+    }
+    if (report.acceptance_criteria.some(ac => !ac.evidence.trim())) throw new Error('Missing AC evidence');
+    if (report.result === 'pass' && (report.acceptance_criteria.some(ac => ac.result !== 'pass') ||
+        !report.tests_executed.length || report.bugs.length || report.regressions.length)) {
+      throw new Error('Contradictory QA pass');
+    }
+  } else if (report.result === 'pass' && (report.security === 'fail' || report.findings.some(f => f.blocking))) {
     throw new Error('Contradictory review pass');
   }
   return report;

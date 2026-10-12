@@ -6,7 +6,7 @@ const os = require('node:os');
 const path = require('node:path');
 const { loadProjects, selectProjects } = require('./projects.cjs');
 const { readReport } = require('./report.cjs');
-const { render, MARKER } = require('./publish-review.cjs');
+const { render, renderQa, MARKER, QA_MARKER } = require('./publish-review.cjs');
 
 const ROOT = path.join(__dirname, '../..');
 const SHA = 'a'.repeat(40);
@@ -72,4 +72,32 @@ test('publisher marks missing report as blocked, never pass', () => {
   assert.ok(body.startsWith(MARKER));
   assert.match(body, /\[AI-BLOCKED\]/);
   assert.match(render(passing, 'https://run'), /\[AI-EVIDENCE\] Claude Review: \*\*pass\*\*/);
+});
+
+const qaContext = { ...context, issue_body: '### Acceptance Criteria\n\n- AC-1: works\n- AC-2: fails safely\n\n### References\n\nNone' };
+const qaPass = {
+  result: 'pass', issue: 7, pr: 9, commit: SHA,
+  acceptance_criteria: [{ id: 'AC-1', result: 'pass', evidence: 'npm test exit 0' }, { id: 'AC-2', result: 'pass', evidence: 'qa-a.test.cjs' }],
+  tests_added: ['test/qa-a.test.cjs'], tests_executed: ['npm --prefix x test (exit 0)'], regressions: [], bugs: [],
+};
+const writeQa = report => { const f = writeReport(report).replace(/review\.json$/, 'qa.json'); fs.writeFileSync(f, JSON.stringify(report)); return f; };
+
+test('accepts a QA report covering every AC exactly once', () => {
+  assert.equal(readReport('qa', writeQa(qaPass), qaContext).result, 'pass');
+});
+
+test('rejects QA reports with missing ACs, missing evidence or a contradictory pass', () => {
+  assert.throws(() => readReport('qa', writeQa({ ...qaPass, acceptance_criteria: qaPass.acceptance_criteria.slice(0, 1) }), qaContext), /every Acceptance Criterion/);
+  assert.throws(() => readReport('qa', writeQa({ ...qaPass, acceptance_criteria: [qaPass.acceptance_criteria[0], { id: 'AC-2', result: 'pass', evidence: ' ' }] }), qaContext), /Missing AC evidence/);
+  assert.throws(() => readReport('qa', writeQa({ ...qaPass, tests_executed: [] }), qaContext), /Contradictory QA pass/);
+  const bug = { severity: 'S2', title: 't', reproduction: 'r', evidence: 'e' };
+  assert.throws(() => readReport('qa', writeQa({ ...qaPass, bugs: [bug] }), qaContext), /Contradictory QA pass/);
+  assert.equal(readReport('qa', writeQa({ ...qaPass, result: 'fail', bugs: [bug] }), qaContext).result, 'fail');
+});
+
+test('QA comment lists every AC and marks a missing report as blocked', () => {
+  const body = renderQa({ ...qaPass, acceptance_criteria: [...qaPass.acceptance_criteria.slice(0, 1), { id: 'AC-2', result: 'fail', evidence: 'a|b\nc' }] }, 'https://run');
+  assert.ok(body.startsWith(QA_MARKER));
+  assert.match(body, /\| AC-1 \| ✅ pass \|/); assert.match(body, /\| AC-2 \| ❌ fail \| a\\\|b<br>c \|/);
+  assert.match(renderQa(null, 'https://run'), /\[AI-BLOCKED\] Claude QA/);
 });

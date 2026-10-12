@@ -60,8 +60,8 @@ Claude 用 gh 创建 Issue（AI Ready=Yes）；有未决问题时则 AI Ready=No
 开 PR（模板，Closes #123）
    ▼
 CI：改动的子项目跑 build/lint/typecheck/test
-    → Issue contract 校验 → Claude Review（只读，结构化输出）
-    → PR 评论 [AI-EVIDENCE] → Merge gate
+    → Issue contract 校验 → Claude Review（只读）+ Claude QA（按 AC 实际验证），并行
+    → 两条 PR 评论 [AI-EVIDENCE] → Merge gate
    ▼
 Human Supervisor 验收业务结果 → 合并 → 按 PR 的 Deploy 一节人工部署
 ```

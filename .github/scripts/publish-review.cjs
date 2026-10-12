@@ -26,20 +26,62 @@ function render(report, runUrl) {
   ].join('\n');
 }
 
+const QA_MARKER = '<!-- hireos:claude-qa -->';
+
+function renderQa(report, runUrl) {
+  if (!report) {
+    return `${QA_MARKER}\n[AI-BLOCKED] Claude QA not completed.\n\nNo valid report was produced. Run: ${runUrl}`;
+  }
+  const icon = r => (r === 'pass' ? '✅' : '❌');
+  const cell = text => String(text).replace(/\|/g, '\\|').replace(/\r?\n/g, '<br>');
+  const list = items => (items.length ? items.map(i => `- ${i}`).join('\n') : '- None');
+  const bugs = report.bugs.length
+    ? report.bugs.map(b => `- **${b.severity}** ${b.title}\n  - 复现: ${b.reproduction}\n  - 证据: ${b.evidence}`).join('\n')
+    : '- None';
+  return [
+    QA_MARKER,
+    `[AI-EVIDENCE] Claude QA: **${report.result}**`,
+    '',
+    `Issue #${report.issue} · PR #${report.pr} · commit \`${report.commit.slice(0, 12)}\``,
+    '',
+    '| AC | 结果 | 证据 |',
+    '| --- | --- | --- |',
+    ...report.acceptance_criteria.map(ac => `| ${ac.id} | ${icon(ac.result)} ${ac.result} | ${cell(ac.evidence)} |`),
+    '',
+    '### Bugs',
+    bugs,
+    '',
+    '### Regressions',
+    list(report.regressions),
+    '',
+    '<details><summary>Tests executed / added</summary>',
+    '',
+    list(report.tests_executed),
+    '',
+    list(report.tests_added),
+    '',
+    '</details>',
+    '',
+    `Run: ${runUrl}`,
+  ].join('\n');
+}
+
 // Runs in a separate job with pull-requests: write; only reads the validated JSON as data.
-module.exports = async ({ github, context, core, reportPath, contextPath }) => {
+// `kind` selects which report this call publishes; each kind keeps its own sticky comment.
+module.exports = async ({ github, context, core, reportPath, contextPath, kind = 'review' }) => {
+  const [marker, draw] = kind === 'qa' ? [QA_MARKER, renderQa] : [MARKER, render];
   const pr = context.payload.pull_request.number;
   const runUrl = `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`;
   let report = null;
   try {
-    report = readReport('review', reportPath, JSON.parse(fs.readFileSync(contextPath, 'utf8')));
+    report = readReport(kind, reportPath, JSON.parse(fs.readFileSync(contextPath, 'utf8')));
   } catch (error) {
     // Missing, malformed or mismatched reports are published as blocked, never as a pass.
-    core.warning(`Review report not publishable: ${error.message}`);
+    core.warning(`${kind} report not publishable: ${error.message}`);
   }
-  const body = render(report, runUrl);
+  const body = draw(report, runUrl);
   const comments = await github.paginate(github.rest.issues.listComments, { ...context.repo, issue_number: pr, per_page: 100 });
-  const existing = comments.find(c => c.user.type === 'Bot' && c.body.startsWith(MARKER));
+  const existing = comments.find(c => c.user.type === 'Bot' && c.body.startsWith(marker));
   if (existing) {
     await github.rest.issues.updateComment({ ...context.repo, comment_id: existing.id, body });
   } else {
@@ -48,4 +90,6 @@ module.exports = async ({ github, context, core, reportPath, contextPath }) => {
 };
 
 module.exports.render = render;
+module.exports.renderQa = renderQa;
 module.exports.MARKER = MARKER;
+module.exports.QA_MARKER = QA_MARKER;
