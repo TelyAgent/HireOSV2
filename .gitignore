@@ -19,6 +19,8 @@ scripts/deploy/.deploy-hireos-remote.password
 scripts/docker/postgres.env.production
 !scripts/docker/postgres.env.production.example
 /miyao.txt
+# Prod server connection notes (IPs, users) -- local only, never in the public repo
+/JumpServer生产服务器连接说明.md
 
 # Claude Code runtime state (session-local, not project source)
 /.claude/
