@@ -1,55 +1,80 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useStore } from "../../store/StoreContext";
-import { listConnections, readNowConnection, pauseConnection } from "../../data/api/files";
-import type { Connection } from "../../data/fixtures/connections";
-import { relTime } from "../../lib/format";
 import { Icon } from "../../components/ui/Icons";
-import { Badge, Button } from "../../components/ui/Primitives";
+import { Button } from "../../components/ui/Primitives";
+import { useImportRuns } from "./UploadTab";
+import { MAX_CONCURRENT_BATCHES, chunkForUpload, runWithConcurrency, selectFolderFiles, skippedTotal, type FolderSelection } from "./folderFiles";
 
-export function FolderTab() {
-  const { t, say, state } = useStore();
-  const [connections, setConnections] = useState<Connection[]>([]);
+const FOLDER_INPUT_ID = "folder-import-input";
 
-  const load = () => listConnections().then((rows) => setConnections(rows.filter((c) => c.kind === "folder")));
-  useEffect(() => {
-    load();
-  }, []);
+/**
+ * One-off import of a local folder. The browser hands over the folder's files (subfolders
+ * included) only when the user picks it, so nothing about the folder is remembered or
+ * watched; the picked résumés then go through the same pipeline as "Upload resumes".
+ */
+export function FolderTab({ onChanged, jobId }: { onChanged?: () => void; jobId?: string }) {
+  const { t } = useStore();
+  const { startRun, runCards } = useImportRuns({ jobId, onChanged });
+  const [selection, setSelection] = useState<{ folder: string; result: FolderSelection; batches: number } | null>(null);
 
-  const readNow = async (id: string) => {
-    const c = await readNowConnection(id);
-    say(`${c.name}: ${t("read now — 1 new item found")}`, { type: "success" });
-    load();
+  const handleFolder = (fileList: FileList) => {
+    const files = Array.from(fileList);
+    const folder = files[0]?.webkitRelativePath.split("/")[0] || "";
+    const result = selectFolderFiles(files);
+    // One request can carry only 20 files / ~20 MB, so a folder goes up as several batches.
+    const batches = chunkForUpload(result.accepted);
+    setSelection({ folder, result, batches: batches.length });
+    void runWithConcurrency(batches, MAX_CONCURRENT_BATCHES, startRun);
   };
-  const togglePause = async (c: Connection) => {
-    await pauseConnection(c.id);
-    say(c.status === "watching" ? t("Paused monitoring — previously received materials are kept") : t("Resumed monitoring"));
-    load();
-  };
+
+  const summary = selection && (
+    <div className="tiny" style={{ marginTop: 12 }} data-testid="folder-summary">
+      <strong>{selection.folder}</strong>
+      {" · "}
+      {selection.result.accepted.length
+        ? `${t("Found")} ${selection.result.accepted.length} ${t("importable file(s)")}` +
+          (selection.batches > 1 ? ` · ${t("Imported in")} ${selection.batches} ${t("batches")}` : "")
+        : t("No importable files in this folder — nothing was imported.")}
+      {skippedTotal(selection.result) > 0 && (
+        <>
+          {" · "}
+          {t("Skipped")} {skippedTotal(selection.result)}
+          {selection.result.skipped.tooLarge > 0 &&
+            ` (${selection.result.skipped.tooLarge} ${t("over 20 MB")})`}
+        </>
+      )}
+    </div>
+  );
 
   return (
-    <div className="card card-pad">
-      <div className="section-title">{t("Import from folder")}</div>
-      <p className="tiny" style={{ marginBottom: 14 }}>
-        {t("Folder connections can watch continuously or be read on demand. A file that’s still being written waits until it’s stable before it’s read.")}
-      </p>
-      {connections.map((c) => (
-        <div className="list-row" key={c.id} style={{ padding: "12px 4px" }}>
-          <Icon name="folder" />
-          <div style={{ flex: 1 }}>
-            <div style={{ fontWeight: 500 }}>{c.name}</div>
-            <div className="tiny">
-              {c.account} · {c.scope} · {t("Last read")} {relTime(c.lastRead, state.lang)}
-            </div>
-          </div>
-          <Badge tone={c.status === "watching" ? "success" : "neutral"}>{c.status === "watching" ? t("Watching") : t("Pause")}</Badge>
-          <Button variant="secondary" size="sm" onClick={() => readNow(c.id)}>
-            {t("Read now")}
-          </Button>
-          <Button variant="secondary" size="sm" onClick={() => togglePause(c)}>
-            {t("Pause")}
-          </Button>
-        </div>
-      ))}
-    </div>
+    <>
+      <div className="card card-pad" style={{ textAlign: "center", padding: "40px 20px" }}>
+        <input
+          type="file"
+          id={FOLDER_INPUT_ID}
+          multiple
+          // Not in React's input typings; supported by Chrome, Edge, Safari and Firefox.
+          ref={(el) => el?.setAttribute("webkitdirectory", "")}
+          style={{ display: "none" }}
+          onChange={(e) => {
+            if (e.target.files?.length) handleFolder(e.target.files);
+            e.target.value = "";
+          }}
+        />
+        <Icon name="folder_open" size={36} style={{ color: "var(--text-tertiary)" }} />
+        <h3 style={{ margin: "8px 0 4px", fontWeight: 500 }}>{t("Import every resume in a folder")}</h3>
+        <p className="tiny">
+          {jobId
+            ? t("Supports PDF, DOCX, TXT · Up to 20 MB per file · Matched against this job only")
+            : t("Supports PDF, DOCX, TXT · Up to 20 MB per file · No job selection required")}
+        </p>
+        <p className="tiny muted">{t("Subfolders are included. The folder itself is not saved or watched.")}</p>
+        <Button variant="primary" style={{ marginTop: 10 }} onClick={() => document.getElementById(FOLDER_INPUT_ID)?.click()}>
+          {t("Choose folder")}
+        </Button>
+        {summary}
+      </div>
+      {runCards}
+    </>
   );
 }

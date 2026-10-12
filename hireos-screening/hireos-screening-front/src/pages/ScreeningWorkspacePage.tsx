@@ -88,7 +88,7 @@ const UPLOAD_METHODS: { id: ImportTab; icon: string; title: string; desc: string
   { id: "upload", icon: "upload_file", title: "Upload files", desc: "PDF, DOCX or TXT resumes" },
   { id: "paste", icon: "edit_note", title: "Paste profile", desc: "Add a structured candidate profile" },
   { id: "email", icon: "mail_outline", title: "Import from email", desc: "Read from an authorized mailbox" },
-  { id: "folder", icon: "folder_open", title: "Import from folder", desc: "Watch a connected folder" },
+  { id: "folder", icon: "folder_open", title: "Import from folder", desc: "Import every resume in a local folder" },
 ];
 
 function ResumeUploadStrip({ onOpen }: { onOpen: (tab: ImportTab) => void }) {

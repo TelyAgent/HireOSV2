@@ -15,11 +15,14 @@ import { delay } from "../../data/api/shared";
 import { Icon } from "../../components/ui/Icons";
 import { Badge, Button } from "../../components/ui/Primitives";
 import { describeItem, formatFileSize } from "./importOutcome";
+import { MAX_CONCURRENT_BATCHES, MAX_RESUME_BYTES, chunkForUpload, runWithConcurrency } from "./folderFiles";
 
 interface Run {
   id: string;
   fileCount: number;
   batch?: ImportBatch;
+  /** Set when the upload request itself failed, so no batch was ever created. */
+  error?: string;
 }
 
 const POLL_INTERVAL_MS = 700;
@@ -173,6 +176,21 @@ function BatchCard({
   cancelling: boolean;
 }) {
   const { t } = useStore();
+  if (run.error) {
+    return (
+      <div className="card card-pad" style={{ marginTop: 14 }}>
+        <div className="flex items-center justify-between" style={{ marginBottom: 6 }}>
+          <div className="section-title" style={{ margin: 0 }}>
+            {t("Batch")} — {run.fileCount} {t("file(s)")}
+          </div>
+          <Badge tone="danger">{t("Failed")}</Badge>
+        </div>
+        <div className="tiny">
+          {t("The upload was rejected, so none of these files were imported.")} ({run.error})
+        </div>
+      </div>
+    );
+  }
   if (!run.batch) {
     return (
       <div className="card card-pad" style={{ marginTop: 14 }}>
@@ -254,9 +272,17 @@ export function useImportRuns({ jobId, onChanged }: { jobId?: string; onChanged?
   };
 
   const startRun = async (files: File[]) => {
-    const id = "run-" + Date.now();
+    const id = `run-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
     setRuns((prev) => [{ id, fileCount: files.length }, ...prev]);
-    const batch = await runImportBatch(files, { jobId });
+    let batch: ImportBatch;
+    try {
+      batch = await runImportBatch(files, { jobId });
+    } catch (error) {
+      // Without this the card would sit at "Processing…" forever.
+      const message = error instanceof Error ? error.message : String(error);
+      setRuns((prev) => prev.map((r) => (r.id === id ? { ...r, error: message } : r)));
+      return;
+    }
     await finishRun(id, batch);
   };
 
@@ -301,13 +327,18 @@ export function useImportRuns({ jobId, onChanged }: { jobId?: string; onChanged?
 }
 
 export function UploadTab({ onChanged, jobId }: { onChanged?: () => void; jobId?: string }) {
-  const { t } = useStore();
+  const { t, say } = useStore();
   const [dragOver, setDragOver] = useState(false);
   const { startRun, runCards } = useImportRuns({ jobId, onChanged });
 
   const handleFiles = (fileList: FileList | File[]) => {
     const files = Array.from(fileList);
-    if (files.length) startRun(files);
+    const tooLarge = files.filter((f) => f.size > MAX_RESUME_BYTES);
+    if (tooLarge.length) {
+      say(`${tooLarge.length} ${t("file(s) over 20 MB were skipped")}: ${tooLarge.map((f) => f.name).join(", ")}`, { type: "warning" });
+    }
+    // Same request limits as folder imports: at most 20 files / ~20 MB per upload.
+    void runWithConcurrency(chunkForUpload(files.filter((f) => f.size <= MAX_RESUME_BYTES)), MAX_CONCURRENT_BATCHES, startRun);
   };
 
   return (
@@ -346,8 +377,8 @@ export function UploadTab({ onChanged, jobId }: { onChanged?: () => void; jobId?
         <h3 style={{ margin: "8px 0 4px", fontWeight: 500 }}>{t("Drag files here, or click to choose")}</h3>
         <p className="tiny">
           {jobId
-            ? t("Supports PDF, DOCX, TXT · Up to 25 MB per file · Matched against this job only")
-            : t("Supports PDF, DOCX, TXT · Up to 25 MB per file · No job selection required")}
+            ? t("Supports PDF, DOCX, TXT · Up to 20 MB per file · Matched against this job only")
+            : t("Supports PDF, DOCX, TXT · Up to 20 MB per file · No job selection required")}
         </p>
         <Button
           variant="primary"

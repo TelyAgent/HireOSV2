@@ -20,7 +20,7 @@ export const OUTCOME_DETAIL: Record<ImportOutcome, string> = {
   quarantined: "File appears password-protected. Isolated for security review — not sent to parsing or AI.",
   parse_failed:
     "Could not extract readable text from this scan. Duplicate check could not run — this is shown as incomplete, not “no duplicates found.”",
-  too_large: "File exceeds the 25 MB limit. Not uploaded.",
+  too_large: "File exceeds the 20 MB limit. Not uploaded.",
   unsupported_type: "Unsupported file type. Only PDF, DOCX and TXT are accepted. Not uploaded.",
 };
 
