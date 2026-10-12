@@ -1,0 +1,93 @@
+# HireOS AI 协作研发流程
+
+本文改编自团队的 a2a-base-repo 方案，按 HireOS 的 monorepo 结构和工具（Claude Code）落地。Agent 规则见根目录 [`AGENTS.md`](../../AGENTS.md)，CI 启用步骤见 [`.github/README.md`](../../.github/README.md)。
+
+## 核心原则
+
+GitHub 是研发决策的唯一权威来源。人尽量不要先讲给另一个人、再由那个人转述给 AI：人改 Issue 或文件，Agent 直接读同一份上下文。
+
+| 对象 | 职责 | 禁止 |
+| --- | --- | --- |
+| Files（`AGENTS.md`、`docs/`、`PORTS.md`） | 长期规则、规格、设计、ADR、运行手册 | 长期有效的信息只留在聊天记录里 |
+| Issue | 为什么做、做到什么程度（AC） | Issue 没写清楚就开始写代码 |
+| PR | 实际改了什么、测试证据、Review、合并决策 | 正常功能 PR 不关联 Issue |
+| Comments | AI 与人之间的正式沟通 | Slack 或会议里做的决定不回写 |
+| Slack / 微信 | 只发 urgent / incident / security 提醒，附 GitHub 链接 | 讨论需求、审批方案 |
+
+## 一个需求的完整路径
+
+```text
+产品/需求方填 Issue 表单（Feature / Bug / Design / Tech Debt）
+   │  必填 Problem、Scope、Non-goals、AC-1..n、Risk、Owner
+   ▼
+监督者分诊：补齐信息 → 去掉 needs-triage → AI Ready=Yes
+   │  信息不足时 Agent 在 Issue 里评论 [AI-QUESTION]
+   ▼
+开发者让 Claude Code 执行："Execute GitHub Issue #123"
+   │  Agent 依次读 Issue+评论 → AGENTS.md → 链接文件 → 代码，实现最小变更并补测试
+   ▼
+开 PR（模板，Closes #123）
+   ▼
+CI：改动的子项目跑 build/lint/typecheck/test
+    → Issue contract 校验 → Claude Review（只读，结构化输出）
+    → PR 评论 [AI-EVIDENCE] → Merge gate
+   ▼
+Human Supervisor 验收业务结果 → 合并 → 按 PR 的 Deploy 一节人工部署
+```
+
+给 Claude Code 的标准输入：
+
+```text
+Execute GitHub Issue #123.
+
+Authoritative context:
+1. Issue #123 and every comment
+2. AGENTS.md
+3. Files linked by Issue #123
+4. Existing code and tests
+
+Rules:
+- Do not infer unresolved product requirements; comment [AI-QUESTION] instead.
+- Implement the smallest change satisfying every AC, with tests.
+- Open a PR using the template with Closes #123 and real test evidence.
+```
+
+## 角色
+
+| 角色 | 主要职责 |
+| --- | --- |
+| 产品 / 需求方 | 写 Issue 和 AC，回答 `[AI-QUESTION]`，按 AC 验收 PR 的业务结果，不审代码细节 |
+| 设计 | 在 Design Issue 里交付；批准的设计放到 `docs/design/<issue>/`（design-spec.md、states.md、handoff/），完成后评论 `[AI-RESULT] design-ready` |
+| 工程师 | 把 Issue 编号交给 Agent，不重新口述需求；审 Agent 的 PR；维护 `AGENTS.md` 和 CI 注册表 |
+| Human Supervisor | 分诊、设置 AI Ready、审批例外、最终合并 |
+
+## 评论协议
+
+```text
+[AI-PLAN]        执行计划
+[AI-QUESTION]    缺少信息或需求冲突
+[AI-EVIDENCE]    测试、日志、代码证据
+[AI-BLOCKED]     无法继续，以及解除条件
+[HUMAN-DECISION] 人做出的正式决定
+[AI-RESULT]      完成摘要
+```
+
+分诊标签见 [`triage-labels.md`](triage-labels.md)，ADR 规范见 [`docs/adr/`](../adr/README.md)。
+
+## 分期落地
+
+**第一期（当前）**
+
+- `AGENTS.md` + `CLAUDE.md`
+- 4 种 Issue 表单（增加了 Subsystem 字段）和 PR 模板（增加了 Database、Deploy 两节）
+- CI：只检查 PR 改到的子项目；历史欠账登记在 `.github/ci/projects.json` 的 `known_failing` 里，只警告不阻断
+- Issue contract 校验 + Claude Review + Merge gate
+
+**第二期（前提：测试补起来）**
+
+- 清空 `known_failing`：修复 core-record、interview、screening 后端的 lint，interview 后端测试，interview 前端 build
+- 给前端补测试（至少每个子系统的 smoke/E2E），给 written 后端补测试
+- 接入 Claude QA：按 AC 逐项验收、补充临时测试，输出 `qa.json`
+- 接入 Quality Ledger：QA 发现的 Bug 自动建 Issue，并在 `docs/quality/` 下生成报告
+
+第一期不做 QA 的原因：目前大部分子项目几乎没有测试，AI QA 拿不到可执行的验证手段，结果会大多是失败或阻塞，噪音大于价值。

@@ -1,0 +1,68 @@
+{
+  "$comment": "CI 检查的项目注册表。checks 是要跑的 npm script；known_failing 中的检查照常执行但只报警告，修好后必须从这里删除（CI 会提示）。新增子项目时在这里登记。",
+  "projects": [
+    {
+      "name": "core-record",
+      "dir": "hireos-core-record",
+      "prisma": true,
+      "checks": ["build", "lint", "typecheck", "test"],
+      "known_failing": ["lint"]
+    },
+    {
+      "name": "jd-backend",
+      "dir": "hireos-jd/hireos-jd-backend",
+      "prisma": true,
+      "checks": ["build", "lint", "typecheck", "test"],
+      "known_failing": []
+    },
+    {
+      "name": "jd-front",
+      "dir": "hireos-jd/hireos-jd-front",
+      "prisma": false,
+      "checks": ["build", "lint", "typecheck"],
+      "known_failing": []
+    },
+    {
+      "name": "interview-backend",
+      "dir": "hireos-interview/job-Interview-backend",
+      "prisma": true,
+      "checks": ["build", "lint", "typecheck", "test"],
+      "known_failing": ["lint", "test"]
+    },
+    {
+      "name": "interview-front",
+      "dir": "hireos-interview/job-Interview-front",
+      "prisma": false,
+      "checks": ["build", "typecheck"],
+      "known_failing": ["build"]
+    },
+    {
+      "name": "screening-backend",
+      "dir": "hireos-screening/hireos-screening-backend",
+      "prisma": true,
+      "checks": ["build", "lint", "typecheck", "test"],
+      "known_failing": ["lint"]
+    },
+    {
+      "name": "screening-front",
+      "dir": "hireos-screening/hireos-screening-front",
+      "prisma": false,
+      "checks": ["build", "lint", "typecheck"],
+      "known_failing": []
+    },
+    {
+      "name": "written-backend",
+      "dir": "hireos-written/hireos-written-backend",
+      "prisma": true,
+      "checks": ["build", "lint", "typecheck"],
+      "known_failing": []
+    },
+    {
+      "name": "written-front",
+      "dir": "hireos-written/hireos-written-front",
+      "prisma": false,
+      "checks": ["build", "lint", "typecheck"],
+      "known_failing": []
+    }
+  ]
+}

@@ -1,0 +1,76 @@
+name: Claude Review
+
+on:
+  workflow_call:
+    secrets:
+      ANTHROPIC_API_KEY:
+        required: false
+      CLAUDE_CODE_OAUTH_TOKEN:
+        required: false
+
+permissions:
+  contents: read
+  pull-requests: read
+
+env:
+  # Change here to trade review depth for cost.
+  REVIEW_MODEL: claude-opus-5-5
+
+jobs:
+  review:
+    name: Claude Review
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Require supported PR and credentials
+        env:
+          API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          OAUTH: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          SAME_REPO: ${{ github.event.pull_request.head.repo.full_name == github.repository }}
+        run: |
+          test "$SAME_REPO" = true || { echo '::error::Use a supervised same-repository branch for AI checks'; exit 1; }
+          test -n "$API_KEY$OAUTH" || { echo '::error::Configure ANTHROPIC_API_KEY or CLAUDE_CODE_OAUTH_TOKEN'; exit 1; }
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/download-artifact@v4
+        with:
+          name: contract-context
+          path: evidence
+      - id: schema
+        run: echo "json=$(jq -c . .github/schemas/review.json)" >> "$GITHUB_OUTPUT"
+      - name: Run Claude Review
+        id: claude
+        uses: anthropics/claude-code-action@v1
+        with:
+          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          github_token: ${{ github.token }}
+          prompt: |
+            Follow .github/prompts/review.md exactly. Context is in evidence/context.json.
+          # Read-only tools: Claude inspects the diff but cannot edit, push or comment.
+          claude_args: |
+            --model ${{ env.REVIEW_MODEL }}
+            --max-turns 60
+            --allowedTools "Read,Glob,Grep,Bash(git diff:*),Bash(git log:*),Bash(git show:*)"
+            --json-schema '${{ steps.schema.outputs.json }}'
+      - name: Save structured report
+        if: always()
+        env:
+          REPORT: ${{ steps.claude.outputs.structured_output }}
+        run: |
+          mkdir -p evidence
+          test -n "$REPORT" || { echo '::error::Claude produced no structured output'; exit 1; }
+          printf '%s' "$REPORT" > evidence/review.json
+      - name: Validate report and enforce verdict
+        run: node .github/scripts/report.cjs review evidence/review.json evidence/context.json
+      - name: Preserve report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: claude-review
+          path: evidence/
+          if-no-files-found: warn
+          retention-days: 30
