@@ -51,6 +51,7 @@ model Membership {
 }
 
 /// A 6-digit sign-in code. Only its HMAC is stored; single use, 10 minutes, 5 attempts.
+/// Every code request creates one — uninvited emails get an unsent decoy so verification behaves identically.
 model LoginCode {
   id         String    @id @default(uuid())
   email      String
@@ -58,6 +59,8 @@ model LoginCode {
   expiresAt  DateTime
   attempts   Int       @default(0)
   consumedAt DateTime?
+  /// Set when a newer code was requested for the same email; the old code then only explains itself.
+  supersededAt DateTime?
   requestIp  String?
   createdAt  DateTime  @default(now())
 

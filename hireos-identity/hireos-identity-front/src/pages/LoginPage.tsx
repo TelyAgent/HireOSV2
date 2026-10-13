@@ -54,9 +54,18 @@ export function LoginPage() {
         return t("This account has been disabled. Contact your admin.");
       case "CODE_INVALID": {
         const left = Number(err.body.attemptsLeft);
-        if (left > 0) return `${t("The code is incorrect or has expired.")} ${t("{n} attempts left.", { n: left })}`;
-        return t("This code can no longer be used — request a new one.");
+        return left > 0 ? `${t("The code is incorrect.")} ${t("{n} attempts left.", { n: left })}` : t("The code is incorrect.");
       }
+      case "CODE_ATTEMPTS_EXCEEDED":
+        return t("Too many incorrect attempts — this code no longer works. Request a new one.");
+      case "CODE_EXPIRED":
+        return t("This code has expired. Request a new one.");
+      case "CODE_USED":
+        return t("This code has already been used. Request a new one.");
+      case "CODE_SUPERSEDED":
+        return t("A newer code was sent — use the code from the latest email.");
+      case "CODE_REQUIRED":
+        return t("Request a code first.");
       default:
         return t("Something went wrong — please try again.");
     }

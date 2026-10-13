@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../persistence/prisma.service';
-import { hashToken, newSessionToken, normalizeRoles, SESSION_TOUCH_INTERVAL_MS, SESSION_TTL_MS, type Role } from '../auth/auth-crypto';
+import { hashToken, newSessionToken, normalizeRoles, SESSION_MAX_AGE_MS, SESSION_TOUCH_INTERVAL_MS, SESSION_TTL_MS, type Role } from '../auth/auth-crypto';
 
 export type SessionIdentity = {
   sessionId: string;
@@ -33,7 +33,8 @@ export class SessionsService {
 
   /**
    * The single source of truth for "who is this cookie": the session must be live, the user active
-   * and the membership not removed. Sliding expiry is pushed forward at most every few minutes.
+   * and the membership not removed. Sliding expiry is pushed forward at most every few minutes, but
+   * never past 30 days from sign-in.
    */
   async resolve(token: string | undefined | null): Promise<SessionIdentity | null> {
     if (!token) return null;
@@ -43,13 +44,15 @@ export class SessionsService {
     });
     const now = Date.now();
     if (!session || session.revokedAt || session.expiresAt.getTime() <= now) return null;
+    const hardExpiry = session.createdAt.getTime() + SESSION_MAX_AGE_MS;
+    if (hardExpiry <= now) return null;
     if (session.user.status !== 'active') return null;
     const membership = session.user.memberships.find((m) => m.workspaceId === session.workspaceId);
     if (!membership || membership.status === 'removed') return null;
 
     let expiresAt = session.expiresAt;
     if (now - session.lastUsedAt.getTime() >= SESSION_TOUCH_INTERVAL_MS) {
-      expiresAt = new Date(now + SESSION_TTL_MS);
+      expiresAt = new Date(Math.min(now + SESSION_TTL_MS, hardExpiry));
       await this.db.session.update({ where: { id: session.id }, data: { lastUsedAt: new Date(now), expiresAt } });
     }
     return {

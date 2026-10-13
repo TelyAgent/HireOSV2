@@ -69,6 +69,7 @@
       "name": "identity-backend",
       "dir": "hireos-identity/hireos-identity-backend",
       "prisma": true,
+      "database": true,
       "checks": ["build", "lint", "typecheck", "test"],
       "known_failing": []
     },

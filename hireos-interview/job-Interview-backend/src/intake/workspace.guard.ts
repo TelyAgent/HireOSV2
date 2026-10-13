@@ -1,7 +1,7 @@
 import { CanActivate, ExecutionContext, ForbiddenException, Injectable, Logger, ServiceUnavailableException, UnauthorizedException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Buffer } from 'node:buffer';
-import { createHash, timingSafeEqual } from 'node:crypto';
+import { timingSafeEqual } from 'node:crypto';
 
 /*
  * Shared HireOS request authentication. The same file lives in every backend (core-record, jd,
@@ -11,7 +11,8 @@ import { createHash, timingSafeEqual } from 'node:crypto';
  *  1. Another HireOS backend: `x-hireos-service-token` matches SERVICE_TOKEN → the caller forwards the
  *     user it acts for in `x-workspace-id` / `x-actor-id`.
  *  2. A signed-in browser: the `hireos_sid` cookie is checked against the identity service
- *     (IDENTITY_INTERNAL_URL + IDENTITY_INTERNAL_TOKEN), cached for 60 s.
+ *     (IDENTITY_INTERNAL_URL + IDENTITY_INTERNAL_TOKEN) on every request — not cached, so signing
+ *     out or removing a member takes effect on the very next call.
  *  3. AUTH_MODE=dev (the default) only: no session → the fixed local development identity,
  *     exactly as before the identity service existed. AUTH_MODE=session refuses instead.
  */
@@ -31,10 +32,7 @@ type Headers = Record<string, string | string[] | undefined>;
 type Introspection = { active: boolean; userId?: string; email?: string; displayName?: string; workspaceId?: string; roles?: string[] };
 
 const SESSION_COOKIE = 'hireos_sid';
-const CACHE_TTL_MS = 60_000;
-const CACHE_MAX = 10_000;
 const SAFE_METHODS = new Set(['GET', 'HEAD', 'OPTIONS']);
-const sessionCache = new Map<string, { expiresAt: number; identity: Identity | null }>();
 
 function header(headers: Headers, name: string): string | undefined {
   const value = headers[name];
@@ -117,11 +115,6 @@ export class WorkspaceGuard implements CanActivate {
   }
 
   private async introspect(token: string): Promise<Identity | null> {
-    const key = createHash('sha256').update(token).digest('hex');
-    const now = Date.now();
-    const cached = sessionCache.get(key);
-    if (cached && cached.expiresAt > now) return cached.identity;
-
     const baseUrl = this.config.get<string>('IDENTITY_INTERNAL_URL', '');
     if (!baseUrl) throw new Error('IDENTITY_INTERNAL_URL is not configured');
     const response = await globalThis.fetch(`${baseUrl.replace(/\/+$/, '')}/internal/sessions/introspect`, {
@@ -132,14 +125,9 @@ export class WorkspaceGuard implements CanActivate {
     });
     if (!response.ok) throw new Error(`identity introspection returned HTTP ${response.status}`);
     const result = (await response.json()) as Introspection;
-    const identity: Identity | null =
-      result.active && result.userId && result.workspaceId
-        ? { workspaceId: result.workspaceId, actorId: result.userId, roles: result.roles ?? [], kind: 'user', email: result.email, displayName: result.displayName }
-        : null;
-
-    if (sessionCache.size >= CACHE_MAX) sessionCache.clear();
-    sessionCache.set(key, { expiresAt: now + CACHE_TTL_MS, identity });
-    return identity;
+    return result.active && result.userId && result.workspaceId
+      ? { workspaceId: result.workspaceId, actorId: result.userId, roles: result.roles ?? [], kind: 'user', email: result.email, displayName: result.displayName }
+      : null;
   }
 
   /** CSRF backstop on top of SameSite=Lax for cookie-authenticated, state-changing requests. */

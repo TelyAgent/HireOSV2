@@ -76,9 +76,9 @@ test('workspace guard resolves the hireos_sid cookie through the identity servic
     assert.equal(request.identity.kind, 'user');
     assert.equal(calls[0].url, 'http://identity/api/internal/sessions/introspect');
     assert.equal(calls[0].init.headers['x-internal-token'], 'internal');
-    // Cached: a second request with the same cookie doesn't call the identity service again.
+    // Not cached: every request asks the identity service, so a sign-out applies to the very next call.
     await guard.canActivate(guardContext({ method: 'GET', headers: { cookie: 'hireos_sid=good' } }));
-    assert.equal(calls.length, 1);
+    assert.equal(calls.length, 2);
     await assert.rejects(
       guard.canActivate(guardContext({ method: 'POST', headers: { cookie: 'hireos_sid=good', origin: 'https://evil.example' } })),
       (error) => error.getStatus() === 403,

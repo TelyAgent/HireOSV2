@@ -53,7 +53,7 @@ HireOS 目前没有真正的用户和登录。五个后端各自有一个 `Works
    ├─ /account/api/    → identity-backend（发码、验码、登出、me、成员管理）
    ├─ /screening/api/  → screening-backend ─┐
    ├─ /jd/api/         → jd-backend        ├─ AuthGuard：读 hireos_sid →
-   ├─ /interview/api/  → interview-backend │   调 identity 内部接口校验（带 60 秒缓存）
+   ├─ /interview/api/  → interview-backend │   调 identity 内部接口校验（每次请求实时校验）
    ├─ /written/api/    → written-backend   │   → request.identity = { userId, workspaceId, roles, ... }
    └─ /core-record/    → core-record      ─┘
 ```
@@ -63,7 +63,7 @@ HireOS 目前没有真正的用户和登录。五个后端各自有一个 `Works
 | 决策 | 选择 | 理由 |
 | --- | --- | --- |
 | 身份服务 | 新建独立服务 `hireos-identity`（后端 + 小前端），独立库 `hireos_identity` | 对应架构文档里的 L1 Identity；不塞进 core-record，core-record 只管候选人/职位/申请主档 |
-| 会话形态 | **不透明会话 ID + 服务端会话表**，后端通过 identity 内部接口校验，结果缓存 60 秒 | 登出、停用即时生效（最多 60 秒）；前端无需实现 token 刷新逻辑（interview 前端有大量散落的 `fetch`，加刷新重试代价大）；没有密钥轮换问题 |
+| 会话形态 | **不透明会话 ID + 服务端会话表**，后端每次请求都通过 identity 内部接口实时校验（#16） | 登出、停用、移除立即生效；前端无需实现 token 刷新逻辑（interview 前端有大量散落的 `fetch`，加刷新重试代价大）；没有密钥轮换问题 |
 | Cookie 共享 | 所有子系统同一域名、不同路径，**一个 host-only Cookie** 即可全局共享 | 网关已经把所有前端放在同一 origin 下（本地 `localhost:8080`，线上 `/hireos/` 前缀），无需跨域 SSO |
 | 鉴权位置 | 各后端的 Guard，而不是网关 `auth_request` | 本地开发时前端 Vite 代理是直连后端的（绕过网关），只有放在后端才能所有路径都生效 |
 | 登录方式 | 邮箱 + 6 位验证码，无密码 | 设计稿要求；省掉密码存储、找回密码等整套流程 |
@@ -174,7 +174,7 @@ model AuthEvent {                        // 登录审计
 
 1. 邮箱规范化（trim + 小写），格式校验。
 2. 频率限制（存库或 Redis，本期用库即可）：
-   - 同一邮箱 60 秒内只能发 1 次，1 小时内最多 5 次；
+   - 同一邮箱 60 秒内只能发 1 次，1 小时内最多 5 次，24 小时内最多 20 次；
    - 同一 IP 1 小时内最多 20 次。
    - 超限返回 429 `CODE_RATE_LIMITED`，并带 `retryAfterSeconds`，前端据此显示倒计时。
 3. 判断是否允许登录（见 5.4）。**不允许时不发信，但响应和允许时完全一样**，防止通过接口探测哪些邮箱是员工。
@@ -212,11 +212,11 @@ model AuthEvent {                        // 登录审计
 
 - **有效期 7 天**（已确认）：
   - 登录后 7 天内没有任何访问就自动退出；
-  - 期间有访问会顺延到「最后访问 + 7 天」；
+  - 期间有访问会顺延到「最后访问 + 7 天」，但从登录起满 30 天必须重新登录，顺延不会超过这个上限（#16 AC-6）；
   - `lastUsedAt` 和 `expiresAt` 最多每 5 分钟更新一次，避免每个请求都写库。
 - **登出**：`POST /account/api/auth/logout`，作废当前会话，清除 Cookie。
 - **退出所有设备**：`POST /account/api/auth/logout-all`。
-- **停用用户**：作废该用户所有会话。各后端缓存最多 60 秒后失效。
+- **停用 / 移除用户**：作废该用户所有会话，各后端下一个请求即拒绝。
 
 ### 5.6 邮件
 
@@ -333,7 +333,7 @@ export type Identity = {
    - 读取 `x-workspace-id`、`x-actor-id` 作为身份，`kind = 'service'`；
    - 这两个值必须由调用方从它自己拿到的用户身份里透传，不能编造。
 3. **用户请求**：从 `Cookie` 头解析 `hireos_sid`，调 identity 的 `/internal/sessions/introspect`。
-   - 结果按 `SHA-256(sid)` 在进程内 LRU 缓存 60 秒，最多 1 万条；
+   - 不缓存：每个请求都实时校验，退出或移除立即生效（#16 AC-7 / AC-8）；
    - 无效或缺失：返回 401 `AUTH_REQUIRED`。
 4. **开发模式**：`AUTH_MODE=dev`（同时要求 `NODE_ENV !== production`）时，没有 Cookie 就回退到现有的固定开发身份。
    - 方便本地用 curl 直接调接口；
@@ -416,7 +416,7 @@ export type Identity = {
 | 谁能登录 | 仅管理员邀请的邮箱 |
 | 发信 | Gmail SMTP（应用专用密码）；以后拿到 DNS 权限可切换到 Resend |
 | HTTPS | 使用现有 `https://hireos.aipollo.me/hireos/` |
-| 会话时长 | 7 天，活跃顺延 |
+| 会话时长 | 闲置 7 天过期，活跃顺延；登录满 30 天强制重新登录（#16） |
 | 角色 | `admin`（管理员）、`hr`、`interviewer`（面试官） |
 | 初始管理员 | `sujunjie427@gmail.com` |
 
@@ -456,7 +456,7 @@ export type Identity = {
   - 已改的调用：screening → core-record、jd；jd → core-record；interview → core-record、jd；screening → interview / written 的交接；written → interview 的交接。
 - **限流取客户端 IP**：线上前面有两层代理（服务器 nginx、网关 nginx），配置 `TRUSTED_PROXY_HOPS=2`。
   - 这要求服务器 nginx 的 `location /hireos/` 传 `X-Forwarded-For`（`proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;`），上线前需要确认；没传时所有人会共用一个 IP 限额（每小时 20 次发码）。
-- 后端 Guard 对 Cookie 的校验结果缓存 60 秒。登出、停用账号后，其他子系统最多 60 秒内失效。
+- 后端 Guard 每次请求都实时校验 Cookie，不做缓存；登出、停用、移除后各子系统立即拒绝旧会话。
 - written 的候选人作答页 `/written/apply/:token` 和对应的公开接口不需要登录。
 
 ### 14.2 线上启用步骤（P3，由人执行）

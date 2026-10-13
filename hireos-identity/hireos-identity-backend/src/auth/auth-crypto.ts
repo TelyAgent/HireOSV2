@@ -2,7 +2,10 @@ import { createHash, createHmac, randomBytes, randomInt, timingSafeEqual } from 
 
 export const CODE_TTL_MS = 10 * 60 * 1000;
 export const CODE_MAX_ATTEMPTS = 5;
+/** Sliding idle timeout: a session unused for 7 days ends. */
 export const SESSION_TTL_MS = 7 * 24 * 60 * 60 * 1000;
+/** Hard cap: 30 days after sign-in the session ends however actively it is used. */
+export const SESSION_MAX_AGE_MS = 30 * 24 * 60 * 60 * 1000;
 /** Sliding expiry is only written back this often, so each request doesn't cost a DB write. */
 export const SESSION_TOUCH_INTERVAL_MS = 5 * 60 * 1000;
 
