@@ -34,6 +34,7 @@ const PROJECT_SCREENS: Screen[] = [
 
 export function screenToPath(screen: Screen, taskId: string | null): string {
   if (screen === "home") return "/";
+  if (screen === "settings") return "/settings";
   // Project-flow screens are meaningless without a real task to show; fall back home
   // rather than producing a broken /project/undefined/... URL.
   if (!taskId) return "/";
@@ -43,6 +44,7 @@ export function screenToPath(screen: Screen, taskId: string | null): string {
 export function pathToRoute(pathname: string): { screen: Screen; taskId: string | null } {
   const path = pathname.replace(/\/+$/, "") || "/";
   if (path === "/") return { screen: "home", taskId: null };
+  if (path === "/settings" || path.startsWith("/settings/")) return { screen: "settings", taskId: null };
   const seg = path.split("/").filter(Boolean);
   if (seg[0] === "project" && seg[1] && seg[2] && PROJECT_SCREENS.includes(seg[2] as Screen)) {
     return { screen: seg[2] as Screen, taskId: seg[1] };
@@ -138,7 +140,11 @@ const StoreCtx = createContext<StoreValue | null>(null);
 
 export function StoreProvider({ children }: { children: ReactNode }) {
   const [state, dispatch] = useReducer(reducer, initialState, (initial) => {
-    const route = pathToRoute(window.location.pathname);
+    // The router's paths are relative to the app's base (`/interview/`, `/hireos/interview/`); strip it here
+    // too, or every deep link starts life as "home" and RouteSync bounces it back to `/`.
+    const base = (import.meta as ImportMeta & { env?: Record<string, string | undefined> }).env?.BASE_URL || "/";
+    const full = window.location.pathname;
+    const route = pathToRoute(full.startsWith(base) ? `/${full.slice(base.length)}` : full);
     return { ...initial, screen: route.screen, currentTaskId: route.taskId };
   });
 

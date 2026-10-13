@@ -9,18 +9,6 @@ export type Me = {
 export type AuthConfig = { loginRequired: boolean; devLogin: boolean };
 export type DevAccount = { email: string; displayName: string; avatarColor: string | null; roles: Role[] };
 
-export type Member = {
-  id: string;
-  email: string;
-  displayName: string;
-  avatarColor: string | null;
-  roles: Role[];
-  membershipStatus: "invited" | "active";
-  status: "active" | "disabled";
-  lastLoginAt: string | null;
-  createdAt: string;
-};
-
 export class ApiError extends Error {
   constructor(
     readonly status: number,
@@ -35,7 +23,7 @@ export class ApiError extends Error {
 export const BASE_URL = import.meta.env.BASE_URL;
 /** Path prefix shared by every subsystem: `/` locally, `/hireos/` on the server. */
 export const ROOT_URL = BASE_URL.replace(/account\/$/, "");
-export const DEFAULT_LANDING = `${ROOT_URL}screening/`;
+export const DEFAULT_LANDING = `${ROOT_URL}jd/`;
 /** Workspace member management lives on the JD settings page. */
 export const MEMBERS_URL = `${ROOT_URL}jd/settings/members`;
 
@@ -56,20 +44,12 @@ const post = <T,>(path: string, body?: unknown) => request<T>(path, { method: "P
 export const api = {
   config: () => request<AuthConfig>("/auth/config"),
   me: () => request<Me>("/auth/me"),
-  updateMe: (patch: { displayName?: string; locale?: "zh" | "en" }) => request<Me>("/auth/me", { method: "PATCH", body: JSON.stringify(patch) }),
   requestCode: (email: string, locale: string) =>
     post<{ sent: true; resendAfterSeconds: number; expiresInSeconds: number }>("/auth/code", { email, locale }),
   verify: (email: string, code: string, returnTo: string | null) =>
     post<Me & { returnTo: string | null }>("/auth/verify", { email, code, returnTo: returnTo ?? undefined }),
   devAccounts: () => request<DevAccount[]>("/auth/dev-accounts"),
   devLogin: (email: string, returnTo: string | null) => post<Me & { returnTo: string | null }>("/auth/dev-login", { email, returnTo: returnTo ?? undefined }),
-  logout: () => post<{ ok: true }>("/auth/logout"),
-  logoutAll: () => post<{ ok: true }>("/auth/logout-all"),
-  members: () => request<Member[]>("/users"),
-  invite: (input: { email: string; displayName: string; roles: Role[]; sendEmail: boolean }) => post<{ id: string; emailSent: boolean }>("/users/invite", input),
-  updateMember: (id: string, patch: { displayName?: string; roles?: Role[]; status?: "active" | "disabled" }) =>
-    request<{ ok: true }>(`/users/${id}`, { method: "PATCH", body: JSON.stringify(patch) }),
-  removeMember: (id: string) => request<{ ok: true }>(`/users/${id}`, { method: "DELETE" }),
 };
 
 export function initials(name: string) {

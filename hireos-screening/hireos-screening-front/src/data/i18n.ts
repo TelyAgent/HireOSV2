@@ -60,7 +60,6 @@ export const ZH: Record<string, string> = {
   Appearance: "外观",
   "Demo role": "演示角色",
   "Switch demo role": "切换演示角色",
-  "Account settings": "账号设置",
   "Personal": "个人",
   "My Profile & Preferences": "我的资料与偏好",
   "Members & Permissions": "成员与权限",

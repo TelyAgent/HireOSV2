@@ -181,4 +181,5 @@ export type Screen =
   | "review"
   | "debrief"
   | "decision"
-  | "package";
+  | "package"
+  | "settings";

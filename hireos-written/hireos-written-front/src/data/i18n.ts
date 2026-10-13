@@ -14,7 +14,6 @@ export const ZH: Record<string, string> = {
   "Search projects, candidates...": "搜索项目、候选人…", "Toggle navigation": "切换导航", "Expand navigation": "展开导航", "Collapse navigation": "收起导航", "Search": "搜索",
   "Notifications": "通知", "Appearance": "外观", "Switch demo role": "切换演示角色",
   "Demo role": "演示角色",
-  "Account settings": "账号设置",
   "Personal": "个人",
   "My Profile & Preferences": "我的资料与偏好",
   "Members & Permissions": "成员与权限",

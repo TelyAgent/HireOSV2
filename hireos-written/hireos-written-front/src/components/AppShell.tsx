@@ -93,7 +93,7 @@ export function AppShell({ openTaskCount, children }: { openTaskCount: number; c
             <Icon name="palette" />
           </button>
           {sessionUser ? (
-            <UserMenu user={sessionUser} labels={{ account: t("Account settings"), signOut: t("Sign out") }} />
+            <UserMenu user={sessionUser} labels={{ signOut: t("Sign out") }} />
           ) : (
             <RolePill onClick={toggleRoleSwitcher} />
           )}

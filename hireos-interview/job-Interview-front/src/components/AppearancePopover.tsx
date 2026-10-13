@@ -1,9 +1,9 @@
 import { useStore } from "../store/StoreContext";
 import { useEffect, useRef } from "react";
+import { AppearancePanel } from "../features/settings/AppearancePanel";
 
 export function AppearancePopover() {
-  const { state, t, setTheme, setAccent, setTextSize, resetPrefs, toggleAppearance } =
-    useStore();
+  const { t, resetPrefs, toggleAppearance } = useStore();
   const ref = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
@@ -20,21 +20,6 @@ export function AppearancePopover() {
     return () => document.removeEventListener("mousedown", handler);
   }, [toggleAppearance]);
 
-  const themes = [
-    { k: "light", label: t.light },
-    { k: "dark", label: t.dark },
-    { k: "deep", label: t.deep },
-    { k: "system", label: t.system },
-  ] as const;
-
-  const accents = [
-    { k: "blue", label: "Blue", hex: "#2563eb" },
-    { k: "teal", label: "Teal", hex: "#0d9488" },
-    { k: "violet", label: "Violet", hex: "#7c3aed" },
-  ] as const;
-
-  const sizes = ["small", "medium", "large"] as const;
-
   return (
     <div
       ref={ref}
@@ -44,7 +29,7 @@ export function AppearancePopover() {
         position: "fixed",
         top: 96,
         right: 20,
-        width: 280,
+        width: 320,
         maxWidth: "calc(100vw - 32px)",
         background: "var(--surface)",
         border: "1px solid var(--line)",
@@ -55,127 +40,8 @@ export function AppearancePopover() {
       }}
     >
       <div style={{ fontSize: 13, fontWeight: 700 }}>{t.appearance}</div>
-
-      <div
-        style={{
-          marginTop: 12,
-          fontSize: 11,
-          fontWeight: 600,
-          color: "var(--ink-3)",
-          letterSpacing: ".04em",
-        }}
-      >
-        {t.theme}
-      </div>
-      <div
-        style={{
-          marginTop: 7,
-          display: "grid",
-          gridTemplateColumns: "repeat(2,1fr)",
-          gap: 7,
-        }}
-      >
-        {themes.map((tk) => {
-          const active = state.theme === tk.k;
-          return (
-            <button
-              key={tk.k}
-              onClick={() => setTheme(tk.k as any)}
-              style={{
-                height: 32,
-                border: `1px solid ${active ? "var(--brand)" : "var(--line)"}`,
-                borderRadius: 8,
-                background: active ? "var(--brand-soft)" : "var(--surface)",
-                color: active ? "var(--brand)" : "var(--ink)",
-                fontSize: 12,
-                fontWeight: 600,
-                cursor: "pointer",
-              }}
-            >
-              {tk.label}
-            </button>
-          );
-        })}
-      </div>
-
-      <div
-        style={{
-          marginTop: 14,
-          fontSize: 11,
-          fontWeight: 600,
-          color: "var(--ink-3)",
-          letterSpacing: ".04em",
-        }}
-      >
-        {t.accentColor}
-      </div>
-      <div style={{ marginTop: 7, display: "flex", gap: 9 }}>
-        {accents.map((a) => {
-          const active = state.accent === a.k;
-          return (
-            <button
-              key={a.k}
-              aria-label={a.label}
-              onClick={() => setAccent(a.k as any)}
-              style={{
-                width: 28,
-                height: 28,
-                borderRadius: 8,
-                background: a.hex,
-                border: `2px solid ${
-                  active
-                    ? state.theme === "dark" || state.theme === "deep"
-                      ? "#fff"
-                      : "#111"
-                    : "transparent"
-                }`,
-                cursor: "pointer",
-              }}
-            />
-          );
-        })}
-      </div>
-
-      <div
-        style={{
-          marginTop: 14,
-          fontSize: 11,
-          fontWeight: 600,
-          color: "var(--ink-3)",
-          letterSpacing: ".04em",
-        }}
-      >
-        {t.textSize}
-      </div>
-      <div
-        style={{
-          marginTop: 7,
-          display: "grid",
-          gridTemplateColumns: "repeat(3,1fr)",
-          gap: 7,
-        }}
-      >
-        {sizes.map((s) => {
-          const active = state.textSize === s;
-          return (
-            <button
-              key={s}
-              onClick={() => setTextSize(s)}
-              style={{
-                height: 32,
-                border: `1px solid ${active ? "var(--brand)" : "var(--line)"}`,
-                borderRadius: 8,
-                background: active ? "var(--brand-soft)" : "var(--surface)",
-                color: active ? "var(--brand)" : "var(--ink)",
-                fontSize: 12,
-                fontWeight: 600,
-                cursor: "pointer",
-              }}
-            >
-              {t[s]}
-            </button>
-          );
-        })}
+      <div style={{ marginTop: 12 }}>
+        <AppearancePanel />
       </div>
 
       <button

@@ -272,3 +272,29 @@ textarea::placeholder {
     padding-bottom: 58px;
   }
 }
+
+/* ---------- Settings (same layout as the JD / Screening / Written settings pages) ---------- */
+.hs-shell { display: flex; min-height: 100%; }
+.hs-nav { width: 240px; flex: none; border-right: 1px solid var(--line); padding: 20px 10px; }
+.hs-nav-group { margin-bottom: 16px; }
+.hs-nav-label { font-size: 11px; text-transform: uppercase; letter-spacing: .04em; color: var(--ink-3); font-weight: 600; padding: 4px 12px; }
+.hs-nav-item { padding: 8px 12px; border-radius: 8px; font-size: 13px; color: var(--ink); cursor: pointer; margin-bottom: 1px; }
+.hs-nav-item:hover { background: var(--surface-2); }
+.hs-nav-item.active { background: var(--brand-soft); color: var(--brand-strong); font-weight: 700; }
+.hs-content { flex: 1; min-width: 0; padding: 26px 32px 60px; max-width: 880px; }
+.hs-title { display: flex; align-items: center; font-size: 17px; font-weight: 700; margin: 0 0 14px; color: var(--ink); }
+.hs-scope { font-size: 11px; color: var(--ink-3); background: var(--surface-3); padding: 2px 8px; border-radius: 8px; margin-left: 8px; font-weight: 500; }
+.hs-tiny { font-size: 12px; color: var(--ink-2); margin: 0; }
+.hs-card { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; overflow: hidden; }
+.hs-pad { padding: 16px 18px; }
+.hs-field { margin-bottom: 16px; }
+.hs-label { font-size: 11px; font-weight: 600; color: var(--ink-2); text-transform: uppercase; letter-spacing: .03em; margin-bottom: 6px; }
+.hs-row { display: flex; align-items: center; gap: 12px; padding: 12px 14px; border-bottom: 1px solid var(--line); }
+.hs-row:last-child { border-bottom: none; }
+.hs-row:hover { background: var(--surface-2); }
+.hs-avatar { display: inline-flex; align-items: center; justify-content: center; border-radius: 50%; color: #fff; font-size: 10px; font-weight: 700; flex: none; }
+@media (max-width: 760px) {
+  .hs-shell { flex-direction: column; }
+  .hs-nav { width: 100%; border-right: none; border-bottom: 1px solid var(--line); }
+  .hs-content { padding: 20px 16px; }
+}

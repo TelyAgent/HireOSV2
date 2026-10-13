@@ -63,10 +63,12 @@ test('sign-in email puts the code first in the subject, in both languages', () =
   assert.equal(templates.mailLocale(undefined), 'zh');
 });
 
-test('invite email escapes the inviter name', () => {
-  const mail = templates.renderInviteEmail({ inviterName: '<b>x</b>', signInUrl: 'https://h/account/login', locale: 'en' });
-  assert.ok(!mail.html.includes('<b>x</b>'));
-  assert.match(mail.html, /&lt;b&gt;x&lt;\/b&gt;/);
+test('invite email is a short invitation with a sign-in link, in both languages', () => {
+  const zh = templates.renderInviteEmail({ signInUrl: 'https://h/account/login?email=a%40b.c&x=<y>', locale: 'zh' });
+  assert.equal(zh.subject, '邀请你加入 HireOS');
+  assert.match(zh.text, /你好，\n\n邀请你加入 HireOS。\n\nhttps:\/\/h\/account\/login/);
+  assert.ok(!zh.html.includes('<y>'));
+  assert.equal(templates.renderInviteEmail({ signInUrl: 'https://h', locale: 'en' }).subject, 'You are invited to join HireOS');
 });
 
 test('client IP skips exactly the trusted proxy hops and ignores forged X-Forwarded-For entries', () => {

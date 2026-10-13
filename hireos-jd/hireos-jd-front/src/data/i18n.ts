@@ -23,7 +23,6 @@ export const ZH: Record<string, string> = {
   Notifications: "通知",
   "Demo tools": "演示工具",
   "Switch demo role": "切换演示角色",
-  "Account settings": "账号设置",
   "Accent": "强调色",
   "Saved — the new name shows everywhere after a refresh": "已保存，刷新后各处都会显示新名字",
   "Not signed in — showing the demo role": "未登录，当前显示演示身份",
