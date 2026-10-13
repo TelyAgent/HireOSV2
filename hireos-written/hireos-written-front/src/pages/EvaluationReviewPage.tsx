@@ -201,6 +201,13 @@ export function EvaluationReviewPage() {
 function CriterionRow({ c, onChange }: { c: Criterion; onChange: (patch: Partial<Criterion>) => void }) {
   const { t } = useStore();
   const [humanText, setHumanText] = useState(c.human == null ? "" : String(c.human));
+  // The input keeps its own text (so a half-typed value isn't reformatted), but a change made from
+  // outside -- "Accept all AI scores" fills every human score at once -- must show up in it too.
+  const [syncedHuman, setSyncedHuman] = useState(c.human);
+  if (!Object.is(c.human, syncedHuman)) {
+    setSyncedHuman(c.human);
+    if (!Object.is(c.human, humanText === "" ? null : parseInt(humanText))) setHumanText(c.human == null ? "" : String(c.human));
+  }
   const bar = Math.round(((c.human ?? c.ai) / c.max) * 100);
 
   function onHumanInput(v: string) {

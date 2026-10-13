@@ -96,12 +96,27 @@ function toOrphanedQuestion(snapshot: QuestionSnapshot): Question {
  * any invitation question that isn't already covered by a current plan item gets a read-only
  * synthetic PlanItem so its status/submission is never silently invisible.
  */
+/**
+ * Whether a sent invitation's question snapshot is this plan item. By id first; by question code as
+ * the fallback, because invitations sent before question ids were made stable (see
+ * PlanPage.handleQuestionConfirm) snapshotted the in-browser AI id (`q_ai_...`), while the same item
+ * reloads as `q_real_<planItemId>` -- an id-only match then showed every sent question twice.
+ */
+export function snapshotMatchesPlanItem(snapshot: QuestionSnapshot, questionId: string): boolean {
+  return snapshot.questionId === questionId || (!!QUESTIONS[questionId] && QUESTIONS[questionId].code === snapshot.code);
+}
+
 export function synthesizeOrphanedInvitationItems(caseId: string, realInvitations: RealInvitation[], currentQuestionIds: Set<string>): PlanItem[] {
   const seen = new Set<string>();
   const orphaned: PlanItem[] = [];
   for (const inv of realInvitations) {
     for (const q of inv.questions) {
-      if (currentQuestionIds.has(q.questionId) || seen.has(q.questionId)) continue;
+      if (seen.has(q.questionId)) continue;
+      if ([...currentQuestionIds].some((id) => snapshotMatchesPlanItem(q, id))) {
+        // Still resolvable by its snapshot id (the submission/evaluation tabs look it up that way).
+        if (!QUESTIONS[q.questionId]) QUESTIONS[q.questionId] = toOrphanedQuestion(q);
+        continue;
+      }
       seen.add(q.questionId);
       QUESTIONS[q.questionId] = toOrphanedQuestion(q);
       orphaned.push({ id: `orphan_${q.questionId}`, caseId, questionId: q.questionId, kind: "optional", status: inv.status, customPrompt: null });

@@ -19,7 +19,7 @@ import {
   type RealInvitation,
 } from "../data/writtenApi";
 import { writtenStatusFromCase } from "../utils/writtenTasks";
-import { applyRealEvaluation, applyRealPlanItems, synthesizeOrphanedInvitationItems } from "../data/realPlanItemsMerge";
+import { applyRealEvaluation, applyRealPlanItems, snapshotMatchesPlanItem, synthesizeOrphanedInvitationItems } from "../data/realPlanItemsMerge";
 
 type TabKey = "plan" | "submission" | "evaluation" | "result";
 type QuestionDrawerState = { mode: "add" } | { mode: "edit"; planItem: PlanItem } | null;
@@ -120,7 +120,7 @@ export function PlanPage() {
   // real case, fetched fresh on every load. A plan item is "already sent" if EITHER says so, so
   // status survives a reload instead of silently reverting to "not sent" the moment the in-memory
   // fixture forgets about it.
-  const realInviteForQuestion = (questionId: string) => realInvitations.find((inv) => inv.questions.some((q) => q.questionId === questionId));
+  const realInviteForQuestion = (questionId: string) => realInvitations.find((inv) => inv.questions.some((q) => snapshotMatchesPlanItem(q, questionId)));
   // "Send to candidate" now bundles every not-yet-sent item in one action (it already did this
   // under the hood via SendToCandidateDrawer's `items` prop — this just moves the trigger up to a
   // single section-level button instead of one per question card).
@@ -180,7 +180,12 @@ export function PlanPage() {
         kind, questionCode: q.code, questionTitle: q.title, questionPrompt: q.prompt,
         customPrompt: customPrompt ?? undefined, competencies: q.competencies, deliverables: q.deliverables,
       });
-      PLANS[created.id] = { id: created.id, caseId, questionId, kind, status: created.status, customPrompt };
+      // Re-key the question to the id it will have after any reload (`q_real_<planItemId>`, see
+      // realPlanItemsMerge.toQuestion) -- an invitation snapshots this id when sent, so it has to
+      // be the stable one, not the in-browser `q_ai_...` id from generation.
+      const stableQuestionId = `q_real_${created.id}`;
+      QUESTIONS[stableQuestionId] = { ...q, id: stableQuestionId, caseScoped: true };
+      PLANS[created.id] = { id: created.id, caseId, questionId: stableQuestionId, kind, status: created.status, customPrompt };
       c.planItems.push(created.id);
       round.planItemIds.push(created.id);
     } catch {
