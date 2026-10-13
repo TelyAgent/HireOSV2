@@ -1,27 +1,167 @@
 import { useEffect, useState } from "react";
-import { Link } from "react-router-dom";
+import { Navigate, useNavigate, useParams } from "react-router-dom";
+import { App as AntApp, Input, Select, Tag } from "antd";
 import { Icon } from "../components/ui/Icon";
-import { Badge, Button, Card, EmptyState, PageHeader } from "../components/ui/Primitives";
+import { Badge, Button, Card, EmptyState } from "../components/ui/Primitives";
+import { AppearanceFields } from "../components/AppShell";
+import { SettingsHead } from "../components/SettingsHead";
 import { useStore } from "../store/StoreContext";
 import { MailAccountDrawer } from "../components/MailAccountDrawer";
+import { MembersSection } from "../features/members/MembersSection";
+import { ACCOUNT_URL, authFetch, useSessionUser } from "../lib/session";
 import { deleteMailAccount, listMailAccounts, setMailAccountEnabled, type MailAccount } from "../data/writtenApi";
 
+/* Same structure as hireos-jd-front's settings page: a section nav on the left, one section at a time. */
+const SETTINGS_NAV = [
+  {
+    group: "Personal",
+    items: [
+      { key: "profile", label: "My Profile & Preferences" },
+      { key: "appearance", label: "Appearance" },
+    ],
+  },
+  {
+    group: "Workspace",
+    items: [
+      { key: "members", label: "Members & Permissions" },
+      { key: "mailbox", label: "Corporate mailbox" },
+    ],
+  },
+];
+
 export function SettingsPage() {
+  const { section = "profile" } = useParams();
   const { t } = useStore();
+  const navigate = useNavigate();
 
   return (
-    <div>
-      <PageHeader
-        title={t("Settings")}
-        actions={
-          <Link className="btn sm" to="/ai-models">
-            <Icon name="smart_toy" style={{ fontSize: 16 }} />
-            {t("AI Models")}
-          </Link>
-        }
-      />
-      <MailAccountsSection />
+    <div className="settings-shell">
+      <div className="settings-nav">
+        {SETTINGS_NAV.map((g) => (
+          <div key={g.group} className="settings-nav-group">
+            <div className="snlabel">{t(g.group)}</div>
+            {g.items.map((it) => (
+              <div
+                key={it.key}
+                className={`settings-nav-item${section === it.key ? " active" : ""}`}
+                onClick={() => navigate(`/settings/${it.key}`)}
+              >
+                {t(it.label)}
+              </div>
+            ))}
+          </div>
+        ))}
+      </div>
+      <div className="settings-content">
+        <SettingsSection section={section} />
+      </div>
     </div>
+  );
+}
+
+function SettingsSection({ section }: { section: string }) {
+  const { t, resetAppearance } = useStore();
+  switch (section) {
+    case "profile":
+      return <ProfileSection />;
+    case "appearance":
+      return (
+        <>
+          <SettingsHead title={t("Appearance")} scope={t("Account — personal")} />
+          <p className="tiny" style={{ marginBottom: 16 }}>
+            {t("This panel and the header Appearance button control the same preference — changes apply instantly everywhere.")}
+          </p>
+          <AppearanceFields />
+          <Button onClick={resetAppearance}>{t("Reset to defaults")}</Button>
+        </>
+      );
+    case "members":
+      return <MembersSection />;
+    case "mailbox":
+      return <MailAccountsSection />;
+    default:
+      // Removed sections and unknown keys land on the profile.
+      return <Navigate to="/settings/profile" replace />;
+  }
+}
+
+const ROLE_LABEL: Record<string, string> = { admin: "Admin", hr: "HR", interviewer: "Interviewer" };
+
+/** The signed-in HireOS account (hireos-identity); the display name is shared by every subsystem. */
+function ProfileSection() {
+  const { state, t, set, user: demoUser } = useStore();
+  const { message } = AntApp.useApp();
+  const sessionUser = useSessionUser();
+  const [name, setName] = useState(sessionUser?.displayName ?? "");
+  const [saving, setSaving] = useState(false);
+
+  const saveName = async () => {
+    setSaving(true);
+    try {
+      const response = await authFetch(`${ACCOUNT_URL}api/auth/me`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ displayName: name.trim() }),
+      });
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      message.success(t("Saved — the new name shows everywhere after a refresh"));
+    } catch {
+      message.error(t("Something went wrong — please try again."));
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const displayName = sessionUser?.displayName ?? demoUser.name;
+  const initials = displayName.split(/\s+/).filter(Boolean).slice(0, 2).map((w) => w[0]).join("").toUpperCase();
+
+  return (
+    <>
+      <SettingsHead title={t("My Profile & Preferences")} scope={t("Current user")} />
+      <Card style={{ marginBottom: 16 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+          <span className="avatar-sm" style={{ background: sessionUser?.avatarColor || "#64748b", width: 40, height: 40, fontSize: 14 }}>
+            {initials}
+          </span>
+          <div>
+            <div style={{ fontWeight: 600 }}>{displayName}</div>
+            <div className="tiny">{sessionUser?.email ?? t("Not signed in — showing the demo role")}</div>
+          </div>
+        </div>
+      </Card>
+      {sessionUser && (
+        <div className="field" style={{ marginBottom: 14 }}>
+          <label>{t("Display name")}</label>
+          <div style={{ display: "flex", gap: 8, maxWidth: 420 }}>
+            <Input value={name} maxLength={100} onChange={(e) => setName(e.target.value)} />
+            <Button variant="primary" disabled={saving || !name.trim() || name.trim() === sessionUser.displayName} onClick={() => void saveName()}>
+              {t("Save")}
+            </Button>
+          </div>
+        </div>
+      )}
+      <div className="field" style={{ marginBottom: 14, maxWidth: 420 }}>
+        <label>{t("Language")}</label>
+        <Select
+          value={state.lang}
+          onChange={(lang: "en" | "zh") => set({ lang })}
+          options={[
+            { value: "en", label: "English" },
+            { value: "zh", label: "中文" },
+          ]}
+        />
+      </div>
+      {sessionUser && (
+        <div className="field">
+          <label>{t("Roles")}</label>
+          <div>
+            {sessionUser.roles.map((role) => (
+              <Tag key={role}>{t(ROLE_LABEL[role] ?? role)}</Tag>
+            ))}
+          </div>
+        </div>
+      )}
+    </>
   );
 }
 
@@ -45,10 +185,8 @@ function MailAccountsSection() {
   if (!accounts) return null;
 
   return (
-    <Card style={{ marginBottom: 20 }}>
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 6 }}>
-        <b>{t("Corporate mailbox")}</b>
-      </div>
+    <>
+      <SettingsHead title={t("Corporate mailbox")} scope={t("Workspace")} />
       <div className="tiny" style={{ marginBottom: 12 }}>
         {t("Used to send real assessment invitation emails to candidates.")}
       </div>
@@ -74,7 +212,7 @@ function MailAccountsSection() {
           onSaved={load}
         />
       )}
-    </Card>
+    </>
   );
 }
 

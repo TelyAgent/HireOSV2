@@ -328,3 +328,24 @@ textarea.input { height: auto; padding: var(--space-3); resize: vertical; }
 @media (max-width: 480px) {
   .grid-4, .grid-3 { grid-template-columns: 1fr; }
 }
+
+/* ---------- Settings (same layout as hireos-jd-front's settings page) ---------- */
+.settings-shell { display: flex; align-items: flex-start; gap: 0; min-height: calc(100vh - 140px); margin: -24px -32px -60px; }
+.settings-nav { width: 240px; flex: 0 0 auto; align-self: stretch; border-right: 1px solid var(--border); padding: 20px 10px; }
+.settings-nav-group { margin-bottom: 16px; }
+.settings-nav-group .snlabel { font-size: calc(var(--text-base) * .72); text-transform: uppercase; letter-spacing: .04em; color: var(--text-tertiary); font-weight: 600; padding: 4px 12px; }
+.settings-nav-item { padding: 8px 12px; border-radius: 6px; font-size: calc(var(--text-base) * .9); color: var(--text-primary); cursor: pointer; margin-bottom: 1px; }
+.settings-nav-item:hover { background: var(--surface-alt); }
+.settings-nav-item.active { background: var(--selected-surface); color: var(--accent-700, var(--accent)); font-weight: 600; }
+.settings-content { flex: 1; min-width: 0; padding: 26px 32px 60px; max-width: 880px; }
+.settings-content .section-title { font-size: calc(var(--text-base) * 1.2); font-weight: 600; margin: 0 0 16px; color: var(--text-primary); display: flex; align-items: center; }
+.scope-tag { font-size: calc(var(--text-base) * .72); color: var(--text-tertiary); background: var(--surface-alt); padding: 2px 8px; border-radius: 8px; margin-left: 8px; font-weight: 500; }
+.list-row { display: flex; align-items: center; gap: 12px; padding: 12px 14px; border-bottom: 1px solid var(--border); }
+.list-row:last-child { border-bottom: none; }
+.list-row:hover { background: var(--surface-alt); }
+.avatar-sm { width: 24px; height: 24px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 10px; font-weight: 600; color: #fff; flex: 0 0 auto; }
+@media (max-width: 760px) {
+  .settings-shell { flex-direction: column; margin: 0; }
+  .settings-nav { width: 100%; border-right: none; border-bottom: 1px solid var(--border); padding: 8px 0; }
+  .settings-content { padding: 20px 0; }
+}

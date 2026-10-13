@@ -1,8 +1,11 @@
+import { useState } from "react";
 import { Navigate, useNavigate, useParams } from "react-router-dom";
-import { MainInner, AppearancePanel, AppearancePreview } from "../components/AppShell";
+import { App as AntApp, Input, Select, Tag } from "antd";
+import { MainInner, AppearancePanel } from "../components/AppShell";
 import { Button } from "../components/ui/Primitives";
 import { useStore } from "../store/StoreContext";
-import { PEOPLE } from "../data/fixtures/people";
+import { MembersSection } from "../features/members/MembersSection";
+import { ACCOUNT_URL, authFetch, useSessionUser } from "../lib/session";
 
 const SETTINGS_NAV = [
   {
@@ -62,53 +65,11 @@ function SettingsHead({ title, scope }: { title: string; scope: string }) {
 }
 
 function SettingsSection({ section }: { section: string }) {
-  const { state, t, say, resetAppearance, set, person } = useStore();
+  const { t, resetAppearance } = useStore();
 
   switch (section) {
     case "profile":
-      return (
-        <>
-          <SettingsHead title={t("My Profile & Preferences")} scope={t("Current user")} />
-          <div className="card card-pad" style={{ marginBottom: 16 }}>
-            <div className="flex items-center gap-12">
-              <span className="avatar-md" style={{ background: person?.color }}>
-                {person?.initials}
-              </span>
-              <div>
-                <div style={{ fontWeight: 500 }}>{person?.name}</div>
-                <div className="tiny">
-                  {person?.title} • {person?.email}
-                </div>
-              </div>
-            </div>
-          </div>
-          <div className="field">
-            <label>{t("Display name")}</label>
-            <input type="text" defaultValue={person?.name} />
-          </div>
-          <div className="field">
-            <label>{t("Language")}</label>
-            <select value={state.lang} onChange={(e) => set({ lang: e.target.value as "en" | "zh" })}>
-              <option value="en">English</option>
-              <option value="zh">中文</option>
-            </select>
-          </div>
-          <div className="field">
-            <label>{t("Time zone")}</label>
-            <select defaultValue="hcm">
-              <option value="hcm">Asia/Ho_Chi_Minh (UTC+7)</option>
-              <option value="sg">Asia/Singapore (UTC+8)</option>
-            </select>
-          </div>
-          <div className="field">
-            <label>{t("Memberships")}</label>
-            <div className="tiny">Sending Labs — {person?.role}</div>
-          </div>
-          <Button variant="primary" onClick={() => say(t("Saved"), { type: "success" })}>
-            {t("Save")}
-          </Button>
-        </>
-      );
+      return <ProfileSection />;
 
     case "appearance":
       return (
@@ -118,48 +79,98 @@ function SettingsSection({ section }: { section: string }) {
             {t("This panel and the header Appearance button control the same preference — changes apply instantly everywhere.")}
           </p>
           <AppearancePanel />
-          <div style={{ marginBottom: 16 }}>
-            <AppearancePreview />
-          </div>
-          <Button variant="text" onClick={resetAppearance}>
+          <Button variant="secondary" onClick={resetAppearance}>
             {t("Reset to defaults")}
           </Button>
         </>
       );
 
     case "members":
-      return (
-        <>
-          <SettingsHead title={t("Members & Permissions")} scope={t("Permission admin")} />
-          <div className="field">
-            <input type="text" placeholder={t("Search members…")} />
-          </div>
-          <div className="card">
-            {Object.values(PEOPLE).map((p) => (
-              <div key={p.id} className="list-row">
-                <span className="avatar-sm" style={{ background: p.color }}>
-                  {p.initials}
-                </span>
-                <div style={{ flex: 1 }}>
-                  <div style={{ fontWeight: 500 }}>{p.name}</div>
-                  <div className="tiny">{p.email}</div>
-                </div>
-                <span className="badge badge-neutral">{p.role}</span>
-                <Button
-                  variant="text"
-                  size="sm"
-                  onClick={() => say(t("Job scope and restricted-field entitlements are configured per member (demo)"))}
-                >
-                  {t("Manage scope")}
-                </Button>
-              </div>
-            ))}
-          </div>
-        </>
-      );
+      return <MembersSection />;
 
     default:
       // Removed sections (overview, AI models, …) and unknown keys land on the profile.
       return <Navigate to="/settings/profile" replace />;
   }
+}
+
+const ROLE_LABEL: Record<string, string> = { admin: "Admin", hr: "HR", interviewer: "Interviewer" };
+
+/** The signed-in HireOS account (hireos-identity); same section as hireos-written-front's settings page. */
+function ProfileSection() {
+  const { state, t, setLang, person } = useStore();
+  const { message } = AntApp.useApp();
+  const sessionUser = useSessionUser();
+  const [name, setName] = useState(sessionUser?.displayName ?? "");
+  const [saving, setSaving] = useState(false);
+
+  const saveName = async () => {
+    setSaving(true);
+    try {
+      const response = await authFetch(`${ACCOUNT_URL}api/auth/me`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ displayName: name.trim() }),
+      });
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      message.success(t("Saved — the new name shows everywhere after a refresh"));
+    } catch {
+      message.error(t("Something went wrong — please try again."));
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const displayName = sessionUser?.displayName ?? person?.name ?? "";
+  const initials = displayName.split(/\s+/).filter(Boolean).slice(0, 2).map((w) => w[0]).join("").toUpperCase();
+
+  return (
+    <>
+      <SettingsHead title={t("My Profile & Preferences")} scope={t("Current user")} />
+      <div className="card card-pad" style={{ marginBottom: 16 }}>
+        <div className="flex items-center gap-12">
+          <span className="avatar-sm" style={{ background: sessionUser?.avatarColor || person?.color || "#64748b", width: 40, height: 40, fontSize: 14 }}>
+            {initials}
+          </span>
+          <div>
+            <div style={{ fontWeight: 600 }}>{displayName}</div>
+            <div className="tiny">{sessionUser?.email ?? t("Not signed in — showing the demo role")}</div>
+          </div>
+        </div>
+      </div>
+      {sessionUser && (
+        <div className="field">
+          <label>{t("Display name")}</label>
+          <div className="flex gap-8" style={{ maxWidth: 420 }}>
+            <Input value={name} maxLength={100} onChange={(e) => setName(e.target.value)} />
+            <Button variant="primary" disabled={saving || !name.trim() || name.trim() === sessionUser.displayName} onClick={() => void saveName()}>
+              {t("Save")}
+            </Button>
+          </div>
+        </div>
+      )}
+      <div className="field" style={{ maxWidth: 420 }}>
+        <label>{t("Language")}</label>
+        <Select
+          value={state.lang}
+          onChange={(lang: "en" | "zh") => setLang(lang)}
+          style={{ width: "100%" }}
+          options={[
+            { value: "en", label: "English" },
+            { value: "zh", label: "中文" },
+          ]}
+        />
+      </div>
+      {sessionUser && (
+        <div className="field">
+          <label>{t("Roles")}</label>
+          <div>
+            {sessionUser.roles.map((role) => (
+              <Tag key={role}>{t(ROLE_LABEL[role] ?? role)}</Tag>
+            ))}
+          </div>
+        </div>
+      )}
+    </>
+  );
 }

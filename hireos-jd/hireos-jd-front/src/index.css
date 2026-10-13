@@ -611,8 +611,8 @@ a:focus-visible, button:focus-visible, [tabindex]:focus-visible, input:focus-vis
 .salary-range .ant-input-number{ width:120px; }
 .salary-unit{ font-weight:600; color:var(--text-secondary); }
 /* antd radio buttons render <label>; keep the form's ".field label" caption style off them. */
-.salary-form .field .ant-radio-button-wrapper{ display:inline-flex; align-items:center; margin:0; font-family:var(--font); font-size:var(--fs-sm); font-weight:400; text-transform:none; letter-spacing:normal; color:var(--text); }
-.salary-form .field .ant-radio-button-wrapper-checked{ color:var(--accent-600); }
+.field .ant-radio-button-wrapper{ display:inline-flex; align-items:center; margin:0; font-family:var(--font); font-size:var(--fs-sm); font-weight:400; text-transform:none; letter-spacing:normal; color:var(--text); }
+.field .ant-radio-button-wrapper-checked{ color:var(--accent-600); }
 .salary-preview{ padding:10px 12px; border-radius:8px; background:var(--surface-alt); font-size:var(--fs-sm); min-height:40px; }
 
 /* Header back button */

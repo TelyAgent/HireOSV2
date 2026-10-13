@@ -36,6 +36,8 @@ export const BASE_URL = import.meta.env.BASE_URL;
 /** Path prefix shared by every subsystem: `/` locally, `/hireos/` on the server. */
 export const ROOT_URL = BASE_URL.replace(/account\/$/, "");
 export const DEFAULT_LANDING = `${ROOT_URL}screening/`;
+/** Workspace member management lives on the JD settings page. */
+export const MEMBERS_URL = `${ROOT_URL}jd/settings/members`;
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const response = await fetch(`${BASE_URL}api${path}`, {

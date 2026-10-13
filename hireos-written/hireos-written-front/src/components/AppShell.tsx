@@ -119,10 +119,11 @@ function RolePill({ onClick }: { onClick: () => void }) {
   );
 }
 
-function AppearanceModal() {
-  const { state, t, setTheme, setAccent, setTextSize, resetAppearance, toggleAppearance, advanceClock } = useStore();
+/** Theme / accent / text size — shared by the top-bar Appearance dialog and Settings → Appearance. */
+export function AppearanceFields() {
+  const { state, t, setTheme, setAccent, setTextSize } = useStore();
   return (
-    <Modal open={state.showAppearance} onCancel={toggleAppearance} footer={null} title={t("Appearance")} width={440}>
+    <>
       <div className="field" style={{ marginBottom: 14 }}>
         <label>{t("Theme")}</label>
         <Radio.Group value={state.theme} onChange={(e) => setTheme(e.target.value)}>
@@ -152,6 +153,15 @@ function AppearanceModal() {
         {t("Applies instantly across tables, menus, evidence highlights and overlays. Saved for this account")}
         {t("— demo uses local storage, not real cloud sync across devices.")}
       </div>
+    </>
+  );
+}
+
+function AppearanceModal() {
+  const { state, t, resetAppearance, toggleAppearance, advanceClock } = useStore();
+  return (
+    <Modal open={state.showAppearance} onCancel={toggleAppearance} footer={null} title={t("Appearance")} width={440}>
+      <AppearanceFields />
       <div className="divider" style={{ margin: "14px 0" }} />
       <div className="field" style={{ marginBottom: 14 }}>
         <label>Demo clock — {fmtDate(nowISO(state.clockOffsetMin))} ({t("Asia/Shanghai")})</label>

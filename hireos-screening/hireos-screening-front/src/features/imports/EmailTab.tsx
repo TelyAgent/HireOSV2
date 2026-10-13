@@ -49,7 +49,7 @@ export function EmailTab({ onChanged, jobId }: { onChanged?: () => void; jobId?:
           title={t("No mailbox enabled for inbound import")}
           body={t("Connect a corporate mailbox with inbound enabled in Settings to import resumes from email.")}
           actions={
-            <Link className="btn btn-primary" to="/settings/preferences">
+            <Link className="btn btn-primary" to="/settings/mailbox">
               {t("Go to Settings")}
             </Link>
           }
@@ -74,7 +74,7 @@ export function EmailTab({ onChanged, jobId }: { onChanged?: () => void; jobId?:
             ) : (
               <>
                 <Badge tone="danger">{t("Disabled")}</Badge>
-                <Link className="btn btn-sm btn-secondary" to="/settings/preferences">
+                <Link className="btn btn-sm btn-secondary" to="/settings/mailbox">
                   {t("Go to Settings")}
                 </Link>
               </>

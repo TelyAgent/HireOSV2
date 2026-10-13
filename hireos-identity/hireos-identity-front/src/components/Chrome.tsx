@@ -1,5 +1,5 @@
 import { Link, NavLink } from "react-router-dom";
-import { initials, type Me } from "../api";
+import { MEMBERS_URL, initials, type Me } from "../api";
 import { useI18n } from "../i18n";
 
 export function Brand() {
@@ -41,7 +41,7 @@ export function AppHeader({ me }: { me: Me }) {
         <NavLink to="/" end>
           {t("Profile")}
         </NavLink>
-        {me.roles.includes("admin") && <NavLink to="/members">{t("Members")}</NavLink>}
+        {me.roles.includes("admin") && <a href={MEMBERS_URL}>{t("Members")}</a>}
       </nav>
       <div className="app-header-right">
         <LangToggle />

@@ -37,16 +37,6 @@ export class SettingsController {
     return this.settings.listActivity(req.identity);
   }
 
-  @Get('ai-models')
-  getAiModels(@Req() req: { identity: Identity }) {
-    return this.settings.getAiModels(req.identity);
-  }
-
-  @Get('ai-models/activity')
-  getAiModelActivity(@Req() req: { identity: Identity }) {
-    return this.settings.getAiModelActivity(req.identity);
-  }
-
   @Get('settings/corporate-mailboxes')
   listCorporateMailboxes(@Req() req: { identity: Identity }) {
     return this.settings.listCorporateMailboxes(req.identity);

@@ -1,4 +1,5 @@
 import { useLayoutEffect, type ReactNode } from "react";
+import { Radio } from "antd";
 import { Link, useLocation } from "react-router-dom";
 import { useStore } from "../store/StoreContext";
 import { PEOPLE } from "../data/fixtures/people";
@@ -12,7 +13,7 @@ import { UserMenu, useSessionUser } from "../lib/session";
    Nav config — ported from the prototype's NAV_ITEMS/isActiveRoute.
    --------------------------------------------------------------- */
 const NAV_WORKSPACE_ITEMS = [
-  { to: "/settings/preferences", icon: "tune", label: "Settings", isActive: (p: string) => p.startsWith("/settings") },
+  { to: "/settings/profile", icon: "tune", label: "Settings", isActive: (p: string) => p.startsWith("/settings") },
 ];
 
 interface NavItem {
@@ -155,12 +156,42 @@ export function SideNav() {
   );
 }
 
+/** Theme / accent / text size — same controls as the JD and Written settings pages. */
+export function AppearancePanel() {
+  const { state, t, setTheme, setAccent, setTextSize } = useStore();
+  return (
+    <>
+      <div className="field">
+        <label>{t("Theme")}</label>
+        <Radio.Group value={state.theme} onChange={(e) => setTheme(e.target.value as ThemeMode)}>
+          <Radio.Button value="light">{t("Light")}</Radio.Button>
+          <Radio.Button value="dark">{t("Dark")}</Radio.Button>
+          <Radio.Button value="deep">{t("Deep")}</Radio.Button>
+          <Radio.Button value="system">{t("System")}</Radio.Button>
+        </Radio.Group>
+      </div>
+      <div className="field">
+        <label>{t("Accent")}</label>
+        <Radio.Group value={state.accent} onChange={(e) => setAccent(e.target.value as Accent)}>
+          <Radio.Button value="blue">{t("Blue")}</Radio.Button>
+          <Radio.Button value="teal">{t("Teal")}</Radio.Button>
+          <Radio.Button value="violet">{t("Violet")}</Radio.Button>
+        </Radio.Group>
+      </div>
+      <div className="field">
+        <label>{t("Text size")}</label>
+        <Radio.Group value={state.textSize} onChange={(e) => setTextSize(e.target.value as TextSize)}>
+          <Radio.Button value="small">{t("Small")}</Radio.Button>
+          <Radio.Button value="medium">{t("Medium")}</Radio.Button>
+          <Radio.Button value="large">{t("Large")}</Radio.Button>
+        </Radio.Group>
+      </div>
+    </>
+  );
+}
+
 function AppearanceModal() {
-  const { state, t, setTheme, setAccent, setTextSize, resetAppearance, toggleAppearance } = useStore();
-  const themes: ThemeMode[] = ["light", "dark", "deep", "system"];
-  const accents: Accent[] = ["blue", "teal", "violet"];
-  const sizes: TextSize[] = ["small", "medium", "large"];
-  const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
+  const { state, t, resetAppearance, toggleAppearance } = useStore();
   return (
     <Modal
       open={state.showAppearance}
@@ -177,36 +208,7 @@ function AppearanceModal() {
         </>
       }
     >
-      <div className="field">
-        <label>{t("Theme")}</label>
-        <div className="flex gap-8 flex-wrap">
-          {themes.map((th) => (
-            <Button key={th} size="sm" variant={state.theme === th ? "primary" : "secondary"} onClick={() => setTheme(th)}>
-              {t(cap(th))}
-            </Button>
-          ))}
-        </div>
-      </div>
-      <div className="field">
-        <label>{t("Accent color")}</label>
-        <div className="flex gap-8 flex-wrap">
-          {accents.map((ac) => (
-            <Button key={ac} size="sm" variant={state.accent === ac ? "primary" : "secondary"} onClick={() => setAccent(ac)}>
-              {t(cap(ac))}
-            </Button>
-          ))}
-        </div>
-      </div>
-      <div className="field">
-        <label>{t("Text size")}</label>
-        <div className="flex gap-8 flex-wrap">
-          {sizes.map((sz) => (
-            <Button key={sz} size="sm" variant={state.textSize === sz ? "primary" : "secondary"} onClick={() => setTextSize(sz)}>
-              {t(cap(sz))}
-            </Button>
-          ))}
-        </div>
-      </div>
+      <AppearancePanel />
       <p className="tiny">
         {t(
           "Preferences are saved for this session and this demo role. Production HireOS syncs Appearance to your account across devices.",
