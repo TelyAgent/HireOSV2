@@ -1,11 +1,14 @@
 import { useCallback, useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useStore } from "../store/StoreContext";
-import { createDraftJob, listJobs } from "../data/api/jobs";
+import { listJobs } from "../data/api/jobs";
+import { BASE_URL } from "../data/api/shared";
 import type { Job, JobFunnel, JobStatus } from "../data/fixtures/jobs";
 import { Badge, Button, PageHeader } from "../components/ui/Primitives";
 import { Icon } from "../components/ui/Icons";
-import { Modal } from "../components/ui/Overlays";
+
+/** Jobs are created in the JD subsystem; it is served next to this app (/screening/ ↔ /jd/). */
+const JD_NEW_JOB_URL = `${BASE_URL.replace(/screening\/$/, "jd/")}jobs/new`;
 
 const SOURCE_LABEL: Record<string, string> = { manual_upload: "Local upload", email: "Email", folder: "Folder", api: "API" };
 
@@ -15,69 +18,6 @@ function JobStatusBadge({ status }: { status: JobStatus }) {
   if (status === "open") return <Badge tone="success">{t("Open", "Open (job status)")}</Badge>;
   if (status === "closed") return <Badge tone="outline">{t("Closed")}</Badge>;
   return <Badge tone="warning">{t("Paused")}</Badge>;
-}
-
-function CreateJobModal({ onClose, onCreated }: { onClose: () => void; onCreated: (jobId: string) => void }) {
-  const { t, say } = useStore();
-  const [title, setTitle] = useState("");
-  const [team, setTeam] = useState("");
-  const [jdText, setJdText] = useState("");
-  const [error, setError] = useState<string | null>(null);
-
-  const submit = async () => {
-    if (!title.trim()) {
-      setError(t("Job title is required"));
-      say(t("Job title is required"), { type: "error" });
-      return;
-    }
-    if (!team.trim()) {
-      setError(t("Team / function is required so this job can be matched against the resume library"));
-      say(t("Team / function is required so this job can be matched against the resume library"), { type: "error" });
-      return;
-    }
-    const job = await createDraftJob({ title, team, jdText });
-    onClose();
-    say(t("Draft job created — confirm requirements before screening"), { type: "success" });
-    onCreated(job.id);
-  };
-
-  return (
-    <Modal
-      open
-      onClose={onClose}
-      title={t("Import / create job")}
-      footer={
-        <>
-          <Button variant="secondary" onClick={onClose}>
-            {t("Cancel")}
-          </Button>
-          <Button variant="primary" onClick={submit}>
-            {t("Create draft job")}
-          </Button>
-        </>
-      }
-    >
-      <p className="tiny" style={{ marginBottom: 12 }}>
-        {t("A job description alone is enough to create a project — candidates can be added later.")}
-      </p>
-      <div className="field">
-        <label>{t("Job title")}</label>
-        <input type="text" value={title} onChange={(e) => setTitle(e.target.value)} placeholder="e.g. Platform Reliability Engineer" />
-      </div>
-      <div className="field">
-        <label>{t("Team / function")}</label>
-        <input type="text" value={team} onChange={(e) => setTeam(e.target.value)} placeholder="e.g. Design, Data Infrastructure, Sales" />
-      </div>
-      <p className="tiny muted" style={{ margin: "-6px 0 12px" }}>
-        {t("Used to match this job against the resume library — see Requirements & Rubric after creating.")}
-      </p>
-      <div className="field">
-        <label>{t("Paste job description")}</label>
-        <textarea value={jdText} onChange={(e) => setJdText(e.target.value)} placeholder={t("Paste the JD text here")} style={{ minHeight: 120 }} />
-      </div>
-      {error && <p className="error-inline">{error}</p>}
-    </Modal>
-  );
 }
 
 function rate(n: number, d: number) {
@@ -115,7 +55,6 @@ export function JobsListPage() {
   const { t } = useStore();
   const navigate = useNavigate();
   const [jobs, setJobs] = useState<Job[]>([]);
-  const [showCreate, setShowCreate] = useState(false);
 
   const load = useCallback(() => {
     listJobs().then(setJobs);
@@ -131,7 +70,7 @@ export function JobsListPage() {
         title={t("Jobs")}
         subtitle={t("Each job is screened independently — applications, standards and permissions never mix across roles.")}
         actions={
-          <Button variant="primary" icon="add" onClick={() => setShowCreate(true)}>
+          <Button variant="primary" icon="add" onClick={() => window.open(JD_NEW_JOB_URL, "_blank", "noopener")}>
             {t("New job")}
           </Button>
         }
@@ -215,9 +154,6 @@ export function JobsListPage() {
       <p className="tiny muted" style={{ margin: "10px 2px 0", lineHeight: 1.5 }}>
         {t("Funnel counts people, not files: Resumes evaluated against the job → Matched by AI → Linked after a person confirms. Percentages show conversion from the previous stage.")}
       </p>
-      {showCreate && (
-        <CreateJobModal onClose={() => setShowCreate(false)} onCreated={(jobId) => navigate(`/jobs/${jobId}/criteria`)} />
-      )}
     </>
   );
 }

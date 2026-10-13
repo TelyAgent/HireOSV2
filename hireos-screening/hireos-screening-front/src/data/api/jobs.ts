@@ -1,6 +1,6 @@
 import { db } from "../db";
 import type { Job, Dimension, Requirement } from "../fixtures/jobs";
-import { ApiError, apiFetch } from "./shared";
+import { apiFetch } from "./shared";
 
 export async function listJobs(): Promise<Job[]> {
   const jobs = await apiFetch<Job[]>("/jobs");
@@ -10,18 +10,6 @@ export async function listJobs(): Promise<Job[]> {
 
 export async function getJobDetail(id: string): Promise<Job> {
   const job = await apiFetch<Job>(`/jobs/${id}`);
-  db.jobs[job.id] = job;
-  return job;
-}
-
-export interface CreateDraftJobInput {
-  title: string;
-  team?: string;
-  jdText?: string;
-}
-export async function createDraftJob(input: CreateDraftJobInput): Promise<Job> {
-  if (!input.title.trim()) throw new ApiError("TITLE_REQUIRED", "Job title is required");
-  const job = await apiFetch<Job>("/jobs", { method: "POST", body: JSON.stringify(input) });
   db.jobs[job.id] = job;
   return job;
 }

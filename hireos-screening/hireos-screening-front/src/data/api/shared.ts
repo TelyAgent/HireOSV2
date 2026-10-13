@@ -12,7 +12,7 @@ async function parseResponse(response: Response): Promise<unknown> {
   return response.text();
 }
 
-const BASE_URL = ((import.meta as ImportMeta & { env?: Record<string, string | undefined> }).env?.BASE_URL) || "/";
+export const BASE_URL = ((import.meta as ImportMeta & { env?: Record<string, string | undefined> }).env?.BASE_URL) || "/";
 
 export async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
   const response = await fetch(`${BASE_URL}api${path}`, {

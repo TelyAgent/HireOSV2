@@ -1,11 +1,9 @@
 import { BadRequestException, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../persistence/prisma.service';
 import type { Identity } from '../auth/workspace.guard';
-import { createJobSchema, criteriaSchema, importJobSchema, validate, type CriteriaInput } from './contracts';
+import { criteriaSchema, validate, type CriteriaInput } from './contracts';
 import { CoreRecordClient } from '../core-record/core-record.client';
-import { JobCriteriaFacade, type RemoteCriteriaProjection, type RoleDraftInput } from './job-criteria.facade';
-import { parseJobDefinition } from './job-definition.parser';
-import { createHash } from 'node:crypto';
+import { JobCriteriaFacade, type RemoteCriteriaProjection } from './job-criteria.facade';
 
 const DEFAULT_DIMENSIONS = [
   { id: 'dim-skills', name: 'Skills', weight: 0.25, rubric: 'How closely the candidate skills match the role.' },
@@ -26,8 +24,9 @@ export class JobsService {
 
   async list(identity: Identity) {
     await this.syncPublishedJobs(identity);
+    // Jobs are created and published in HireOS JD; Screening only lists the published ones.
     const jobs = await this.db.job.findMany({
-      where: { workspaceId: identity.workspaceId },
+      where: { workspaceId: identity.workspaceId, status: 'open' },
       orderBy: { createdAt: 'desc' },
       include: { criteriaVersions: { orderBy: { version: 'desc' }, take: 1 } },
     });
@@ -100,9 +99,10 @@ export class JobsService {
 
   /**
    * Jobs published in HireOS JD live in Core Record (status `open`); Screening keeps its own Job
-   * rows (keyed by the Core Record id, like `create` does), so pull in any published job it doesn't
-   * have yet and keep already-mirrored jobs' title (and closures) in step with Core Record. A Core Record
-   * outage only skips the sync — the local list is still returned.
+   * rows (keyed by the Core Record id), so pull in any published job it doesn't have yet and keep
+   * already-mirrored jobs' title and status in step with Core Record — an unpublished (draft) or
+   * closed job drops out of the list and out of matching. A Core Record outage only skips the sync —
+   * the last mirrored state is still returned.
    */
   private async syncPublishedJobs(identity: Identity) {
     let coreJobs: Awaited<ReturnType<CoreRecordClient['listJobs']>>;
@@ -122,12 +122,8 @@ export class JobsService {
     for (const core of coreJobs) {
       const existing = localById.get(core.id);
       if (existing) {
-        // Screening marks its own jobs `open` locally once criteria are confirmed while Core Record
-        // still says `draft`, so only propagate an explicit close from Core Record, never draft/open.
-        const closed = ['paused', 'closed', 'archived'].includes(core.status);
-        const status = closed ? core.status : existing.status;
-        if (existing.title !== core.title || existing.status !== status) {
-          await this.db.job.update({ where: { id: core.id }, data: { title: core.title, status } });
+        if (existing.title !== core.title || existing.status !== core.status) {
+          await this.db.job.update({ where: { id: core.id }, data: { title: core.title, status: core.status } });
         }
         continue;
       }
@@ -178,174 +174,6 @@ export class JobsService {
     return toFrontendJob(job, remoteCriteria ? normalizeRemoteCriteria(remoteCriteria, job.criteriaVersions[0]?.dimensions) : undefined);
   }
 
-  async create(identity: Identity, raw: unknown) {
-    const input = validate(createJobSchema, raw);
-    if (input.jdText?.trim()) {
-      return this.importFromSource(identity, {
-        sourceText: input.jdText,
-        title: input.title,
-        team: input.team,
-        assessmentRequired: input.assessmentRequired,
-      });
-    }
-    const coreJob = await this.coreRecord.createJob(identity, {
-      title: input.title,
-      team: input.team,
-      location: 'Remote (US)',
-      employmentType: 'Full-time',
-      seniority: 'Unspecified',
-      openings: 1,
-      status: 'draft',
-    }, `screening:job:create:${identity.workspaceId}:${input.title}:${input.team || ''}`);
-    const job = await this.db.$transaction(async (tx) => {
-      const created = coreJob?.id
-        ? await tx.job.upsert({
-            where: { id: coreJob.id },
-            update: {
-              title: input.title,
-              team: input.team || 'Unassigned',
-              status: coreJob.status || 'draft',
-              jdText: input.jdText || null,
-              assessmentRequired: input.assessmentRequired ?? false,
-            },
-            create: {
-              id: coreJob.id,
-              workspaceId: identity.workspaceId,
-              title: input.title,
-              team: input.team || 'Unassigned',
-              status: coreJob.status || 'draft',
-              location: 'Remote (US)',
-              employmentType: 'Full-time',
-              seniority: 'Unspecified',
-              jdText: input.jdText || null,
-              assessmentRequired: input.assessmentRequired ?? false,
-            },
-          })
-        : await tx.job.create({
-            data: {
-              workspaceId: identity.workspaceId,
-              title: input.title,
-              team: input.team || 'Unassigned',
-              location: 'Remote (US)',
-              employmentType: 'Full-time',
-              seniority: 'Unspecified',
-              jdText: input.jdText || null,
-              assessmentRequired: input.assessmentRequired ?? false,
-            },
-          });
-      const existingCriteria = await tx.jobCriteriaVersion.findFirst({
-        where: { jobId: created.id },
-        orderBy: { version: 'desc' },
-      });
-      if (existingCriteria) return created;
-      await tx.jobCriteriaVersion.create({
-        data: {
-          workspaceId: identity.workspaceId,
-          jobId: created.id,
-          version: 0,
-          requirements: [],
-          dimensions: DEFAULT_DIMENSIONS,
-        },
-      });
-      return created;
-    });
-    return this.get(identity, job.id);
-  }
-
-  async importFromSource(identity: Identity, raw: unknown) {
-    const input = validate(importJobSchema, raw);
-    const existing = await this.db.job.findFirst({
-      where: { workspaceId: identity.workspaceId, jdText: input.sourceText },
-      select: { id: true },
-    });
-    if (existing) return this.get(identity, existing.id);
-    const parsed = parseJobDefinition(input.sourceText);
-    const title = input.title || parsed.title;
-    const team = input.team || parsed.team;
-    const sourceRef = {
-      type: 'source_text',
-      fileName: input.sourceFileName,
-      contentHash: `sha256:${createHash('sha256').update(input.sourceText).digest('hex')}`,
-      parser: 'screening.job-definition.parser.v1',
-    };
-    const roleInput: RoleDraftInput = {
-      roleSummary: parsed.roleSummary,
-      responsibilities: parsed.responsibilities,
-      requirements: parsed.requirements,
-      dimensions: parsed.dimensions,
-      hiringContext: parsed.hiringContext,
-      successCriteria: parsed.successCriteria,
-      sourceRefs: [sourceRef],
-      origin: 'external_import',
-    };
-    const coreJob = await this.coreRecord.createJob(identity, {
-      title,
-      team,
-      location: parsed.location,
-      employmentType: parsed.employmentType,
-      seniority: parsed.seniority,
-      openings: 1,
-      status: 'draft',
-    }, `screening:job:import:${identity.workspaceId}:${sourceRef.contentHash}`);
-    const job = await this.db.$transaction(async (tx) => {
-      const created = coreJob?.id
-        ? await tx.job.upsert({
-            where: { id: coreJob.id },
-            update: {
-              title,
-              team,
-              location: parsed.location,
-              employmentType: parsed.employmentType,
-              seniority: parsed.seniority,
-              status: coreJob.status || 'draft',
-              jdText: input.sourceText,
-              assessmentRequired: input.assessmentRequired ?? false,
-            },
-            create: {
-              id: coreJob.id,
-              workspaceId: identity.workspaceId,
-              title,
-              team,
-              location: parsed.location,
-              employmentType: parsed.employmentType,
-              seniority: parsed.seniority,
-              status: coreJob?.status || 'draft',
-              jdText: input.sourceText,
-              assessmentRequired: input.assessmentRequired ?? false,
-            },
-          })
-        : await tx.job.create({
-            data: {
-              workspaceId: identity.workspaceId,
-              title,
-              team,
-              location: parsed.location,
-              employmentType: parsed.employmentType,
-              seniority: parsed.seniority,
-              jdText: input.sourceText,
-              assessmentRequired: input.assessmentRequired ?? false,
-            },
-          });
-      await tx.jobCriteriaVersion.upsert({
-        where: { jobId_version: { jobId: created.id, version: 0 } },
-        update: { requirements: parsed.requirements, dimensions: parsed.dimensions },
-        create: {
-          workspaceId: identity.workspaceId,
-          jobId: created.id,
-          version: 0,
-          requirements: parsed.requirements,
-          dimensions: parsed.dimensions,
-        },
-      });
-      return created;
-    });
-    if (this.criteriaFacade.isRemote()) {
-      const remote = await this.criteriaFacade.update(identity, job.id, roleInput);
-      await this.syncRemoteCriteria(identity.workspaceId, job.id, remote);
-    }
-    return this.get(identity, job.id);
-  }
-
   async updateCriteria(identity: Identity, id: string, raw: unknown) {
     const input = validate(criteriaSchema, raw);
     const job = await this.find(identity.workspaceId, id);
@@ -389,7 +217,7 @@ export class JobsService {
       }),
       this.db.job.update({
         where: { id: job.id },
-        data: { criteriaStatus: 'confirmed', criteriaVersion: confirmedVersion, confirmedBy: actorId, confirmedAt, status: 'open' },
+        data: { criteriaStatus: 'confirmed', criteriaVersion: confirmedVersion, confirmedBy: actorId, confirmedAt },
       }),
     ]);
     return this.get(identity, id);
@@ -480,11 +308,6 @@ export class JobsService {
             criteriaVersion: confirmedVersion,
             confirmedBy: projection.confirmedBy,
             confirmedAt,
-            // Confirming criteria is the only gate the product has for "is this job real
-            // enough to match against" -- there is no separate publish/open action
-            // anywhere in the UI or API, so a job must become open here or it can never
-            // become open at all, and discovery matching would silently find nothing.
-            status: 'open',
           },
         });
         return;

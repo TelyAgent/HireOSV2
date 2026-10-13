@@ -1,21 +1,6 @@
 import { BadRequestException } from '@nestjs/common';
 import { z } from 'zod';
 
-export const createJobSchema = z.object({
-  title: z.string().trim().min(1).max(200),
-  team: z.string().trim().max(200).optional(),
-  jdText: z.string().max(50000).optional(),
-  assessmentRequired: z.boolean().optional(),
-}).strict();
-
-export const importJobSchema = z.object({
-  sourceFileName: z.string().trim().min(1).max(500).optional(),
-  sourceText: z.string().trim().min(1).max(50000),
-  title: z.string().trim().min(1).max(200).optional(),
-  team: z.string().trim().max(200).optional(),
-  assessmentRequired: z.boolean().optional(),
-}).strict();
-
 export const criteriaSchema = z.object({
   requirements: z.array(z.object({
     id: z.string().min(1),

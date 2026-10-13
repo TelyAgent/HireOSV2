@@ -81,19 +81,6 @@ export class CoreRecordClient {
     });
   }
 
-  async createJob(
-    identity: Identity,
-    input: { title: string; team?: string; location?: string; employmentType?: string; seniority?: string; openings?: number; status?: string },
-    idempotencyKey: string = randomUUID(),
-  ): Promise<CoreJob | null> {
-    if (this.mode === 'mock') return null;
-    return this.request<CoreJob>('/jobs', identity, {
-      method: 'POST',
-      idempotencyKey,
-      body: input,
-    });
-  }
-
   /** Core Record's job directory — the jobs HireOS JD creates and publishes live here. */
   async listJobs(identity: Identity): Promise<CoreJob[]> {
     if (this.mode === 'mock') return [];
@@ -116,7 +103,7 @@ export class CoreRecordClient {
   /**
    * Registers a file with Core Record's shared Material master (see
    * docs/HireOS-Database-Architecture-Decision.md §4.1) -- mirrors createCandidate/
-   * createJob/createApplication's mock/remote split: in 'mock' mode this returns null
+   * createApplication's mock/remote split: in 'mock' mode this returns null
    * and MaterialsService.saveUpload falls back to its old local-only behavior (local
    * hash dedup, local disk write) exactly like it did before this migration.
    */

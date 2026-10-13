@@ -6,7 +6,6 @@ const { WorkspaceGuard } = require('../dist/auth/workspace.guard');
 const { splitText, normalizeTextForDedupe } = require('../dist/intake/materials.service');
 const { normalizeName, displayNameFromFileName, errorDetails } = require('../dist/intake/imports.service');
 const { ProfileParserService } = require('../dist/profiles/profile-parser.service');
-const { parseJobDefinition } = require('../dist/jobs/job-definition.parser');
 const { SecurityScanService } = require('../dist/intake/security-scan.service');
 
 test('phase 0 health payload is stable', () => {
@@ -74,29 +73,6 @@ test('local profile parser extracts evidence-backed contact and skills', () => {
   assert.equal(profile.location.value, 'Arlington, Virginia');
   assert.deepEqual(profile.skills.map((skill) => skill.name), ['TypeScript', 'React', 'AWS']);
   assert.equal(profile.skills[0].evidence.sourceMaterialId, 'mat-1');
-});
-
-test('job definition parser preserves source structure for reusable imports', () => {
-  const definition = parseJobDefinition(
-    '职位名称：高级后端工程师\n' +
-    '所属部门：AI 平台研发部\n' +
-    '工作地点：杭州\n' +
-    '工作模式：全职\n' +
-    '汇报对象：后端技术负责人\n\n' +
-    '职位概述\n负责 AI 平台基础设施建设。\n\n' +
-    '主要职责\n1. 负责后端服务架构设计、编码和发布。\n2. 建设监控和告警机制。\n\n' +
-    '任职要求\n1. 具备 5 年及以上后端研发经验。\n2. 熟悉 PostgreSQL 和 Redis。\n\n' +
-    '加分项\n1. 有 Kubernetes 经验。\n\n' +
-    '我们提供\n参与平台核心基础设施建设。',
-  );
-  assert.equal(definition.title, '高级后端工程师');
-  assert.equal(definition.location, '杭州');
-  assert.equal(definition.responsibilities.length, 2);
-  assert.equal(definition.requirements.length, 3);
-  assert.equal(definition.requirements.filter((item) => item.priority === 'must_have').length, 2);
-  assert.equal(definition.requirements.filter((item) => item.priority === 'nice_to_have').length, 1);
-  assert.equal(definition.dimensions.length, 5);
-  assert.equal(definition.dimensions.reduce((sum, item) => sum + item.weight, 0), 1);
 });
 
 test('errorDetails marks file-level user errors as non-retryable and other failures as retryable', () => {
