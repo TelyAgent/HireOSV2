@@ -112,6 +112,7 @@ export class JobsService {
       this.logger.warn(`Skipping Core Record job sync: ${error instanceof Error ? error.message : String(error)}`);
       return;
     }
+    await this.archiveDeletedJobs(identity, coreJobs.map((job) => job.id));
     if (!coreJobs.length) return;
     const local = await this.db.job.findMany({
       where: { workspaceId: identity.workspaceId, id: { in: coreJobs.map((job) => job.id) } },
@@ -161,6 +162,26 @@ export class JobsService {
           },
         });
       });
+    }
+  }
+
+  /**
+   * A job deleted in HireOS JD disappears from Core Record entirely, so the status sync above never
+   * sees it. Archive any still-listed local job missing from Core Record's directory — checked one by
+   * one, since the directory is capped and absence from it alone doesn't prove deletion.
+   */
+  private async archiveDeletedJobs(identity: Identity, coreIds: string[]) {
+    const missing = await this.db.job.findMany({
+      where: { workspaceId: identity.workspaceId, status: 'open', id: { notIn: coreIds } },
+      select: { id: true },
+    });
+    for (const { id } of missing) {
+      try {
+        const core = await this.coreRecord.getJob(identity, id);
+        await this.db.job.update({ where: { id }, data: { status: core ? core.status : 'archived' } });
+      } catch (error) {
+        this.logger.warn(`Could not check Core Record job ${id}: ${error instanceof Error ? error.message : String(error)}`);
+      }
     }
   }
 

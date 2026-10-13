@@ -87,6 +87,12 @@ export class CoreRecordClient {
     return this.request<CoreJob[]>('/jobs', identity, { method: 'GET' });
   }
 
+  /** One Core Record job, or null once it no longer exists (HireOS JD hard-deletes unused jobs). */
+  async getJob(identity: Identity, id: string): Promise<CoreJob | null> {
+    if (this.mode === 'mock') return null;
+    return this.request<CoreJob | null>(`/jobs/${encodeURIComponent(id)}`, identity, { method: 'GET', notFoundAsNull: true });
+  }
+
   async createApplication(
     identity: Identity,
     input: { candidateId: string; jobId: string; cycleId?: string; origin?: string; linkReason: string },
@@ -139,7 +145,7 @@ export class CoreRecordClient {
   private async request<T>(
     path: string,
     identity: Identity,
-    input: { method: 'GET' | 'POST'; idempotencyKey?: string; body?: unknown },
+    input: { method: 'GET' | 'POST'; idempotencyKey?: string; body?: unknown; notFoundAsNull?: boolean },
   ): Promise<T> {
     const response = await globalThis.fetch(`${this.baseUrl}${path}`, {
       method: input.method,
@@ -153,6 +159,7 @@ export class CoreRecordClient {
       },
       body: input.body === undefined ? undefined : JSON.stringify(input.body),
     });
+    if (input.notFoundAsNull && response.status === 404) return null as T;
     const body = await parseBody(response);
     if (!response.ok) {
       const error = body as { code?: string; message?: string };
