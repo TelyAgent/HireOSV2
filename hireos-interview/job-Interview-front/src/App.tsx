@@ -15,6 +15,7 @@ import { ReviewPage } from "./pages/project/ReviewPage";
 import { DebriefPage } from "./pages/project/DebriefPage";
 import { DecisionPage } from "./pages/project/DecisionPage";
 import { PackagePage } from "./pages/project/PackagePage";
+import { SettingsPage } from "./pages/SettingsPage";
 
 export default function App() {
   const { state } = useStore();
@@ -23,6 +24,8 @@ export default function App() {
     <AppShell>
       <Routes>
         <Route path="/" element={<HomePage />} />
+        <Route path="/settings" element={<Navigate to="/settings/profile" replace />} />
+        <Route path="/settings/:section" element={<SettingsPage />} />
 
         {/* Project sub-pages all share the ProjectShell chrome and hang off a real task id */}
         <Route

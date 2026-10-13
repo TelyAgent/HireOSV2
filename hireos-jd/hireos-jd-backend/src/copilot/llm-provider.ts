@@ -4,6 +4,9 @@ import OpenAI from 'openai';
 
 export type ChatTurn = { role: 'user' | 'assistant'; content: string };
 
+export type WebSource = { title: string; url: string };
+export type WebAnswer = { text: string; sources: WebSource[] };
+
 @Injectable()
 export class LlmProvider {
   private readonly client: OpenAI;
@@ -51,4 +54,43 @@ export class LlmProvider {
       throw new ServiceUnavailableException({ code: 'LLM_REQUEST_FAILED', message });
     }
   }
+
+  /** Free-text answer with the provider's hosted web search tool; citations come back as `sources`. */
+  async answerWithWebSearch(instructions: string, input: string): Promise<WebAnswer> {
+    try {
+      const response = await this.client.responses.create({
+        model: this.model,
+        instructions,
+        input,
+        tools: [{ type: 'web_search' }],
+      });
+      const sources = new Map<string, WebSource>();
+      for (const item of response.output) {
+        if (item.type !== 'message') continue;
+        for (const part of item.content) {
+          if (part.type !== 'output_text') continue;
+          for (const annotation of part.annotations) {
+            if (annotation.type !== 'url_citation') continue;
+            const url = annotation.url.replace(/[?&]utm_source=openai$/, '');
+            if (!sources.has(url)) sources.set(url, { title: annotation.title || new URL(url).hostname, url });
+          }
+        }
+      }
+      const text = stripInlineMarkdown(response.output_text);
+      if (!text) throw new Error('LLM_EMPTY_RESPONSE');
+      return { text, sources: [...sources.values()].slice(0, 5) };
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'LLM_REQUEST_FAILED';
+      throw new ServiceUnavailableException({ code: 'LLM_REQUEST_FAILED', message });
+    }
+  }
+}
+
+/** The chat renders plain text: drop inline citation links (listed separately as sources) and bold markers. */
+function stripInlineMarkdown(text: string): string {
+  return text
+    .replace(/\s*\(\[[^\]]*\]\([^)]*\)\)/g, '')
+    .replace(/\[([^\]]+)\]\([^)]*\)/g, '$1')
+    .replace(/\*\*([^*]+)\*\*/g, '$1')
+    .trim();
 }

@@ -278,6 +278,8 @@ table.data-table{ width:100%; border-collapse:collapse; font-size:var(--fs-sm); 
 
 .modal-wrap{ margin:auto; background:var(--surface); border-radius:var(--radius-lg); width:520px; max-width:92vw; max-height:88vh; display:flex; flex-direction:column; box-shadow:var(--shadow-3); animation:popin .14s ease-out; }
 .modal-wrap.wide{ width:760px; }
+/* Appearance dialog: same 640px width as the Screening one. */
+.appearance-overlay .modal-wrap{ width:640px; }
 .modal-wrap.xwide{ width:960px; }
 @keyframes popin{ from{ transform:scale(.97); opacity:0;} to{transform:scale(1); opacity:1;} }
 .modal-header{ padding:18px 22px 4px; display:flex; align-items:flex-start; justify-content:space-between; }
@@ -611,8 +613,8 @@ a:focus-visible, button:focus-visible, [tabindex]:focus-visible, input:focus-vis
 .salary-range .ant-input-number{ width:120px; }
 .salary-unit{ font-weight:600; color:var(--text-secondary); }
 /* antd radio buttons render <label>; keep the form's ".field label" caption style off them. */
-.salary-form .field .ant-radio-button-wrapper{ display:inline-flex; align-items:center; margin:0; font-family:var(--font); font-size:var(--fs-sm); font-weight:400; text-transform:none; letter-spacing:normal; color:var(--text); }
-.salary-form .field .ant-radio-button-wrapper-checked{ color:var(--accent-600); }
+.field .ant-radio-button-wrapper{ display:inline-flex; align-items:center; margin:0; font-family:var(--font); font-size:var(--fs-sm); font-weight:400; text-transform:none; letter-spacing:normal; color:var(--text); }
+.field .ant-radio-button-wrapper-checked{ color:var(--accent-600); }
 .salary-preview{ padding:10px 12px; border-radius:8px; background:var(--surface-alt); font-size:var(--fs-sm); min-height:40px; }
 
 /* Header back button */
@@ -857,7 +859,8 @@ a:focus-visible, button:focus-visible, [tabindex]:focus-visible, input:focus-vis
 .gm-form-grid{ grid-template-columns:1fr 1fr; gap:8px 10px; }
 .gm-form-grid .full{ grid-column:1 / -1; }
 .gm-hint{ color:var(--text-tertiary); font-weight:400; margin-left:4px; }
-.gm-bubble{ max-width:92%; border-radius:12px; padding:11px 14px; font-size:var(--fs-sm); line-height:1.5; }
+.gm-bubble{ max-width:92%; border-radius:12px; padding:11px 14px; font-size:var(--fs-sm); line-height:1.5; overflow-wrap:anywhere; }
+.gm-bubble .gm-link{ color:var(--accent-600); text-decoration:underline; text-underline-offset:2px; }
 .gm-bubble.user{ align-self:flex-end; background:var(--accent-600); color:var(--text-on-accent); border-bottom-right-radius:3px; }
 .gm-bubble.ai{ align-self:flex-start; background:var(--surface-alt); border-bottom-left-radius:3px; width:100%; max-width:100%; }
 .gm-bubble.ai .gm-draft-title{ font-weight:600; margin-bottom:6px; }
@@ -911,3 +914,14 @@ a:focus-visible, button:focus-visible, [tabindex]:focus-visible, input:focus-vis
 /* antd TextArea in the "Paste notes" modal: follow the app's theme variables so it tracks light/dark/deep. */
 .paste-notes.ant-input{ background:var(--surface); color:var(--text); border-color:var(--border-strong); font-size:var(--fs-sm); }
 .paste-notes.ant-input::placeholder{ color:var(--text-tertiary); }
+
+/* Every antd dialog (Modal, modal.confirm) sits in the middle of the screen, like JD's own overlays.
+   margin:auto inside the flex wrapper centers it; a dialog taller than the viewport starts at the top
+   and scrolls instead of being clipped. */
+.ant-modal-wrap { display: flex; }
+.ant-modal-wrap .ant-modal { top: 0; margin: auto; padding: 24px 0; }
+
+/* Top-bar text buttons (language, Appearance) — same look as hireos-interview's top bar. */
+.topbar-btn { height: 32px; padding: 0 11px; border: 1px solid var(--border); border-radius: 9px; background: var(--surface); color: var(--text-secondary); font: inherit; font-size: 12.5px; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; flex: none; white-space: nowrap; }
+.topbar-btn:hover { background: var(--surface-alt); }
+.topbar-btn.lang { font-weight: 600; }

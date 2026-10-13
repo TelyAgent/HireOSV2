@@ -20,7 +20,6 @@ import { ReleasePage } from "./pages/ReleasePage";
 import { ComparisonsListPage } from "./pages/ComparisonsListPage";
 import { ComparisonDetailPage } from "./pages/ComparisonDetailPage";
 import { SettingsPage } from "./pages/SettingsPage";
-import { AiModelsPage } from "./pages/AiModelsPage";
 import { CandidateApplyPage } from "./pages/CandidateApplyPage";
 import { SessionGate } from "./lib/session";
 
@@ -92,8 +91,9 @@ function ShellRoutes() {
         <Route path="/results/:id/release" element={<ReleasePage />} />
         <Route path="/comparisons" element={<ComparisonsListPage />} />
         <Route path="/comparisons/:id" element={<ComparisonDetailPage />} />
-        <Route path="/settings" element={<SettingsPage />} />
-        <Route path="/ai-models" element={<AiModelsPage />} />
+        <Route path="/settings" element={<Navigate to="/settings/profile" replace />} />
+        <Route path="/settings/:section" element={<SettingsPage />} />
+        <Route path="/ai-models" element={<Navigate to="/settings/profile" replace />} />
         <Route path="*" element={<Navigate to="/tasks" replace />} />
       </Routes>
     </AppShell>

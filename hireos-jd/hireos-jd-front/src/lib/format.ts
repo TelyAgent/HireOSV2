@@ -84,15 +84,37 @@ export interface MoneyRange {
   basis?: string;
 }
 
+export const CURRENCY_ZH: Record<string, string> = {
+  CNY: "人民币",
+  USD: "美元",
+  SGD: "新加坡元",
+  HKD: "港币",
+  EUR: "欧元",
+  GBP: "英镑",
+  JPY: "日元",
+  VND: "越南盾",
+};
+
+/**
+ * The one salary line format, amount first: "15K–20K/月 · 税前 · 人民币" / "15K–20K / month · gross · USD".
+ * Amounts are raw (15000, not 15). It still satisfies the completeness F1 check (range, currency, period,
+ * gross/net) and parses back with `parseMoney`.
+ */
+export function salaryText(range: MoneyRange, lang: "zh" | "en"): string {
+  const zh = lang === "zh";
+  const k = (n: number | null) => (n == null ? "—" : `${Number((n / 1000).toFixed(2)).toLocaleString("en-US")}K`);
+  const amount = `${k(range.min)}–${k(range.max)}`;
+  const period = range.period === "year" ? (zh ? "年" : "year") : range.period === "hour" ? (zh ? "小时" : "hour") : zh ? "月" : "month";
+  const basis = range.basis === "gross" ? (zh ? "税前" : "gross") : range.basis === "net" ? (zh ? "税后" : "net") : range.basis;
+  const currency = range.currency || (zh ? "CNY" : "USD");
+  const parts = [zh ? `${amount}/${period}` : `${amount} / ${period}`, basis, zh ? (CURRENCY_ZH[currency] ?? currency) : currency];
+  return parts.filter(Boolean).join(" · ");
+}
+
 export function money(range?: MoneyRange | null): string {
   const zh = __lang === "zh";
   if (!range || (range.min == null && range.max == null)) return zh ? "未指定" : "Not specified";
-  const cur = range.currency || "USD";
-  const per =
-    range.period === "month" ? (zh ? "/月" : "/mo") : range.period === "year" ? (zh ? "/年" : "/yr") : zh ? "/小时" : "/hr";
-  const fmt = (n: number | null) => (n == null ? "—" : n / 1000 + "k");
-  const basis = range.basis === "gross" ? (zh ? "税前" : "gross") : range.basis === "net" ? (zh ? "税后" : "net") : range.basis ?? "";
-  return `${cur} ${fmt(range.min)}–${fmt(range.max)}${per} ${basis}`.trim();
+  return salaryText(range, zh ? "zh" : "en");
 }
 
 /** Relative-day label used by task rows ("Due Mar 3" / "Overdue"). */

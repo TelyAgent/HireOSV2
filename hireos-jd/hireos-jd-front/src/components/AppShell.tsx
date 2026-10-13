@@ -1,8 +1,9 @@
 import { useLayoutEffect, type ReactNode } from "react";
+import { Radio } from "antd";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { useStore } from "../store/StoreContext";
 import { Icon } from "./ui/Icons";
-import { Button, StatusBadge } from "./ui/Primitives";
+import { Button } from "./ui/Primitives";
 import { CloseButton, ModalBody, ModalFooter, ModalHeader, OverlayHost } from "./ui/Overlays";
 import { PEOPLE } from "../data/fixtures/people";
 import { UserMenu, useSessionUser } from "../lib/session";
@@ -29,6 +30,16 @@ export function MainInner({ variant, children }: { variant?: "wide" | "flush"; c
   return <div className={`main-inner${variant ? " " + variant : ""}`}>{children}</div>;
 }
 
+/** Same sun glyph as hireos-interview's top-bar Appearance button. */
+function SunIcon() {
+  return (
+    <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <circle cx="12" cy="12" r="4" />
+      <path d="M12 2v3M12 19v3M4.2 4.2l2.1 2.1M17.7 17.7l2.1 2.1M2 12h3M19 12h3M4.2 19.8l2.1-2.1M17.7 6.3l2.1-2.1" />
+    </svg>
+  );
+}
+
 function TopBar() {
   const { state, t, toggleLang, openModal, person } = useStore();
   const navigate = useNavigate();
@@ -44,34 +55,20 @@ function TopBar() {
         </div>
       </div>
       <div className="topbar-actions">
-        <Button
-          variant="secondary"
-          size="sm"
-          style={{ borderRadius: 20 }}
-          onClick={toggleLang}
-          title={t("Switch language")}
-          aria-label={t("Switch language")}
-        >
+        <button type="button" className="topbar-btn lang" onClick={toggleLang} title={t("Switch language")} aria-label={t("Switch language")}>
           {langLabel}
-        </Button>
-        <button
-          className="icon-btn"
-          title={t("Appearance")}
-          aria-label={t("Appearance")}
-          onClick={() => openModal(<AppearanceModal />, { wide: true })}
-        >
-          <Icon name="palette" />
         </button>
         <button
-          className="icon-btn"
-          title={t("Demo tools")}
-          aria-label={t("Demo tools")}
-          onClick={() => openModal(<DemoToolsModal />)}
+          type="button"
+          className="topbar-btn"
+          aria-label={t("Appearance")}
+          onClick={() => openModal(<AppearanceModal />, { overlayClass: "appearance-overlay" })}
         >
-          <Icon name="science" />
+          <SunIcon />
+          {t("Appearance")}
         </button>
         {sessionUser ? (
-          <UserMenu user={sessionUser} labels={{ account: t("Account settings"), signOut: t("Sign out") }} />
+          <UserMenu user={sessionUser} labels={{ signOut: t("Sign out") }} />
         ) : (
           <div
             className="role-pill"
@@ -152,104 +149,37 @@ function SideNav() {
 /* ---------------------------------------------------------------
    Appearance / role / demo modals
    --------------------------------------------------------------- */
-const THEME_SWATCH: Record<ThemeMode, string> = {
-  light: "#fff",
-  dark: "#292a2d",
-  deep: "#132a3e",
-  system: "linear-gradient(90deg,#fff 50%,#292a2d 50%)",
-};
-
+/** Theme / accent / text size — same controls as hireos-written-front's Settings → Appearance. */
 export function AppearancePanel() {
-  const { state, t, setLang, setTheme, setAccent, setTextSize } = useStore();
-  const themes: ThemeMode[] = ["light", "dark", "deep", "system"];
-  const sizes: TextSize[] = ["small", "medium", "large"];
-  const accents: { key: Accent; color: string; label: string }[] = [
-    { key: "teal", color: "#0d9488", label: "Teal" },
-    { key: "blue", color: "#2563eb", label: "Blue" },
-    { key: "violet", color: "#7c3aed", label: "Violet" },
-  ];
-  const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
+  const { state, t, setTheme, setAccent, setTextSize } = useStore();
   return (
     <>
       <div className="field">
-        <label>{t("Language")}</label>
-        <div className="flex gap-10">
-          <Button variant={state.lang === "en" ? "primary" : "secondary"} size="sm" onClick={() => setLang("en")}>
-            English
-          </Button>
-          <Button variant={state.lang === "zh" ? "primary" : "secondary"} size="sm" onClick={() => setLang("zh")}>
-            中文
-          </Button>
-        </div>
-      </div>
-      <div className="field">
         <label>{t("Theme")}</label>
-        <div className="flex gap-10">
-          {themes.map((th) => (
-            <div
-              key={th}
-              className={`theme-card${state.theme === th ? " selected" : ""}`}
-              style={{ flex: 1 }}
-              onClick={() => setTheme(th)}
-            >
-              <div className="theme-swatch" style={{ border: "1px solid var(--border)" }}>
-                <div style={{ background: THEME_SWATCH[th] }} />
-              </div>
-              <div style={{ fontSize: "var(--fs-xs)", fontWeight: 600 }}>{t(cap(th))}</div>
-            </div>
-          ))}
-        </div>
+        <Radio.Group value={state.theme} onChange={(e) => setTheme(e.target.value as ThemeMode)}>
+          <Radio.Button value="light">{t("Light")}</Radio.Button>
+          <Radio.Button value="dark">{t("Dark")}</Radio.Button>
+          <Radio.Button value="deep">{t("Deep")}</Radio.Button>
+          <Radio.Button value="system">{t("System")}</Radio.Button>
+        </Radio.Group>
       </div>
       <div className="field">
-        <label>{t("Accent color")}</label>
-        <div className="flex gap-10">
-          {accents.map((a) => (
-            <span
-              key={a.key}
-              className={`accent-dot${state.accent === a.key ? " selected" : ""}`}
-              style={{ background: a.color }}
-              title={t(a.label)}
-              onClick={() => setAccent(a.key)}
-            />
-          ))}
-        </div>
+        <label>{t("Accent")}</label>
+        <Radio.Group value={state.accent} onChange={(e) => setAccent(e.target.value as Accent)}>
+          <Radio.Button value="blue">{t("Blue")}</Radio.Button>
+          <Radio.Button value="teal">{t("Teal")}</Radio.Button>
+          <Radio.Button value="violet">{t("Violet")}</Radio.Button>
+        </Radio.Group>
       </div>
       <div className="field">
         <label>{t("Text size")}</label>
-        <div className="flex gap-10">
-          {sizes.map((s) => (
-            <div key={s} className={`size-card${state.textSize === s ? " selected" : ""}`} onClick={() => setTextSize(s)}>
-              <div style={{ fontSize: s === "small" ? 12 : s === "large" ? 18 : 15, fontWeight: 600 }}>Aa</div>
-              <div className="tiny">{t(cap(s))}</div>
-            </div>
-          ))}
-        </div>
+        <Radio.Group value={state.textSize} onChange={(e) => setTextSize(e.target.value as TextSize)}>
+          <Radio.Button value="small">{t("Small")}</Radio.Button>
+          <Radio.Button value="medium">{t("Medium")}</Radio.Button>
+          <Radio.Button value="large">{t("Large")}</Radio.Button>
+        </Radio.Group>
       </div>
     </>
-  );
-}
-
-export function AppearancePreview() {
-  const { t } = useStore();
-  return (
-    <div className="card card-pad" style={{ background: "var(--surface-alt)", border: "none" }}>
-      <div className="eyebrow" style={{ marginBottom: 6 }}>
-        {t("Live preview")}
-      </div>
-      <div className="page-title" style={{ fontSize: "var(--fs-lg)", marginBottom: 4 }}>
-        Senior Backend Engineer
-      </div>
-      <div className="flex gap-6" style={{ marginBottom: 8 }}>
-        <StatusBadge kind="hiring_status" value="open" />
-        <StatusBadge kind="approval_status" value="pending" />
-      </div>
-      <Button variant="primary" size="sm">
-        {t("Submit for approval")}
-      </Button>{" "}
-      <Button variant="secondary" size="sm">
-        {t("Preview")}
-      </Button>
-    </div>
   );
 }
 
@@ -260,14 +190,13 @@ function AppearanceModal() {
       <ModalHeader title={t("Appearance")} />
       <ModalBody>
         <AppearancePanel />
-        <AppearancePreview />
-        <p className="tiny" style={{ marginTop: 10 }}>
+        <p className="tiny">
           {t(
             "Preferences are saved for this session and this demo role. Production HireOS syncs Appearance to your account across devices.",
           )}
         </p>
       </ModalBody>
-      <ModalFooter spread>
+      <ModalFooter>
         <Button variant="text" onClick={resetAppearance}>
           {t("Reset to defaults")}
         </Button>
@@ -308,33 +237,6 @@ function RoleSwitcherModal() {
             </div>
           </div>
         ))}
-      </ModalBody>
-      <ModalFooter>
-        <CloseButton />
-      </ModalFooter>
-    </>
-  );
-}
-
-function DemoToolsModal() {
-  const { t } = useStore();
-  return (
-    <>
-      <ModalHeader title={t("Demo tools")} />
-      <ModalBody>
-        <p className="tiny" style={{ marginBottom: 10 }}>
-          {t(
-            "This prototype runs standalone (no Shell / other L2 modules installed). Settings and AI Models are the shared public capabilities — fully usable here.",
-          )}
-        </p>
-        <div className="card card-pad" style={{ background: "var(--surface-alt)", border: "none" }}>
-          <div className="tiny" style={{ marginBottom: 6 }}>
-            {t("Workspace")}
-          </div>
-          <div style={{ fontWeight: 500 }}>
-            Sending Labs <span className="tiny">(ws-demo)</span>
-          </div>
-        </div>
       </ModalBody>
       <ModalFooter>
         <CloseButton />

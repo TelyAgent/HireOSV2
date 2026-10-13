@@ -68,7 +68,7 @@ export class UsersService {
     if (input.sendEmail) {
       try {
         const signInUrl = `${this.config.publicUrl}/account/login?email=${encodeURIComponent(email)}`;
-        await this.mail.send(email, renderInviteEmail({ inviterName: actor.displayName, signInUrl, locale: mailLocale(user.locale) }));
+        await this.mail.send(email, renderInviteEmail({ signInUrl, locale: mailLocale(user.locale) }));
         emailSent = true;
       } catch (error) {
         this.logger.warn(`Invite email to ${email} failed: ${error instanceof Error ? error.message : String(error)}`);

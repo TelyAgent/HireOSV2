@@ -105,6 +105,13 @@ body {
   margin: -12px 0 16px;
 }
 
+/* Status line under the code boxes (e.g. "Signing in…"). */
+.auth-status {
+  color: var(--muted);
+  font-size: 13px;
+  margin: 10px 0 0;
+}
+
 .auth-label {
   display: block;
   font-family: "SFMono-Regular", Menlo, Consolas, monospace;
@@ -271,86 +278,7 @@ body {
   cursor: pointer;
 }
 
-/* ---------- Signed-in pages ---------- */
-.app-header {
-  display: flex;
-  align-items: center;
-  gap: 24px;
-  height: 56px;
-  padding: 0 20px;
-  background: var(--surface);
-  border-bottom: 1px solid var(--border);
-}
-
-.app-brand {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  color: var(--text);
-  font-weight: 700;
-  text-decoration: none;
-}
-
-.app-section {
-  color: var(--muted);
-  font-weight: 400;
-}
-
-.app-nav {
-  display: flex;
-  gap: 4px;
-}
-
-.app-nav a {
-  padding: 6px 12px;
-  border-radius: 8px;
-  color: var(--muted);
-  text-decoration: none;
-  font-size: 14px;
-}
-
-.app-nav a.active {
-  background: #e6f6f4;
-  color: var(--brand-strong);
-  font-weight: 600;
-}
-
-.app-header-right {
-  margin-left: auto;
-  display: flex;
-  align-items: center;
-  gap: 12px;
-}
-
-.app-user {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 14px;
-}
-
-.page {
-  max-width: 960px;
-  margin: 24px auto;
-  padding: 0 16px;
-}
-
-.profile-head {
-  display: flex;
-  align-items: center;
-  gap: 16px;
-}
-
-.profile-name {
-  font-size: 20px;
-  font-weight: 700;
-}
-
 @media (max-width: 640px) {
-  .app-section,
-  .app-user {
-    display: none;
-  }
   .auth-card {
     padding: 22px 18px;
   }
@@ -358,3 +286,9 @@ body {
     gap: 6px;
   }
 }
+
+/* Every antd dialog (Modal, modal.confirm) sits in the middle of the screen, like JD's own overlays.
+   margin:auto inside the flex wrapper centers it; a dialog taller than the viewport starts at the top
+   and scrolls instead of being clipped. */
+.ant-modal-wrap { display: flex; }
+.ant-modal-wrap .ant-modal { top: 0; margin: auto; padding: 24px 0; }

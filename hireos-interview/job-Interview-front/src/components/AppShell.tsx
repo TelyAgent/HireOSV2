@@ -4,7 +4,7 @@ import {
   CloseSvg,
   SunSvg,
 } from "./ui/Icons";
-import { AppearancePopover } from "./AppearancePopover";
+import { AppearanceModal } from "./AppearanceModal";
 import { UserMenu, useSessionUser } from "../lib/session";
 
 export function TopBar() {
@@ -95,7 +95,6 @@ export function TopBar() {
           <SunSvg size={14} />
           {t.appearance}
         </button>
-        {state.showAppearance && <AppearancePopover />}
       </div>
       <button
         onClick={() => set({ showCreateModal: true })}
@@ -116,10 +115,11 @@ export function TopBar() {
       </button>
 
       {sessionUser ? (
-        <UserMenu user={sessionUser} labels={{ account: t.accountSettings, signOut: t.signOut }} />
+        <UserMenu user={sessionUser} labels={{ signOut: t.signOut }} />
       ) : (
         <RoleButton role={role} />
       )}
+      <AppearanceModal />
     </div>
   );
 }
@@ -181,7 +181,7 @@ function RoleButton({ role }: { role: { initials: string; name: string; title: s
  * collapsed it becomes a 52px icon-only rail with the label in the native tooltip.
  */
 export function SideNav() {
-  const { state, t, go, set, say } = useStore();
+  const { state, t, go, set } = useStore();
   const collapsed = state.sidenavCollapsed;
   const toggleLabel = collapsed ? t.expandNav : t.collapseNav;
 
@@ -255,14 +255,8 @@ export function SideNav() {
         <button
           aria-label={t.sideSettings}
           title={collapsed ? t.sideSettings : undefined}
-          onClick={() =>
-            say(
-              state.lang === "zh"
-                ? "设置模块不在当前演示范围内。"
-                : "Settings module is not part of this demo.",
-            )
-          }
-          style={navItem(false)}
+          onClick={() => go("settings")}
+          style={navItem(state.screen === "settings")}
         >
           {icon("tune")}
           {label(t.sideSettings)}

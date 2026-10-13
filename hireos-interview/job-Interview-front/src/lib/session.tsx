@@ -84,8 +84,8 @@ function initials(name: string) {
   return (parts.length >= 2 ? parts[0][0] + parts[1][0] : name.trim().slice(0, 2)).toUpperCase();
 }
 
-/** Top-bar pill for the signed-in user: account settings and sign out. */
-export function UserMenu({ user, labels }: { user: SessionUser; labels: { account: string; signOut: string } }) {
+/** Top-bar pill for the signed-in user: who is signed in, and sign out. */
+export function UserMenu({ user, labels }: { user: SessionUser; labels: { signOut: string } }) {
   return (
     <Dropdown
       trigger={["click"]}
@@ -94,7 +94,6 @@ export function UserMenu({ user, labels }: { user: SessionUser; labels: { accoun
         items: [
           { key: "email", label: user.email, disabled: true },
           { type: "divider" },
-          { key: "account", label: <a href={ACCOUNT_URL}>{labels.account}</a> },
           { key: "signout", label: labels.signOut, danger: true, onClick: () => void signOut() },
         ],
       }}

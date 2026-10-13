@@ -70,25 +70,12 @@ ${paragraph(copy.ignore, `color:${MUTED};font-size:13px;line-height:1.6;padding-
   return { subject: copy.subject, html, text };
 }
 
-export function renderInviteEmail(input: { inviterName: string; signInUrl: string; locale: MailLocale }): RenderedMail {
-  const inviter = escapeHtml(input.inviterName);
+export function renderInviteEmail(input: { signInUrl: string; locale: MailLocale }): RenderedMail {
   const url = escapeHtml(input.signInUrl);
   const copy =
     input.locale === 'en'
-      ? {
-          subject: `${input.inviterName} invited you to HireOS`,
-          greeting: 'Hi,',
-          intro: `${inviter} has invited you to HireOS. Sign in with this email address — we'll send you a one-time code, no password needed.`,
-          button: 'Sign in to HireOS',
-          plainIntro: `${input.inviterName} has invited you to HireOS. Sign in with this email address — we'll send you a one-time code, no password needed.`,
-        }
-      : {
-          subject: `${input.inviterName} 邀请你加入 HireOS`,
-          greeting: '你好，',
-          intro: `${inviter} 邀请你加入 HireOS。用这个邮箱登录即可，我们会发送一次性验证码，不需要密码。`,
-          button: '登录 HireOS',
-          plainIntro: `${input.inviterName} 邀请你加入 HireOS。用这个邮箱登录即可，我们会发送一次性验证码，不需要密码。`,
-        };
+      ? { subject: 'You are invited to join HireOS', greeting: 'Hi,', intro: 'You are invited to join HireOS.', button: 'Sign in to HireOS' }
+      : { subject: '邀请你加入 HireOS', greeting: '你好，', intro: '邀请你加入 HireOS。', button: '登录 HireOS' };
   const html = layout(
     `<tr><td style="padding:26px 28px 6px;color:${TEXT};font-size:15px;line-height:1.6;">${copy.greeting}</td></tr>
 ${paragraph(copy.intro)}
@@ -96,6 +83,6 @@ ${paragraph(copy.intro)}
 <a href="${url}" style="display:inline-block;background:${BRAND};color:#ffffff;text-decoration:none;font-weight:600;font-size:15px;padding:12px 22px;border-radius:10px;">${copy.button}</a>
 </td></tr>`,
   );
-  const text = `${copy.greeting}\n\n${copy.plainIntro}\n\n${input.signInUrl}\n`;
+  const text = `${copy.greeting}\n\n${copy.intro}\n\n${input.signInUrl}\n`;
   return { subject: copy.subject, html, text };
 }

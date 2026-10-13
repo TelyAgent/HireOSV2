@@ -12,8 +12,7 @@ import { DecisionPage } from "./pages/DecisionPage";
 import { ComparePage } from "./pages/ComparePage";
 import { DeliveriesListPage } from "./pages/DeliveriesListPage";
 import { DeliveryDetailPage } from "./pages/DeliveryDetailPage";
-import { PreferencesPage } from "./pages/PreferencesPage";
-import { AiModelsPage } from "./pages/AiModelsPage";
+import { SettingsPage } from "./pages/SettingsPage";
 
 export default function App() {
   return (
@@ -33,8 +32,8 @@ export default function App() {
         <Route path="/comparisons/:id" element={<ComparePage />} />
         <Route path="/deliveries" element={<DeliveriesListPage />} />
         <Route path="/deliveries/:id" element={<DeliveryDetailPage />} />
-        <Route path="/settings/preferences" element={<PreferencesPage />} />
-        <Route path="/settings/ai-models" element={<AiModelsPage />} />
+        <Route path="/settings" element={<Navigate to="/settings/profile" replace />} />
+        <Route path="/settings/:section" element={<SettingsPage />} />
         <Route path="*" element={<Navigate to="/jobs" replace />} />
       </Routes>
     </AppShell>

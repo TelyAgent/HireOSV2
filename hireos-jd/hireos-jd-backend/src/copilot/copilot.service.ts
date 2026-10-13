@@ -7,7 +7,7 @@ import { CoreRecordClient } from '../core/core-record.client';
 import { DraftsService } from '../drafts/drafts.service';
 import { PrismaService } from '../persistence/prisma.service';
 import { findIdempotent, json, requestHash, storeIdempotency, type RequestMeta } from '../records';
-import { LlmProvider, type ChatTurn } from './llm-provider';
+import { LlmProvider, type ChatTurn, type WebAnswer } from './llm-provider';
 import { PromptRegistry } from './prompt-registry';
 import { ReplyStreamExtractor } from './reply-stream-extractor';
 import {
@@ -293,6 +293,14 @@ export class CopilotService {
         roleSummary: fields.roleSummary,
         responsibilities: fields.responsibilities || [],
         requirements,
+        publicCompensation: fields.publicCompensation ?? null,
+        ...(fields.businessProblem || fields.expectedOutcomes?.length
+          ? { hiringContext: { businessProblem: fields.businessProblem, expectedOutcomes: fields.expectedOutcomes } }
+          : {}),
+        // Same `{ period, statement }` shape the role blueprint reads; the period lives in the statement text.
+        ...(fields.successCriteria?.length
+          ? { successCriteria: fields.successCriteria.map((statement) => ({ period: '90 days', statement })) }
+          : {}),
         sourceRefs: [{ kind: 'copilot_conversation', id }],
         origin: 'jd_module',
       },
@@ -431,6 +439,8 @@ export class CopilotService {
     const input = refineVariantsInputSchema.parse(raw);
     const conversation = await this.loadConversation(identity, id);
     if (conversation.phase === 'completed') throw new ConflictException({ code: 'CONVERSATION_COMPLETED' });
+    const answer = await this.answerIfQuestion(identity, id, input.variants[0]?.fields ?? {}, input.note);
+    if (answer) return { variants: input.variants, answer };
 
     const variants = await Promise.all(
       input.variants.map(async (variant) => {
@@ -461,6 +471,25 @@ export class CopilotService {
       return existing.responseBody;
     }
 
+    const answer = await this.answerIfQuestion(identity, id, current, input.note);
+    if (answer) {
+      // A question about the role, not an edit: answer it and leave the draft (fields, phase, revision) untouched.
+      return this.db.$transaction(async (tx) => {
+        const prior = await findIdempotent(tx, identity, operation, meta, input);
+        if (prior.prior) return prior.prior.responseBody;
+        const latest = await tx.copilotMessage.findFirst({ where: { conversationId: id }, orderBy: { sequence: 'desc' } });
+        const sequence = (latest?.sequence ?? 0) + 1;
+        await tx.copilotMessage.create({ data: { conversationId: id, sequence, role: 'user', text: input.note, idempotencyKey: prior.key } });
+        await tx.copilotMessage.create({
+          data: { conversationId: id, sequence: sequence + 1, role: 'assistant', text: formatWebAnswer(answer) },
+        });
+        const messages = await tx.copilotMessage.findMany({ where: { conversationId: id }, orderBy: { sequence: 'asc' } });
+        const result = { ...serializeConversation(conversation, messages), answer };
+        await storeIdempotency(tx, identity, operation, prior.key, prior.hash, result);
+        return result;
+      });
+    }
+
     const fields = await this.runRefineTurn(identity, id, current, input.note);
     return this.db.$transaction(async (tx) => {
       const prior = await findIdempotent(tx, identity, operation, meta, input);
@@ -483,6 +512,41 @@ export class CopilotService {
   }
 
   /**
+   * The refine box doubles as a chat box once a draft exists, so a note may be a question ("what's the
+   * monthly salary for this role in Wuhan?") rather than an edit. Questions are answered with web search
+   * and never touch the draft; anything that asks to change the draft — or an unclear note — stays an edit.
+   */
+  private async answerIfQuestion(identity: Identity, id: string, current: JdFields, note: string): Promise<WebAnswer | null> {
+    let intent = 'edit';
+    try {
+      const raw = await this.llm.completeJson(REFINE_INTENT_PROMPT, [
+        { role: 'user', content: `当前 JD 草稿：${JSON.stringify(current)}\n\n用户这句话：${note}` },
+      ]);
+      const parsed: unknown = JSON.parse(raw);
+      if (parsed && typeof parsed === 'object' && (parsed as { intent?: unknown }).intent === 'question') intent = 'question';
+    } catch (error) {
+      // Classification is best-effort: falling back to the old "every note is an edit" behavior.
+      this.logger.warn(`refine_intent failed (conversation=${id}): ${error instanceof Error ? error.message : String(error)}`);
+    }
+    if (intent !== 'question') return null;
+    const startedAt = Date.now();
+    try {
+      const context = [
+        current.title && `职位：${current.title}`,
+        current.department && `部门：${current.department}`,
+        current.location && `地点：${current.location}`,
+        current.employmentType && `类型：${current.employmentType}`,
+        current.mustHave?.length && `任职要求：${current.mustHave.join('；')}`,
+      ].filter(Boolean).join('\n');
+      const answer = await this.llm.answerWithWebSearch(WEB_ANSWER_INSTRUCTIONS, `${context}\n\n问题：${note}`);
+      this.logger.log(`refine_web_answer succeeded in ${Date.now() - startedAt}ms (conversation=${id}, ${answer.sources.length} sources)`);
+      return answer;
+    } catch (error) {
+      throw await this.recordLlmFailure(identity, id, 'refine_web_answer', error);
+    }
+  }
+
+  /**
    * One refine pass over a complete JD. The model gets the whole current JD and must return every field in
    * full; a result that lost required content is rejected instead of overwriting a good draft.
    */
@@ -497,11 +561,18 @@ export class CopilotService {
           `请按我的补充意见修改：${note}`,
           '要求：只改动与意见相关的内容，其余字段和条目保持原文不变' + (style ? '，写作风格保持不变' : '') + '。',
           'fields 必须输出修改后的完整 JD：每个字段都要给出，列表字段（responsibilities、mustHave、niceToHave）要列出全部条目，不能只输出改动的条目。',
+          '业务背景、预期成果、入职成功标准分别写进 businessProblem、expectedOutcomes、successCriteria。这三项和 publicCompensation 是可选字段：当前草稿里没有、意见也没明确要求的，不要输出，更不要自行编写。',
+          '薪资写进 publicCompensation（结构见字段 schema），不要放进其他字段，也不要新增 schema 以外的字段；意见没提薪资时原样保留。',
         ].join('\n'),
       },
     ];
     const parsed = await this.runAutoCompleteTurn(identity, id, turns);
     const fields: JdFields = { ...current, ...parsed.fields, title: parsed.fields.title || current.title };
+    // Prompting alone doesn't stop the model from "completing" optional sections nobody asked for, so an
+    // optional section that was empty is only accepted when the note actually talks about it.
+    for (const [field, mentioned] of OPTIONAL_SECTION_MENTIONS) {
+      if (current[field] === undefined && !mentioned.test(note)) delete fields[field];
+    }
     if (computeMissingFields(fields).length > 0) {
       throw new ServiceUnavailableException({ code: 'REFINE_INCOMPLETE', message: '这次修改没有生成完整的 JD，原草稿未改动，请换个说法再试一次。' });
     }
@@ -669,10 +740,39 @@ export class CopilotService {
         data: { workspaceId: identity.workspaceId, conversationId, capabilityCode, status: 'Failed', failureCode: 'LLM_INVALID_OUTPUT' },
       })
       .catch(() => undefined);
+    // The raw parse error (a zod issue dump or JSON syntax error) means nothing to the user; it's logged above.
     return error instanceof ServiceUnavailableException
       ? error
-      : new ServiceUnavailableException({ code: 'LLM_INVALID_OUTPUT', message });
+      : new ServiceUnavailableException({ code: 'LLM_INVALID_OUTPUT', message: 'AI 返回的内容格式有误，原草稿未改动，请重试或换个说法。' });
   }
+}
+
+const OPTIONAL_SECTION_MENTIONS: [keyof JdFields, RegExp][] = [
+  ['businessProblem', /背景|业务|为什么|原因|business|context|why/i],
+  ['expectedOutcomes', /成果|产出|目标|交付|指标|KPI|OKR|outcome|deliverable/i],
+  ['successCriteria', /成功|试用期|\d+\s*天|个月|success|first\s*\d+/i],
+  ['publicCompensation', /薪|工资|待遇|报酬|salary|pay|compensation|\d+(\.\d+)?\s*[kK万]/i],
+];
+
+const REFINE_INTENT_PROMPT = [
+  '你是招聘 JD 助手的意图分类器。用户已经有一份 JD 草稿，现在又说了一句话。',
+  '判断这句话是要求修改草稿（edit），还是在提问、咨询、要信息或建议而没有要求改稿（question）。',
+  '明确要求修改、补充、删减、调整草稿内容（包括“改成”“加上”“写上”“去掉”等）的是 edit；',
+  '询问薪资行情、市场情况、招聘难度、写法建议、名词解释等的是 question。既提问又要求修改的算 edit。',
+  '只输出 JSON：{"intent":"edit"} 或 {"intent":"question"}。',
+].join('\n');
+
+const WEB_ANSWER_INSTRUCTIONS = [
+  '你是招聘助手。用户正在写一份 JD，下面给出岗位背景和用户的问题。',
+  '需要行情、薪资、市场等时效性信息时先联网搜索，基于搜索结果回答；不确定时说明口径和不确定性。',
+  '用简体中文，纯文本，不要用 Markdown，不要贴链接，也不要在末尾写“来源”（来源会单独列出）。回答简洁，控制在 200 字以内。',
+  '薪资类问题给出区间，并注明口径（税前月薪、年终/薪数等）和适用的经验段。不要修改或复述 JD。',
+].join('\n');
+
+/** Stored message text for a web answer: the answer plus its sources, since the chat history is plain text. */
+function formatWebAnswer(answer: WebAnswer): string {
+  if (answer.sources.length === 0) return answer.text;
+  return `${answer.text}\n\n来源：\n${answer.sources.map((source) => `- ${source.title} ${source.url}`).join('\n')}`;
 }
 
 const TITLE_VARIANT_STYLES = [

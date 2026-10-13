@@ -1,5 +1,17 @@
 import { z } from 'zod';
 
+/** Public salary range, same shape as the JD editor's `MoneyRange` (e.g. 15000–25000 CNY / month, gross). */
+export const compensationSchema = z
+  .object({
+    min: z.number().nonnegative().nullable(),
+    max: z.number().nonnegative().nullable(),
+    currency: z.string().trim().min(1).max(8),
+    period: z.enum(['hour', 'month', 'year']),
+    basis: z.enum(['gross', 'net']).optional(),
+  })
+  .strict()
+  .refine((range) => range.min !== null || range.max !== null, { message: 'Provide min or max.' });
+
 export const jdFieldsSchema = z
   .object({
     title: z.string().trim().min(1).optional(),
@@ -11,16 +23,47 @@ export const jdFieldsSchema = z
     responsibilities: z.array(z.string().trim().min(1)).optional(),
     mustHave: z.array(z.string().trim().min(1)).optional(),
     niceToHave: z.array(z.string().trim().min(1)).optional(),
+    publicCompensation: compensationSchema.optional(),
+    // Optional internal sections of the editor template (business problem, expected outcomes, success criteria).
+    businessProblem: z.string().trim().min(1).optional(),
+    expectedOutcomes: z.array(z.string().trim().min(1)).optional(),
+    successCriteria: z.array(z.string().trim().min(1)).optional(),
   })
   .strict();
 
 export type JdFields = z.infer<typeof jdFieldsSchema>;
 
+/**
+ * What the model returns is not trusted to match the schema exactly: unknown keys (e.g. a made-up `salary`)
+ * are dropped and a malformed salary range is ignored, instead of failing the whole turn.
+ */
+const llmListSchema = z.preprocess(
+  // Models sometimes return a list field as one string; split it into items instead of failing the turn.
+  (value) =>
+    typeof value === 'string'
+      ? value.split(/\r?\n/).map((line) => line.replace(/^\s*(?:[-•*]|\d+[.)、])\s*/, '').trim()).filter(Boolean)
+      : value,
+  z.array(z.string().trim().min(1)).optional(),
+);
+
+const llmFieldsSchema = jdFieldsSchema
+  .extend({
+    responsibilities: llmListSchema,
+    mustHave: llmListSchema,
+    niceToHave: llmListSchema,
+    expectedOutcomes: llmListSchema,
+    successCriteria: llmListSchema,
+    publicCompensation: compensationSchema.optional().catch(undefined),
+  })
+  .strip()
+  // A caught (dropped) value must not leave an explicit `undefined` that would overwrite a saved field on merge.
+  .transform((fields) => Object.fromEntries(Object.entries(fields).filter(([, value]) => value !== undefined)) as JdFields);
+
 export const llmTurnResultSchema = z
   .object({
     reply: z.string().trim().min(1),
     phase: z.enum(['intake', 'ready_to_confirm']),
-    fields: jdFieldsSchema,
+    fields: llmFieldsSchema,
     missingFields: z.array(z.string()),
   })
   .strict();

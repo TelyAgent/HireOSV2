@@ -151,16 +151,6 @@ export const FILE_CONNECTIONS: FileConnection[] = [];
 
 export const ACTIVITY: { at: string; text: string }[] = [];
 
-export interface AiModelTask { task: string; primary: string; fallback: string; budget: string; status: "ok" | "fallback_active"; note?: string }
-export const AI_MODEL_TASKS: AiModelTask[] = [
-  { task: "question_generate", primary: "Claude Opus 4.6", fallback: "Claude Sonnet 4.5", budget: "$40 / week", status: "ok" },
-  { task: "quality_review", primary: "Claude Sonnet 4.5", fallback: "—", budget: "$10 / week", status: "ok" },
-  { task: "evidence_map", primary: "Claude Sonnet 4.5", fallback: "Claude Haiku 4.5", budget: "$25 / week", status: "ok" },
-  { task: "rubric_evaluate", primary: "Claude Opus 4.6", fallback: "Claude Sonnet 4.5", budget: "$60 / week", status: "fallback_active", note: "Primary model timed out on 2026-09-11 06:10 UTC — approved fallback engaged automatically." },
-  { task: "feedback_draft", primary: "Claude Sonnet 4.5", fallback: "—", budget: "$15 / week", status: "ok" },
-  { task: "candidate_compare", primary: "Claude Sonnet 4.5", fallback: "—", budget: "$10 / week", status: "ok" },
-];
-
 /** Demo clock — resolves to a fixed base instant + an offset the "advance clock" demo tool adds. */
 export function nowISO(clockOffsetMin: number): string {
   const base = new Date(DEMO_CLOCK_BASE).getTime() + clockOffsetMin * 60000;

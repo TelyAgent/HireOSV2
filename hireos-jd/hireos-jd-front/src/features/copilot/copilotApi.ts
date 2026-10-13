@@ -1,3 +1,4 @@
+import type { MoneyRange } from "../../lib/format";
 /**
  * Thin client for the real `hireos-jd-backend` Copilot endpoints
  * (`/api/copilot/conversations/...`). Used by GeminiPanel's "create a job"
@@ -28,6 +29,12 @@ export interface CopilotJdFields {
   responsibilities?: string[];
   mustHave?: string[];
   niceToHave?: string[];
+  /** Public salary range; only set when the user (or source material) gave one — never AI-estimated. */
+  publicCompensation?: MoneyRange;
+  /** Optional internal sections of the editor template. */
+  businessProblem?: string;
+  expectedOutcomes?: string[];
+  successCriteria?: string[];
 }
 
 export interface CopilotMessageDto {
@@ -37,6 +44,12 @@ export interface CopilotMessageDto {
   attachments?: unknown;
   sequence: number;
   createdAt: string;
+}
+
+/** A refine note that was a question: answered (with web search) instead of editing the draft. */
+export interface CopilotWebAnswer {
+  text: string;
+  sources: { title: string; url: string }[];
 }
 
 export interface CopilotConversationDto {
@@ -197,7 +210,7 @@ export function autoCompleteCopilotConversation(conversationId: string, text?: s
 }
 
 /** "Refine" on a ready draft: the backend rewrites the full current JD with the note and keeps it ready to confirm. */
-export function refineCopilotDraft(conversationId: string, note: string): Promise<CopilotConversationDto> {
+export function refineCopilotDraft(conversationId: string, note: string): Promise<CopilotConversationDto & { answer?: CopilotWebAnswer }> {
   return request(`${BASE}/${conversationId}/refine`, {
     method: "POST",
     body: JSON.stringify({ note }),
@@ -238,7 +251,7 @@ export function refineCopilotVariants(
   conversationId: string,
   note: string,
   variants: CopilotTitleVariant[],
-): Promise<{ variants: CopilotTitleVariant[] }> {
+): Promise<{ variants: CopilotTitleVariant[]; answer?: CopilotWebAnswer }> {
   return request(`${BASE}/${conversationId}/refine-variants`, {
     method: "POST",
     body: JSON.stringify({ note, variants: variants.map(({ key, label, description, fields }) => ({ key, label, description, fields })) }),

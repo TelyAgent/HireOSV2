@@ -10,6 +10,10 @@
     "roleSummary": "岗位使命/概述",
     "responsibilities": "核心职责",
     "mustHave": "必须条件",
-    "niceToHave": "加分项"
+    "niceToHave": "加分项",
+    "publicCompensation": "对外薪资范围：{ min, max, currency, period, basis }。min/max 为数字（如 15000，不是 \"15K\"），只给一个数时 min 和 max 相同；currency 如 CNY、USD，中文语境默认 CNY；period 为 month/year/hour；basis 为 gross（税前）或 net（税后），没说就不填",
+    "businessProblem": "业务背景（内部）：为什么现在需要这个岗位、要解决什么业务问题",
+    "expectedOutcomes": "预期成果（内部，字符串数组）：这个人要交付的成果，尽量可衡量",
+    "successCriteria": "入职成功标准（内部，字符串数组）：入职 30 / 90 天时怎样算成功，每条注明时间点"
   }
 }
