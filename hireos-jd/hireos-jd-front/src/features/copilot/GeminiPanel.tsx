@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { useNavigate } from "react-router-dom";
 import { Tooltip } from "antd";
 import { Icon } from "../../components/ui/Icons";
@@ -6,7 +6,7 @@ import { Button } from "../../components/ui/Primitives";
 import { useStore } from "../../store/StoreContext";
 import { mkBlock } from "../../data/fixtures/documents";
 import { docKey, normalizeBlocks } from "../workspace/docHelpers";
-import { nowISO, uid } from "../../lib/format";
+import { money, nowISO, uid } from "../../lib/format";
 import {
   autoCompleteCopilotConversation,
   confirmCopilotDraft,
@@ -22,9 +22,11 @@ import {
   uploadCopilotAttachment,
   type CopilotConversationDto,
   type CopilotJdFields,
+  type CopilotWebAnswer,
 } from "./copilotApi";
 import { updateJobFields } from "../jobs/jobsApi";
-import { VoiceInputButton, type VoiceInputStatus } from "./VoiceInputButton";
+import { CURRENCIES } from "../workspace/SalaryModal";
+import { VoiceInputButton, type VoiceInputHandle, type VoiceInputStatus } from "./VoiceInputButton";
 import { mergeVoiceTranscript } from "../../lib/voice-stream";
 import { fmtRelative } from "../../lib/format";
 import type { Audience, Requirement } from "../../data/types";
@@ -55,6 +57,10 @@ export function jdFieldsToGeminiDraft(fields: CopilotJdFields): GeminiDraft {
     responsibilities: fields.responsibilities && fields.responsibilities.length > 0 ? fields.responsibilities : [],
     must: fields.mustHave && fields.mustHave.length > 0 ? fields.mustHave : [],
     pref: fields.niceToHave,
+    compensation: fields.publicCompensation,
+    businessProblem: fields.businessProblem,
+    outcomes: fields.expectedOutcomes,
+    success: fields.successCriteria,
   };
 }
 
@@ -158,6 +164,38 @@ function resultToMsg(result: CopilotConversationDto, origin?: GeminiOrigin, prev
     : { role: "ai", text: lastReply?.text || "" };
 }
 
+function formatWebAnswer(answer: CopilotWebAnswer, sourcesLabel: string): string {
+  if (answer.sources.length === 0) return answer.text;
+  return `${answer.text}\n\n${sourcesLabel}\n${answer.sources.map((source) => `- ${source.title} ${source.url}`).join("\n")}`;
+}
+
+const URL_PATTERN = /https?:\/\/[^\s<>"'）)】」]+/g;
+
+/** Plain message text with http(s) URLs turned into links (shown as their host) — e.g. web answer sources. */
+function LinkifiedText({ text }: { text: string }) {
+  const parts: ReactNode[] = [];
+  let last = 0;
+  for (const match of text.matchAll(URL_PATTERN)) {
+    const url = match[0];
+    const start = match.index;
+    if (start > last) parts.push(text.slice(last, start));
+    let label = url;
+    try {
+      label = new URL(url).hostname.replace(/^www\./, "");
+    } catch {
+      // Keep the raw URL as its own label.
+    }
+    parts.push(
+      <a key={start} className="gm-link" href={url} target="_blank" rel="noopener noreferrer" title={url}>
+        {label}
+      </a>,
+    );
+    last = start + url.length;
+  }
+  if (last < text.length) parts.push(text.slice(last));
+  return <>{parts}</>;
+}
+
 type ActiveDraftMsg = Extract<GeminiMsg, { draft: GeminiDraft }> | Extract<GeminiMsg, { kind: "variants" }>;
 
 /** The draft the Workspace shows: the latest draft or variant set that is still open (not replaced, not created). */
@@ -173,25 +211,39 @@ function findActiveDraft(msgs: GeminiMsg[]): { index: number; msg: ActiveDraftMs
 }
 
 interface DraftChanges {
-  fields: Partial<Record<"title" | "department" | "summary" | "location" | "employmentType" | "headcount", string>>;
+  fields: Partial<Record<"title" | "department" | "summary" | "location" | "employmentType" | "headcount" | "compensation" | "businessProblem", string>>;
   responsibilities: Set<number>;
   must: Set<number>;
   pref: Set<number>;
+  outcomes: Set<number>;
+  success: Set<number>;
   count: number;
 }
 
 /** Prototype's `geminiDiffDrafts`: changed scalar fields (with their old value) and list items that are new. */
 function diffDrafts(prev: GeminiDraft | undefined, next: GeminiDraft): DraftChanges | null {
   if (!prev) return null;
-  const changes: DraftChanges = { fields: {}, responsibilities: new Set(), must: new Set(), pref: new Set(), count: 0 };
-  for (const field of ["title", "department", "summary", "location", "employmentType", "headcount"] as const) {
+  const changes: DraftChanges = {
+    fields: {},
+    responsibilities: new Set(),
+    must: new Set(),
+    pref: new Set(),
+    outcomes: new Set(),
+    success: new Set(),
+    count: 0,
+  };
+  for (const field of ["title", "department", "summary", "location", "employmentType", "headcount", "businessProblem"] as const) {
     const before = String(prev[field] ?? "");
     if (before !== String(next[field] ?? "")) {
       changes.fields[field] = before;
       changes.count++;
     }
   }
-  for (const list of ["responsibilities", "must", "pref"] as const) {
+  if (money(prev.compensation) !== money(next.compensation)) {
+    changes.fields.compensation = money(prev.compensation);
+    changes.count++;
+  }
+  for (const list of ["responsibilities", "must", "pref", "outcomes", "success"] as const) {
     const old = new Set(prev[list] ?? []);
     (next[list] ?? []).forEach((item, i) => {
       if (!old.has(item)) {
@@ -236,6 +288,10 @@ export function GeminiPanel({ ctx }: { ctx: GeminiCtx }) {
   const [wsOpen, setWsOpen] = useState(true);
   const panelRef = useRef<HTMLDivElement>(null);
   const voiceBaseInputRef = useRef<string | null>(null);
+  const voiceButtonRef = useRef<VoiceInputHandle>(null);
+  // Send was pressed mid-recording: stop voice first, then send once the transcript is in the composer.
+  const sendAfterVoiceRef = useRef(false);
+  const [voiceSendQueued, setVoiceSendQueued] = useState(false);
   const messagesRef = useRef<HTMLDivElement>(null);
   const attachFileInputRef = useRef<HTMLInputElement>(null);
   const composerRef = useRef<HTMLTextAreaElement>(null);
@@ -407,9 +463,13 @@ export function GeminiPanel({ ctx }: { ctx: GeminiCtx }) {
       let reply: GeminiMsg;
       if (msg.kind === "variants") {
         const result = await refineCopilotVariants(conversationId, note, msg.variants);
+        if (result.answer) return void resolveThinking({ role: "ai", text: formatWebAnswer(result.answer, t("Sources:")) });
         reply = { ...msg, variants: result.variants, prev: msg.variants, superseded: undefined };
       } else {
-        reply = resultToMsg(await refineCopilotDraft(conversationId, note), msg.origin, msg.draft);
+        const result = await refineCopilotDraft(conversationId, note);
+        // A question, not an edit: show the answer and keep the current draft as-is.
+        if (result.answer) return void resolveThinking({ role: "ai", text: formatWebAnswer(result.answer, t("Sources:")) });
+        reply = resultToMsg(result, msg.origin, msg.draft);
       }
       updateMsg(index, { superseded: true });
       resolveThinking({
@@ -437,6 +497,16 @@ export function GeminiPanel({ ctx }: { ctx: GeminiCtx }) {
   };
 
   const send = (overrideText?: string) => {
+    if (overrideText === undefined && voiceStatus !== "idle") {
+      if (voiceSendQueued) return;
+      sendAfterVoiceRef.current = true;
+      if (voiceButtonRef.current?.stop() !== "pending" && sendAfterVoiceRef.current) {
+        // Ended without a transcript callback (nothing recognized yet): send what's already typed.
+        sendAfterVoiceRef.current = false;
+        setVoiceSendQueued(true);
+      }
+      return;
+    }
     const text = (overrideText ?? input).trim();
     if (!text || working) return;
     setInput("");
@@ -488,12 +558,28 @@ export function GeminiPanel({ ctx }: { ctx: GeminiCtx }) {
   const handleVoiceFinal = (transcript: string) => {
     setInput(mergeVoiceTranscript(voiceBaseInputRef.current ?? input, transcript));
     voiceBaseInputRef.current = null;
+    if (sendAfterVoiceRef.current) {
+      sendAfterVoiceRef.current = false;
+      setVoiceSendQueued(true);
+    }
   };
 
   const handleVoiceError = (message: string) => {
     voiceBaseInputRef.current = null;
+    sendAfterVoiceRef.current = false;
     say(message, { type: "error" });
   };
+
+  // Waits for the button to report idle so `send` sees the final composer text and doesn't re-stop voice.
+  useEffect(() => {
+    if (voiceStatus !== "idle") return;
+    // Voice was cancelled while a send was pending (no transcript came back): drop the pending send.
+    sendAfterVoiceRef.current = false;
+    if (!voiceSendQueued) return;
+    setVoiceSendQueued(false);
+    send();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [voiceSendQueued, voiceStatus]);
 
   const startNewConversation = async () => {
     if (working) return;
@@ -630,11 +716,28 @@ export function GeminiPanel({ ctx }: { ctx: GeminiCtx }) {
         blocks: normalizeBlocks([
           mkBlock(bid(), "h2", d.title),
           mkBlock(bid(), "p", d.summary || "Drafted live with Ask Copilot from a spoken/typed description."),
+          ...(d.businessProblem
+            ? [
+                mkBlock(bid(), "h2", "Business problem", { level: "internal" }),
+                mkBlock(bid(), "p", d.businessProblem, { level: "internal" }),
+              ]
+            : []),
           mkBlock(bid(), "h2", "Responsibilities"),
           mkBlock(bid(), "ul", d.responsibilities),
           mkBlock(bid(), "h2", "Requirements"),
           mkBlock(bid(), "ul", d.must),
           ...(d.pref && d.pref.length ? [mkBlock(bid(), "h2", "Preferred"), mkBlock(bid(), "ul", d.pref)] : []),
+          mkBlock(bid(), "h2", "Compensation"),
+          mkBlock(bid(), "p", money(d.compensation)),
+          ...(d.outcomes?.length
+            ? [mkBlock(bid(), "h2", "Expected outcomes", { level: "internal" }), mkBlock(bid(), "ul", d.outcomes, { level: "internal" })]
+            : []),
+          ...(d.success?.length
+            ? [
+                mkBlock(bid(), "h2", "Success in the first 90 days", { level: "internal" }),
+                mkBlock(bid(), "ul", d.success, { level: "internal" }),
+              ]
+            : []),
         ]),
       };
       (draft.activity[newId] = draft.activity[newId] || []).unshift({
@@ -837,6 +940,7 @@ export function GeminiPanel({ ctx }: { ctx: GeminiCtx }) {
               <VoiceWaveform level={voiceLevel} listening={voiceStatus === "listening"} />
               <div className="gemini-composer-actions">
                 <VoiceInputButton
+                  ref={voiceButtonRef}
                   disabled={working}
                   onPartialTranscript={handleVoicePartial}
                   onTranscript={handleVoiceFinal}
@@ -986,6 +1090,31 @@ function DraftBody({ d }: { d: GeminiDraft }) {
             ))}
           </ul>
         </>
+      )}
+      <div style={{ fontWeight: 500, marginTop: 4 }}>{t("Compensation")}</div>
+      <div>{money(d.compensation)}</div>
+      {d.businessProblem && (
+        <>
+          <div style={{ fontWeight: 500, marginTop: 4 }}>{t("Business problem")}</div>
+          <div>{d.businessProblem}</div>
+        </>
+      )}
+      {(
+        [
+          ["Expected outcomes", d.outcomes],
+          ["Success criteria", d.success],
+        ] as const
+      ).map(([title, items]) =>
+        items && items.length > 0 ? (
+          <div key={title}>
+            <div style={{ fontWeight: 500, marginTop: 4 }}>{t(title)}</div>
+            <ul>
+              {items.map((r) => (
+                <li key={r}>{r}</li>
+              ))}
+            </ul>
+          </div>
+        ) : null,
       )}
     </>
   );
@@ -1168,10 +1297,19 @@ function WorkspaceDoc({ d, changes, origin }: { d: GeminiDraft; changes: DraftCh
         {changed(field) && tag("Updated")}
       </span>
     ) : null;
-  const list = (title: string, items: string[] | undefined, key: "responsibilities" | "must" | "pref") =>
+  const internalTag = <span className="badge" style={{ marginLeft: 6 }}>{t("Internal")}</span>;
+  const list = (
+    title: string,
+    items: string[] | undefined,
+    key: "responsibilities" | "must" | "pref" | "outcomes" | "success",
+    internal = false,
+  ) =>
     items && items.length > 0 ? (
       <>
-        <h4>{t(title)}</h4>
+        <h4>
+          {t(title)}
+          {internal && internalTag}
+        </h4>
         <ul>
           {items.map((item, i) => {
             const isNew = !!changes?.[key].has(i);
@@ -1221,9 +1359,28 @@ function WorkspaceDoc({ d, changes, origin }: { d: GeminiDraft; changes: DraftCh
           {changed("summary") && tag("Updated")}
         </p>
       )}
+      {d.businessProblem && (
+        <>
+          <h4>
+            {t("Business problem")}
+            {internalTag}
+          </h4>
+          <p className={changed("businessProblem") ? "gm-changed" : undefined} title={was("businessProblem")}>
+            {d.businessProblem}
+            {changed("businessProblem") && tag("Updated")}
+          </p>
+        </>
+      )}
       {list("Responsibilities", d.responsibilities, "responsibilities")}
       {list("Requirements", d.must, "must")}
       {list("Nice-to-have", d.pref, "pref")}
+      <h4>{t("Compensation")}</h4>
+      <p className={changed("compensation") ? "gm-changed" : undefined} title={was("compensation")}>
+        {money(d.compensation)}
+        {changed("compensation") && tag("Updated")}
+      </p>
+      {list("Expected outcomes", d.outcomes, "outcomes", true)}
+      {list("Success criteria", d.success, "success", true)}
     </div>
   );
 }
@@ -1253,6 +1410,11 @@ function ManualJobForm({
     responsibilities: "",
     mustHave: "",
     niceToHave: "",
+    salaryMin: "",
+    salaryMax: "",
+    currency: "CNY",
+    period: "month",
+    basis: "gross",
   });
   const [invalid, setInvalid] = useState<string | null>(null);
   const set = (field: keyof typeof values) => (e: { target: { value: string } }) => {
@@ -1274,6 +1436,22 @@ function ManualJobForm({
     const niceToHave = toLines(values.niceToHave);
     if (!responsibilities.length) return fail("responsibilities", "Please add at least one responsibility.");
     if (!mustHave.length) return fail("mustHave", "Please add at least one requirement.");
+    // Optional, entered in thousands like the editor's salary dialog; both ends or neither.
+    let publicCompensation: CopilotJdFields["publicCompensation"];
+    if (values.salaryMin.trim() || values.salaryMax.trim()) {
+      const min = Number(values.salaryMin);
+      const max = Number(values.salaryMax);
+      if (!values.salaryMin.trim() || !values.salaryMax.trim() || !(min > 0) || !(max >= min)) {
+        return fail("salary", "Enter a min and max (max ≥ min).");
+      }
+      publicCompensation = {
+        min: Math.round(min * 1000),
+        max: Math.round(max * 1000),
+        currency: values.currency,
+        period: values.period,
+        basis: values.basis,
+      };
+    }
     onSubmit(
       {
         title: values.title.trim(),
@@ -1285,6 +1463,7 @@ function ManualJobForm({
         responsibilities,
         mustHave,
         ...(niceToHave.length ? { niceToHave } : {}),
+        ...(publicCompensation ? { publicCompensation } : {}),
       },
       values.level,
     );
@@ -1348,6 +1527,38 @@ function ManualJobForm({
         <label className="full">
           {t("Preferred")} <span className="gm-hint">{t("one per line")}</span>
           <textarea rows={2} value={values.niceToHave} onChange={set("niceToHave")} />
+        </label>
+        <label>
+          {t("Min")} <span className="gm-hint">K</span>
+          <input className={cls("salary")} type="number" min={0} step="any" value={values.salaryMin} onChange={set("salaryMin")} placeholder={t("e.g. 15")} />
+        </label>
+        <label>
+          {t("Max")} <span className="gm-hint">K</span>
+          <input className={cls("salary")} type="number" min={0} step="any" value={values.salaryMax} onChange={set("salaryMax")} placeholder={t("e.g. 25")} />
+        </label>
+        <label>
+          {t("Currency")}
+          <select value={values.currency} onChange={set("currency")}>
+            {CURRENCIES.map((x) => (
+              <option key={x} value={x}>
+                {x}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label>
+          {t("Pay period")}
+          <select value={values.period} onChange={set("period")}>
+            <option value="month">{t("Monthly")}</option>
+            <option value="year">{t("Yearly")}</option>
+          </select>
+        </label>
+        <label className="full">
+          {t("Gross / net")}
+          <select value={values.basis} onChange={set("basis")}>
+            <option value="gross">{t("Gross (pre-tax)")}</option>
+            <option value="net">{t("Net (after tax)")}</option>
+          </select>
         </label>
         <Button variant="primary" size="sm" className="full" disabled={busy} onClick={submit}>
           {t("Save")}
@@ -1438,7 +1649,9 @@ function GeminiMessage({
   }
   return (
     <div className="gm-bubble ai">
-      <div style={{ whiteSpace: "pre-wrap" }}>{msg.text}</div>
+      <div style={{ whiteSpace: "pre-wrap" }}>
+        <LinkifiedText text={msg.text} />
+      </div>
       {msg.options && msg.options.length > 0 && (
         <div className="gm-msg-options">
           {msg.options.map((option) => (

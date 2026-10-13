@@ -8,24 +8,16 @@ import { InputNumber, Radio, Select } from "antd";
 import { Button } from "../../components/ui/Primitives";
 import { CancelButton, ModalBody, ModalFooter, ModalHeader } from "../../components/ui/Overlays";
 import { useStore } from "../../store/StoreContext";
+import { CURRENCY_ZH, salaryText } from "../../lib/format";
 import { SALARY_TAX, currencyOf, detectLanguage, filledBlocks, findSection, parseMoney, REQ_ITEMS } from "./completeness";
 import { blockPlainText, groupSections, selectDraft } from "./docHelpers";
 import { useDocActions } from "./docActions";
 
-const CURRENCIES = ["CNY", "USD", "SGD", "HKD", "EUR", "GBP", "JPY", "VND"];
-const CURRENCY_ZH: Record<string, string> = { CNY: "人民币", USD: "美元", SGD: "新加坡元", HKD: "港币", EUR: "欧元", GBP: "英镑", JPY: "日元", VND: "越南盾" };
-
-function fmt(n: number) {
-  return Number.isInteger(n) ? n.toLocaleString("en-US") : String(Number(n.toFixed(2)));
-}
+export const CURRENCIES = ["CNY", "USD", "SGD", "HKD", "EUR", "GBP", "JPY", "VND"];
 
 /** The standard line, in the document's language. Amounts are in thousands (K). */
 export function salaryLine(o: { min: number; max: number; currency: string; period: "month" | "year"; tax: "gross" | "net" }, lang: "zh" | "en") {
-  const range = `${fmt(o.min)}K–${fmt(o.max)}K`;
-  if (lang === "zh") {
-    return `${CURRENCY_ZH[o.currency] ?? o.currency}${o.tax === "gross" ? "税前" : "税后"}${o.period === "month" ? "月薪" : "年薪"} ${range}`;
-  }
-  return `${o.currency} ${range} / ${o.period}, ${o.tax}`;
+  return salaryText({ min: o.min * 1000, max: o.max * 1000, currency: o.currency, period: o.period, basis: o.tax }, lang);
 }
 
 export function SalaryModal({ jobId }: { jobId: string }) {

@@ -69,13 +69,19 @@ function floatToPcm16(sample: number): number {
   return clamped < 0 ? Math.round(clamped * 32768) : Math.round(clamped * 32767);
 }
 
+// AudioContexts whose worklet module is already registered, so a reused context skips the reload.
+const workletLoadedContexts = new WeakSet<BaseAudioContext>();
+
 export async function createVoiceAudioCapture(options: VoiceAudioCaptureOptions): Promise<VoiceAudioCapture> {
   // Served from `public/` under the app's base path (e.g. /jd/ behind the local gateway), not the site root.
   const moduleUrl = new URL(`${API_BASE_URL}doubaoinput-pcm-worklet.mjs`, options.pageOrigin).href;
   const createWorkletNode = options.createWorkletNode
     || ((context: AudioContext) => new AudioWorkletNode(context, "doubaoinput-pcm"));
   try {
-    await options.audioContext.audioWorklet.addModule(moduleUrl);
+    if (!workletLoadedContexts.has(options.audioContext)) {
+      await options.audioContext.audioWorklet.addModule(moduleUrl);
+      workletLoadedContexts.add(options.audioContext);
+    }
     const node = createWorkletNode(options.audioContext);
     node.port.onmessage = (event: MessageEvent<{ type?: string; audio?: ArrayBuffer }>) => {
       if (event.data.type === "pcm" && event.data.audio) options.onPcm(event.data.audio);

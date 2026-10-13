@@ -7,7 +7,9 @@ const OUTPUT_FORMAT = [
   '你必须只输出一个 JSON 对象（不要包含任何其他文字、markdown 代码块标记），字段如下：',
   '- reply: string — 给用户看的自然语言回复（追问或确认小结）',
   "- phase: 'intake' | 'ready_to_confirm'",
-  '- fields: object — 本轮新增/变更的字段（用 job-standard-v1 的字段名，如 title/department/location/employmentType/headcount/roleSummary/responsibilities/mustHave/niceToHave），未变化的字段不要输出',
+  '- fields: object — 本轮新增/变更的字段（用 job-standard-v1 的字段名，如 title/department/location/employmentType/headcount/roleSummary/responsibilities/mustHave/niceToHave/publicCompensation/businessProblem/expectedOutcomes/successCriteria），未变化的字段不要输出；不要输出 schema 以外的字段',
+  '- publicCompensation（薪资）只记录用户或资料里明确给出的数字，绝不自行估算或编造；没有就不输出这个字段',
+  '- businessProblem/expectedOutcomes/successCriteria 是可选的内部章节：只整理用户或资料里提到的内容，不要为了填满而编造，也不要为它们追问',
   '- missingFields: string[] — 你认为仍然缺失的关键字段名',
 ].join('\n');
 

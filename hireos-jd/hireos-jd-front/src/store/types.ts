@@ -1,6 +1,7 @@
 import type { AiAnalysis } from "../features/workspace/documentsApi";
 import type { JdVersions } from "../features/workspace/versions";
 import type { CopilotJdFields } from "../features/copilot/copilotApi";
+import type { MoneyRange } from "../lib/format";
 import type {
   ActivityItem,
   Approval,
@@ -45,6 +46,10 @@ export interface GeminiDraft {
   responsibilities: string[];
   must: string[];
   pref?: string[];
+  compensation?: MoneyRange;
+  businessProblem?: string;
+  outcomes?: string[];
+  success?: string[];
 }
 
 /** A follow-up quick action shown under an assistant message, e.g. "View the created JD" after a job

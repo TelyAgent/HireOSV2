@@ -26,6 +26,8 @@ export interface CurrentDraftDto {
   requirements: { label?: string; priority?: string }[];
   internalCompensation: MoneyRange | null;
   publicCompensation: MoneyRange | null;
+  hiringContext?: { businessProblem?: string; expectedOutcomes?: string[] } | null;
+  successCriteria?: { period?: string; statement?: string }[] | null;
 }
 
 async function parseOrThrow<T>(response: Response): Promise<T> {

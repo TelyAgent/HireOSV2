@@ -130,6 +130,11 @@ export function buildDraftFromBackend(title: string, content: CurrentDraftDto, j
 
   blocks.push(mkBlock(bid(), "h2", title, { level: "public" }));
   blocks.push(mkBlock(bid(), "p", content.roleSummary || "No role summary on file.", { level: "public" }));
+  const businessProblem = content.hiringContext?.businessProblem;
+  if (businessProblem) {
+    blocks.push(mkBlock(bid(), "h2", "Business problem", { level: "internal" }));
+    blocks.push(mkBlock(bid(), "p", businessProblem, { level: "internal" }));
+  }
   if (content.responsibilities.length) {
     blocks.push(mkBlock(bid(), "h2", "Responsibilities", { level: "public" }));
     blocks.push(...listBlocks(bid, content.responsibilities, "public"));
@@ -146,6 +151,16 @@ export function buildDraftFromBackend(title: string, content: CurrentDraftDto, j
   blocks.push(mkBlock(bid(), "p", money(content.publicCompensation), { level: "public" }));
   if (content.internalCompensation) {
     blocks.push(mkBlock(bid(), "p", `Internal ceiling: ${money(content.internalCompensation)}`, { level: "confidential" }));
+  }
+  const outcomes = content.hiringContext?.expectedOutcomes?.filter(Boolean) ?? [];
+  if (outcomes.length) {
+    blocks.push(mkBlock(bid(), "h2", "Expected outcomes", { level: "internal" }));
+    blocks.push(...listBlocks(bid, outcomes, "internal"));
+  }
+  const success = (content.successCriteria ?? []).map((s) => s.statement).filter((s): s is string => !!s);
+  if (success.length) {
+    blocks.push(mkBlock(bid(), "h2", "Success in the first 90 days", { level: "internal" }));
+    blocks.push(...listBlocks(bid, success, "internal"));
   }
 
   return { id: `doc-${jobId}`, jobId, audience: DOC_AUDIENCE, language: "en", revision: 1, saveState: "saved", blocks };

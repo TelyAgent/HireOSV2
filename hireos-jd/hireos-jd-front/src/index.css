@@ -857,7 +857,8 @@ a:focus-visible, button:focus-visible, [tabindex]:focus-visible, input:focus-vis
 .gm-form-grid{ grid-template-columns:1fr 1fr; gap:8px 10px; }
 .gm-form-grid .full{ grid-column:1 / -1; }
 .gm-hint{ color:var(--text-tertiary); font-weight:400; margin-left:4px; }
-.gm-bubble{ max-width:92%; border-radius:12px; padding:11px 14px; font-size:var(--fs-sm); line-height:1.5; }
+.gm-bubble{ max-width:92%; border-radius:12px; padding:11px 14px; font-size:var(--fs-sm); line-height:1.5; overflow-wrap:anywhere; }
+.gm-bubble .gm-link{ color:var(--accent-600); text-decoration:underline; text-underline-offset:2px; }
 .gm-bubble.user{ align-self:flex-end; background:var(--accent-600); color:var(--text-on-accent); border-bottom-right-radius:3px; }
 .gm-bubble.ai{ align-self:flex-start; background:var(--surface-alt); border-bottom-left-radius:3px; width:100%; max-width:100%; }
 .gm-bubble.ai .gm-draft-title{ font-weight:600; margin-bottom:6px; }
