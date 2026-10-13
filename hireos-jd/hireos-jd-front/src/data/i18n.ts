@@ -21,7 +21,6 @@ export const ZH: Record<string, string> = {
   "Switch language": "切换语言",
   Appearance: "外观",
   Notifications: "通知",
-  "Demo tools": "演示工具",
   "Switch demo role": "切换演示角色",
   "Accent": "强调色",
   "Saved — the new name shows everywhere after a refresh": "已保存，刷新后各处都会显示新名字",
@@ -118,8 +117,6 @@ export const ZH: Record<string, string> = {
   "Role switching is a demo control for this prototype, not a production permission model.":
     "角色切换是本原型的演示控件，并不代表生产环境的权限模型。",
   Current: "当前",
-  "This prototype runs standalone (no Shell / other L2 modules installed). Settings and AI Models are the shared public capabilities — fully usable here.":
-    "本原型独立运行（未安装 Shell 或其他 L2 模块）。设置、AI 模型属于共享公共能力，在此可完整使用。",
 
   /* ---------- appearance option labels (shared with `cap()` output) ---------- */
   /* `System` above is the activity actor; the theme option reuses the same word. */

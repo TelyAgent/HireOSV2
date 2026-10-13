@@ -349,3 +349,14 @@ textarea.input { height: auto; padding: var(--space-3); resize: vertical; }
   .settings-nav { width: 100%; border-right: none; border-bottom: 1px solid var(--border); padding: 8px 0; }
   .settings-content { padding: 20px 0; }
 }
+
+/* Every antd dialog (Modal, modal.confirm) sits in the middle of the screen, like JD's own overlays.
+   margin:auto inside the flex wrapper centers it; a dialog taller than the viewport starts at the top
+   and scrolls instead of being clipped. */
+.ant-modal-wrap { display: flex; }
+.ant-modal-wrap .ant-modal { top: 0; margin: auto; padding: 24px 0; }
+
+/* Top-bar text buttons (language, Appearance) — same look as hireos-interview's top bar. */
+.topbar-btn { height: 32px; padding: 0 11px; border: 1px solid var(--border); border-radius: 9px; background: var(--surface); color: var(--text-secondary); font: inherit; font-size: 12.5px; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; flex: none; white-space: nowrap; }
+.topbar-btn:hover { background: var(--surface-alt); }
+.topbar-btn.lang { font-weight: 600; }

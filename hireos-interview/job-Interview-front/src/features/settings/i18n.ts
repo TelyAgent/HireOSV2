@@ -16,7 +16,10 @@ const ZH: Record<string, string> = {
   "Account — personal": "账号 — 个人",
   "This panel and the header Appearance button control the same preference — changes apply instantly everywhere.":
     "此处与顶部的外观按钮控制同一套设置，修改会立即在所有页面生效。",
-  "Reset to defaults": "恢复默认",
+  "Reset to defaults": "重置为默认",
+  Done: "完成",
+  "Preferences are saved for this session and this demo role. Production HireOS syncs Appearance to your account across devices.":
+    "外观偏好仅保存于本次会话和当前演示角色。生产环境的 HireOS 会将外观设置同步到你的账号并跨设备生效。",
   Theme: "主题",
   Accent: "强调色",
   "Text size": "文字大小",

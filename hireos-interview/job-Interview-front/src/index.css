@@ -298,3 +298,9 @@ textarea::placeholder {
   .hs-nav { width: 100%; border-right: none; border-bottom: 1px solid var(--line); }
   .hs-content { padding: 20px 16px; }
 }
+
+/* Every antd dialog (Modal, modal.confirm) sits in the middle of the screen, like JD's own overlays.
+   margin:auto inside the flex wrapper centers it; a dialog taller than the viewport starts at the top
+   and scrolls instead of being clipped. */
+.ant-modal-wrap { display: flex; }
+.ant-modal-wrap .ant-modal { top: 0; margin: auto; padding: 24px 0; }

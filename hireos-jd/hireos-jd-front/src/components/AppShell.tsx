@@ -30,6 +30,16 @@ export function MainInner({ variant, children }: { variant?: "wide" | "flush"; c
   return <div className={`main-inner${variant ? " " + variant : ""}`}>{children}</div>;
 }
 
+/** Same sun glyph as hireos-interview's top-bar Appearance button. */
+function SunIcon() {
+  return (
+    <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <circle cx="12" cy="12" r="4" />
+      <path d="M12 2v3M12 19v3M4.2 4.2l2.1 2.1M17.7 17.7l2.1 2.1M2 12h3M19 12h3M4.2 19.8l2.1-2.1M17.7 6.3l2.1-2.1" />
+    </svg>
+  );
+}
+
 function TopBar() {
   const { state, t, toggleLang, openModal, person } = useStore();
   const navigate = useNavigate();
@@ -45,31 +55,17 @@ function TopBar() {
         </div>
       </div>
       <div className="topbar-actions">
-        <Button
-          variant="secondary"
-          size="sm"
-          style={{ borderRadius: 20 }}
-          onClick={toggleLang}
-          title={t("Switch language")}
-          aria-label={t("Switch language")}
-        >
+        <button type="button" className="topbar-btn lang" onClick={toggleLang} title={t("Switch language")} aria-label={t("Switch language")}>
           {langLabel}
-        </Button>
-        <button
-          className="icon-btn"
-          title={t("Appearance")}
-          aria-label={t("Appearance")}
-          onClick={() => openModal(<AppearanceModal />, { wide: true })}
-        >
-          <Icon name="palette" />
         </button>
         <button
-          className="icon-btn"
-          title={t("Demo tools")}
-          aria-label={t("Demo tools")}
-          onClick={() => openModal(<DemoToolsModal />)}
+          type="button"
+          className="topbar-btn"
+          aria-label={t("Appearance")}
+          onClick={() => openModal(<AppearanceModal />, { overlayClass: "appearance-overlay" })}
         >
-          <Icon name="science" />
+          <SunIcon />
+          {t("Appearance")}
         </button>
         {sessionUser ? (
           <UserMenu user={sessionUser} labels={{ signOut: t("Sign out") }} />
@@ -194,13 +190,13 @@ function AppearanceModal() {
       <ModalHeader title={t("Appearance")} />
       <ModalBody>
         <AppearancePanel />
-        <p className="tiny" style={{ marginTop: 10 }}>
+        <p className="tiny">
           {t(
             "Preferences are saved for this session and this demo role. Production HireOS syncs Appearance to your account across devices.",
           )}
         </p>
       </ModalBody>
-      <ModalFooter spread>
+      <ModalFooter>
         <Button variant="text" onClick={resetAppearance}>
           {t("Reset to defaults")}
         </Button>
@@ -241,33 +237,6 @@ function RoleSwitcherModal() {
             </div>
           </div>
         ))}
-      </ModalBody>
-      <ModalFooter>
-        <CloseButton />
-      </ModalFooter>
-    </>
-  );
-}
-
-function DemoToolsModal() {
-  const { t } = useStore();
-  return (
-    <>
-      <ModalHeader title={t("Demo tools")} />
-      <ModalBody>
-        <p className="tiny" style={{ marginBottom: 10 }}>
-          {t(
-            "This prototype runs standalone (no Shell / other L2 modules installed). Settings and AI Models are the shared public capabilities — fully usable here.",
-          )}
-        </p>
-        <div className="card card-pad" style={{ background: "var(--surface-alt)", border: "none" }}>
-          <div className="tiny" style={{ marginBottom: 6 }}>
-            {t("Workspace")}
-          </div>
-          <div style={{ fontWeight: 500 }}>
-            Sending Labs <span className="tiny">(ws-demo)</span>
-          </div>
-        </div>
       </ModalBody>
       <ModalFooter>
         <CloseButton />

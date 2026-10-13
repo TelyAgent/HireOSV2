@@ -6,7 +6,6 @@ import { Button } from "./ui/Primitives";
 import { useStore } from "../store/StoreContext";
 import { USERS } from "../data/users";
 import type { UserId } from "../store/types";
-import { fmtDate, nowISO } from "../data/fixtures";
 import { UserMenu, useSessionUser } from "../lib/session";
 
 interface NavItem { href: string; label: string; ic: string }
@@ -25,6 +24,16 @@ const NAV: NavGroup[] = [
 function navActive(href: string, pathname: string) {
   if (href === "/tasks") return pathname === "/tasks";
   return pathname === href || pathname.startsWith(href + "/");
+}
+
+/** Same sun glyph as hireos-interview's top-bar Appearance button. */
+function SunIcon() {
+  return (
+    <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <circle cx="12" cy="12" r="4" />
+      <path d="M12 2v3M12 19v3M4.2 4.2l2.1 2.1M17.7 17.7l2.1 2.1M2 12h3M19 12h3M4.2 19.8l2.1-2.1M17.7 6.3l2.1-2.1" />
+    </svg>
+  );
 }
 
 export function AppShell({ openTaskCount, children }: { openTaskCount: number; children: ReactNode }) {
@@ -81,16 +90,16 @@ export function AppShell({ openTaskCount, children }: { openTaskCount: number; c
             <Icon name="menu" />
           </button>
           <div style={{ flex: 1 }} />
-          <button className="lang-switch" type="button" title={t("Language")} aria-label={t("Language")} onClick={toggleLang}>
-            <span className={state.lang === "en" ? "on" : ""}>EN</span>
-            <span className={state.lang === "zh" ? "on" : ""}>中</span>
+          <button type="button" className="topbar-btn lang" aria-label={t("Language")} onClick={toggleLang}>
+            {state.lang === "en" ? "中 / EN" : "EN / 中"}
           </button>
           <button className="icon-btn" type="button" title={t("Notifications")} aria-label={t("Notifications")} onClick={() => navigate("/tasks")}>
             <Icon name="notifications_none" />
             <span className="dot" />
           </button>
-          <button className="icon-btn" type="button" title={t("Appearance")} aria-label={t("Appearance")} onClick={toggleAppearance}>
-            <Icon name="palette" />
+          <button type="button" className="topbar-btn" aria-label={t("Appearance")} onClick={toggleAppearance}>
+            <SunIcon />
+            {t("Appearance")}
           </button>
           {sessionUser ? (
             <UserMenu user={sessionUser} labels={{ signOut: t("Sign out") }} />
@@ -149,32 +158,29 @@ export function AppearanceFields() {
           <Radio.Button value="large">{t("Large")}</Radio.Button>
         </Radio.Group>
       </div>
-      <div className="tiny" style={{ marginBottom: 14 }}>
-        {t("Applies instantly across tables, menus, evidence highlights and overlays. Saved for this account")}
-        {t("— demo uses local storage, not real cloud sync across devices.")}
-      </div>
     </>
   );
 }
 
 function AppearanceModal() {
-  const { state, t, resetAppearance, toggleAppearance, advanceClock } = useStore();
+  const { state, t, resetAppearance, toggleAppearance } = useStore();
   return (
-    <Modal open={state.showAppearance} onCancel={toggleAppearance} footer={null} title={t("Appearance")} width={440}>
-      <AppearanceFields />
-      <div className="divider" style={{ margin: "14px 0" }} />
-      <div className="field" style={{ marginBottom: 14 }}>
-        <label>Demo clock — {fmtDate(nowISO(state.clockOffsetMin))} ({t("Asia/Shanghai")})</label>
-        <div style={{ display: "flex", gap: 8 }}>
-          <Button size="sm" onClick={() => advanceClock(6)}>+6h</Button>
-          <Button size="sm" onClick={() => advanceClock(24)}>+1 day</Button>
-          <Button size="sm" onClick={() => advanceClock(72)}>+3 days</Button>
+    <Modal
+      open={state.showAppearance}
+      onCancel={toggleAppearance}
+      title={t("Appearance")}
+      width={640}
+      footer={
+        <div style={{ display: "flex", justifyContent: "flex-end", gap: 10 }}>
+          <Button variant="ghost" onClick={resetAppearance}>{t("Reset to defaults")}</Button>
+          <Button variant="primary" onClick={toggleAppearance}>{t("Done")}</Button>
         </div>
-      </div>
-      <div style={{ display: "flex", justifyContent: "flex-end", gap: 10 }}>
-        <Button onClick={resetAppearance}>{t("Reset to defaults")}</Button>
-        <Button variant="primary" onClick={toggleAppearance}>{t("Done")}</Button>
-      </div>
+      }
+    >
+      <AppearanceFields />
+      <p className="tiny" style={{ margin: 0 }}>
+        {t("Preferences are saved for this session and this demo role. Production HireOS syncs Appearance to your account across devices.")}
+      </p>
     </Modal>
   );
 }

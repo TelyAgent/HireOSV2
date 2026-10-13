@@ -52,6 +52,16 @@ function activeSection(pathname: string): string | null {
   return shared ? (lastSection ?? shared[1]) : null;
 }
 
+/** Same sun glyph as hireos-interview's top-bar Appearance button. */
+function SunIcon() {
+  return (
+    <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <circle cx="12" cy="12" r="4" />
+      <path d="M12 2v3M12 19v3M4.2 4.2l2.1 2.1M17.7 17.7l2.1 2.1M2 12h3M19 12h3M4.2 19.8l2.1-2.1M17.7 6.3l2.1-2.1" />
+    </svg>
+  );
+}
+
 export function TopBar() {
   const { state, t, toggleLang, toggleAppearance, toggleRoleSwitcher, person } = useStore();
   const langLabel = state.lang === "en" ? "中 / EN" : "EN / 中";
@@ -65,11 +75,12 @@ export function TopBar() {
         <span className="brand-context">{t("Resume Screening")}</span>
       </div>
       <div className="topbar-actions">
-        <Button variant="secondary" size="sm" style={{ borderRadius: 20 }} onClick={toggleLang}>
+        <button type="button" className="topbar-btn lang" onClick={toggleLang}>
           {langLabel}
-        </Button>
-        <button className="icon-btn" title={t("Appearance")} aria-label={t("Appearance")} onClick={toggleAppearance}>
-          <Icon name="palette" />
+        </button>
+        <button type="button" className="topbar-btn" aria-label={t("Appearance")} onClick={toggleAppearance}>
+          <SunIcon />
+          {t("Appearance")}
         </button>
         {sessionUser ? (
           <UserMenu user={sessionUser} labels={{ signOut: t("Sign out") }} />

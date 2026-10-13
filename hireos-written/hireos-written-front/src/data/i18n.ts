@@ -54,6 +54,8 @@ export const ZH: Record<string, string> = {
   "This email is already a member.": "该邮箱已经是成员。",
   "The workspace needs at least one active admin.": "工作区至少需要一位正常状态的管理员。",
   "Sign out": "退出登录",
+  "Preferences are saved for this session and this demo role. Production HireOS syncs Appearance to your account across devices.":
+    "外观偏好仅保存于本次会话和当前演示角色。生产环境的 HireOS 会将外观设置同步到你的账号并跨设备生效。",
   "Language": "语言",
 
   "My Work": "我的工作台", "Signed in as": "当前登录：", "Accessible workspace": "可访问的工作区",
@@ -383,7 +385,7 @@ export const ZH: Record<string, string> = {
   "Applies instantly across tables, menus, evidence highlights and overlays. Saved for this account":
     "会立即应用到表格、菜单、证据高亮与弹层中。设置已保存到当前账户",
   "— demo uses local storage, not real cloud sync across devices.": "（演示版使用本地存储，并非跨设备的真实云同步）。",
-  "Reset to defaults": "恢复默认设置", "Done": "完成",
+  "Reset to defaults": "重置为默认", "Done": "完成",
 
   "Preferences": "偏好设置", "AI Models": "AI 模型",
   "Organization and Team layers govern official scoring. Personal views never change team results. Appearance (theme, accent, text size) lives in the":

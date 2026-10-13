@@ -196,7 +196,7 @@ export function LoginPage() {
                 />
               ))}
             </div>
-            {busy && <p className="auth-hint">{t("Signing in…")}</p>}
+            {busy && <p className="auth-status">{t("Signing in…")}</p>}
             {error && <p className="auth-error">{error}</p>}
             <div className="auth-links">
               <button

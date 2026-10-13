@@ -4,7 +4,7 @@ import {
   CloseSvg,
   SunSvg,
 } from "./ui/Icons";
-import { AppearancePopover } from "./AppearancePopover";
+import { AppearanceModal } from "./AppearanceModal";
 import { UserMenu, useSessionUser } from "../lib/session";
 
 export function TopBar() {
@@ -95,7 +95,6 @@ export function TopBar() {
           <SunSvg size={14} />
           {t.appearance}
         </button>
-        {state.showAppearance && <AppearancePopover />}
       </div>
       <button
         onClick={() => set({ showCreateModal: true })}
@@ -120,6 +119,7 @@ export function TopBar() {
       ) : (
         <RoleButton role={role} />
       )}
+      <AppearanceModal />
     </div>
   );
 }

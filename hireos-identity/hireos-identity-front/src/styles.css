@@ -105,6 +105,13 @@ body {
   margin: -12px 0 16px;
 }
 
+/* Status line under the code boxes (e.g. "Signing in…"). */
+.auth-status {
+  color: var(--muted);
+  font-size: 13px;
+  margin: 10px 0 0;
+}
+
 .auth-label {
   display: block;
   font-family: "SFMono-Regular", Menlo, Consolas, monospace;
@@ -279,3 +286,9 @@ body {
     gap: 6px;
   }
 }
+
+/* Every antd dialog (Modal, modal.confirm) sits in the middle of the screen, like JD's own overlays.
+   margin:auto inside the flex wrapper centers it; a dialog taller than the viewport starts at the top
+   and scrolls instead of being clipped. */
+.ant-modal-wrap { display: flex; }
+.ant-modal-wrap .ant-modal { top: 0; margin: auto; padding: 24px 0; }
