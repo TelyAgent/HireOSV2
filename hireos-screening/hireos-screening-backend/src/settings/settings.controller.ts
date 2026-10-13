@@ -37,26 +37,6 @@ export class SettingsController {
     return this.settings.listActivity(req.identity);
   }
 
-  @Get('preferences')
-  getPreferences(@Req() req: { identity: Identity }) {
-    return this.settings.getPreferences(req.identity);
-  }
-
-  @Post('preferences/proposals/:id/activate')
-  activateProposal(@Req() req: { identity: Identity }, @Param('id') id: string) {
-    return this.settings.activateProposal(req.identity, id);
-  }
-
-  @Post('preferences/proposals/:id/reject')
-  rejectProposal(@Req() req: { identity: Identity }, @Param('id') id: string) {
-    return this.settings.rejectProposal(req.identity, id);
-  }
-
-  @Post('preferences/versions/:id/rollback')
-  rollbackPreference(@Req() req: { identity: Identity }, @Param('id') id: string) {
-    return this.settings.rollbackPreference(req.identity, id);
-  }
-
   @Get('ai-models')
   getAiModels(@Req() req: { identity: Identity }) {
     return this.settings.getAiModels(req.identity);

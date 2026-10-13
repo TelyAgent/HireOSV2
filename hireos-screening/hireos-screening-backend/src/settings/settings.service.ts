@@ -109,56 +109,6 @@ export class SettingsService {
     });
   }
 
-  async getPreferences(identity: Identity) {
-    const setting = await this.ensureSetting(identity.workspaceId, 'preferences', defaultPreferences());
-    return setting.payload;
-  }
-
-  async activateProposal(identity: Identity, proposalId: string) {
-    const setting = await this.ensureSetting(identity.workspaceId, 'preferences', defaultPreferences());
-    const payload = clone(setting.payload) as any;
-    const proposal = payload.proposed.find((item: any) => item.id === proposalId);
-    if (!proposal) throw new NotFoundException({ code: 'NOT_FOUND' });
-    payload.proposed = payload.proposed.filter((item: any) => item.id !== proposalId);
-    payload.versions.unshift({
-      id: `v-${setting.version + 1}`,
-      label: `v${setting.version + 1} (current)`,
-      activatedAt: new Date().toISOString(),
-      activatedBy: identity.actorId,
-    });
-    const updated = await this.updateSetting(setting.id, setting.version + 1, payload, identity.actorId);
-    await this.audit(identity, 'preference_profile_activated', 'WorkspaceSetting', setting.id, { proposalId });
-    return updated.payload;
-  }
-
-  async rejectProposal(identity: Identity, proposalId: string) {
-    const setting = await this.ensureSetting(identity.workspaceId, 'preferences', defaultPreferences());
-    const payload = clone(setting.payload) as any;
-    if (!payload.proposed.some((item: any) => item.id === proposalId)) {
-      throw new NotFoundException({ code: 'NOT_FOUND' });
-    }
-    payload.proposed = payload.proposed.filter((item: any) => item.id !== proposalId);
-    const updated = await this.updateSetting(setting.id, setting.version + 1, payload, identity.actorId);
-    await this.audit(identity, 'preference_proposal_rejected', 'WorkspaceSetting', setting.id, { proposalId });
-    return updated.payload;
-  }
-
-  async rollbackPreference(identity: Identity, versionId: string) {
-    const setting = await this.ensureSetting(identity.workspaceId, 'preferences', defaultPreferences());
-    const payload = clone(setting.payload) as any;
-    const version = payload.versions.find((item: any) => item.id === versionId);
-    if (!version) throw new NotFoundException({ code: 'NOT_FOUND' });
-    payload.versions.unshift({
-      id: `v-${setting.version + 1}`,
-      label: `v${setting.version + 1} (current, rolled back to ${version.label})`,
-      activatedAt: new Date().toISOString(),
-      activatedBy: identity.actorId,
-    });
-    const updated = await this.updateSetting(setting.id, setting.version + 1, payload, identity.actorId);
-    await this.audit(identity, 'preference_profile_rolled_back', 'WorkspaceSetting', setting.id, { versionId });
-    return updated.payload;
-  }
-
   async getAiModels(identity: Identity) {
     const setting = await this.ensureSetting(identity.workspaceId, 'ai_models', defaultAiModels());
     return setting.payload;
@@ -476,36 +426,12 @@ function serializeConnection(row: any) {
   };
 }
 
-function clone<T>(value: T): T {
-  return JSON.parse(JSON.stringify(value)) as T;
-}
-
 function hoursAgo(now: Date, hours: number) {
   return new Date(now.getTime() - hours * 60 * 60 * 1000);
 }
 
 function daysAgo(now: Date, days: number) {
   return new Date(now.getTime() - days * 24 * 60 * 60 * 1000);
-}
-
-function defaultPreferences() {
-  return {
-    organization: { scope: 'Organization', status: 'active', owner: 'People Ops', rules: [{ feature: 'Prohibited: name, photo, school prestige, employment gaps as standalone signals', locked: true }] },
-    team: { scope: 'Team - Platform Engineering', status: 'active', owner: 'daniel', rules: [{ feature: 'Slight emphasis on distributed-systems depth for backend roles', weightAdjustment: '+0.03 to Technical Depth' }] },
-    role: { scope: 'Role - Senior Backend Engineer (confirmed rubric)', status: 'active', pointerOnly: true },
-    user: { scope: 'User - Local Screening User (personal view only)', status: 'active', rules: [{ feature: 'Personal sort: boost Ownership & 0 to 1 in my own candidate list view', weightAdjustment: '+0.05 (view-only, does not change team scoring)' }] },
-    proposed: [{ id: 'prop-1', scope: 'team', title: 'Proposed: increase Communication weight for customer-facing backend roles', sampleSize: 34, window: 'Last 60 days', basis: 'Derived from 34 eligible feedback events.', status: 'proposed', createdAt: daysAgo(new Date(), 4).toISOString() }],
-    signals: [
-      { id: 'sig-1', feature: 'Ownership & 0 to 1 evidence', direction: 'increase', strength: 0.6, source: '34 shortlist/advance actions, last 60 days', eligibility: 'eligible' },
-      { id: 'sig-2', feature: 'Communication clarity', direction: 'increase', strength: 0.4, source: '21 advance actions citing communication strength', eligibility: 'eligible' },
-      { id: 'sig-3', feature: 'Company prestige / brand name', direction: 'increase', strength: 0.2, source: 'Pattern detected in 9 advance actions', eligibility: 'prohibited' },
-    ],
-    versions: [
-      { id: 'v-3', label: 'v3 (current)', activatedAt: daysAgo(new Date(), 21).toISOString(), activatedBy: 'morgan' },
-      { id: 'v-2', label: 'v2', activatedAt: daysAgo(new Date(), 80).toISOString(), activatedBy: 'morgan' },
-      { id: 'v-1', label: 'v1 (initial)', activatedAt: daysAgo(new Date(), 150).toISOString(), activatedBy: 'morgan' },
-    ],
-  };
 }
 
 function defaultAiModels() {

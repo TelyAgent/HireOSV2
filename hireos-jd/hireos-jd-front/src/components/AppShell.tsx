@@ -21,7 +21,7 @@ const NAV_PRIMARY: NavItem[] = [
   { to: "/jobs", icon: "work", label: "Job Library", match: "/jobs" },
 ];
 const NAV_SHARED: NavItem[] = [
-  { to: "/settings/overview", icon: "settings", label: "Settings", match: "/settings" },
+  { to: "/settings/profile", icon: "settings", label: "Settings", match: "/settings" },
 ];
 
 /** The page body wrapper — mirrors the prototype's `setMain(html, widthClass)`. */

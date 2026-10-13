@@ -40,7 +40,7 @@ export default function App() {
         <Route path="/jobs/new" element={<NewJobPage />} />
         <Route path="/jobs/:id" element={<JobWorkspacePage />} />
         <Route path="/jobs/:id/:tab" element={<JobWorkspacePage />} />
-        <Route path="/settings" element={<Navigate to="/settings/overview" replace />} />
+        <Route path="/settings" element={<Navigate to="/settings/profile" replace />} />
         <Route path="/settings/:section" element={<SettingsPage />} />
         <Route path="*" element={<NotFoundPage />} />
       </Routes>
