@@ -1,8 +1,8 @@
 # HireOS Command — JD Management 角色 User Journey
 
-文档编号：CMD-JD-UJ-ROLE-001  
-版本：v1.1  
-状态：用于产品、设计、研发与 AI 审查的工作稿  
+文档编号：CMD-JD-UJ-ROLE-001
+版本：v1.1
+状态：用于产品、设计、研发与 AI 审查的工作稿
 范围：JD Management 登录后的角色目标、操作路径、关注点与审查输入
 
 ## 1. 文档目的

@@ -1,7 +1,7 @@
 # JD Management User Journey 审查报告
 
-审查对象：`docs/product/JD_Management/HireOS_Command_JD_Management_Role_User_Journeys_v1.0.md`  
-审查依据：2026-10-13 JD Management 评审会议转写总结、JD Management PRD/Interface Spec/Design Brief v1.3  
+审查对象：`docs/product/JD_Management/HireOS_Command_JD_Management_Role_User_Journeys_v1.0.md`
+审查依据：2026-10-13 JD Management 评审会议转写总结、JD Management PRD/Interface Spec/Design Brief v1.3
 审查结果版本：User Journey v1.1
 
 ## 1. 总体结论

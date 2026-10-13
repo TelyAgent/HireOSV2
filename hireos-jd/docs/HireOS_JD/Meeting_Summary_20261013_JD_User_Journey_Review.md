@@ -1,8 +1,8 @@
 # JD Management 评审会议总结：User Journey 与 AI 审查要求
 
-文档编号：CMD-JD-MEETING-20261013-001  
-来源：`/Users/apple/Desktop/Code_20261013201609.txt` 会议转写  
-日期：2026-10-13  
+文档编号：CMD-JD-MEETING-20261013-001
+来源：`/Users/apple/Desktop/Code_20261013201609.txt` 会议转写
+日期：2026-10-13
 用途：作为 JD Management User Journey、产品修复和 AI Review 的输入
 
 > 说明：原始文件是语音转写，存在“创业阶梯”“bill manager”等识别误差。本文按上下文将其理解为职位/JD、Hiring Manager 或业务负责人；不确定事项单独列出，不把推测写成已确认规则。
