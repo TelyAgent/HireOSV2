@@ -5,6 +5,7 @@
  * round trips.
  */
 import { API_BASE_URL } from "../utils/apiBase";
+import { authFetch } from "../lib/session";
 
 const BASE = `${API_BASE_URL}api`;
 
@@ -32,7 +33,7 @@ export interface RealWrittenTask {
 }
 
 export async function listRealWrittenTasks(): Promise<RealWrittenTask[]> {
-  const response = await fetch(`${BASE}/tasks`);
+  const response = await authFetch(`${BASE}/tasks`);
   if (!response.ok) throw new Error(`Request failed (${response.status})`);
   return response.json() as Promise<RealWrittenTask[]>;
 }
@@ -47,7 +48,7 @@ export interface CaseAiContext {
 /** Only cases created via a real screening handoff have this row — a 404 (fixture-only demo
  * case) means "no extra JD/resume context," not an error, so callers should treat it as optional. */
 export async function fetchCaseAiContext(caseId: string): Promise<CaseAiContext | null> {
-  const response = await fetch(`${BASE}/cases/${encodeURIComponent(caseId)}/context`);
+  const response = await authFetch(`${BASE}/cases/${encodeURIComponent(caseId)}/context`);
   if (response.status === 404) return null;
   if (!response.ok) throw new Error(`Request failed (${response.status})`);
   return response.json() as Promise<CaseAiContext>;
@@ -79,7 +80,7 @@ export interface RealBankQuestion {
 }
 
 export async function listBankQuestions(): Promise<RealBankQuestion[]> {
-  const response = await fetch(`${BASE}/questions`);
+  const response = await authFetch(`${BASE}/questions`);
   if (!response.ok) throw new Error(`Request failed (${response.status})`);
   return response.json() as Promise<RealBankQuestion[]>;
 }
@@ -92,7 +93,7 @@ export async function createBankQuestion(input: {
   language?: string;
   author?: string;
 }): Promise<RealBankQuestion> {
-  const response = await fetch(`${BASE}/questions`, {
+  const response = await authFetch(`${BASE}/questions`, {
     method: "POST",
     headers: { "content-type": "application/json" },
     body: JSON.stringify(input),
@@ -106,7 +107,7 @@ export async function updateBankQuestion(
   id: string,
   input: { title?: string; prompt?: string; roles?: string[]; competencies?: { name: string; fraction: number }[]; favorite?: boolean },
 ): Promise<RealBankQuestion> {
-  const response = await fetch(`${BASE}/questions/${encodeURIComponent(id)}`, {
+  const response = await authFetch(`${BASE}/questions/${encodeURIComponent(id)}`, {
     method: "PATCH",
     headers: { "content-type": "application/json" },
     body: JSON.stringify(input),
@@ -116,7 +117,7 @@ export async function updateBankQuestion(
 }
 
 export async function deleteBankQuestion(id: string): Promise<void> {
-  const response = await fetch(`${BASE}/questions/${encodeURIComponent(id)}`, { method: "DELETE" });
+  const response = await authFetch(`${BASE}/questions/${encodeURIComponent(id)}`, { method: "DELETE" });
   if (!response.ok) await throwWithMessage(response);
 }
 
@@ -127,7 +128,7 @@ export async function extractQuestionCompetencies(input: {
   roles?: string[];
   lang: "zh" | "en";
 }): Promise<{ competencies: { name: string; fraction: number }[] }> {
-  const response = await fetch(`${BASE}/ai/extract-competencies`, {
+  const response = await authFetch(`${BASE}/ai/extract-competencies`, {
     method: "POST",
     headers: { "content-type": "application/json" },
     body: JSON.stringify(input),
@@ -143,7 +144,7 @@ export async function generateAiQuestion(input: {
   focusBrief: string;
   lang: "zh" | "en";
 }): Promise<GeneratedQuestion> {
-  const response = await fetch(`${BASE}/ai/generate-question`, {
+  const response = await authFetch(`${BASE}/ai/generate-question`, {
     method: "POST",
     headers: { "content-type": "application/json" },
     body: JSON.stringify(input),
@@ -199,7 +200,7 @@ export async function finalizeCaseEvaluation(
   caseId: string,
   input: { overall: number; criteria: RealFinalCriterion[]; finalizedBy?: string },
 ): Promise<{ finalizedAt: string }> {
-  const response = await fetch(`${BASE}/cases/${encodeURIComponent(caseId)}/result/finalize`, {
+  const response = await authFetch(`${BASE}/cases/${encodeURIComponent(caseId)}/result/finalize`, {
     method: "POST",
     headers: { "content-type": "application/json" },
     body: JSON.stringify(input),
@@ -210,7 +211,7 @@ export async function finalizeCaseEvaluation(
 
 /** Persists the published result on the case's latest submission (must already be finalized). */
 export async function releaseCaseResult(caseId: string, input: RealReleaseInput): Promise<{ releasedAt: string }> {
-  const response = await fetch(`${BASE}/cases/${encodeURIComponent(caseId)}/result/release`, {
+  const response = await authFetch(`${BASE}/cases/${encodeURIComponent(caseId)}/result/release`, {
     method: "POST",
     headers: { "content-type": "application/json" },
     body: JSON.stringify(input),
@@ -232,7 +233,7 @@ export async function createInvitation(
     recipientEmail: string;
   },
 ): Promise<{ id: string; token: string; emailSent: boolean; emailError?: string }> {
-  const response = await fetch(`${BASE}/cases/${encodeURIComponent(caseId)}/invitations`, {
+  const response = await authFetch(`${BASE}/cases/${encodeURIComponent(caseId)}/invitations`, {
     method: "POST",
     headers: { "content-type": "application/json" },
     body: JSON.stringify(input),
@@ -252,7 +253,7 @@ export interface CaseLifecycleState {
 }
 
 async function caseAction(caseId: string, action: string, body?: unknown): Promise<CaseLifecycleState> {
-  const response = await fetch(`${BASE}/cases/${encodeURIComponent(caseId)}/${action}`, {
+  const response = await authFetch(`${BASE}/cases/${encodeURIComponent(caseId)}/${action}`, {
     method: "POST",
     headers: { "content-type": "application/json" },
     body: body === undefined ? undefined : JSON.stringify(body),
@@ -299,7 +300,7 @@ async function throwWithMessage(response: Response): Promise<never> {
 }
 
 export async function listMailAccounts(): Promise<MailAccount[]> {
-  const response = await fetch(`${BASE}/settings/mail-accounts`);
+  const response = await authFetch(`${BASE}/settings/mail-accounts`);
   if (!response.ok) throw new Error(`Request failed (${response.status})`);
   return response.json() as Promise<MailAccount[]>;
 }
@@ -313,7 +314,7 @@ export interface MailConnectionInput {
 }
 
 export async function testMailAccount(input: MailConnectionInput): Promise<{ status: "ok" | "error"; message?: string }> {
-  const response = await fetch(`${BASE}/settings/mail-accounts/test`, {
+  const response = await authFetch(`${BASE}/settings/mail-accounts/test`, {
     method: "POST",
     headers: { "content-type": "application/json" },
     body: JSON.stringify(input),
@@ -323,7 +324,7 @@ export async function testMailAccount(input: MailConnectionInput): Promise<{ sta
 }
 
 export async function createMailAccount(input: MailAccountInput & { password: string }): Promise<MailAccount> {
-  const response = await fetch(`${BASE}/settings/mail-accounts`, {
+  const response = await authFetch(`${BASE}/settings/mail-accounts`, {
     method: "POST",
     headers: { "content-type": "application/json" },
     body: JSON.stringify(input),
@@ -333,7 +334,7 @@ export async function createMailAccount(input: MailAccountInput & { password: st
 }
 
 export async function updateMailAccount(id: string, input: Partial<MailAccountInput>): Promise<MailAccount> {
-  const response = await fetch(`${BASE}/settings/mail-accounts/${encodeURIComponent(id)}`, {
+  const response = await authFetch(`${BASE}/settings/mail-accounts/${encodeURIComponent(id)}`, {
     method: "PATCH",
     headers: { "content-type": "application/json" },
     body: JSON.stringify(input),
@@ -343,12 +344,12 @@ export async function updateMailAccount(id: string, input: Partial<MailAccountIn
 }
 
 export async function deleteMailAccount(id: string): Promise<void> {
-  const response = await fetch(`${BASE}/settings/mail-accounts/${encodeURIComponent(id)}`, { method: "DELETE" });
+  const response = await authFetch(`${BASE}/settings/mail-accounts/${encodeURIComponent(id)}`, { method: "DELETE" });
   if (!response.ok) throw new Error(`Request failed (${response.status})`);
 }
 
 export async function setMailAccountEnabled(id: string, enabled: boolean): Promise<MailAccount> {
-  const response = await fetch(`${BASE}/settings/mail-accounts/${encodeURIComponent(id)}/enabled`, {
+  const response = await authFetch(`${BASE}/settings/mail-accounts/${encodeURIComponent(id)}/enabled`, {
     method: "POST",
     headers: { "content-type": "application/json" },
     body: JSON.stringify({ enabled }),
@@ -358,7 +359,7 @@ export async function setMailAccountEnabled(id: string, enabled: boolean): Promi
 }
 
 export async function listCaseInvitations(caseId: string): Promise<RealInvitation[]> {
-  const response = await fetch(`${BASE}/cases/${encodeURIComponent(caseId)}/invitations`);
+  const response = await authFetch(`${BASE}/cases/${encodeURIComponent(caseId)}/invitations`);
   if (!response.ok) throw new Error(`Request failed (${response.status})`);
   return response.json() as Promise<RealInvitation[]>;
 }
@@ -405,7 +406,7 @@ export interface RealPlanItem {
 /** A 404 here means a fixture-only demo case with no real backend Case row — callers should treat
  * that as "nothing to load," not an error, and leave the case's fixture plan items untouched. */
 export async function listPlanItems(caseId: string): Promise<RealPlanItem[]> {
-  const response = await fetch(`${BASE}/cases/${encodeURIComponent(caseId)}/plan-items`);
+  const response = await authFetch(`${BASE}/cases/${encodeURIComponent(caseId)}/plan-items`);
   if (!response.ok) throw new Error(`Request failed (${response.status})`);
   return response.json() as Promise<RealPlanItem[]>;
 }
@@ -422,7 +423,7 @@ export async function createPlanItem(
     deliverables?: string[];
   },
 ): Promise<RealPlanItem> {
-  const response = await fetch(`${BASE}/cases/${encodeURIComponent(caseId)}/plan-items`, {
+  const response = await authFetch(`${BASE}/cases/${encodeURIComponent(caseId)}/plan-items`, {
     method: "POST",
     headers: { "content-type": "application/json" },
     body: JSON.stringify(input),
@@ -432,7 +433,7 @@ export async function createPlanItem(
 }
 
 export async function updatePlanItem(caseId: string, id: string, input: { customPrompt?: string | null; status?: string }): Promise<RealPlanItem> {
-  const response = await fetch(`${BASE}/cases/${encodeURIComponent(caseId)}/plan-items/${encodeURIComponent(id)}`, {
+  const response = await authFetch(`${BASE}/cases/${encodeURIComponent(caseId)}/plan-items/${encodeURIComponent(id)}`, {
     method: "PATCH",
     headers: { "content-type": "application/json" },
     body: JSON.stringify(input),
@@ -442,6 +443,6 @@ export async function updatePlanItem(caseId: string, id: string, input: { custom
 }
 
 export async function deletePlanItem(caseId: string, id: string): Promise<void> {
-  const response = await fetch(`${BASE}/cases/${encodeURIComponent(caseId)}/plan-items/${encodeURIComponent(id)}`, { method: "DELETE" });
+  const response = await authFetch(`${BASE}/cases/${encodeURIComponent(caseId)}/plan-items/${encodeURIComponent(id)}`, { method: "DELETE" });
   if (!response.ok) throw new Error(`Request failed (${response.status})`);
 }

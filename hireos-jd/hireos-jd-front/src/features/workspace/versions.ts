@@ -6,6 +6,7 @@ import { API_BASE_URL } from "../../lib/apiBase";
 import { blockLevel, blockPlainText } from "./docHelpers";
 import type { CoreJobDto } from "../jobs/jobsApi";
 import type { BlockLevel, DocBlock, DocMeta } from "../../data/types";
+import { authFetch } from "../../lib/session";
 
 const JOBS = `${API_BASE_URL}api/jobs`;
 
@@ -36,7 +37,7 @@ async function parseOrThrow<T>(response: Response): Promise<T> {
 
 /** The job's JD ID (assigned on first read) and its published versions, oldest first. */
 export async function getVersions(jobId: string): Promise<JdVersions> {
-  return parseOrThrow<JdVersions>(await fetch(`${JOBS}/${jobId}/versions`));
+  return parseOrThrow<JdVersions>(await authFetch(`${JOBS}/${jobId}/versions`));
 }
 
 /** Publishes the saved document at `revision` as the next version (and opens the job if it's a draft). */
@@ -44,7 +45,7 @@ export async function publishVersion(
   jobId: string,
   body: { revision: number; note: string; publishedBy: string },
 ): Promise<{ version: JdVersion; job: CoreJobDto }> {
-  const response = await fetch(`${JOBS}/${jobId}/publish`, {
+  const response = await authFetch(`${JOBS}/${jobId}/publish`, {
     method: "POST",
     headers: { "content-type": "application/json" },
     body: JSON.stringify(body),

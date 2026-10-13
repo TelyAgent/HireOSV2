@@ -6,6 +6,7 @@
 import { API_BASE_URL } from "../../lib/apiBase";
 import type { Audience, DocBlock, DocMeta, Suggestion } from "../../data/types";
 import type { MoneyRange } from "../../lib/format";
+import { authFetch } from "../../lib/session";
 
 const JOBS = `${API_BASE_URL}api/jobs`;
 
@@ -37,7 +38,7 @@ async function parseOrThrow<T>(response: Response): Promise<T> {
 }
 
 export async function getJobDocument(jobId: string, audience: Audience): Promise<JobDocumentDto | null> {
-  const response = await fetch(`${JOBS}/${jobId}/documents/${audience}`);
+  const response = await authFetch(`${JOBS}/${jobId}/documents/${audience}`);
   if (response.status === 404) return null;
   return parseOrThrow<JobDocumentDto>(response);
 }
@@ -49,7 +50,7 @@ export async function saveJobDocument(
   baseRevision?: number,
   meta?: DocMeta,
 ): Promise<JobDocumentDto> {
-  const response = await fetch(`${JOBS}/${jobId}/documents/${audience}`, {
+  const response = await authFetch(`${JOBS}/${jobId}/documents/${audience}`, {
     method: "PUT",
     headers: { "content-type": "application/json" },
     body: JSON.stringify({ blocks, baseRevision, meta }),
@@ -58,7 +59,7 @@ export async function saveJobDocument(
 }
 
 export async function getCurrentDraft(jobId: string): Promise<CurrentDraftDto | null> {
-  const response = await fetch(`${JOBS}/${jobId}/drafts/current`);
+  const response = await authFetch(`${JOBS}/${jobId}/drafts/current`);
   if (response.status === 404) return null;
   return parseOrThrow<CurrentDraftDto>(response);
 }
@@ -81,7 +82,7 @@ export interface RewriteResult {
 
 /** AI rewrite of a selected part of the document — backs the Copilot side panel. */
 export async function rewriteDocumentSelection(jobId: string, audience: Audience, body: RewriteRequest): Promise<RewriteResult> {
-  const response = await fetch(`${JOBS}/${jobId}/documents/${audience}/rewrite`, {
+  const response = await authFetch(`${JOBS}/${jobId}/documents/${audience}/rewrite`, {
     method: "POST",
     headers: { "content-type": "application/json" },
     body: JSON.stringify(body),
@@ -103,12 +104,12 @@ export interface NewSuggestion {
 
 /** Proposed document changes persisted per job document, so they survive reloads and are shared. */
 export async function listSuggestions(jobId: string, audience: Audience): Promise<Suggestion[]> {
-  const response = await fetch(`${JOBS}/${jobId}/documents/${audience}/suggestions`);
+  const response = await authFetch(`${JOBS}/${jobId}/documents/${audience}/suggestions`);
   return parseOrThrow<Suggestion[]>(response);
 }
 
 export async function createSuggestion(jobId: string, audience: Audience, body: NewSuggestion): Promise<Suggestion> {
-  const response = await fetch(`${JOBS}/${jobId}/documents/${audience}/suggestions`, {
+  const response = await authFetch(`${JOBS}/${jobId}/documents/${audience}/suggestions`, {
     method: "POST",
     headers: { "content-type": "application/json" },
     body: JSON.stringify(body),
@@ -122,7 +123,7 @@ export async function updateSuggestion(
   id: string,
   patch: Partial<Pick<Suggestion, "status" | "staleReason" | "newText" | "newItems">>,
 ): Promise<Suggestion> {
-  const response = await fetch(`${JOBS}/${jobId}/documents/${audience}/suggestions/${id}`, {
+  const response = await authFetch(`${JOBS}/${jobId}/documents/${audience}/suggestions/${id}`, {
     method: "PATCH",
     headers: { "content-type": "application/json" },
     body: JSON.stringify(patch),
@@ -176,7 +177,7 @@ export interface AiAnalysis {
 }
 
 async function postJson<T>(url: string, body: unknown): Promise<T> {
-  const response = await fetch(url, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) });
+  const response = await authFetch(url, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) });
   return parseOrThrow<T>(response);
 }
 

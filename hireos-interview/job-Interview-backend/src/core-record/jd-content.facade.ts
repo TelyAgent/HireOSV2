@@ -39,6 +39,8 @@ export class JdContentFacade {
           'x-correlation-id': `${this.serviceName}:${randomUUID()}`,
           'x-source-service': this.serviceName,
           'x-workspace-id': identity.workspaceId,
+          'x-actor-id': identity.actorId,
+          ...(process.env.SERVICE_TOKEN ? { 'x-hireos-service-token': process.env.SERVICE_TOKEN } : {}),
         },
       });
     } catch (error) {

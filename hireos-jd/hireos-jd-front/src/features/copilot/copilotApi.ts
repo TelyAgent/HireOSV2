@@ -6,6 +6,7 @@
 
 import { API_BASE_URL } from "../../lib/apiBase";
 import { safeRandomUUID } from "../../lib/uuid";
+import { authFetch } from "../../lib/session";
 
 const BASE = `${API_BASE_URL}api/copilot/conversations`;
 
@@ -52,7 +53,7 @@ export interface CopilotConversationDto {
 
 async function request<T>(path: string, init: RequestInit & { idempotencyKey: string }): Promise<T> {
   const { idempotencyKey, headers, ...rest } = init;
-  const response = await fetch(path, {
+  const response = await authFetch(path, {
     ...rest,
     headers: { "content-type": "application/json", "idempotency-key": idempotencyKey, ...(headers || {}) },
   });
@@ -70,7 +71,7 @@ export function createCopilotConversation(): Promise<CopilotConversationDto> {
 
 /** History list: each item's `messages` is empty (the backend keeps list responses lightweight). */
 export async function listCopilotConversations(): Promise<CopilotConversationDto[]> {
-  const response = await fetch(BASE);
+  const response = await authFetch(BASE);
   const body = await response.json().catch(() => []);
   if (!response.ok) {
     const problem = body as { code?: string; message?: string };
@@ -80,7 +81,7 @@ export async function listCopilotConversations(): Promise<CopilotConversationDto
 }
 
 export async function getCopilotConversation(conversationId: string): Promise<CopilotConversationDto> {
-  const response = await fetch(`${BASE}/${conversationId}`);
+  const response = await authFetch(`${BASE}/${conversationId}`);
   const body = await response.json().catch(() => ({}));
   if (!response.ok) {
     const problem = body as { code?: string; message?: string };
@@ -101,7 +102,7 @@ export async function streamCopilotMessage(
   text: string,
   onDelta: (text: string) => void,
 ): Promise<CopilotConversationDto> {
-  const response = await fetch(`${BASE}/${conversationId}/messages`, {
+  const response = await authFetch(`${BASE}/${conversationId}/messages`, {
     method: "POST",
     headers: { "content-type": "application/json", accept: "text/event-stream", "idempotency-key": idempotencyKey("copilot-msg") },
     body: JSON.stringify({ text }),
@@ -155,7 +156,7 @@ function parseSseEvent(raw: string): { type: string; data: string } | null {
 export async function uploadCopilotAttachment(conversationId: string, file: File): Promise<CopilotConversationDto> {
   const formData = new FormData();
   formData.append("file", file);
-  const response = await fetch(`${BASE}/${conversationId}/attachments`, {
+  const response = await authFetch(`${BASE}/${conversationId}/attachments`, {
     method: "POST",
     headers: { "idempotency-key": idempotencyKey("copilot-attach") },
     body: formData,

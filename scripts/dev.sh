@@ -13,7 +13,7 @@ LOG_DIR="$ROOT/.local/logs"
 PID_DIR="$ROOT/.local/pids"
 mkdir -p "$LOG_DIR" "$PID_DIR"
 
-NAMES=(interview-backend interview-frontend screening-backend screening-frontend core-record jd-backend jd-frontend written-backend written-frontend gateway-frontend gateway-backend)
+NAMES=(interview-backend interview-frontend screening-backend screening-frontend core-record jd-backend jd-frontend written-backend written-frontend identity-backend identity-frontend gateway-frontend gateway-backend)
 DIRS=(
   "$ROOT/hireos-interview/job-Interview-backend"
   "$ROOT/hireos-interview/job-Interview-front"
@@ -24,6 +24,8 @@ DIRS=(
   "$ROOT/hireos-jd/hireos-jd-front"
   "$ROOT/hireos-written/hireos-written-backend"
   "$ROOT/hireos-written/hireos-written-front"
+  "$ROOT/hireos-identity/hireos-identity-backend"
+  "$ROOT/hireos-identity/hireos-identity-front"
   "$ROOT/gateway"
   "$ROOT/gateway"
 )
@@ -37,12 +39,14 @@ CMDS=(
   "npm run dev"
   "npm run start:dev"
   "npm run dev"
+  "npm run start:dev"
+  "npm run dev"
   "npm run frontend"
   "npm run backend"
 )
-PORTS=(3001 5173 3002 5174 3004 3005 5175 3008 5178 8080 8090)
-BACKENDS=(interview-backend screening-backend core-record jd-backend written-backend)
-FRONTENDS=(interview-frontend screening-frontend jd-frontend written-frontend)
+PORTS=(3001 5173 3002 5174 3004 3005 5175 3008 5178 3003 5179 8080 8090)
+BACKENDS=(interview-backend screening-backend core-record jd-backend written-backend identity-backend)
+FRONTENDS=(interview-frontend screening-frontend jd-frontend written-frontend identity-frontend)
 GATEWAYS=(gateway-frontend gateway-backend)
 
 find_index() {

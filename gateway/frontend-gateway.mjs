@@ -11,6 +11,7 @@ const ROUTES = [
   { prefix: '/screening', target: 'http://127.0.0.1:5174', label: 'Screening' },
   { prefix: '/jd', target: 'http://127.0.0.1:5175', label: 'JD' },
   { prefix: '/written', target: 'http://127.0.0.1:5178', label: 'Written Test' },
+  { prefix: '/account', target: 'http://127.0.0.1:5179', label: 'Account / Sign in' },
 ];
 
 function matchRoute(url) {

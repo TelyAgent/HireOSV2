@@ -16,40 +16,77 @@ test('phase 0 health payload is stable', () => {
   assert.match(payload.timestamp, /^\d{4}-\d{2}-\d{2}T/);
 });
 
-test('workspace guard rejects production and missing development auth', () => {
-  const context = {
-    switchToHttp() {
-      return { getRequest: () => ({}) };
-    },
-  };
+function guardContext(request) {
+  return { switchToHttp: () => ({ getRequest: () => request }) };
+}
 
-  assert.throws(
-    () => new WorkspaceGuard(new ConfigService({ NODE_ENV: 'production', DEV_AUTH_ENABLED: 'true' })).canActivate(context),
-    (error) => error.getStatus() === 401 && error.response.code === 'AUTH_REQUIRED',
-  );
-  assert.throws(
-    () => new WorkspaceGuard(new ConfigService({ NODE_ENV: 'development', DEV_AUTH_ENABLED: 'false' })).canActivate(context),
-    (error) => error.getStatus() === 401 && error.response.code === 'AUTH_REQUIRED',
-  );
+test('workspace guard rejects production, missing development auth and session mode without a session', async () => {
+  for (const env of [
+    { NODE_ENV: 'production', DEV_AUTH_ENABLED: 'true' },
+    { NODE_ENV: 'development', DEV_AUTH_ENABLED: 'false' },
+    { NODE_ENV: 'development', DEV_AUTH_ENABLED: 'true', AUTH_MODE: 'session' },
+  ]) {
+    await assert.rejects(
+      new WorkspaceGuard(new ConfigService(env)).canActivate(guardContext({ headers: {}, method: 'GET' })),
+      (error) => error.getStatus() === 401 && error.response.code === 'AUTH_REQUIRED',
+    );
+  }
 });
 
-test('workspace guard injects an explicit local development identity', () => {
-  const request = {};
-  const context = {
-    switchToHttp() {
-      return { getRequest: () => request };
-    },
-  };
-
-  assert.equal(
-    new WorkspaceGuard(new ConfigService({ NODE_ENV: 'development', DEV_AUTH_ENABLED: 'true' })).canActivate(context),
-    true,
-  );
+test('workspace guard injects an explicit local development identity in dev mode', async () => {
+  const request = { headers: {}, method: 'GET' };
+  assert.equal(await new WorkspaceGuard(new ConfigService({ NODE_ENV: 'development', DEV_AUTH_ENABLED: 'true' })).canActivate(guardContext(request)), true);
   assert.deepEqual(request.identity, {
     workspaceId: 'local-screening-workspace',
     actorId: 'local-screening-user',
-    roles: ['recruiter', 'hiring_manager', 'admin'],
+    roles: ['admin', 'hr', 'interviewer'],
+    kind: 'dev',
   });
+});
+
+test('workspace guard trusts other backends only with the shared service token', async () => {
+  const guard = new WorkspaceGuard(new ConfigService({ AUTH_MODE: 'session', SERVICE_TOKEN: 'svc-secret' }));
+  const request = { method: 'POST', headers: { 'x-hireos-service-token': 'svc-secret', 'x-workspace-id': 'ws-1', 'x-actor-id': 'user-1' } };
+  assert.equal(await guard.canActivate(guardContext(request)), true);
+  assert.deepEqual(request.identity, { workspaceId: 'ws-1', actorId: 'user-1', roles: [], kind: 'service' });
+  await assert.rejects(
+    guard.canActivate(guardContext({ method: 'GET', headers: { 'x-hireos-service-token': 'wrong', 'x-workspace-id': 'ws-1' } })),
+    (error) => error.getStatus() === 401 && error.response.code === 'INVALID_SERVICE_TOKEN',
+  );
+});
+
+test('workspace guard resolves the hireos_sid cookie through the identity service and checks Origin', async () => {
+  const realFetch = globalThis.fetch;
+  const calls = [];
+  globalThis.fetch = async (url, init) => {
+    calls.push({ url, init });
+    const { token } = JSON.parse(init.body);
+    return new Response(JSON.stringify(token === 'good' ? { active: true, userId: 'u-1', workspaceId: 'ws-1', roles: ['hr'], email: 'a@b.c', displayName: 'A' } : { active: false }), { status: 200 });
+  };
+  try {
+    const guard = new WorkspaceGuard(new ConfigService({
+      AUTH_MODE: 'session',
+      IDENTITY_INTERNAL_URL: 'http://identity/api',
+      IDENTITY_INTERNAL_TOKEN: 'internal',
+      ALLOWED_ORIGINS: 'https://hireos.example',
+    }));
+    const request = { method: 'POST', headers: { cookie: 'x=1; hireos_sid=good', origin: 'https://hireos.example' } };
+    assert.equal(await guard.canActivate(guardContext(request)), true);
+    assert.equal(request.identity.actorId, 'u-1');
+    assert.equal(request.identity.kind, 'user');
+    assert.equal(calls[0].url, 'http://identity/api/internal/sessions/introspect');
+    assert.equal(calls[0].init.headers['x-internal-token'], 'internal');
+    // Cached: a second request with the same cookie doesn't call the identity service again.
+    await guard.canActivate(guardContext({ method: 'GET', headers: { cookie: 'hireos_sid=good' } }));
+    assert.equal(calls.length, 1);
+    await assert.rejects(
+      guard.canActivate(guardContext({ method: 'POST', headers: { cookie: 'hireos_sid=good', origin: 'https://evil.example' } })),
+      (error) => error.getStatus() === 403,
+    );
+    await assert.rejects(guard.canActivate(guardContext({ method: 'GET', headers: { cookie: 'hireos_sid=bad' } })), (error) => error.getStatus() === 401);
+  } finally {
+    globalThis.fetch = realFetch;
+  }
 });
 
 test('phase 1 text and filename normalization preserve source boundaries', () => {

@@ -12,7 +12,7 @@
 | --- | --- | --- | --- | --- |
 | hireos-interview（面试） | 3001 | `/api` | 5173 | 使用中 |
 | hireos-screening（简历筛选） | 3002 | `/api` | 5174 | 使用中 |
-| （预留，未分配） | 3003 | — | — | 空闲 |
+| hireos-identity（统一账号与登录） | 3003 | `/api` | 5179 | 使用中 |
 | hireos-core-record（核心档案，无独立前端） | 3004 | `/api/v1` | — | 使用中 |
 | hireos-jd（职位描述） | 3005 | `/api` | 5175 | 使用中 |
 | hireos-assessment（测评，代码未创建） | 3006 | `/api` | 5176 | 预留 |
@@ -30,6 +30,7 @@
 | hireos-core-record | `hireos-core-record/.env` → `PORT` | — |
 | hireos-jd | `hireos-jd/hireos-jd-backend/.env` → `PORT` | `hireos-jd/hireos-jd-front/vite.config.ts` → `server.port` |
 | hireos-written | `hireos-written/hireos-written-backend/.env` → `PORT` | `hireos-written/hireos-written-front/vite.config.ts` → `server.port` |
+| hireos-identity | `hireos-identity/hireos-identity-backend/.env` → `PORT` | `hireos-identity/hireos-identity-front/vite.config.ts` → `server.port` |
 
 ## 前端 → 后端代理关系
 
@@ -39,6 +40,9 @@
 - hireos-screening-front：`/screening/api` → `http://127.0.0.1:3002/api`
 - hireos-jd-front：`/jd/api` → `http://127.0.0.1:3005/api`，另有 `/jd/ws/voice-stream` → `http://127.0.0.1:3005/ws/voice-stream`（语音流 WebSocket）
 - hireos-written-front：`/written/api` → `http://127.0.0.1:3008/api`（后端目前只有空骨架 + `/api/health`，还没有业务接口）
+- hireos-identity-front：`/account/api` → `http://127.0.0.1:3003/api`；`/account/api/internal/*` 被拦截不转发（只供后端之间调用）
+
+各业务前端（interview / screening / jd / written）还会直接请求同源的 `/account/api/auth/me` 等登录接口：经 `:8080` 前端网关访问时由 identity 前端的代理转发；单独打开某个前端的 Vite 端口时，它的 `vite.config.ts` 里也有一条 `/account/api` 代理。
 
 前端代码里发请求一律用 `` `${import.meta.env.BASE_URL}api/...` ``（每个前端的 `src/utils/apiBase.ts` 或 `src/lib/apiBase.ts` 导出的 `API_BASE_URL`），不要写死 `/api/...`——`BASE_URL` 由下面的 `base` 配置决定，两者必须对应。
 
@@ -49,6 +53,8 @@
 - `hireos-screening-backend/.env`
   - `CORE_RECORD_BASE_URL=http://127.0.0.1:3004/api/v1`
   - `JD_BASE_URL=http://127.0.0.1:3005/api`
+- interview / screening / jd / written / core-record 各后端的 `.env`
+  - `IDENTITY_INTERNAL_URL=http://127.0.0.1:3003/api`（线上为 `http://identity-backend:3003/api`），用于校验登录会话
 
 ## 新增子系统时怎么做
 
@@ -69,6 +75,7 @@
 | JD | `/jd/*` → `127.0.0.1:5175/jd/*` | `/jd/*` → `127.0.0.1:3005/api/*` |
 | Written | `/written/*` → `127.0.0.1:5178/written/*` | `/written/*` → `127.0.0.1:3008/api/*` |
 | Core Record | — （无独立前端） | `/core-record/*` → `127.0.0.1:3004/api/v1/*` |
+| Identity（登录） | `/account/*` → `127.0.0.1:5179/account/*` | `/account/*` → `127.0.0.1:3003/api/*`（`/account/api/internal/*` 返回 404） |
 
 实现在 `/Users/qmk/work/HireOS/gateway/`（`frontend-gateway.mjs` / `backend-gateway.mjs`，纯 `http-proxy` 转发，不做鉴权）。
 

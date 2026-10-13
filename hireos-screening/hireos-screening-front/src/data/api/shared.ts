@@ -1,3 +1,5 @@
+import { authFetch } from "../../lib/session";
+
 export class ApiError extends Error {
   code: string;
   constructor(code: string, message?: string) {
@@ -15,7 +17,7 @@ async function parseResponse(response: Response): Promise<unknown> {
 export const BASE_URL = ((import.meta as ImportMeta & { env?: Record<string, string | undefined> }).env?.BASE_URL) || "/";
 
 export async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
-  const response = await fetch(`${BASE_URL}api${path}`, {
+  const response = await authFetch(`${BASE_URL}api${path}`, {
     credentials: "include",
     ...init,
     headers: {

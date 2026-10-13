@@ -4,6 +4,7 @@ import { ConfigProvider, App as AntApp } from "antd";
 import { BrowserRouter } from "react-router-dom";
 import App from "./App";
 import { StoreProvider } from "./store/StoreContext";
+import { SessionGate } from "./lib/session";
 import "./index.css";
 
 class ErrorBoundary extends Component<{ children: ReactNode }, { error: Error | null; info: ErrorInfo | null }> {
@@ -52,13 +53,15 @@ root.render(
       }}
     >
       <AntApp>
-        <StoreProvider>
-          <BrowserRouter basename={(import.meta as ImportMeta & { env?: Record<string, string | undefined> }).env?.BASE_URL || "/"}>
-            <ErrorBoundary>
-              <App />
-            </ErrorBoundary>
-          </BrowserRouter>
-        </StoreProvider>
+        <SessionGate>
+          <StoreProvider>
+            <BrowserRouter basename={(import.meta as ImportMeta & { env?: Record<string, string | undefined> }).env?.BASE_URL || "/"}>
+              <ErrorBoundary>
+                <App />
+              </ErrorBoundary>
+            </BrowserRouter>
+          </StoreProvider>
+        </SessionGate>
       </AntApp>
     </ConfigProvider>
   </StrictMode>,

@@ -90,7 +90,7 @@ test('intake persistence, validation, parsing and recovery', async (t) => {
     await t.test('workspace isolation and production fail-closed guard', async () => {
       await assert.rejects(app.get(JobsService).get('different-workspace', job.id), (e) => e.getStatus() === 404);
       const guard = new WorkspaceGuard(new ConfigService({ NODE_ENV: 'production', DEV_AUTH_ENABLED: 'true' }));
-      assert.throws(() => guard.canActivate({}), (e) => e.getStatus() === 401);
+      await assert.rejects(guard.canActivate({ switchToHttp: () => ({ getRequest: () => ({ headers: {}, method: 'GET' }) }) }), (e) => e.getStatus() === 401);
     });
     let resumeMaterial;
     await t.test('real TXT, PDF and DOCX extraction; OCR, invalid and oversized files', async () => {

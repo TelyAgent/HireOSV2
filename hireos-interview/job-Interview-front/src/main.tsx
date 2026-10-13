@@ -5,6 +5,7 @@ import { BrowserRouter } from "react-router-dom";
 import App from "./App";
 import { StoreProvider, RouteSync } from "./store/StoreContext";
 import { API_BASE_URL } from "./utils/apiBase";
+import { SessionGate } from "./lib/session";
 import "./index.css";
 
 class ErrorBoundary extends Component<
@@ -57,15 +58,17 @@ root.render(
       }}
     >
       <AntApp>
-        <StoreProvider>
-          <BrowserRouter basename={API_BASE_URL}>
-            <RouteSync>
-              <ErrorBoundary>
-                <App />
-              </ErrorBoundary>
-            </RouteSync>
-          </BrowserRouter>
-        </StoreProvider>
+        <SessionGate>
+          <StoreProvider>
+            <BrowserRouter basename={API_BASE_URL}>
+              <RouteSync>
+                <ErrorBoundary>
+                  <App />
+                </ErrorBoundary>
+              </RouteSync>
+            </BrowserRouter>
+          </StoreProvider>
+        </SessionGate>
       </AntApp>
     </ConfigProvider>
   </StrictMode>,

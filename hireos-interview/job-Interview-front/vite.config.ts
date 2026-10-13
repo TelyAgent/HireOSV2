@@ -39,6 +39,13 @@ export default defineConfig({
         changeOrigin: true,
         rewrite: (path) => path.replace(/^\/interview/, ''),
       },
+      // Shared sign-in (hireos-identity) when this dev server is opened directly instead of via :8080.
+      '/account/api': {
+        target: 'http://127.0.0.1:3003',
+        changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/account/, ''),
+        bypass: (req) => (req.url?.startsWith('/account/api/internal') ? false : undefined),
+      },
     },
   },
 });

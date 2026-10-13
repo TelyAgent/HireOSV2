@@ -89,6 +89,8 @@ export class CoreRecordClient {
         'x-correlation-id': `${this.serviceName}:${randomUUID()}`,
         'x-source-service': this.serviceName,
         'x-workspace-id': identity.workspaceId,
+        'x-actor-id': identity.actorId,
+        ...(process.env.SERVICE_TOKEN ? { 'x-hireos-service-token': process.env.SERVICE_TOKEN } : {}),
         ...(idempotencyKey ? { 'idempotency-key': idempotencyKey } : {}),
       },
       body: body === undefined ? undefined : JSON.stringify(body),

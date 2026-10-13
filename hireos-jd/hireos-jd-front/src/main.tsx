@@ -5,6 +5,7 @@ import { BrowserRouter } from "react-router-dom";
 import App from "./App";
 import { StoreProvider } from "./store/StoreContext";
 import { API_BASE_URL } from "./lib/apiBase";
+import { SessionGate } from "./lib/session";
 import "./index.css";
 
 class ErrorBoundary extends Component<{ children: ReactNode }, { error: Error | null; info: ErrorInfo | null }> {
@@ -43,13 +44,15 @@ createRoot(document.getElementById("root")!).render(
   <StrictMode>
     <ConfigProvider theme={{ token: { colorPrimary: "#0d9488", borderRadius: 6, fontFamily: "inherit" } }}>
       <AntApp>
-        <StoreProvider>
-          <BrowserRouter basename={API_BASE_URL}>
-            <ErrorBoundary>
-              <App />
-            </ErrorBoundary>
-          </BrowserRouter>
-        </StoreProvider>
+        <SessionGate>
+          <StoreProvider>
+            <BrowserRouter basename={API_BASE_URL}>
+              <ErrorBoundary>
+                <App />
+              </ErrorBoundary>
+            </BrowserRouter>
+          </StoreProvider>
+        </SessionGate>
       </AntApp>
     </ConfigProvider>
   </StrictMode>,

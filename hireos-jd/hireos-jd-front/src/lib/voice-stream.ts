@@ -7,6 +7,7 @@
  * needed here.
  */
 import { API_BASE_URL } from "./apiBase";
+import { authFetch } from "./session";
 
 export type VoiceStreamServerEvent =
   | { type: "ready" }
@@ -208,7 +209,7 @@ export async function openVoiceStream(options: StreamOptions): Promise<VoiceStre
 }
 
 async function defaultFetchTicket(): Promise<TicketResponse> {
-  const response = await fetch(`${API_BASE_URL}api/audio/realtime-ticket`, { method: "POST" });
+  const response = await authFetch(`${API_BASE_URL}api/audio/realtime-ticket`, { method: "POST" });
   if (!response.ok) {
     let detail = "流式语音输入暂不可用。";
     try {

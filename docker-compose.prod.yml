@@ -40,6 +40,9 @@ services:
   written-backend:
     logging: *local-logging
 
+  identity-backend:
+    logging: *local-logging
+
   gateway:
     logging: *local-logging
     ports:
@@ -72,3 +75,10 @@ services:
       context: ./hireos-written/hireos-written-front
       args:
         VITE_BASE_PATH: /hireos/written/
+
+  identity-frontend:
+    logging: *local-logging
+    build:
+      context: ./hireos-identity/hireos-identity-front
+      args:
+        VITE_BASE_PATH: /hireos/account/

@@ -121,7 +121,13 @@ export class CaseLifecycleService {
     try {
       const response = await globalThis.fetch(`${baseUrl}/screening-handoff`, {
         method: 'POST',
-        headers: { 'content-type': 'application/json' },
+        headers: {
+          'content-type': 'application/json',
+          'x-source-service': 'written',
+          'x-workspace-id': identity.workspaceId,
+          'x-actor-id': identity.actorId,
+          ...(this.config.get<string>('SERVICE_TOKEN') ? { 'x-hireos-service-token': this.config.get<string>('SERVICE_TOKEN') as string } : {}),
+        },
         body: JSON.stringify(payload),
       });
       if (!response.ok) throw new Error(`HTTP ${response.status}: ${(await response.text()).slice(0, 300)}`);

@@ -22,8 +22,26 @@ import { ComparisonDetailPage } from "./pages/ComparisonDetailPage";
 import { SettingsPage } from "./pages/SettingsPage";
 import { AiModelsPage } from "./pages/AiModelsPage";
 import { CandidateApplyPage } from "./pages/CandidateApplyPage";
+import { SessionGate } from "./lib/session";
 
 export default function App() {
+  return (
+    <Routes>
+      {/* Candidate-facing, no login and no internal HR chrome — kept outside <AppShell> and the sign-in gate. */}
+      <Route path="/apply/:token" element={<CandidateApplyPage />} />
+      <Route
+        path="/*"
+        element={
+          <SessionGate>
+            <ShellRoutes />
+          </SessionGate>
+        }
+      />
+    </Routes>
+  );
+}
+
+function ShellRoutes() {
   const openTaskCount = useOpenTaskCount();
   const { state, set } = useStore();
 
@@ -56,16 +74,6 @@ export default function App() {
     };
   }, [set]);
 
-  return (
-    <Routes>
-      {/* Candidate-facing, no login and no internal HR chrome — kept outside <AppShell>. */}
-      <Route path="/apply/:token" element={<CandidateApplyPage />} />
-      <Route path="/*" element={<ShellRoutes openTaskCount={openTaskCount} />} />
-    </Routes>
-  );
-}
-
-function ShellRoutes({ openTaskCount }: { openTaskCount: number }) {
   return (
     <AppShell openTaskCount={openTaskCount}>
       <Routes>

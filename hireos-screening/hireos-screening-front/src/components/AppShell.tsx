@@ -6,6 +6,7 @@ import type { Accent, TextSize, ThemeMode } from "../store/types";
 import { Icon } from "./ui/Icons";
 import { Button, PersonAvatar } from "./ui/Primitives";
 import { Modal } from "./ui/Overlays";
+import { UserMenu, useSessionUser } from "../lib/session";
 
 /* ---------------------------------------------------------------
    Nav config — ported from the prototype's NAV_ITEMS/isActiveRoute.
@@ -53,6 +54,7 @@ function activeSection(pathname: string): string | null {
 export function TopBar() {
   const { state, t, toggleLang, toggleAppearance, toggleRoleSwitcher, person } = useStore();
   const langLabel = state.lang === "en" ? "中 / EN" : "EN / 中";
+  const sessionUser = useSessionUser();
   return (
     <div className="topbar">
       <div className="brand">
@@ -68,23 +70,27 @@ export function TopBar() {
         <button className="icon-btn" title={t("Appearance")} aria-label={t("Appearance")} onClick={toggleAppearance}>
           <Icon name="palette" />
         </button>
-        <div
-          className="role-pill"
-          onClick={toggleRoleSwitcher}
-          onKeyDown={(e) => {
-            if (e.key === "Enter" || e.key === " ") {
-              e.preventDefault();
-              toggleRoleSwitcher();
-            }
-          }}
-          tabIndex={0}
-          role="button"
-          aria-label={t("Switch demo role")}
-        >
-          <PersonAvatar person={person} />
-          <span>{person?.name}</span>
-          <span className="demo-tag">{t("Demo role")}</span>
-        </div>
+        {sessionUser ? (
+          <UserMenu user={sessionUser} labels={{ account: t("Account settings"), signOut: t("Sign out") }} />
+        ) : (
+          <div
+            className="role-pill"
+            onClick={toggleRoleSwitcher}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" || e.key === " ") {
+                e.preventDefault();
+                toggleRoleSwitcher();
+              }
+            }}
+            tabIndex={0}
+            role="button"
+            aria-label={t("Switch demo role")}
+          >
+            <PersonAvatar person={person} />
+            <span>{person?.name}</span>
+            <span className="demo-tag">{t("Demo role")}</span>
+          </div>
+        )}
       </div>
     </div>
   );

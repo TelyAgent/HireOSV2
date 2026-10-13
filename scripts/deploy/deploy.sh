@@ -52,15 +52,16 @@ COMPOSE_FILES="-f docker-compose.yml -f docker-compose.prod.yml"
 # Individual docker-compose.yml service names, and the subsystem/role group
 # aliases `deploy <target>` accepts in place of one -- mirrors scripts/dev.sh's
 # grouping convention for the local orchestrator.
-ALL_SERVICES=(interview-backend interview-frontend screening-backend screening-frontend core-record jd-backend jd-frontend written-backend written-frontend gateway)
+ALL_SERVICES=(interview-backend interview-frontend screening-backend screening-frontend core-record jd-backend jd-frontend written-backend written-frontend identity-backend identity-frontend gateway)
 resolve_targets() {
   case "$1" in
     interview) echo "interview-backend interview-frontend" ;;
     screening) echo "screening-backend screening-frontend" ;;
     jd) echo "jd-backend jd-frontend" ;;
     written) echo "written-backend written-frontend" ;;
-    backends) echo "interview-backend screening-backend core-record jd-backend written-backend" ;;
-    frontends) echo "interview-frontend screening-frontend jd-frontend written-frontend" ;;
+    identity) echo "identity-backend identity-frontend" ;;
+    backends) echo "interview-backend screening-backend core-record jd-backend written-backend identity-backend" ;;
+    frontends) echo "interview-frontend screening-frontend jd-frontend written-frontend identity-frontend" ;;
     all|"") echo "${ALL_SERVICES[*]}" ;;
     *) echo "$1" ;;
   esac
@@ -162,6 +163,7 @@ cmd_push_env() {
     "hireos-core-record/.env.production"
     "hireos-jd/hireos-jd-backend/.env.production"
     "hireos-written/hireos-written-backend/.env.production"
+    "hireos-identity/hireos-identity-backend/.env.production"
     "scripts/docker/postgres.env.production"
   )
   local f flat
@@ -233,7 +235,7 @@ cmd_deploy() {
   local targets
   targets="$(resolve_targets "${1:-all}")"
   for t in $targets; do
-    [[ " ${ALL_SERVICES[*]} " == *" $t "* ]] || fail "unknown service/group '$t' -- one of: ${ALL_SERVICES[*]} | interview | screening | jd | written | backends | frontends | all"
+    [[ " ${ALL_SERVICES[*]} " == *" $t "* ]] || fail "unknown service/group '$t' -- one of: ${ALL_SERVICES[*]} | interview | screening | jd | written | identity | backends | frontends | all"
   done
 
   local release

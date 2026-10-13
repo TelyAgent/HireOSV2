@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { ZoomMeetingPanel } from './ZoomMeetingPanel';
 import { API_BASE_URL } from '../../utils/apiBase';
+import { authFetch } from "../../lib/session";
 
 // mode 's2s': the backend uses a Server-to-Server app on a fixed host account — nothing to authorize here.
 type Connection = { mode?: 'oauth' | 's2s'; connected: boolean; name: string | null; pending: boolean; error: string | null; meeting?: { joinUrl: string } | null };
@@ -19,7 +20,7 @@ export function ZoomHostPanel({ lang, onActive, round = null, autoJoin = false }
     const controller = new AbortController(); let timer: ReturnType<typeof setTimeout>;
     const poll = async () => {
       try {
-        const response = await fetch(`${API_BASE_URL}api/meetings/host/status`, { signal: controller.signal });
+        const response = await authFetch(`${API_BASE_URL}api/meetings/host/status`, { signal: controller.signal });
         const body = await response.json(); if (!response.ok) throw new Error(body.code || 'ZOOM_STATUS_FAILED');
         if (!controller.signal.aborted) {
           setConnection(body);
@@ -38,7 +39,7 @@ export function ZoomHostPanel({ lang, onActive, round = null, autoJoin = false }
   useEffect(() => {
     if (!connection?.connected || !round?.roundId) return;
     const controller = new AbortController();
-    void fetch(`${API_BASE_URL}api/meetings/host/link`, {
+    void authFetch(`${API_BASE_URL}api/meetings/host/link`, {
       method: 'POST',
       headers: { 'x-hireos-zoom': '1', 'Content-Type': 'application/json' },
       body: JSON.stringify({ roundId: round.roundId, topic: round.topic }),
@@ -63,7 +64,7 @@ export function ZoomHostPanel({ lang, onActive, round = null, autoJoin = false }
     if (!popup) { setError('POPUP_BLOCKED'); return; }
     popup.opener = null; setBusy(true); setError('');
     try {
-      const response = await fetch(`${API_BASE_URL}api/meetings/host/authorize`, { method: 'POST', headers: { 'x-hireos-zoom': '1' }, signal: AbortSignal.timeout(15000) });
+      const response = await authFetch(`${API_BASE_URL}api/meetings/host/authorize`, { method: 'POST', headers: { 'x-hireos-zoom': '1' }, signal: AbortSignal.timeout(15000) });
       const body = await response.json(); if (!response.ok) throw new Error(body.code || 'ZOOM_AUTH_FAILED');
       const url = new URL(body.authorizationUrl); if (url.origin !== 'https://zoom.us') throw new Error('ZOOM_AUTH_FAILED');
       popup.location.href = url.href; setReload(value => value + 1);

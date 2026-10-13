@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { liveCopy } from './i18n';
 import { API_BASE_URL } from '../../utils/apiBase';
 import './zoom-meeting.css';
+import { authFetch } from "../../lib/session";
 
 type Status = 'idle' | 'loading' | 'joining' | 'joined' | 'reconnecting' | 'left' | 'error';
 type JoinConfig = { meetingNumber: string; password: string; displayName: string; signature: string; sdkKey?: string; expiresAt: number; zak?: string; joinUrl?: string };
@@ -30,7 +31,7 @@ export function ZoomMeetingPanel({ lang, onActive, host = false, onInvitation, r
     const { host: isHost, roundId: currentRound } = meetingContext.current;
     if (!isHost || endRequested.current) return;
     endRequested.current = true;
-    void fetch(`${API_BASE_URL}api/meetings/host/end`, {
+    void authFetch(`${API_BASE_URL}api/meetings/host/end`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'x-hireos-zoom': '1' },
       body: JSON.stringify({ roundId: currentRound }),
@@ -69,7 +70,7 @@ export function ZoomMeetingPanel({ lang, onActive, host = false, onInvitation, r
         setStatus('joined');
         if (host && roundId && rtmsStartedForRound.current !== roundId) {
           rtmsStartedForRound.current = roundId;
-          void fetch(`${API_BASE_URL}api/meetings/host/rtms/start`, {
+          void authFetch(`${API_BASE_URL}api/meetings/host/rtms/start`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json', 'x-hireos-zoom': '1' },
             body: JSON.stringify({ roundId }),
@@ -122,7 +123,7 @@ export function ZoomMeetingPanel({ lang, onActive, host = false, onInvitation, r
     setError(''); setDiagnostic(''); setStatus('loading'); setElapsed(0);
     const timeout = setTimeout(() => controller.abort(), host ? 75000 : 15000);
     try {
-      const response = await fetch(
+      const response = await authFetch(
         host ? `${API_BASE_URL}api/meetings/host/start` : `${API_BASE_URL}api/meetings/dev/join-config`,
         { method: 'POST', signal: controller.signal, headers: { 'Content-Type': 'application/json', 'x-hireos-zoom': '1' }, body: host ? JSON.stringify({ roundId, topic }) : undefined },
       );

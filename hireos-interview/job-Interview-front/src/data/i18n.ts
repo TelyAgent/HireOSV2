@@ -14,6 +14,8 @@ export const LANG = {
     homeSubtitle:
       "Evidence-based interview execution and evaluation, organized by role.",
     newProject: "+ New Interview Project",
+    accountSettings: "Account settings",
+    signOut: "Sign out",
     myWork: "MY WORK",
     workspaceOverview: "WORKSPACE OVERVIEW",
     moreStats: "MORE STATISTICS",
@@ -386,6 +388,8 @@ export const LANG = {
     homeTitle: "面试",
     homeSubtitle: "以证据为基础的面试执行与评估，按岗位组织。",
     newProject: "+ 新建面试项目",
+    accountSettings: "账号设置",
+    signOut: "退出登录",
     myWork: "我的工作",
     workspaceOverview: "工作区总览",
     moreStats: "更多统计",

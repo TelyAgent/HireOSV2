@@ -5,9 +5,11 @@ import {
   SunSvg,
 } from "./ui/Icons";
 import { AppearancePopover } from "./AppearancePopover";
+import { UserMenu, useSessionUser } from "../lib/session";
 
 export function TopBar() {
   const { state, t, go, role, set, toggleLang, toggleAppearance } = useStore();
+  const sessionUser = useSessionUser();
   const langLabel = state.lang === "en" ? "中 / EN" : "EN / 中";
 
   return (
@@ -113,7 +115,11 @@ export function TopBar() {
         {t.newProject}
       </button>
 
-      <RoleButton role={role} />
+      {sessionUser ? (
+        <UserMenu user={sessionUser} labels={{ account: t.accountSettings, signOut: t.signOut }} />
+      ) : (
+        <RoleButton role={role} />
+      )}
     </div>
   );
 }

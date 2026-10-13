@@ -23,6 +23,8 @@ export const ZH: Record<string, string> = {
   Notifications: "通知",
   "Demo tools": "演示工具",
   "Switch demo role": "切换演示角色",
+  "Account settings": "账号设置",
+  "Sign out": "退出登录",
   "Demo role": "演示角色",
   "Expand navigation": "展开导航",
   "Collapse navigation": "收起导航",

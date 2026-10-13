@@ -18,6 +18,7 @@ const ROUTES = [
   { prefix: '/jd', target: 'http://127.0.0.1:3005' },
   { prefix: '/written', target: 'http://127.0.0.1:3008' },
   { prefix: '/core-record', target: 'http://127.0.0.1:3004' },
+  { prefix: '/account', target: 'http://127.0.0.1:3003' },
 ];
 
 function matchRoute(url) {
@@ -43,7 +44,8 @@ const server = http.createServer((req, res) => {
     return;
   }
   const route = matchRoute(req.url);
-  if (!route) {
+  // Identity's session-introspection API is backend-to-backend only (see nginx.conf).
+  if (!route || req.url.startsWith('/account/api/internal')) {
     res.writeHead(404, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify({ code: 'NOT_FOUND', message: `No backend registered for ${req.url}` }));
     return;

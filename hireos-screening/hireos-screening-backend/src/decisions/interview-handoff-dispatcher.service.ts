@@ -62,7 +62,7 @@ export class InterviewHandoffDispatcherService implements OnModuleInit, OnModule
     }
   }
 
-  private async dispatchOne(event: { id: string; eventType: string; payload: unknown; attempt: number }) {
+  private async dispatchOne(event: { id: string; workspaceId: string; eventType: string; payload: unknown; attempt: number }) {
     const target = this.targetFor(event.eventType);
     if (!target) {
       // No receiver registered for this event type -- not a delivery failure, just
@@ -74,7 +74,12 @@ export class InterviewHandoffDispatcherService implements OnModuleInit, OnModule
     try {
       const response = await globalThis.fetch(`${baseUrl}${target.endpoint}`, {
         method: 'POST',
-        headers: { 'content-type': 'application/json' },
+        headers: {
+          'content-type': 'application/json',
+          'x-source-service': 'screening',
+          'x-workspace-id': event.workspaceId,
+          ...(process.env.SERVICE_TOKEN ? { 'x-hireos-service-token': process.env.SERVICE_TOKEN } : {}),
+        },
         body: JSON.stringify(event.payload),
       });
       if (!response.ok) throw new Error(`HTTP ${response.status}`);

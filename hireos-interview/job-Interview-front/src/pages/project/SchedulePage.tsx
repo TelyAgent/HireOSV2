@@ -7,6 +7,7 @@ import { CloseSvg } from "../../components/ui/Icons";
 import { api, type ApiError, type Round } from "../../features/project-intake/api";
 import { errorText } from "../../features/project-intake/i18n";
 import { API_BASE_URL } from "../../utils/apiBase";
+import { authFetch } from "../../lib/session";
 
 const meetingLabel = (format: string, zh: boolean) => {
   if (format === "Work sample") return zh ? "作品评审（模拟）" : "Work sample review (simulated)";
@@ -61,7 +62,7 @@ export function SchedulePage() {
 
   const loadZoomStatus = async () => {
     try {
-      const response = await fetch(`${API_BASE_URL}api/meetings/host/status`, { cache: "no-store" });
+      const response = await authFetch(`${API_BASE_URL}api/meetings/host/status`, { cache: "no-store" });
       const body = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(body.code || "ZOOM_STATUS_FAILED");
       setZoomConnection(body);
@@ -86,7 +87,7 @@ export function SchedulePage() {
     setZoomAuthBusy(true);
     setZoomConnection((current) => current ? { ...current, pending: true, error: null } : { connected: false, name: null, pending: true, error: null });
     try {
-      const authRes = await fetch(`${API_BASE_URL}api/meetings/host/authorize`, { method: "POST", headers: { "x-hireos-zoom": "1" } });
+      const authRes = await authFetch(`${API_BASE_URL}api/meetings/host/authorize`, { method: "POST", headers: { "x-hireos-zoom": "1" } });
       const authBody = await authRes.json().catch(() => ({}));
       if (!authRes.ok) throw new Error(authBody.code || "ZOOM_AUTH_FAILED");
       const url = new URL(authBody.authorizationUrl);
@@ -96,7 +97,7 @@ export function SchedulePage() {
       let connected = false;
       for (let i = 0; i < 60 && !connected; i++) {
         await new Promise((resolve) => setTimeout(resolve, 2500));
-        const statusRes = await fetch(`${API_BASE_URL}api/meetings/host/status`, { cache: "no-store" });
+        const statusRes = await authFetch(`${API_BASE_URL}api/meetings/host/status`, { cache: "no-store" });
         const status = await statusRes.json().catch(() => ({}));
         if (status.connected && !status.pending) {
           connected = true;
@@ -138,7 +139,7 @@ export function SchedulePage() {
     const round = rounds.find((r) => r.id === openRoundId);
     if (!round) return;
     try {
-      const statusRes = await fetch(`${API_BASE_URL}api/meetings/host/status`);
+      const statusRes = await authFetch(`${API_BASE_URL}api/meetings/host/status`);
       const status = await statusRes.json().catch(() => ({}));
       if (!statusRes.ok) throw new Error(status.code || "ZOOM_STATUS_FAILED");
       if (!status.connected) {
@@ -147,7 +148,7 @@ export function SchedulePage() {
         if (!authorized) throw new Error("ZOOM_AUTH_FAILED");
       }
       setZoomPhase("generating");
-      const linkRes = await fetch(`${API_BASE_URL}api/meetings/host/link`, {
+      const linkRes = await authFetch(`${API_BASE_URL}api/meetings/host/link`, {
         method: "POST", headers: { "x-hireos-zoom": "1", "Content-Type": "application/json" },
         body: JSON.stringify({ roundId: round.id, topic: `HireOS Interview — ${round.name}` }),
       });

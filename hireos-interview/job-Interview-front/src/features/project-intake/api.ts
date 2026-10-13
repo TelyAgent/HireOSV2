@@ -1,4 +1,5 @@
 import { API_BASE_URL } from '../../utils/apiBase';
+import { authFetch } from "../../lib/session";
 
 export type MaterialKind = 'resume' | 'screening' | 'assessment' | 'other';
 export type Material = { id: string; name: string; text: string; readStatus: string; errorCode: string | null; segments: { id: string; text: string; page?: number }[] };
@@ -171,7 +172,7 @@ export type BriefState = {
 export class ApiError extends Error { constructor(public code: string) { super(code); } }
 export async function api<T>(path: string, init?: RequestInit): Promise<T> {
   let response: Response;
-  try { response = await fetch(`${API_BASE_URL}api${path}`, { ...init, headers: { ...(init?.body instanceof FormData ? {} : { 'Content-Type': 'application/json' }), ...init?.headers } }); }
+  try { response = await authFetch(`${API_BASE_URL}api${path}`, { ...init, headers: { ...(init?.body instanceof FormData ? {} : { 'Content-Type': 'application/json' }), ...init?.headers } }); }
   catch { throw new ApiError('NETWORK_ERROR'); }
   if (!response.ok) {
     const error = await response.json().catch(() => ({}));

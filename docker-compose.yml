@@ -76,6 +76,15 @@ services:
     env_file:
       - ./hireos-written/hireos-written-backend/.env.production
 
+  identity-backend:
+    build: ./hireos-identity/hireos-identity-backend
+    platform: linux/amd64
+    restart: unless-stopped
+    env_file:
+      - ./hireos-identity/hireos-identity-backend/.env.production
+    depends_on:
+      - postgres
+
   interview-frontend:
     build: ./hireos-interview/job-Interview-front
     platform: linux/amd64
@@ -93,6 +102,11 @@ services:
 
   written-frontend:
     build: ./hireos-written/hireos-written-front
+    platform: linux/amd64
+    restart: unless-stopped
+
+  identity-frontend:
+    build: ./hireos-identity/hireos-identity-front
     platform: linux/amd64
     restart: unless-stopped
 
@@ -115,6 +129,8 @@ services:
       - jd-frontend
       - written-backend
       - written-frontend
+      - identity-backend
+      - identity-frontend
 
 volumes:
   postgres_data:

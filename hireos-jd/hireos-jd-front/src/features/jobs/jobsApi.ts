@@ -7,6 +7,7 @@
 
 import { API_BASE_URL } from "../../lib/apiBase";
 import { safeRandomUUID } from "../../lib/uuid";
+import { authFetch } from "../../lib/session";
 
 const BASE = `${API_BASE_URL}api/jobs`;
 
@@ -36,12 +37,12 @@ async function parseOrThrow<T>(response: Response): Promise<T> {
 }
 
 export async function listJobs(): Promise<CoreJobDto[]> {
-  const response = await fetch(BASE);
+  const response = await authFetch(BASE);
   return parseOrThrow<CoreJobDto[]>(response);
 }
 
 export async function getJob(id: string): Promise<CoreJobDto | null> {
-  const response = await fetch(`${BASE}/${id}`);
+  const response = await authFetch(`${BASE}/${id}`);
   if (response.status === 404) return null;
   return parseOrThrow<CoreJobDto>(response);
 }
@@ -57,7 +58,7 @@ export interface JobFieldsPatch {
 }
 
 export async function updateJobFields(id: string, patch: JobFieldsPatch): Promise<CoreJobDto> {
-  const response = await fetch(`${BASE}/${id}`, {
+  const response = await authFetch(`${BASE}/${id}`, {
     method: "PATCH",
     headers: { "content-type": "application/json", "idempotency-key": `job-fields-${id}-${safeRandomUUID()}` },
     body: JSON.stringify(patch),
@@ -67,7 +68,7 @@ export async function updateJobFields(id: string, patch: JobFieldsPatch): Promis
 
 /** Persists the Draft ⇄ Published switch (Core Record status `draft` / `open`). */
 export async function updateJobStatus(id: string, status: "draft" | "published"): Promise<CoreJobDto> {
-  const response = await fetch(`${BASE}/${id}/status`, {
+  const response = await authFetch(`${BASE}/${id}/status`, {
     method: "PATCH",
     headers: { "content-type": "application/json", "idempotency-key": `job-status-${id}-${safeRandomUUID()}` },
     body: JSON.stringify({ status }),
@@ -76,7 +77,7 @@ export async function updateJobStatus(id: string, status: "draft" | "published")
 }
 
 export async function deleteJob(id: string): Promise<void> {
-  const response = await fetch(`${BASE}/${id}`, {
+  const response = await authFetch(`${BASE}/${id}`, {
     method: "DELETE",
     headers: { "idempotency-key": `job-delete-${id}-${safeRandomUUID()}` },
   });

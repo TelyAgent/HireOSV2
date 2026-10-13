@@ -1,0 +1,99 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+/// One person across every HireOS subsystem. Signs in with an emailed one-time code — no password.
+model User {
+  id          String       @id @default(uuid())
+  /// Stored trimmed + lower-cased; the sign-in lookup key.
+  email       String       @unique
+  displayName String
+  avatarColor String?
+  locale      String       @default("zh")
+  /// active | disabled — disabling revokes every session of the user.
+  status      String       @default("active")
+  lastLoginAt DateTime?
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+  memberships Membership[]
+  sessions    Session[]
+}
+
+/// Keeps the workspace ids the subsystems already store (e.g. `local-screening-workspace`).
+model Workspace {
+  id          String       @id
+  name        String
+  createdAt   DateTime     @default(now())
+  memberships Membership[]
+}
+
+/// Invite-only access: an email can only sign in with an invited/active membership.
+model Membership {
+  userId      String
+  workspaceId String
+  /// admin | hr | interviewer
+  roles       String[]
+  /// invited | active | removed — `invited` turns `active` on first sign-in.
+  status      String    @default("invited")
+  invitedBy   String?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@id([userId, workspaceId])
+  @@index([workspaceId])
+}
+
+/// A 6-digit sign-in code. Only its HMAC is stored; single use, 10 minutes, 5 attempts.
+model LoginCode {
+  id         String    @id @default(uuid())
+  email      String
+  codeHash   String
+  expiresAt  DateTime
+  attempts   Int       @default(0)
+  consumedAt DateTime?
+  requestIp  String?
+  createdAt  DateTime  @default(now())
+
+  @@index([email, createdAt])
+}
+
+/// A signed-in browser. The cookie carries a random token; only its SHA-256 is stored.
+model Session {
+  id          String    @id @default(uuid())
+  tokenHash   String    @unique
+  userId      String
+  workspaceId String
+  userAgent   String?
+  ip          String?
+  createdAt   DateTime  @default(now())
+  lastUsedAt  DateTime  @default(now())
+  /// Sliding: last use + 7 days.
+  expiresAt   DateTime
+  revokedAt   DateTime?
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+/// Sign-in audit trail; also the source for code-request rate limits.
+model AuthEvent {
+  id        String   @id @default(uuid())
+  /// code_requested | code_failed | login_succeeded | logout | logout_all | user_invited | user_updated | user_disabled ...
+  type      String
+  email     String?
+  userId    String?
+  ip        String?
+  userAgent String?
+  detail    Json?
+  createdAt DateTime @default(now())
+
+  @@index([type, email, createdAt])
+  @@index([type, ip, createdAt])
+}

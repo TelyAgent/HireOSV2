@@ -64,6 +64,20 @@
       "prisma": false,
       "checks": ["build", "lint", "typecheck"],
       "known_failing": []
+    },
+    {
+      "name": "identity-backend",
+      "dir": "hireos-identity/hireos-identity-backend",
+      "prisma": true,
+      "checks": ["build", "lint", "typecheck", "test"],
+      "known_failing": []
+    },
+    {
+      "name": "identity-front",
+      "dir": "hireos-identity/hireos-identity-front",
+      "prisma": false,
+      "checks": ["build", "lint", "typecheck"],
+      "known_failing": []
     }
   ]
 }

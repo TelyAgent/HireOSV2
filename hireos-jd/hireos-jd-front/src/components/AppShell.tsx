@@ -5,6 +5,7 @@ import { Icon } from "./ui/Icons";
 import { Button, StatusBadge } from "./ui/Primitives";
 import { CloseButton, ModalBody, ModalFooter, ModalHeader, OverlayHost } from "./ui/Overlays";
 import { PEOPLE } from "../data/fixtures/people";
+import { UserMenu, useSessionUser } from "../lib/session";
 import type { Accent, TextSize, ThemeMode } from "../store/types";
 
 /* ---------------------------------------------------------------
@@ -32,6 +33,7 @@ function TopBar() {
   const { state, t, toggleLang, openModal, person } = useStore();
   const navigate = useNavigate();
   const langLabel = state.lang === "en" ? "中 / EN" : "EN / 中";
+  const sessionUser = useSessionUser();
 
   return (
     <div className="topbar">
@@ -68,25 +70,29 @@ function TopBar() {
         >
           <Icon name="science" />
         </button>
-        <div
-          className="role-pill"
-          onClick={() => openModal(<RoleSwitcherModal />)}
-          onKeyDown={(e) => {
-            if (e.key === "Enter" || e.key === " ") {
-              e.preventDefault();
-              openModal(<RoleSwitcherModal />);
-            }
-          }}
-          tabIndex={0}
-          role="button"
-          aria-label={t("Switch demo role")}
-        >
-          <span className="avatar" style={{ background: person?.color }}>
-            {person?.initials}
-          </span>
-          <span>{person?.name}</span>
-          <span className="demo-tag">{t("Demo role")}</span>
-        </div>
+        {sessionUser ? (
+          <UserMenu user={sessionUser} labels={{ account: t("Account settings"), signOut: t("Sign out") }} />
+        ) : (
+          <div
+            className="role-pill"
+            onClick={() => openModal(<RoleSwitcherModal />)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" || e.key === " ") {
+                e.preventDefault();
+                openModal(<RoleSwitcherModal />);
+              }
+            }}
+            tabIndex={0}
+            role="button"
+            aria-label={t("Switch demo role")}
+          >
+            <span className="avatar" style={{ background: person?.color }}>
+              {person?.initials}
+            </span>
+            <span>{person?.name}</span>
+            <span className="demo-tag">{t("Demo role")}</span>
+          </div>
+        )}
       </div>
     </div>
   );

@@ -7,6 +7,7 @@ import { useStore } from "../store/StoreContext";
 import { USERS } from "../data/users";
 import type { UserId } from "../store/types";
 import { fmtDate, nowISO } from "../data/fixtures";
+import { UserMenu, useSessionUser } from "../lib/session";
 
 interface NavItem { href: string; label: string; ic: string }
 interface NavGroup { section: string | null; items: NavItem[] }
@@ -28,6 +29,7 @@ function navActive(href: string, pathname: string) {
 
 export function AppShell({ openTaskCount, children }: { openTaskCount: number; children: ReactNode }) {
   const { state, t, toggleLang, toggleSidebar, toggleAppearance, toggleRoleSwitcher } = useStore();
+  const sessionUser = useSessionUser();
   const location = useLocation();
   const navigate = useNavigate();
   const toggleLabel = state.sidebarCollapsed ? t("Expand navigation") : t("Collapse navigation");
@@ -90,7 +92,11 @@ export function AppShell({ openTaskCount, children }: { openTaskCount: number; c
           <button className="icon-btn" type="button" title={t("Appearance")} aria-label={t("Appearance")} onClick={toggleAppearance}>
             <Icon name="palette" />
           </button>
-          <RolePill onClick={toggleRoleSwitcher} />
+          {sessionUser ? (
+            <UserMenu user={sessionUser} labels={{ account: t("Account settings"), signOut: t("Sign out") }} />
+          ) : (
+            <RolePill onClick={toggleRoleSwitcher} />
+          )}
         </div>
         <div className="content">{children}</div>
       </div>
