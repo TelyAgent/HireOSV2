@@ -16,7 +16,7 @@ GitHub 是研发决策的唯一权威来源：Files 保存长期规则，Issue �
 ## Issue 和 PR 门槛
 
 - 正常工作必须关联一个主 Issue，PR 使用 `Closes #<number>`；其他依赖使用 `Refs #<number>`。
-- Issue 必须具备 Type、Problem、User Outcome、Scope、Non-goals、Acceptance Criteria、References、Dependencies、Risk、Owner、Estimate 和 `AI Ready`。Type 只能是 Feature、Bug、Design 或 Tech Debt；线上 Incident 使用 Bug Type 搭配 `incident` 标签。`AI Ready=Yes` 且每项 AC 使用唯一的 `AC-1`、`AC-2` 编号后，才开始实现。
+- Issue 必须具备 Type、Subsystem、Problem、User Outcome、Scope、Non-goals、Acceptance Criteria、References、Dependencies、Risk、Owner、Estimate 和 `AI Ready`。Type 只能是 Feature、Bug、Design 或 Tech Debt；线上 Incident 使用 Bug Type 搭配 `incident` 标签。`AI Ready=Yes` 且每项 AC 使用唯一的 `AC-1`、`AC-2` 编号后，才开始实现。
 - 通过 CLI/API 创建或修改 Issue 正文时，读取并复用 [Issue Markdown 模板](.github/issue_body_template.md)，按对应 [Issue Form](.github/ISSUE_TEMPLATE/) 补齐类型专属字段。所有字段标题必须独占一行，使用 `### <字段名>`，名称与表单 `attributes.label` 完全一致；字段内容中的子标题使用四级或更深标题。提交前核对必需字段非空、字段标题唯一且均为三级、Type/Risk/Estimate/AI Ready 取值与表单一致、AC 编号唯一。CLI/API 不会自动应用 Issue Form；正文格式由创建者保证。
 - 创建或修改任意 Issue 正文字段前，对完整的最终正文运行 `node .github/scripts/issue-contract.cjs <正文文件> submission`，退出码 0 后提交；执行前使用 `execution` 模式。校验范围、人工证据职责及仅限 Ledger 的待分诊 Bug 例外见 [Issue 正文校验](.github/issue-contract.md)。局部更新也必须检查完整契约。
 - 需求、依赖或验收条件存在影响行为的未决问题时，在 Issue 留下 `[AI-QUESTION]` 并停止依赖该信息的实现；不要自行猜测产品意图。
@@ -27,8 +27,8 @@ GitHub 是研发决策的唯一权威来源：Files 保存长期规则，Issue �
 ## 实现和验证
 
 - 先理解 Issue 和现有约束，再实现满足 AC 的最小变更；保持用户已有改动，避免无关重构。
-- 从仓库配置和 CI 工作流发现真实命令，不凭记忆创造测试命令。接入的应用工程使用 Yarn 安装依赖与执行脚本。CI 的检查顺序以 [`.github/workflows/ci.yml`](.github/workflows/ci.yml) 为准：Build、Lint、Type Check、Unit、Integration、Codex Review、Merge gate；Human Supervisor 审批并合并后，由独立的 [Codex QA 工作流](.github/workflows/codex-qa.yml) 验收实际合并提交。QA 不属于合并门禁。当前未配置 E2E 阶段；PR 分类与质量证据 PR 的适用检查以该工作流及其调用脚本为准。
-- 现有自动化脚本可用 `node --test .github/scripts/automation.test.cjs .github/scripts/post-merge.test.cjs` 验证。新增或修改功能时，补充有意义的自动测试，并在 PR 中记录实际命令、退出码和证据路径；未执行的测试不能写成通过。
+- 从仓库配置和 CI 工作流发现真实命令，不凭记忆创造测试命令。本仓库应用工程使用 npm 与 package-lock.json 安装依赖和执行脚本；命令及项目范围以 CI 注册表为准。CI 的检查顺序以 [`.github/workflows/ci.yml`](.github/workflows/ci.yml) 为准：Build、Lint、Type Check、Unit、Integration、Codex Review、Merge gate；Human Supervisor 审批并合并后，由独立的 [Codex QA 工作流](.github/workflows/codex-qa.yml) 验收实际合并提交。QA 不属于合并门禁。当前未配置 E2E 阶段；PR 分类与质量证据 PR 的适用检查以该工作流及其调用脚本为准。
+- 现有自动化脚本可用 `node --test .github/scripts/automation.test.cjs .github/scripts/post-merge.test.cjs .github/scripts/issue-contract.test.cjs .github/scripts/qa-environment.test.cjs` 验证。新增或修改功能时，补充有意义的自动测试，并在 PR 中记录实际命令、退出码和证据路径；未执行的测试不能写成通过。
 - 评估当前项目的 a2a 流程落地效果或四级评级时，调用 [eval-a2a-adoption skill](.agents/skills/eval-a2a-adoption/SKILL.md)，先递归核验流程引用文件，确认必需文件缺失即不合格；再检查最新 10 个 Issue / 10 个 PR，按最近 4 个完整周的已验收 Feature/Bug 和 Estimate 评级，交付有证据的报告。
 - 需要 QA 验收时，读取 [`.agents/skills/qa/SKILL.md`](.agents/skills/qa/SKILL.md)，逐项验证 AC，检查异常路径，并按 [`.github/schemas/qa.json`](.github/schemas/qa.json) 生成结构化报告。QA 只产生报告和证据，不替代 Review、Security Review 或 Human Supervisor。
 - 需要 Codex Review 时，遵循 [`.github/prompts/review.md`](.github/prompts/review.md) 和 [`.github/schemas/review.json`](.github/schemas/review.json)，直接检查目标 diff，不依赖 QA 结论；Review 在合并前依赖基础检查，QA 在合并后执行；两阶段分别绑定 PR head SHA 和实际合并提交 SHA。

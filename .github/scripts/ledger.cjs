@@ -31,6 +31,10 @@ module.exports = async ({ github, context, core }) => {
     const filename = path.join(process.env.RUNNER_TEMP, `${kind}.json`);
     if (fs.existsSync(filename)) reports[kind] = readReport(kind, filename, expected);
   }
+  if (reports[phase]?.result === 'pass' && run.conclusion !== 'success') {
+    core.notice('Successful report from an unsuccessful workflow is not acceptance evidence.');
+    delete reports[phase];
+  }
   const text = value => String(value).replace(/<!--|-->/g, '').replace(/@/g, '@\u200b');
   const sourceFields = inspectIssue(issue.body).sections;
   const sourceOwner = sourceFields.Owner;
@@ -65,7 +69,7 @@ module.exports = async ({ github, context, core }) => {
     const bugMarker = `<!-- codex-qa-bug:${fingerprint} -->`;
     let tracked = existingIssues.find(i => !i.pull_request && i.body?.includes(bugMarker));
     if (!tracked) {
-      const body = `${bugMarker}\n### Type\n\nBug\n\n### Problem\n\n${text(bug.title)}\n\n` +
+      const body = `${bugMarker}\n### Type\n\nBug\n\n### Subsystem\n\ncross-cutting\n\n### Problem\n\n${text(bug.title)}\n\n` +
         `### User Outcome\n\nRestore the expected behavior described in #${issue.number}.\n\n` +
         `### Scope\n\nReproduce and fix the defect found in #${pr.number}.\n\n### Non-goals\n\nUnrelated changes.\n\n` +
         `### Acceptance Criteria\n\nAC-1: Add a regression test reproducing the defect, then verify the fix. Supervisor must confirm the expected behavior before AI Ready=Yes.\n\n` +

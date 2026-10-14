@@ -25,6 +25,7 @@ function validate(value, schema, location = '$') {
 }
 
 function readReport(kind, filename, expected) {
+  if (expected.phase && expected.phase !== kind) throw new Error('Mismatched report phase');
   if (!['qa', 'review'].includes(kind)) throw new Error('Unknown report kind');
   const raw = fs.readFileSync(filename, 'utf8');
   if (Buffer.byteLength(raw) > 500000) throw new Error('Report too large');
@@ -58,7 +59,7 @@ if (require.main === module) {
   const report = readReport(kind, filename, JSON.parse(fs.readFileSync(contextFile, 'utf8')));
   if (process.env.GITHUB_STEP_SUMMARY) {
     fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY,
-      `## Claude ${kind}: ${report.result}\n\nIssue #${report.issue} · PR #${report.pr} · commit ${report.commit}\n\nSee claude-${kind} artifact for evidence.\n`);
+      `## Codex ${kind}: ${report.result}\n\nIssue #${report.issue} · PR #${report.pr} · commit ${report.commit}\n\nSee codex-${kind} artifact for evidence.\n`);
   }
   if (report.result !== 'pass') process.exitCode = 1;
 }

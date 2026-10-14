@@ -18,9 +18,9 @@ node .github/scripts/issue-contract.cjs /绝对路径/issue-body.md execution
 
 ## 校验范围与标准
 
-[Issue Forms](ISSUE_TEMPLATE/) 定义字段和下拉选项，[issue-contract.json](schemas/issue-contract.json) 保存对应机器契约。修改任一处时同步另一处，并运行 `node --test .github/scripts/automation.test.cjs`；测试逐项比对四类表单的必填字段及枚举，防止漂移。
+[Issue Forms](ISSUE_TEMPLATE/) 定义字段和下拉选项，[issue-contract.json](schemas/issue-contract.json) 保存对应机器契约。修改任一处时同步另一处，并运行 `node --test .github/scripts/issue-contract.test.cjs`；测试逐项比对四类表单的必填字段及枚举，防止漂移。
 
-[issue-contract.cjs](scripts/issue-contract.cjs) 校验：共用和类型专属必填字段非空、字段标题唯一且为三级、字段内子标题四级或更深、Type/Risk/Estimate/AI Ready/Severity 枚举、Owner 用户名格式，以及 AC 编号唯一且内容非空。代码块和 HTML 注释中的示例不会被当作字段或 AC 定义。可增加 `### Evidence`，其他附加解释放在已有字段的四级子标题下。
+[issue-contract.cjs](scripts/issue-contract.cjs) 校验：共用（含 Subsystem、Estimate）和类型专属必填字段非空、字段标题唯一且为三级、字段内子标题四级或更深、Type/Risk/Estimate/AI Ready/Severity 枚举、Owner 用户名格式，以及 AC 编号唯一且内容非空。代码块和 HTML 注释中的示例不会被当作字段或 AC 定义。可增加 `### Evidence`，其他附加解释放在已有字段的四级子标题下。
 
 机器校验通过只证明正文结构和枚举合法。Owner 的实际身份、实施前点数确认、需求/依赖就绪、AC 是否充分以及历史审批顺序仍由 Agent 和 Human Supervisor 对证据核查。
 

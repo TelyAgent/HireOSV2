@@ -29,7 +29,7 @@ Closes #____
 ## Test Evidence
 
 - build / lint / typecheck:
-- Unit / integration (`npm test`):
+- Unit / integration（按 CI 注册表逐项目执行 npm scripts）:
 - 手动或浏览器验证（地址、截图）:
 - Design differences:
 
@@ -42,7 +42,7 @@ Closes #____
 
 ## AI Review
 
-- [ ] Claude review passed（CI 自动发布评论）
+- [ ] Codex review passed（CI 自动发布评论）
 - [ ] Security review passed / N/A（说明理由）
 
 ## Risk & Rollback

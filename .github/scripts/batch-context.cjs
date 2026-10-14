@@ -33,7 +33,11 @@ async function buildIssueContext({ github, repo, issueNumber }) {
     github.paginate(github.rest.issues.listComments, { ...repo, issue_number: pr.number, per_page: 100 }),
     github.paginate(github.rest.pulls.listReviewComments, { ...repo, pull_number: pr.number, per_page: 100 }),
   ]);
+  const files = await github.paginate(github.rest.pulls.listFiles, { ...repo, pull_number: pr.number, per_page: 100 });
+  if (!Number.isInteger(pr.changed_files) || pr.changed_files < 1 || pr.changed_files >= 3000 ||
+      files.length !== pr.changed_files || new Set(files.map(f => f.filename)).size !== files.length) throw new Error('Incomplete merged PR changes');
   return {
+    phase: 'qa', head: pr.head?.sha, changed_files: files,
     issue: issue.number, pr: pr.number, commit: pr.merge_commit_sha, base,
     issue_body: issue.body, issue_comments: comments, pr_body: pr.body,
     pr_comments: prComments, review_comments: reviewComments,

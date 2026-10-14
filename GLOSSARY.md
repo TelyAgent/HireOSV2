@@ -5,7 +5,7 @@
 | 术语 | 定义 |
 | --- | --- |
 | **Single Source of Truth** | GitHub 是影响研发决策的唯一权威协作中心。长期规则进入 Files，任务状态进入 Issue，变更和验收证据进入 PR。 |
-| **Issue Contract** | Issue 的最小契约：Type、Problem、User Outcome、Scope、Non-goals、Acceptance Criteria、References、Dependencies、Risk、Owner、Estimate、AI Ready。 |
+| **Issue Contract** | Issue 的最小契约：Type、Subsystem、Problem、User Outcome、Scope、Non-goals、Acceptance Criteria、References、Dependencies、Risk、Owner、Estimate、AI Ready。 |
 | **PR Contract** | PR 的最小契约：关联 Issue、变更说明、规格引用、验收条件、测试证据、AI Review、安全审查、风险回滚、文档和监督者。 |
 | **Acceptance Criteria（AC）** | 可机器验证的完成条件，使用 `AC-1`、`AC-2` 等唯一编号；QA 必须逐项给出证据。 |
 | **Estimate** | Issue 的相对工作规模，取值 1、2、3、5、8 或 TBD；包含实现、测试、文档和验收。实施前由 Owner 确认具体点数，详见 [Estimate 管理规则](a2a_dev_process.md#estimate-管理规则)。 |

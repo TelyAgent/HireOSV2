@@ -39,7 +39,18 @@ jobs:
     needs: target
     if: needs.target.outputs.eligible == 'true'
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 45
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: hireos_test
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd pg_isready --health-interval 5s --health-timeout 5s --health-retries 10
+    env:
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/hireos_test
     steps:
       - name: Require credentials
         env:
@@ -53,26 +64,38 @@ jobs:
           persist-credentials: false
       - uses: actions/setup-node@v4
         with:
-          node-version: '22'
+          node-version: '24'
+      - name: Load trusted QA rules
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.repository.default_branch }}
+          path: .trusted
+          persist-credentials: false
+          sparse-checkout: /.github/
+          sparse-checkout-cone-mode: false
       - name: Load merged Issue contract and PR changes
         uses: actions/github-script@v7
         env:
           QA_COMMIT: ${{ needs.target.outputs.commit }}
         with:
           script: |
-            await require('./.github/scripts/context.cjs')({ github, context, phase: 'qa', commit: process.env.QA_COMMIT });
-      - run: yarn install --frozen-lockfile --non-interactive
+            await require('./.trusted/.github/scripts/context.cjs')({ github, context, phase: 'qa', commit: process.env.QA_COMMIT });
+      - name: Prepare touched monorepo projects
+        run: node .trusted/.github/scripts/qa-environment.cjs prepare
       - name: Run Codex QA
         uses: openai/codex-action@v1
         with:
           openai-api-key: ${{ secrets.OPENAI_API_KEY }}
-          prompt-file: .github/prompts/qa.md
+          prompt-file: .trusted/.github/prompts/qa.md
           output-file: evidence/qa.json
           sandbox: workspace-write
           safety-strategy: drop-sudo
-          codex-args: '["--output-schema", ".github/schemas/qa.json"]'
+          codex-args: '["--output-schema", ".trusted/.github/schemas/qa.json"]'
+      - name: Preserve tests and reject product changes
+        if: always()
+        run: node .trusted/.github/scripts/qa-environment.cjs guard
       - name: Validate report and enforce verdict
-        run: node .github/scripts/report.cjs qa evidence/qa.json evidence/context.json
+        run: node .trusted/.github/scripts/report.cjs qa evidence/qa.json evidence/context.json
       - name: Preserve report and raw evidence
         if: always()
         uses: actions/upload-artifact@v4

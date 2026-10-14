@@ -24,7 +24,7 @@ function closedContext(pr = productPR()) {
     repository: { default_branch: 'main' }, pull_request: pr } };
 }
 function issueBody() {
-  const fields = { Type: 'Feature', Problem: 'Missing behavior', 'User Outcome': 'Behavior works',
+  const fields = { Type: 'Feature', Subsystem: 'cross-cutting', Problem: 'Missing behavior', 'User Outcome': 'Behavior works',
     Scope: 'One feature', 'Non-goals': 'None', 'Acceptance Criteria': 'AC-1: behavior works',
     References: 'Local fixture', Dependencies: 'None', Risk: 'low', Owner: '@supervisor',
     Estimate: '3', 'AI Ready': 'Yes', 'User Flows': 'Call the feature' };
@@ -333,4 +333,15 @@ test('workflow wiring keeps Review in CI and QA in merged-close workflow with bo
   assert.match(publisher, /artifact\.size_in_bytes > 20000000/);
   assert.match(publisher, /file_size > 500000/);
   assert.match(publisher, /name not in z\.namelist\(\)/);
+});
+
+test('a failing workflow cannot publish a successful QA verdict after a guard or setup failure', async () => {
+  const folder = temp();
+  try {
+    const fixture = publisher(folder);
+    await fixture.publish('qa', report('qa'), run('qa', { conclusion: 'failure' }));
+    assert.match(fixture.capture.summary, /QA: \*\*not completed\*\*/);
+    assert.match(fixture.capture.summary, /AI-BLOCKED/);
+    assert.equal(fixture.capture.bugs.length, 0);
+  } finally { fs.rmSync(folder, { recursive: true, force: true }); }
 });

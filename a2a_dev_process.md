@@ -55,7 +55,10 @@ GitHub 的 Issue Forms 可以设置必填字段、默认 labels 和 assignees；
 │   │   ├── evidence-pr.cjs
 │   │   ├── merge-gate.cjs
 │   │   ├── automation.test.cjs
-│   │   └── post-merge.test.cjs
+│   │   ├── post-merge.test.cjs
+│   │   ├── issue-contract.test.cjs
+│   │   ├── qa-environment.cjs
+│   │   └── qa-environment.test.cjs
 │   └── workflows/
 │       ├── README.md
 │       ├── ci-flow.mmd
@@ -113,6 +116,8 @@ Codex 会读取仓库中的 `AGENTS.md`，且目录越深的指令可以为特�
 
 `docs/product/`、`docs/specs/`、`docs/design/`、`docs/api/` 和 `docs/runbooks/` 按项目需求维护具体内容；`docs/quality/reports/`、`docs/quality/bugs/` 和原始 `evidence/` 是按执行阶段生成的证据路径，产物要求见 [质量台账说明](docs/quality/README.md)，不以空占位文件代替实际证据。项目专属的其他技能按需放在 `.agents/skills/`，下述四个流程技能为统一要求。
 
+HireOS 是现有 npm/package-lock monorepo，CI 与 QA 按 `.github/ci/projects.json` 选择子工程；不在仓库根安装应用依赖。移动端角色与 `docs/mobile/platform-matrix.md` 仅在接入 iOS/Android 工程时适用，当前仓库未接入移动端，该依赖记为 N/A。
+
 `web/AGENTS.md`、`backend/AGENTS.md`、`ios/AGENTS.md`、`android/AGENTS.md` 是可选的平台指引，仅建议按需提供，不属于统一目录的强制文件；角色表中的相关引用也不改变其可选性质。文件完整性评估将这四项记为 `na`，缺失不影响评级；已有文件中的适用约束仍须遵循。根目录 `AGENTS.md` 和下述四个 skill 仍为必需。
 
 四个 skill 是所有产品仓库必须提供的流程指引；`SKILL.md` 及其引用的 references、scripts、schema 等支撑文件必须完整可读。仓库 `AGENTS.md` 应提供对应调用入口，其他 Agent 无技能发现能力时直接读取相应 `SKILL.md` 执行。具体步骤以链接的技能为准：
@@ -132,6 +137,7 @@ Codex 会读取仓库中的 `AGENTS.md`，且目录越深的指令可以为特�
 | 字段                    | 要求                                            |
 | --------------------- | --------------------------------------------- |
 | `Type`                | Feature / Bug / Design / Tech Debt             |
+| `Subsystem`           | HireOS 受影响子系统，与 Issue Form 选项一致              |
 | `Problem`             | 当前问题，不描述解决方案                                  |
 | `User Outcome`        | 用户完成后获得什么                                     |
 | `Scope`               | 本次包含内容                                        |

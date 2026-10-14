@@ -20,6 +20,10 @@ Tech Debt: Technical Evidence、Compatibility / Rollback。
 
 填写任务类型。
 
+### Subsystem
+
+填写受影响子系统，与 Issue Form 选项一致。
+
 ### Problem
 
 填写当前问题、影响和证据。

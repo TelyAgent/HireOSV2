@@ -1,0 +1,482 @@
+[
+  {
+    "source": "a2a_dev_process.md",
+    "line": 115,
+    "target": ".github/issue-contract.md",
+    "exists": true
+  },
+  {
+    "source": "a2a_dev_process.md",
+    "line": 115,
+    "target": ".github/scripts/issue-contract.cjs",
+    "exists": true
+  },
+  {
+    "source": "a2a_dev_process.md",
+    "line": 115,
+    "target": ".github/schemas/issue-contract.json",
+    "exists": true
+  },
+  {
+    "source": "a2a_dev_process.md",
+    "line": 115,
+    "target": ".github/workflows/README.md",
+    "exists": true
+  },
+  {
+    "source": "a2a_dev_process.md",
+    "line": 117,
+    "target": "docs/quality/README.md",
+    "exists": true
+  },
+  {
+    "source": "a2a_dev_process.md",
+    "line": 127,
+    "target": ".agents/skills/qa/SKILL.md",
+    "exists": true
+  },
+  {
+    "source": "a2a_dev_process.md",
+    "line": 128,
+    "target": ".agents/skills/eval-a2a-adoption/SKILL.md",
+    "exists": true
+  },
+  {
+    "source": "a2a_dev_process.md",
+    "line": 129,
+    "target": ".agents/skills/estimate-issue/SKILL.md",
+    "exists": true
+  },
+  {
+    "source": "a2a_dev_process.md",
+    "line": 130,
+    "target": ".agents/skills/check-issues/SKILL.md",
+    "exists": true
+  },
+  {
+    "source": "a2a_dev_process.md",
+    "line": 167,
+    "target": ".agents/skills/estimate-issue/SKILL.md",
+    "exists": true
+  },
+  {
+    "source": "a2a_dev_process.md",
+    "line": 188,
+    "target": ".agents/skills/eval-a2a-adoption/SKILL.md",
+    "exists": true
+  },
+  {
+    "source": "AGENTS.md",
+    "line": 14,
+    "target": "a2a_dev_process.md",
+    "exists": true
+  },
+  {
+    "source": "AGENTS.md",
+    "line": 14,
+    "target": "GLOSSARY.md",
+    "exists": true
+  },
+  {
+    "source": "AGENTS.md",
+    "line": 20,
+    "target": ".github/issue_body_template.md",
+    "exists": true
+  },
+  {
+    "source": "AGENTS.md",
+    "line": 20,
+    "target": ".github/ISSUE_TEMPLATE",
+    "exists": true
+  },
+  {
+    "source": "AGENTS.md",
+    "line": 21,
+    "target": ".github/issue-contract.md",
+    "exists": true
+  },
+  {
+    "source": "AGENTS.md",
+    "line": 23,
+    "target": ".agents/skills/estimate-issue/SKILL.md",
+    "exists": true
+  },
+  {
+    "source": "AGENTS.md",
+    "line": 24,
+    "target": "a2a_dev_process.md",
+    "exists": true
+  },
+  {
+    "source": "AGENTS.md",
+    "line": 25,
+    "target": ".github/pull_request_template.md",
+    "exists": true
+  },
+  {
+    "source": "AGENTS.md",
+    "line": 30,
+    "target": ".github/workflows/ci.yml",
+    "exists": true
+  },
+  {
+    "source": "AGENTS.md",
+    "line": 30,
+    "target": ".github/workflows/codex-qa.yml",
+    "exists": true
+  },
+  {
+    "source": "AGENTS.md",
+    "line": 32,
+    "target": ".agents/skills/eval-a2a-adoption/SKILL.md",
+    "exists": true
+  },
+  {
+    "source": "AGENTS.md",
+    "line": 33,
+    "target": ".agents/skills/qa/SKILL.md",
+    "exists": true
+  },
+  {
+    "source": "AGENTS.md",
+    "line": 33,
+    "target": ".github/schemas/qa.json",
+    "exists": true
+  },
+  {
+    "source": "AGENTS.md",
+    "line": 34,
+    "target": ".github/prompts/review.md",
+    "exists": true
+  },
+  {
+    "source": "AGENTS.md",
+    "line": 34,
+    "target": ".github/schemas/review.json",
+    "exists": true
+  },
+  {
+    "source": "AGENTS.md",
+    "line": 38,
+    "target": "docs/quality/README.md",
+    "exists": true
+  },
+  {
+    "source": "GLOSSARY.md",
+    "line": 11,
+    "target": "a2a_dev_process.md",
+    "exists": true
+  },
+  {
+    "source": ".github/issue-contract.md",
+    "line": 17,
+    "target": ".github/scripts/context.cjs",
+    "exists": true
+  },
+  {
+    "source": ".github/issue-contract.md",
+    "line": 21,
+    "target": ".github/ISSUE_TEMPLATE",
+    "exists": true
+  },
+  {
+    "source": ".github/issue-contract.md",
+    "line": 21,
+    "target": ".github/schemas/issue-contract.json",
+    "exists": true
+  },
+  {
+    "source": ".github/issue-contract.md",
+    "line": 23,
+    "target": ".github/scripts/issue-contract.cjs",
+    "exists": true
+  },
+  {
+    "source": ".github/issue-contract.md",
+    "line": 29,
+    "target": ".github/scripts/ledger.cjs",
+    "exists": true
+  },
+  {
+    "source": ".github/README.md",
+    "line": 3,
+    "target": "a2a_dev_process.md",
+    "exists": true
+  },
+  {
+    "source": ".github/README.md",
+    "line": 3,
+    "target": "AGENTS.md",
+    "exists": true
+  },
+  {
+    "source": ".github/README.md",
+    "line": 3,
+    "target": ".github/workflows/README.md",
+    "exists": true
+  },
+  {
+    "source": ".github/README.md",
+    "line": 11,
+    "target": "docs/agents/triage-labels.md",
+    "exists": true
+  },
+  {
+    "source": ".github/README.md",
+    "line": 19,
+    "target": ".github/issue-contract.md",
+    "exists": true
+  },
+  {
+    "source": ".github/README.md",
+    "line": 19,
+    "target": ".github/issue_body_template.md",
+    "exists": true
+  },
+  {
+    "source": ".github/README.md",
+    "line": 20,
+    "target": ".github/pull_request_template.md",
+    "exists": true
+  },
+  {
+    "source": ".github/README.md",
+    "line": 21,
+    "target": ".github/ci/projects.json",
+    "exists": true
+  },
+  {
+    "source": ".github/workflows/README.md",
+    "line": 3,
+    "target": "a2a_dev_process.md",
+    "exists": true
+  },
+  {
+    "source": ".github/workflows/README.md",
+    "line": 3,
+    "target": ".github/README.md",
+    "exists": true
+  },
+  {
+    "source": ".github/workflows/README.md",
+    "line": 5,
+    "target": ".github/workflows/ci-flow.svg",
+    "exists": true
+  },
+  {
+    "source": ".github/workflows/README.md",
+    "line": 7,
+    "target": ".github/workflows/ci-flow.mmd",
+    "exists": true
+  },
+  {
+    "source": ".github/workflows/README.md",
+    "line": 13,
+    "target": ".github/workflows/ci.yml",
+    "exists": true
+  },
+  {
+    "source": ".github/workflows/README.md",
+    "line": 14,
+    "target": ".github/workflows/codex-review.yml",
+    "exists": true
+  },
+  {
+    "source": ".github/workflows/README.md",
+    "line": 15,
+    "target": ".github/workflows/codex-qa.yml",
+    "exists": true
+  },
+  {
+    "source": ".github/workflows/README.md",
+    "line": 16,
+    "target": ".github/workflows/quality-ledger.yml",
+    "exists": true
+  },
+  {
+    "source": ".github/workflows/README.md",
+    "line": 22,
+    "target": ".github/ci/projects.json",
+    "exists": true
+  },
+  {
+    "source": ".github/workflows/README.md",
+    "line": 22,
+    "target": ".github/scripts/projects.cjs",
+    "exists": true
+  },
+  {
+    "source": ".github/workflows/README.md",
+    "line": 30,
+    "target": ".github/scripts/evidence-pr.cjs",
+    "exists": true
+  },
+  {
+    "source": ".github/workflows/README.md",
+    "line": 30,
+    "target": ".github/scripts/context.cjs",
+    "exists": true
+  },
+  {
+    "source": ".github/workflows/README.md",
+    "line": 30,
+    "target": ".github/issue-contract.md",
+    "exists": true
+  },
+  {
+    "source": ".github/workflows/README.md",
+    "line": 32,
+    "target": ".github/scripts/report.cjs",
+    "exists": true
+  },
+  {
+    "source": ".github/workflows/README.md",
+    "line": 34,
+    "target": ".github/scripts/merge-gate.cjs",
+    "exists": true
+  },
+  {
+    "source": ".github/workflows/README.md",
+    "line": 38,
+    "target": ".github/scripts/post-merge.cjs",
+    "exists": true
+  },
+  {
+    "source": ".github/workflows/README.md",
+    "line": 40,
+    "target": ".github/scripts/context.cjs",
+    "exists": true
+  },
+  {
+    "source": ".github/workflows/README.md",
+    "line": 42,
+    "target": ".github/scripts/qa-environment.cjs",
+    "exists": true
+  },
+  {
+    "source": ".github/workflows/README.md",
+    "line": 44,
+    "target": ".github/prompts/qa.md",
+    "exists": true
+  },
+  {
+    "source": ".github/workflows/README.md",
+    "line": 44,
+    "target": ".agents/skills/qa/SKILL.md",
+    "exists": true
+  },
+  {
+    "source": ".github/workflows/README.md",
+    "line": 46,
+    "target": ".github/schemas/qa.json",
+    "exists": true
+  },
+  {
+    "source": ".github/workflows/README.md",
+    "line": 50,
+    "target": ".github/workflows/quality-ledger.yml",
+    "exists": true
+  },
+  {
+    "source": ".github/workflows/README.md",
+    "line": 52,
+    "target": ".github/scripts/quality-source.cjs",
+    "exists": true
+  },
+  {
+    "source": ".github/workflows/README.md",
+    "line": 54,
+    "target": ".github/scripts/ledger.cjs",
+    "exists": true
+  },
+  {
+    "source": ".github/workflows/README.md",
+    "line": 54,
+    "target": "docs/quality/README.md",
+    "exists": true
+  },
+  {
+    "source": "docs/agents/dev-process.md",
+    "line": 3,
+    "target": "a2a_dev_process.md",
+    "exists": true
+  },
+  {
+    "source": "docs/agents/dev-process.md",
+    "line": 3,
+    "target": "AGENTS.md",
+    "exists": true
+  },
+  {
+    "source": "docs/agents/dev-process.md",
+    "line": 3,
+    "target": ".github/README.md",
+    "exists": true
+  },
+  {
+    "source": "docs/agents/dev-process.md",
+    "line": 13,
+    "target": "docs/agents/claude-design-github-codex-workflow.md",
+    "exists": true
+  },
+  {
+    "source": "docs/agents/dev-process.md",
+    "line": 13,
+    "target": "docs/agents/triage-labels.md",
+    "exists": true
+  },
+  {
+    "source": "docs/agents/dev-process.md",
+    "line": 13,
+    "target": "docs/adr/README.md",
+    "exists": true
+  },
+  {
+    "source": "docs/agents/dev-process.md",
+    "line": 13,
+    "target": ".github/workflows/README.md",
+    "exists": true
+  },
+  {
+    "source": "docs/agents/claude-design-github-codex-workflow.md",
+    "line": 4,
+    "target": "a2a_dev_process.md",
+    "exists": true
+  },
+  {
+    "source": "docs/agents/claude-design-github-codex-workflow.md",
+    "line": 91,
+    "target": "a2a_dev_process.md",
+    "exists": true
+  },
+  {
+    "source": "docs/agents/claude-design-github-codex-workflow.md",
+    "line": 137,
+    "target": ".github/pull_request_template.md",
+    "exists": true
+  },
+  {
+    "source": "docs/agents/claude-design-github-codex-workflow.md",
+    "line": 158,
+    "target": "docs/quality/README.md",
+    "exists": true
+  },
+  {
+    "source": "docs/adr/README.md",
+    "line": 30,
+    "target": "docs/adr/0001-github-as-source-of-truth.md",
+    "exists": true
+  },
+  {
+    "source": "docs/quality/README.md",
+    "line": 23,
+    "target": ".github/scripts/quality-source.cjs",
+    "exists": true
+  },
+  {
+    "source": "docs/quality/README.md",
+    "line": 41,
+    "target": ".github/workflows/ci.yml",
+    "exists": true
+  }
+]
