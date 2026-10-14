@@ -100,10 +100,15 @@ export class MailAccountsService {
     return this.serialize(account);
   }
 
+  /** The mailbox invitations go out from -- also named in the letter's sign-off on the candidate page. */
+  senderAccount(workspaceId: string) {
+    return this.db.mailAccount.findFirst({ where: { workspaceId, enabled: true }, orderBy: { createdAt: 'asc' } });
+  }
+
   /** Used by InvitationsService to actually deliver an invitation email -- picks the workspace's
    * first enabled account (this app only ever needs one configured outbound mailbox at a time). */
   async sendFromWorkspaceAccount(identity: Identity, message: { to: string; subject: string; html: string; text: string }): Promise<{ sent: boolean; error?: string }> {
-    const account = await this.db.mailAccount.findFirst({ where: { workspaceId: identity.workspaceId, enabled: true }, orderBy: { createdAt: 'asc' } });
+    const account = await this.senderAccount(identity.workspaceId);
     if (!account) return { sent: false, error: 'NO_MAILBOX_CONFIGURED' };
     try {
       await this.mail.send(account, message);

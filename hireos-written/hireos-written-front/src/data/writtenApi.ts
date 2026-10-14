@@ -366,9 +366,18 @@ export async function listCaseInvitations(caseId: string): Promise<RealInvitatio
   return response.json() as Promise<RealInvitation[]>;
 }
 
+/** The covering letter (greeting, introduction, HR sign-off) -- built by the backend, same as the email. */
+export interface InvitationLetter {
+  greeting: string;
+  paragraphs: string[];
+  closing: string;
+  signature: string[];
+}
+
 export interface PublicInvitation {
   candidateName: string;
   jobTitle: string;
+  letter?: InvitationLetter;
   questions: QuestionSnapshot[];
   mode: "timed" | "deadline_only";
   durationMin: number | null;

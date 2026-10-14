@@ -9,6 +9,7 @@ import { CaseLifecycleService } from '../cases/case-lifecycle.service';
 import type { CreateInvitationDto, QuestionSnapshotDto } from './create-invitation.dto';
 import type { SubmitAnswersDto } from './submit-answers.dto';
 import type { FinalizeEvaluationDto, ReleaseResultDto } from './case-result.dto';
+import { invitationEmail, invitationLetter } from './invitation-letter';
 import { assertCaseOpen, assertDraftSendable, nextRoundNumber } from './rounds';
 
 function generateToken(): string {
@@ -66,9 +67,11 @@ export class InvitationsService {
 
     const appBaseUrl = this.config.get<string>('PUBLIC_APP_BASE_URL', 'http://127.0.0.1:5178/written/').replace(/\/$/, '');
     const link = `${appBaseUrl}/apply/${invitation.token}`;
-    const subject = `${kase.job.title} · 测评邀请`;
-    const text = `${kase.candidate.name}，您好：\n\n您已被邀请完成「${kase.job.title}」岗位的测评，请点击以下链接查看题目并提交作答：\n${link}\n\n此邮件由系统自动发送。`;
-    const html = `<p>${kase.candidate.name}，您好：</p><p>您已被邀请完成「${kase.job.title}」岗位的测评，请点击以下链接查看题目并提交作答：</p><p><a href="${link}">${link}</a></p><p style="color:#888">此邮件由系统自动发送。</p>`;
+    const sender = await this.mailAccounts.senderAccount(identity.workspaceId);
+    const { subject, text, html } = invitationEmail(
+      { candidateName: kase.candidate.name, jobTitle: kase.job.title, senderName: sender?.name ?? null, mode: invitation.mode, durationMin: invitation.durationMin, deadline: invitation.deadline },
+      link,
+    );
     const result = await this.mailAccounts.sendFromWorkspaceAccount(identity, { to: dto.recipientEmail, subject, text, html });
 
     return { id: invitation.id, round: invitation.round, token: invitation.token, emailSent: result.sent, emailError: result.error };
@@ -164,9 +167,19 @@ export class InvitationsService {
       await this.lifecycle.advance(invitation.caseId, 'awaiting_submission');
     }
 
+    const sender = await this.mailAccounts.senderAccount(invitation.workspaceId);
     return {
       candidateName: invitation.case.candidate.name,
       jobTitle: invitation.case.job.title,
+      // Same greeting, introduction and HR sign-off as the invitation email.
+      letter: invitationLetter({
+        candidateName: invitation.case.candidate.name,
+        jobTitle: invitation.case.job.title,
+        senderName: sender?.name ?? null,
+        mode: invitation.mode,
+        durationMin: invitation.durationMin,
+        deadline: invitation.deadline,
+      }),
       questions: invitation.questions,
       mode: invitation.mode,
       durationMin: invitation.durationMin,

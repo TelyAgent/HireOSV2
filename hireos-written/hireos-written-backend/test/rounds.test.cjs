@@ -59,7 +59,7 @@ function setup({ status = 'released', draftRoundOpen = false, invitations: invit
   db.$transaction = async (fn) => fn(db);
   const config = { get: (_k, d) => d };
   const lifecycle = new CaseLifecycleService(db, config);
-  const invitations = new InvitationsService(db, { sendFromWorkspaceAccount: async () => ({ sent: true }) }, config, {}, lifecycle);
+  const invitations = new InvitationsService(db, { sendFromWorkspaceAccount: async () => ({ sent: true }), senderAccount: async () => null }, config, {}, lifecycle);
   const planItems = new PlanItemsService(db);
   return { db, invitations, planItems, lifecycle };
 }

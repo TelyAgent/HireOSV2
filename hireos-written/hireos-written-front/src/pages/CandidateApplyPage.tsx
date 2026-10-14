@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
 import { useStore } from "../store/StoreContext";
 import { Button } from "../components/ui/Primitives";
+import { InvitationLetterCard } from "../components/InvitationLetterCard";
 import { fetchPublicInvitation, submitPublicInvitation, type PublicInvitation } from "../data/writtenApi";
 
 /**
@@ -66,6 +67,7 @@ export function CandidateApplyPage() {
 
         {state.status === "ready" && !state.data.submission && !justSubmitted && (
           <>
+            {state.data.letter && <InvitationLetterCard letter={state.data.letter} />}
             <div className="card card-pad" style={{ marginBottom: 16 }}>
               <h2 style={{ marginBottom: 4 }}>{state.data.jobTitle}</h2>
               <div className="tiny" style={{ color: "var(--text-secondary)", marginBottom: 8 }}>

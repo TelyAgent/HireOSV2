@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import { Drawer } from "antd";
 import { useStore } from "../store/StoreContext";
 import { Button } from "./ui/Primitives";
+import { InvitationLetterCard, previewInvitationLetter } from "./InvitationLetterCard";
 import { API_BASE_URL } from "../utils/apiBase";
 import { createInvitation, listMailAccounts, type MailAccount } from "../data/writtenApi";
 import { CASES, CORE_APPLICATIONS, CORE_JOBS, CORE_CANDIDATES, INVITATIONS, QUESTIONS, type PlanItem, type Round } from "../data/fixtures";
@@ -233,6 +234,16 @@ export function SendToCandidateDrawer({
           <div className="tiny" style={{ color: "var(--text-tertiary)", marginBottom: 12 }}>
             {t("This is exactly what the candidate will see when they open the form link.")}
           </div>
+          <InvitationLetterCard
+            letter={previewInvitationLetter({
+              candidateName: cand.name,
+              jobTitle: job?.title ?? "—",
+              senderName: sender?.name ?? null,
+              mode,
+              durationMin: mode === "timed" ? durationMin : null,
+              deadline,
+            })}
+          />
           <div className="card card-pad" style={{ marginBottom: 16 }}>
             <div className="tiny" style={{ color: "var(--text-tertiary)", marginBottom: 4 }}>{t("Target role")}</div>
             <div style={{ fontWeight: 600, marginBottom: 12 }}>{job?.title ?? "—"}</div>
