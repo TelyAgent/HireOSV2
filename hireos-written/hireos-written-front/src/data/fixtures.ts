@@ -124,7 +124,7 @@ export interface Attempt { id: string; caseId: string; questionId: string; round
 export const ATTEMPTS: Record<string, Attempt> = {};
 
 export interface Criterion { name: string; max: number; ai: number; human: number | null; confidence: string; coverage: string; overridden?: boolean; overrideReason?: string; evidence: string; source: string }
-export interface Evaluation { id: string; attemptId: string; status: "ai_draft" | "final"; finalizedBy: string | null; finalizedAt: string | null; criteria: Criterion[] }
+export interface Evaluation { id: string; attemptId: string; status: "ai_draft" | "final"; finalizedBy: string | null; finalizedAt: string | null; criteria: Criterion[]; /** Real cases: the AI evaluator's overall comment on the answers. */ summary?: string }
 export const EVALUATIONS: Record<string, Evaluation> = {};
 
 export interface Result { id: string; caseId: string; evaluationId: string; overall: number; status: string; releaseId: string | null; /** Real cases: the round this result belongs to (#48). */ invitationId?: string; round?: number }

@@ -62,6 +62,11 @@ export function ReleaseContent({
   const [closeOpen, setCloseOpen] = useState(false);
   const [closeReason, setCloseReason] = useState<CloseReason | null>(null);
   const [busy, setBusy] = useState(false);
+  // What the candidate is told. Null = not edited yet, so the defaults below (which depend on the
+  // result, possibly loaded after mount) apply; HR reviews and edits them before publishing.
+  const [outcomeDraft, setOutcomeDraft] = useState<string | null>(null);
+  const [feedbackDraft, setFeedbackDraft] = useState<string | null>(null);
+  const [nextStepDraft, setNextStepDraft] = useState<string | null>(null);
 
   if (!c || !result) return <EmptyState title="No finalized result for this case yet." />;
 
@@ -69,19 +74,26 @@ export function ReleaseContent({
   const evaluation = EVALUATIONS[result.evaluationId];
   const inv = Object.values(INVITATIONS).find((i) => i.caseId === caseId);
   const disclosure = inv ? inv.disclosurePolicy : "score_and_summary";
+  const outcomeText = outcomeDraft ?? t(result.overall >= 65 ? "Strong performance on this assessment." : "Below the bar for this role on this assessment.");
+  // Pre-filled from the AI evaluator's summary of these answers -- never a canned sentence.
+  const feedbackText = feedbackDraft ?? (evaluation.summary ?? "");
+  const nextStepText = nextStepDraft ?? t("HR will follow up with next steps.");
 
   async function publish() {
     if (busy) return;
     if (!chk1 || !chk2) {
-      say("Both review and disclosure approval are required to publish.", { type: "danger" });
+      say(t("Both review and disclosure approval are required to publish."), { type: "danger" });
+      return;
+    }
+    if (!outcomeText.trim() || !feedbackText.trim() || !nextStepText.trim()) {
+      say(t("Fill in the outcome, feedback and next step before publishing."), { type: "danger" });
       return;
     }
     const relId = `rel_${result!.invitationId ?? caseId}`;
     const rel: Release = {
       id: relId, caseId, overall: result!.overall, showScore: disclosure === "score_and_summary",
-      outcomeText: result!.overall >= 65 ? "Strong performance on this assessment." : "This assessment did not meet the bar for this role.",
-      feedbackText: "Clear structure; accounting treatment mostly correct with one gap in variance analysis.",
-      nextStepText: "HR will follow up with next steps.", publishedAt: new Date().toISOString(),
+      outcomeText: outcomeText.trim(), feedbackText: feedbackText.trim(), nextStepText: nextStepText.trim(),
+      publishedAt: new Date().toISOString(),
     };
     RELEASES[relId] = rel;
     result!.status = "published";
@@ -103,7 +115,7 @@ export function ReleaseContent({
     }
     forceTick();
     onChanged?.();
-    say("Result finalized and published. Candidate portal and notification queued.", { type: "success" });
+    say(t("Result finalized and published. Candidate portal and notification queued."), { type: "success" });
   }
 
   /** Runs a lifecycle action against the backend and mirrors the resulting state onto CASES. */
@@ -178,12 +190,40 @@ export function ReleaseContent({
         <div className="card card-pad">
           <h4 style={{ marginBottom: 8 }}>{t("Candidate preview")}</h4>
           <div className="tiny" style={{ marginBottom: 8 }}>{t("Disclosure policy:")} {disclosure === "score_and_summary" ? t("Score + summary") : t("Summary only")}</div>
-          <div className="card card-pad" style={{ background: "var(--canvas)" }}>
-            <b>{t("Outcome:")}</b> {result.overall >= 65 ? t("Strong performance on this assessment.") : t("Below the bar for this role on this assessment.")}<br />
-            {disclosure === "score_and_summary" && <><b>{t("Score:")}</b> {result.overall}<br /></>}
-            <b>{t("Feedback:")}</b> {t("Clear structure; accounting treatment mostly correct with one gap in variance analysis.")}<br />
-            <b>{t("Next step:")}</b> {t("HR will follow up with next steps.")}
-          </div>
+          {release ? (
+            // Published: show exactly what was released (older releases stored the English defaults).
+            <div className="card card-pad" style={{ background: "var(--canvas)", whiteSpace: "pre-wrap" }}>
+              <b>{t("Outcome:")}</b> {t(release.outcomeText)}<br />
+              {release.showScore && <><b>{t("Score:")}</b> {release.overall}<br /></>}
+              <b>{t("Feedback:")}</b> {t(release.feedbackText)}<br />
+              <b>{t("Next step:")}</b> {t(release.nextStepText)}
+            </div>
+          ) : (
+            <div className="card card-pad" style={{ background: "var(--canvas)" }}>
+              <div className="field" style={{ marginBottom: 10 }}>
+                <label>{t("Outcome:")}</label>
+                <input className="input" value={outcomeText} onChange={(e) => setOutcomeDraft(e.target.value)} />
+              </div>
+              {disclosure === "score_and_summary" && <div style={{ marginBottom: 10 }}><b>{t("Score:")}</b> {result.overall}</div>}
+              <div className="field" style={{ marginBottom: 10 }}>
+                <label>{t("Feedback:")}</label>
+                <textarea
+                  className="input"
+                  rows={5}
+                  value={feedbackText}
+                  placeholder={t("Write feedback on this candidate's answers.")}
+                  onChange={(e) => setFeedbackDraft(e.target.value)}
+                />
+                <div className="tiny" style={{ color: "var(--text-tertiary)", marginTop: 4 }}>
+                  {evaluation.summary ? t("Pre-filled from the AI evaluation of these answers — check it reads well for the candidate before publishing.") : t("No AI summary for these answers — please write the feedback yourself.")}
+                </div>
+              </div>
+              <div className="field">
+                <label>{t("Next step:")}</label>
+                <input className="input" value={nextStepText} onChange={(e) => setNextStepDraft(e.target.value)} />
+              </div>
+            </div>
+          )}
           <div className="tiny" style={{ marginTop: 8 }}>{t("Never includes: internal ranking, reviewer notes, or the internal answer key.")}</div>
         </div>
       </div>

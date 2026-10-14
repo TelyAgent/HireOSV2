@@ -134,6 +134,7 @@ export function applyRealEvaluation(caseId: string, invitation: RealInvitation):
       EVALUATIONS[evaluationId] = {
         id: evaluationId, attemptId, status: "final", finalizedBy: submission.finalizedBy ?? null, finalizedAt: submission.finalizedAt,
         criteria: final.criteria.map(toFinalCriterion),
+        summary: submission.evaluation?.summary,
       };
     }
     const resultId = `result_${key}`;
@@ -155,6 +156,7 @@ export function applyRealEvaluation(caseId: string, invitation: RealInvitation):
   const evaluation: Evaluation = {
     id: evaluationId, attemptId, status: "ai_draft", finalizedBy: null, finalizedAt: null,
     criteria: submission.evaluation.criteria.map(toCriterion),
+    summary: submission.evaluation.summary,
   };
   EVALUATIONS[evaluation.id] = evaluation;
   return attemptId;
