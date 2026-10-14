@@ -206,6 +206,16 @@ export function ScreeningWorkspacePage() {
     return (b.ev?.overall ?? -1) - (a.ev?.overall ?? -1);
   });
 
+  const criteriaConfirmed = job.criteriaStatus === "confirmed";
+  /** Resumes uploaded before the rubric is confirmed can't be matched, so uploading waits for it. */
+  const openImport = (tab: ImportTab) => {
+    if (!criteriaConfirmed) {
+      say(t("Please confirm the requirements & rubric first"), { type: "warning" });
+      return;
+    }
+    setImportTab(tab);
+  };
+
   return (
     <div className="screening-workspace">
       <div className="screening-toolbar ws-head">
@@ -215,12 +225,12 @@ export function ScreeningWorkspacePage() {
             <h2 style={{ margin: 0, fontSize: "var(--fs-h1)", lineHeight: 1.2 }}>{job.title}</h2>
           </div>
           <p className="page-subtitle">
-            {job.team} · {job.location} · {t("Standard")} v{job.criteriaVersion} ({t("confirmed")})
+            {job.team} · {job.location} · {t("Standard")} v{job.criteriaVersion} ({criteriaConfirmed ? t("confirmed") : t("pending confirmation")})
           </p>
         </div>
       </div>
 
-      <ResumeUploadStrip onOpen={setImportTab} />
+      <ResumeUploadStrip onOpen={openImport} />
 
       <div className="candidate-section-heading">
         {t("AI Suggested candidates")} <span className="cnt">{suggested.length}</span>
@@ -235,6 +245,7 @@ export function ScreeningWorkspacePage() {
           >
             {t("Match again")}
           </Button>
+          {!criteriaConfirmed && <Badge tone="warning">{t("Rubric not confirmed")}</Badge>}
           <Link className="btn btn-sm btn-secondary" to={`/jobs/${job.id}/criteria`}>
             {t("Requirements & rubric")}
           </Link>

@@ -12,9 +12,11 @@ const JD_NEW_JOB_URL = `${BASE_URL.replace(/screening\/$/, "jd/")}jobs/new`;
 
 const SOURCE_LABEL: Record<string, string> = { manual_upload: "Local upload", email: "Email", folder: "Folder", api: "API" };
 
-function JobStatusBadge({ status }: { status: JobStatus }) {
+/** An open job whose rubric isn't confirmed can't match resumes yet, so it isn't shown as plainly "Open". */
+function JobStatusBadge({ status, criteriaStatus }: { status: JobStatus; criteriaStatus: Job["criteriaStatus"] }) {
   const { t } = useStore();
   if (status === "draft") return <Badge tone="warning">{t("Draft")}</Badge>;
+  if (status === "open" && criteriaStatus !== "confirmed") return <Badge tone="warning">{t("Rubric pending")}</Badge>;
   if (status === "open") return <Badge tone="success">{t("Open", "Open (job status)")}</Badge>;
   if (status === "closed") return <Badge tone="outline">{t("Closed")}</Badge>;
   return <Badge tone="warning">{t("Paused")}</Badge>;
@@ -106,7 +108,7 @@ export function JobsListPage() {
                   </td>
                   <td>
                     <div className="status-stack">
-                      <JobStatusBadge status={j.status} />
+                      <JobStatusBadge status={j.status} criteriaStatus={j.criteriaStatus} />
                     </div>
                   </td>
                   <td className="num fn-cell">
