@@ -34,6 +34,7 @@ import { ConfirmDialog, Drawer, Modal } from "../components/ui/Overlays";
 import { useBoundedPolling } from "../lib/usePolling";
 import { StillProcessingNotice } from "../components/ui/StillProcessing";
 import { PageSkeleton } from "../components/ui/PageSkeleton";
+import { useFieldValidation } from "../lib/useFieldValidation";
 import { concernTitle } from "../lib/concerns";
 import { ApiError } from "../data/api/shared";
 import { listEvaluations, type EvaluationSnapshot, type ScreeningRunResult } from "../data/api/screening";
@@ -330,17 +331,14 @@ function OverrideModal({ detail, onClose, onSaved }: { detail: ApplicationDetail
   const [dimId, setDimId] = useState(dims[0]?.id || "");
   const [score, setScore] = useState("");
   const [reason, setReason] = useState("");
+  const fields = useFieldValidation({
+    score: () => (!/^\d{1,3}$/.test(score.trim()) || Number(score) > 100 ? t("Enter a whole number from 0 to 100.") : null),
+    reason: () => (!reason.trim() ? t("Explain why your assessment differs from the AI score.") : null),
+  });
 
   const submit = async () => {
+    if (!fields.validateAll()) return;
     const n = parseInt(score, 10);
-    if (isNaN(n) || n < 0 || n > 100) {
-      say(t("Enter a score between 0 and 100"), { type: "error" });
-      return;
-    }
-    if (!reason.trim()) {
-      say(t("A reason is required"), { type: "error" });
-      return;
-    }
     const dim = dims.find((d) => d.id === dimId);
     if (!dim) return;
     await saveHumanOverride(detail.application.id, { dimensionId: dim.id, dimensionName: dim.name, score: n, reason: reason.trim(), by: state.currentUser });
@@ -379,12 +377,20 @@ function OverrideModal({ detail, onClose, onSaved }: { detail: ApplicationDetail
         </select>
       </div>
       <div className="field">
-        <label>{t("Your score (0–100)")}</label>
-        <input type="text" value={score} onChange={(e) => setScore(e.target.value)} placeholder="e.g. 85" />
+        <label htmlFor={fields.labelFor("score")}>
+          {t("Your score (0–100)")}
+          <span className="required-mark">*</span>
+        </label>
+        <input type="text" inputMode="numeric" {...fields.field("score")} value={score} onChange={(e) => setScore(e.target.value)} placeholder="e.g. 85" />
+        {fields.error("score")}
       </div>
       <div className="field">
-        <label>{t("Reason")}</label>
-        <textarea value={reason} onChange={(e) => setReason(e.target.value)} placeholder={t("Why does your assessment differ from the AI score?")} />
+        <label htmlFor={fields.labelFor("reason")}>
+          {t("Reason")}
+          <span className="required-mark">*</span>
+        </label>
+        <textarea {...fields.field("reason")} value={reason} onChange={(e) => setReason(e.target.value)} placeholder={t("Why does your assessment differ from the AI score?")} />
+        {fields.error("reason")}
       </div>
     </Modal>
   );

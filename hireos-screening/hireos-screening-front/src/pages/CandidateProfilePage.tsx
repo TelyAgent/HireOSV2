@@ -14,6 +14,7 @@ import { Modal } from "../components/ui/Overlays";
 import { useBoundedPolling } from "../lib/usePolling";
 import { StillProcessingNotice } from "../components/ui/StillProcessing";
 import { PageSkeleton } from "../components/ui/PageSkeleton";
+import { useFieldValidation } from "../lib/useFieldValidation";
 
 const MATCH_POLL_INTERVAL_MS = 3000;
 const PARSE_POLL_INTERVAL_MS = 3000;
@@ -41,7 +42,7 @@ export function NoJobState({
   onCorrect: () => void;
   onReparse: () => void;
 }) {
-  const { t } = useStore();
+  const { t, state } = useStore();
   // Matching reads the parsed profile, so without one a run can only end as "insufficient
   // data" -- point at the parse instead of offering a match button that can't work.
   if (parseStatus === "pending")
@@ -98,7 +99,7 @@ export function NoJobState({
             {jd.reason || t("No open role in the current job set matches this profile yet.")}
             <br />
             <span className="tiny">
-              {t("Current search scope:")} {openRoles} {t("open roles")} · {t("last checked")} {relTime(jd.lastRunAt, "en")}
+              {t("Current search scope:")} {openRoles} {t("open roles")} · {t("last checked")} {relTime(jd.lastRunAt, state.lang)}
             </span>
           </>
         }
@@ -138,13 +139,20 @@ function CorrectProfileModal({ candidate, onClose, onSaved }: { candidate: Candi
   const [min, setMin] = useState(candidate.compensationExpectation ? String(candidate.compensationExpectation.min) : "");
   const [max, setMax] = useState(candidate.compensationExpectation ? String(candidate.compensationExpectation.max) : "");
   const [reason, setReason] = useState("");
+  const amount = (v: string) => (v.trim() && !/^\d+$/.test(v.trim()) ? t("Enter a whole number, e.g. 160000.") : null);
+  const fields = useFieldValidation({
+    min: () => amount(min),
+    max: () => amount(max) ?? (min.trim() && max.trim() && Number(max) < Number(min) ? t("The maximum can't be lower than the minimum.") : null),
+    reason: () => (!reason.trim() ? t("Say why the profile is being corrected — it is kept in the log.") : null),
+  });
 
   const save = async () => {
+    if (!fields.validateAll()) return;
     await correctProfile(candidate.id, {
       location: location.trim() || undefined,
       compensationMin: min.trim() ? parseInt(min, 10) : undefined,
       compensationMax: max.trim() ? parseInt(max, 10) : undefined,
-      reason: reason.trim() || t("Manual correction"),
+      reason: reason.trim(),
     });
     onClose();
     say(t("Profile corrected — affected screenings marked stale for refresh"), { type: "success" });
@@ -176,17 +184,23 @@ function CorrectProfileModal({ candidate, onClose, onSaved }: { candidate: Candi
       </div>
       <div className="flex gap-16">
         <div className="field" style={{ flex: 1 }}>
-          <label>{t("Compensation expectation — min (USD/yr)")}</label>
-          <input type="text" value={min} onChange={(e) => setMin(e.target.value)} placeholder="e.g. 160000" />
+          <label htmlFor={fields.labelFor("min")}>{t("Compensation expectation — min (USD/yr)")}</label>
+          <input type="text" inputMode="numeric" {...fields.field("min", { required: false })} value={min} onChange={(e) => setMin(e.target.value)} placeholder="e.g. 160000" />
+          {fields.error("min")}
         </div>
         <div className="field" style={{ flex: 1 }}>
-          <label>{t("Compensation expectation — max (USD/yr)")}</label>
-          <input type="text" value={max} onChange={(e) => setMax(e.target.value)} placeholder="e.g. 190000" />
+          <label htmlFor={fields.labelFor("max")}>{t("Compensation expectation — max (USD/yr)")}</label>
+          <input type="text" inputMode="numeric" {...fields.field("max", { required: false })} value={max} onChange={(e) => setMax(e.target.value)} placeholder="e.g. 190000" />
+          {fields.error("max")}
         </div>
       </div>
       <div className="field">
-        <label>{t("Reason for correction")}</label>
-        <input type="text" value={reason} onChange={(e) => setReason(e.target.value)} placeholder="e.g. Candidate confirmed by email" />
+        <label htmlFor={fields.labelFor("reason")}>
+          {t("Reason for correction")}
+          <span className="required-mark">*</span>
+        </label>
+        <input type="text" {...fields.field("reason")} value={reason} onChange={(e) => setReason(e.target.value)} placeholder={t("e.g. Candidate confirmed by email")} />
+        {fields.error("reason")}
       </div>
     </Modal>
   );

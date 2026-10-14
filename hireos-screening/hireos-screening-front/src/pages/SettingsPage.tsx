@@ -23,6 +23,7 @@ import { ACCOUNT_URL, authFetch, useSessionUser } from "../lib/session";
 import { Icon } from "../components/ui/Icons";
 import { Drawer, ConfirmDialog } from "../components/ui/Overlays";
 import { WithDisabledReason } from "../components/ui/DisabledReason";
+import { useFieldValidation } from "../lib/useFieldValidation";
 
 interface ProviderPreset {
   label: string;
@@ -110,21 +111,18 @@ function CorporateMailboxDrawer({
     purposes: { inbound, outbound },
   });
 
-  const validate = (): boolean => {
-    if (!email.trim()) {
-      say(t("Mailbox address is required."), { type: "error" });
-      return false;
-    }
-    if (!password.trim() && !mailbox?.hasPassword) {
-      say(t("An authorization code is required for the first connection."), { type: "error" });
-      return false;
-    }
-    if (!imapHost.trim() || !smtpHost.trim()) {
-      say(t("IMAP and SMTP server addresses are required."), { type: "error" });
-      return false;
-    }
-    return true;
-  };
+  // Each field reports its own problem next to it (#26 AC-1); a failed save focuses the first one.
+  const fields = useFieldValidation({
+    email: () => (!email.trim() ? t("Mailbox address is required.") : !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim()) ? t("Enter a valid email address.") : null),
+    password: () => (!password.trim() && !mailbox?.hasPassword ? t("An authorization code is required for the first connection.") : null),
+    imapHost: () => (!imapHost.trim() ? t("IMAP server address is required.") : null),
+    smtpHost: () => (!smtpHost.trim() ? t("SMTP server address is required.") : null),
+  });
+  const validate = (): boolean =>
+    fields.validateAll((key) => {
+      // Server fields live in the collapsed "advanced" section; open it so the error can be seen.
+      if (key === "imapHost" || key === "smtpHost") setShowAdvanced(true);
+    });
 
   const handleTest = async () => {
     if (!validate()) return;
@@ -216,13 +214,21 @@ function CorporateMailboxDrawer({
         </div>
         <div className="flex gap-16">
           <div className="field" style={{ flex: 1 }}>
-            <label>{t("Mailbox address")} *</label>
-            <input type="text" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="user@example.com" />
+            <label htmlFor={fields.labelFor("email")}>
+              {t("Mailbox address")}
+              <span className="required-mark">*</span>
+            </label>
+            <input type="text" {...fields.field("email")} value={email} onChange={(e) => setEmail(e.target.value)} placeholder="user@example.com" />
+            {fields.error("email")}
           </div>
           <div className="field" style={{ flex: 1 }}>
-            <label>{t("Authorization code")} *</label>
+            <label htmlFor={fields.labelFor("password")}>
+              {t("Authorization code")}
+              {!mailbox?.hasPassword && <span className="required-mark">*</span>}
+            </label>
             <div style={{ position: "relative" }}>
               <input
+                {...fields.field("password", { required: !mailbox?.hasPassword })}
                 type={showPassword ? "text" : "password"}
                 value={password}
                 onChange={(e) => setPassword(e.target.value.replace(/\s+/g, ""))}
@@ -238,6 +244,7 @@ function CorporateMailboxDrawer({
                 <Icon name={showPassword ? "visibility_off" : "visibility"} size={16} />
               </button>
             </div>
+            {fields.error("password")}
           </div>
         </div>
         <div className="card-pad" style={{ background: "var(--info-bg, #eff6ff)", borderRadius: 8, marginBottom: 16 }}>
@@ -260,8 +267,12 @@ function CorporateMailboxDrawer({
             <div style={{ borderLeft: "2px solid var(--border)", paddingLeft: 12, marginTop: 8, marginBottom: 8 }}>
               <div className="flex gap-16">
                 <div className="field" style={{ flex: 1 }}>
-                  <label>{t("IMAP host")}</label>
-                  <input type="text" value={imapHost} onChange={(e) => setImapHost(e.target.value)} />
+                  <label htmlFor={fields.labelFor("imapHost")}>
+                    {t("IMAP host")}
+                    <span className="required-mark">*</span>
+                  </label>
+                  <input type="text" {...fields.field("imapHost")} value={imapHost} onChange={(e) => setImapHost(e.target.value)} />
+                  {fields.error("imapHost")}
                 </div>
                 <div className="field" style={{ flex: 1 }}>
                   <label>{t("IMAP port")}</label>
@@ -270,8 +281,12 @@ function CorporateMailboxDrawer({
               </div>
               <div className="flex gap-16">
                 <div className="field" style={{ flex: 1 }}>
-                  <label>{t("SMTP host")}</label>
-                  <input type="text" value={smtpHost} onChange={(e) => setSmtpHost(e.target.value)} />
+                  <label htmlFor={fields.labelFor("smtpHost")}>
+                    {t("SMTP host")}
+                    <span className="required-mark">*</span>
+                  </label>
+                  <input type="text" {...fields.field("smtpHost")} value={smtpHost} onChange={(e) => setSmtpHost(e.target.value)} />
+                  {fields.error("smtpHost")}
                 </div>
                 <div className="field" style={{ flex: 1 }}>
                   <label>{t("SMTP port")}</label>

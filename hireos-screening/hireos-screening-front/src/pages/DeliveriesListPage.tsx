@@ -39,7 +39,7 @@ function deliverySubjects(d: Delivery) {
 }
 
 export function DeliveriesListPage() {
-  const { t } = useStore();
+  const { t, state } = useStore();
   const navigate = useNavigate();
   const [rows, setRows] = useState<Delivery[]>([]);
 
@@ -78,7 +78,7 @@ export function DeliveriesListPage() {
                   <td>
                     <Badge tone={DELIVERY_STATUS_TONE[d.status]}>{t(DELIVERY_STATUS_LABEL[d.status] || d.status)}</Badge>
                   </td>
-                  <td className="tiny">{fmtDate(d.createdAt, "en")}</td>
+                  <td className="tiny">{fmtDate(d.createdAt, state.lang)}</td>
                   <td className="text-right">
                     <a
                       className="btn btn-sm btn-secondary"

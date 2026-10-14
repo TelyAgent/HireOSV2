@@ -58,7 +58,7 @@ export class DeliveriesService {
         status: 'prepared',
         transport: pkg.transport,
         targetLabel: pkg.targetLabel,
-        history: json([{ at: new Date().toISOString(), state: 'Package ready' }]),
+        history: json(appendHistory([], 'package_ready')),
       },
     });
     return this.progressAttempt(identity, pkg.id, attempt.id);
@@ -93,7 +93,7 @@ export class DeliveriesService {
         where: { id: attempt.id },
         data: {
           status: body.imported ? 'imported' : 'received',
-          history: appendHistory(attempt.history, body.imported ? 'Received / Imported' : 'Received'),
+          history: appendHistory(attempt.history, body.imported ? 'received_imported' : 'received'),
         },
       }),
       this.db.handoffPackage.update({
@@ -120,9 +120,9 @@ export class DeliveriesService {
     });
     if (!attempt) throw new NotFoundException({ code: 'NOT_FOUND' });
     const now = new Date().toISOString();
-    const history = appendHistory(attempt.history, 'Queued');
-    const submitted = appendHistory(history, 'Submitted');
-    const awaiting = appendHistory(submitted, 'Delivered (no receipt yet — awaiting confirmation)');
+    const history = appendHistory(attempt.history, 'queued');
+    const submitted = appendHistory(history, 'submitted');
+    const awaiting = appendHistory(submitted, 'delivered_awaiting_confirmation');
     await this.db.$transaction([
       this.db.deliveryAttempt.update({
         where: { id: attempt.id },
@@ -174,7 +174,7 @@ function serializePackage(pkg: any) {
     reviewStatus: pkg.reviewStatus || undefined,
     status: attempt?.status === 'prepared' ? 'prepared' : attempt?.status || pkg.status,
     createdAt: pkg.createdAt.toISOString(),
-    history: attempt?.history || [],
+    history: serializeHistory(attempt?.history),
     candidateLabel: pkg.application?.candidate?.displayName,
     jobLabel: pkg.application?.job?.title,
     packageStatus: pkg.status,
@@ -188,9 +188,34 @@ function serializePackage(pkg: any) {
   };
 }
 
-function appendHistory(value: unknown, state: string) {
+/**
+ * Delivery timeline steps (#26): stored and returned as an enum `key` the client localizes; the English
+ * `state` text is kept alongside for older readers.
+ */
+export const DELIVERY_HISTORY_STATES = {
+  package_ready: 'Package ready',
+  queued: 'Queued',
+  submitted: 'Submitted',
+  delivered_awaiting_confirmation: 'Delivered (no receipt yet — awaiting confirmation)',
+  received: 'Received',
+  received_imported: 'Received / Imported',
+} as const;
+export type DeliveryHistoryKey = keyof typeof DELIVERY_HISTORY_STATES;
+
+function appendHistory(value: unknown, key: DeliveryHistoryKey) {
   const history = Array.isArray(value) ? value : [];
-  return [...history, { at: new Date().toISOString(), state }];
+  return [...history, { at: new Date().toISOString(), key, state: DELIVERY_HISTORY_STATES[key] }];
+}
+
+/** Entries written before keys existed only have the English `state`; recover their key from it. */
+export function serializeHistory(value: unknown): Array<{ at: string; key: DeliveryHistoryKey | null; state: string }> {
+  if (!Array.isArray(value)) return [];
+  const byText = new Map(Object.entries(DELIVERY_HISTORY_STATES).map(([key, text]) => [text, key as DeliveryHistoryKey]));
+  return value.map((entry: any) => ({
+    at: entry.at,
+    key: entry.key && entry.key in DELIVERY_HISTORY_STATES ? entry.key : byText.get(entry.state) ?? null,
+    state: entry.state,
+  }));
 }
 
 function redactRestricted(value: unknown): unknown {

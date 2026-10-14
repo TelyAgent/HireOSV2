@@ -60,10 +60,15 @@ export interface MoneyRange {
 
 export function fmtMoney(range: MoneyRange | null | undefined, lang: Lang): string {
   if (!range || (range.min == null && range.max == null)) return translate(lang, "Not provided");
-  const cur = range.currency === "USD" ? "$" : (range.currency || "") + " ";
-  const fmt = (n: number | null) => (n == null ? "?" : cur + n.toLocaleString("en-US"));
-  const per = range.period === "year" ? "/yr" : range.period === "month" ? "/mo" : range.period === "hour" ? "/hr" : "";
-  const basis = range.basis && range.basis !== "unknown" ? ` (${range.basis})` : "";
+  const zh = lang === "zh";
+  const symbol: Record<string, string> = { USD: "$", CNY: "¥", RMB: "¥" };
+  const cur = range.currency ? (symbol[range.currency] ?? `${range.currency} `) : "";
+  const fmt = (n: number | null) => (n == null ? "?" : cur + n.toLocaleString(zh ? "zh-CN" : "en-US"));
+  const periods: Record<string, [string, string]> = { year: ["/yr", "/年"], month: ["/mo", "/月"], hour: ["/hr", "/小时"] };
+  const per = range.period && periods[range.period] ? periods[range.period][zh ? 1 : 0] : "";
+  const bases: Record<string, string> = { gross: "税前", net: "税后" };
+  const basisLabel = range.basis && range.basis !== "unknown" ? (zh ? bases[range.basis] ?? range.basis : range.basis) : "";
+  const basis = basisLabel ? (zh ? `（${basisLabel}）` : ` (${basisLabel})`) : "";
   if (range.min === range.max) return `${fmt(range.min)}${per}${basis}`;
   return `${fmt(range.min)}–${fmt(range.max)}${per}${basis}`;
 }

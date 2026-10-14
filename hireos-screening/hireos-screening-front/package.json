@@ -5,12 +5,13 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "tsc -b && vite build",
+    "build": "node scripts/check-i18n.mjs && tsc -b && vite build",
     "preview": "vite preview",
     "typecheck": "tsc -b --noEmit",
     "lint": "eslint .",
     "test": "node --test test/unit/*.test.mjs",
-    "test:smoke": "node test/smoke.test.mjs"
+    "test:smoke": "node test/smoke.test.mjs",
+    "check:i18n": "node scripts/check-i18n.mjs"
   },
   "dependencies": {
     "@ant-design/icons": "^6.0.0",

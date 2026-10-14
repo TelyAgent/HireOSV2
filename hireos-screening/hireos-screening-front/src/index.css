@@ -556,6 +556,10 @@ a:focus-visible,button:focus-visible,[tabindex]:focus-visible,input:focus-visibl
 .decision-summary dd { margin: 0; white-space: pre-wrap; word-break: break-word; }
 .withdrawn-decision { padding: 10px 0; border-top: 1px solid var(--border); }
 .withdrawn-decision:first-of-type { border-top: 0; padding-top: 0; }
+/* Field-level validation (#26) */
+.field-error { margin: 4px 0 0; font-size: var(--fs-xs); color: var(--danger-text); line-height: 1.4; }
+.field input[aria-invalid="true"], .field textarea[aria-invalid="true"], .field select[aria-invalid="true"] { border-color: var(--danger-text); }
+.required-mark { color: var(--danger-text); margin-left: 2px; }
 /* Decision page: open concerns one per line (#27) */
 .decision-concerns ul { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
 .decision-concerns li a { display: flex; align-items: center; gap: 6px; color: inherit; text-decoration: none; font-size: var(--fs-sm); }
