@@ -34,6 +34,7 @@ import { ConfirmDialog, Drawer, Modal } from "../components/ui/Overlays";
 import { useBoundedPolling } from "../lib/usePolling";
 import { StillProcessingNotice } from "../components/ui/StillProcessing";
 import { PageSkeleton } from "../components/ui/PageSkeleton";
+import { concernTitle } from "../lib/concerns";
 import { ApiError } from "../data/api/shared";
 import { listEvaluations, type EvaluationSnapshot, type ScreeningRunResult } from "../data/api/screening";
 import type { Evaluation } from "../data/fixtures/evaluations";
@@ -45,10 +46,6 @@ function cap(s: string): string {
 }
 /** Concern titles and verification questions are generated server-side in English around the
  * requirement text (which is already in the job's language) -- translate the fixed wrapper. */
-function concernTitle(title: string, t: (s: string) => string) {
-  const m = /^(.*) is not confirmed$/s.exec(title);
-  return m ? t("{label} is not confirmed").replace("{label}", m[1]) : title;
-}
 function verificationQuestion(question: string, t: (s: string) => string) {
   const m = /^Please confirm: (.*)$/s.exec(question);
   return m ? t("Please confirm: {label}").replace("{label}", m[1]) : question;
@@ -127,7 +124,7 @@ function ConcernRow({ concern, onResolve }: { concern: Concern; onResolve: (id: 
   const [acceptRiskOpen, setAcceptRiskOpen] = useState(false);
   const restricted = concern.restricted && !RESTRICTED_VIEWERS.includes(state.currentUser);
   return (
-    <div className="card-pad" style={{ borderBottom: "1px solid var(--border)" }}>
+    <div className="card-pad" id={`concern-${concern.id}`} style={{ borderBottom: "1px solid var(--border)" }}>
       <div className="flex items-center justify-between flex-wrap gap-8">
         <div>
           <div style={{ fontWeight: 500, fontSize: "var(--fs-sm)" }}>
@@ -415,6 +412,15 @@ export function ScreeningDetailPage() {
 
   // Confirming a link starts screening in the background, so the page can open before
   // that run finishes -- keep polling until the result lands.
+  // Arriving from the decision page's concern list (#27 AC-1): bring that concern into view once loaded.
+  useEffect(() => {
+    if (!detail?.evaluation || !window.location.hash.startsWith("#concern-")) return;
+    const el = document.getElementById(window.location.hash.slice(1));
+    if (!el) return;
+    el.scrollIntoView({ block: "center" });
+    el.classList.add("concern-flash");
+  }, [detail]);
+
   const inProgress = !!detail && !detail.evaluation && !!detail.screeningInProgress;
   const screeningPoll = useBoundedPolling(inProgress, load, 3000);
 

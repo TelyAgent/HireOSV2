@@ -1,4 +1,4 @@
-import { db } from "../db";
+import { applyServerState, db } from "../db";
 import type { Application } from "../fixtures/applications";
 import type { Evaluation } from "../fixtures/evaluations";
 import type { Concern } from "../fixtures/concerns";
@@ -113,20 +113,27 @@ export async function saveHumanOverride(applicationId: string, input: SaveHumanO
 
 export type ConcernResolution = "dismissed" | "confirmed" | "accepted_risk";
 export async function resolveConcern(applicationId: string, concernId: string, resolution: ConcernResolution): Promise<Concern> {
-  return apiFetch<Concern>(`/concerns/${concernId}/resolve`, {
+  const concern = await apiFetch<Concern>(`/concerns/${concernId}/resolve`, {
     method: "POST",
     body: JSON.stringify({ resolution }),
   });
+  applyServerState({ applicationId, concern });
+  return concern;
 }
 
 export async function assignVerificationItemToMe(itemId: string, userId: PersonId): Promise<VerificationItem> {
   void userId; // server infers the assignee from the authenticated session, not this param
-  return apiFetch<VerificationItem>(`/verification-items/${itemId}/assign`, { method: "POST" });
+  const item = await apiFetch<VerificationItem>(`/verification-items/${itemId}/assign`, { method: "POST" });
+  applyServerState({ applicationId: item.applicationId, verificationItem: item });
+  return item;
 }
 
 export async function resolveVerificationItem(itemId: string, outcome: "met" | "not_met", resolvedBy: PersonId): Promise<VerificationItem> {
-  return apiFetch<VerificationItem>(`/verification-items/${itemId}/resolve`, {
+  void resolvedBy; // server records the authenticated actor
+  const item = await apiFetch<VerificationItem>(`/verification-items/${itemId}/resolve`, {
     method: "POST",
     body: JSON.stringify({ outcome }),
   });
+  applyServerState({ applicationId: item.applicationId, verificationItem: item });
+  return item;
 }

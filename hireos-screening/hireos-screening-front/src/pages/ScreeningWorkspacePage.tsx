@@ -23,13 +23,14 @@ import {
   EmptyState,
   RecommendationBadge,
   ScoreRing,
+  scoreDisplay,
 } from "../components/ui/Primitives";
 import { PageSkeleton } from "../components/ui/PageSkeleton";
 import { WithDisabledReason } from "../components/ui/DisabledReason";
 
 type EligFilter = "all" | EligibilityStatus;
 
-type WorkspaceRowData = { app: ApplicationWithNames; ev: Evaluation | undefined };
+type WorkspaceRowData = { app: ApplicationWithNames; ev: Evaluation | undefined; openConcerns: number };
 
 const DECISION_LABEL: Record<DecisionOutcome, string> = {
   strong_advance: "Strong advance",
@@ -43,7 +44,7 @@ function cap(s: string): string {
   return s ? s.charAt(0).toUpperCase() + s.slice(1) : s;
 }
 
-function WorkspaceRow({ app, ev }: WorkspaceRowData) {
+function WorkspaceRow({ app, ev, openConcerns }: WorkspaceRowData) {
   const { t } = useStore();
   const navigate = useNavigate();
   const decision = db.decisions[app.id];
@@ -66,11 +67,27 @@ function WorkspaceRow({ app, ev }: WorkspaceRowData) {
         <div style={{ fontWeight: 500 }}>{app.candidateName || app.candidateId}</div>
         {ev?.freshness === "stale" && <div className="tiny">{t("Refresh available")}</div>}
       </td>
-      <td>{ev ? <EligibilityBadge status={ev.eligibilityStatus} /> : <Badge tone="outline">{t("Not run")}</Badge>}</td>
-      <td>{ev ? <ScoreRing overall={ev.overall} size="sm" /> : "—"}</td>
+      {/* Ordered by decision value (#27): score first, then coverage and concerns, explanations last. */}
+      <td>
+        {!ev ? (
+          <span className="muted">—</span>
+        ) : scoreDisplay(ev.overall) == null ? (
+          <span className="tiny muted">{t("Insufficient evidence")}</span>
+        ) : (
+          <span className="score-big">{scoreDisplay(ev.overall)}</span>
+        )}
+      </td>
       <td style={{ minWidth: 120 }}>{ev ? <CoverageBar coverage={ev.coverage} /> : "—"}</td>
       <td>
-        {ev?.evaluationStatus === "insufficient_evidence" ? (
+        {openConcerns > 0 && (
+          <Badge tone="danger">
+            {openConcerns} {t(openConcerns === 1 ? "concern" : "concerns")}
+          </Badge>
+        )}
+      </td>
+      <td>{ev ? <EligibilityBadge status={ev.eligibilityStatus} /> : <Badge tone="outline">{t("Not run")}</Badge>}</td>
+      <td className="secondary-col">
+        {!ev ? null : ev.evaluationStatus === "insufficient_evidence" ? (
           <Badge tone="warning">{t("Review (insufficient evidence)")}</Badge>
         ) : (
           <RecommendationBadge outcome={inferRecommendation(ev)} />
@@ -149,7 +166,13 @@ export function ScreeningWorkspacePage() {
       const details = await Promise.all(
         apps.map((app) => getApplicationDetail(app.id).catch(() => null)),
       );
-      setRows(apps.map((app, i) => ({ app, ev: details[i]?.evaluation || undefined })));
+      setRows(
+        apps.map((app, i) => ({
+          app,
+          ev: details[i]?.evaluation || undefined,
+          openConcerns: (details[i]?.concerns || []).filter((c) => c.status === "open").length,
+        })),
+      );
     } catch {
       setJob(null);
     }
@@ -198,6 +221,7 @@ export function ScreeningWorkspacePage() {
 
   if (job === null) return <EmptyState icon="work_off" title={t("Job not found")} />;
 
+  const eligCount = (status: EligFilter) => rows.filter((r) => r.ev && r.ev.eligibilityStatus === status).length;
   let visibleRows = rows;
   if (eligFilter !== "all") visibleRows = visibleRows.filter((r) => r.ev && r.ev.eligibilityStatus === eligFilter);
   // Newly linked, not-yet-screened candidates float to the top (newest first); the rest by score.
@@ -315,27 +339,37 @@ export function ScreeningWorkspacePage() {
             <tr>
               <th></th>
               <th>{t("Candidate")}</th>
-              <th>
-                <select className="table-head-filter" aria-label={t("Eligibility")} value={eligFilter} onChange={(e) => setEligFilter(e.target.value as EligFilter)}>
-                  <option value="all">{t("Eligibility")}</option>
-                  <option value="eligible">{t("Eligible")}</option>
-                  <option value="needs_verification">{t("Needs verification")}</option>
-                  <option value="not_eligible">{t("Not eligible")}</option>
-                </select>
-              </th>
               <th>{t("Overall")}</th>
               <th>{t("Coverage")}</th>
-              <th>{t("AI recommendation")}</th>
+              <th>{t("Concerns")}</th>
+              <th>
+                {/* Each option shows how many rows it would leave (#27 AC-5). */}
+                <select className="table-head-filter" aria-label={t("Eligibility")} value={eligFilter} onChange={(e) => setEligFilter(e.target.value as EligFilter)}>
+                  <option value="all">
+                    {t("Eligibility")} ({rows.length})
+                  </option>
+                  <option value="eligible">
+                    {t("Eligible")} ({eligCount("eligible")})
+                  </option>
+                  <option value="needs_verification">
+                    {t("Needs verification")} ({eligCount("needs_verification")})
+                  </option>
+                  <option value="not_eligible">
+                    {t("Not eligible")} ({eligCount("not_eligible")})
+                  </option>
+                </select>
+              </th>
+              <th className="secondary-col">{t("AI recommendation")}</th>
               <th>{t("Human status")}</th>
               <th></th>
             </tr>
           </thead>
           <tbody>
             {visibleRows.length ? (
-              visibleRows.map((r) => <WorkspaceRow key={r.app.id} app={r.app} ev={r.ev} />)
+              visibleRows.map((r) => <WorkspaceRow key={r.app.id} app={r.app} ev={r.ev} openConcerns={r.openConcerns} />)
             ) : (
               <tr>
-                <td colSpan={8}>
+                <td colSpan={9}>
                   <EmptyState icon="group_off" title={t("No linked candidates match this filter")} />
                 </td>
               </tr>
@@ -379,7 +413,7 @@ export function ScreeningWorkspacePage() {
                       <td>
                         {c.reason === "below_threshold" ? <Badge tone="outline">{t("Below threshold")}</Badge> : <Badge tone="neutral">{t("Dismissed")}</Badge>}
                       </td>
-                      <td className="tiny suggestion-copy">{c.rationale}</td>
+                      <td className="secondary-copy">{c.rationale}</td>
                       <td className="text-right">
                         <Link className="btn btn-sm btn-secondary" to={`/candidates/${c.candidateId}`} onClick={(e) => e.stopPropagation()}>
                           {t("Open", "Open (action)")}
@@ -421,8 +455,11 @@ function RecommendationRow({ recommendation, confidence }: { recommendation: Job
       <td>
         <div style={{ fontWeight: 500 }}>{name}</div>
       </td>
-      <td className="tiny suggestion-copy">{confidence}</td>
-      <td className="tiny suggestion-copy">{recommendation.rationale}</td>
+      {/* Confidence and rationale explain the suggestion; they stay secondary to the candidate (#27 AC-3). */}
+      <td>
+        <span className="confidence-chip">{confidence}</span>
+      </td>
+      <td className="secondary-copy">{recommendation.rationale}</td>
       <td className="text-right">
         <Link className="btn btn-sm btn-primary" to={`/candidates/${recommendation.candidateId}/jobs`} onClick={(e) => e.stopPropagation()}>
           {t("Review", "Review (action)")}

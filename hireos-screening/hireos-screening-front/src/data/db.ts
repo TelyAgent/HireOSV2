@@ -79,6 +79,33 @@ export function getRecsForCandidate(candidateId: string) {
 export function getRecsForJob(jobId: string) {
   return db.recommendations.filter((r) => r.jobId === jobId);
 }
+/**
+ * Writes what a mutation's response says into the shared cache, so every page that reads it (detail,
+ * decision, comparison) agrees without a refetch (#27 AC-8). Every screening mutation goes through here.
+ */
+export function applyServerState(update: {
+  applicationId: string;
+  concern?: Concern;
+  verificationItem?: VerificationItem;
+  /** `null` = no decision in effect any more (withdrawn). */
+  decision?: Decision | null;
+  screeningStatus?: Application["screeningStatus"];
+}) {
+  const { applicationId, concern, verificationItem, decision, screeningStatus } = update;
+  if (concern) {
+    const list = db.concerns[applicationId] || [];
+    const index = list.findIndex((c) => c.id === concern.id);
+    db.concerns[applicationId] = index >= 0 ? list.map((c, i) => (i === index ? concern : c)) : [...list, concern];
+  }
+  if (verificationItem) db.verificationItems[verificationItem.id] = verificationItem;
+  if (decision === null) delete db.decisions[applicationId];
+  else if (decision) db.decisions[applicationId] = decision;
+  if (screeningStatus) {
+    const application = db.applications.find((a) => a.id === applicationId);
+    if (application) application.screeningStatus = screeningStatus;
+  }
+}
+
 export function getConcerns(applicationId: string) {
   return db.concerns[applicationId] || [];
 }
