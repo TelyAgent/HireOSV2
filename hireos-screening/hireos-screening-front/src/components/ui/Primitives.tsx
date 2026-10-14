@@ -4,7 +4,6 @@ import { Icon } from "./Icons";
 import { useGoBack } from "../../lib/navigation";
 import { useStore } from "../../store/StoreContext";
 import { initialsOf, type Person } from "../../data/fixtures/people";
-import type { Task } from "../../data/fixtures/tasks";
 
 /* ---------------------------------------------------------------
    Buttons
@@ -100,17 +99,6 @@ export function PriorityBadge({ priority }: { priority: string }) {
   const { t } = useStore();
   const label = priority.charAt(0).toUpperCase() + priority.slice(1);
   return <Badge tone={PRIORITY_TONE[priority] ?? "neutral"}>{t(label)}</Badge>;
-}
-
-export function TaskStatusBadge({ task }: { task: Task }) {
-  const { t } = useStore();
-  if (task.status === "completed") return <Badge tone="success">{t("Completed")}</Badge>;
-  if (task.status === "cancelled") return <Badge tone="outline">{t("Cancelled")}</Badge>;
-  if (task.status === "waiting") return <Badge tone="neutral">{t("Waiting")}</Badge>;
-  if (task.needsRefresh) return <Badge tone="warning">{t("Needs refresh")}</Badge>;
-  const overdue = task.dueAt && new Date(task.dueAt).getTime() < Date.now();
-  if (overdue) return <Badge tone="danger">{t("Overdue")}</Badge>;
-  return <Badge tone="info">{task.status === "in_progress" ? t("In progress") : t("Open")}</Badge>;
 }
 
 export function FreshnessBadge({ freshness }: { freshness?: "current" | "stale" | "restricted" | "withdrawn" | null }) {

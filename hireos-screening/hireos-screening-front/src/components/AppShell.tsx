@@ -235,7 +235,7 @@ function RoleSwitcherModal() {
     <Modal open={state.showRoleSwitcher} onClose={toggleRoleSwitcher} title={t("Switch demo role")}>
       <p className="tiny" style={{ marginBottom: 14 }}>
         {t(
-          'This switches which person\'s "My Tasks" and permissions the prototype shows. It does not represent real authentication.',
+          "This switches which demo person the prototype acts as, and with whose permissions. It does not represent real authentication.",
         )}
       </p>
       {Object.values(PEOPLE).map((p) => (
