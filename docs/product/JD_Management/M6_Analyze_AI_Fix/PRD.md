@@ -7,7 +7,7 @@
 | 主角色 | Recruiter / TA；Hiring Manager 确认业务内容；Viewer 只读 |
 | 同目录文档 | [User Journey](User_Journey.md) · [输入输出闭环](Loop_IO.md) |
 | 实现现状 | ✅ 后端已有 analyze、section AI、suggestions 接口；线上 Analyze 可用，AI fix / Undo 未验证（F-010、F-011） |
-| 依据 | [完整性标准 v0.1](../HireOS_Command_JD_Completeness_Standard_v0.1.md)、[User Journeys v1.0 §B5](../HireOS_Command_JD_Management_User_Journeys_v1.0.md)、[测试脚本 v0.1 J6](../HireOS_Command_JD_Management_User_Journeys_v0.1.md)、[PRD v1.3 §5.3](../HireOS_Command_JD_Management_PRD_v1.3.md) |
+| 依据 | [完整性标准 v0.1](../HireOS_Command_JD_Completeness_Standard_v0.1.md)、[User Journeys v1.0 §B5](../HireOS_Command_JD_Management_User_Journeys_v1.0.md)、测试脚本 v0.1 J6（已于 #30 删除）、[PRD v1.3 §5.3](../HireOS_Command_JD_Management_PRD_v1.3.md) |
 
 ## 1. 背景与目标
 

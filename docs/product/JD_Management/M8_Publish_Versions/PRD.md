@@ -7,7 +7,7 @@
 | 主角色 | Recruiter / TA（发布）；HR Approver（发布前审批，见 M7） |
 | 同目录文档 | [User Journey](User_Journey.md) · [输入输出闭环](Loop_IO.md) |
 | 实现现状 | 🟡 后端已有 versions、publish 接口，职位状态只有 draft ↔ published；线上没有发布渠道（F-005），版本对比和恢复未验证（F-013）；审批未实现 |
-| 依据 | [测试脚本 v0.1 J8](../HireOS_Command_JD_Management_User_Journeys_v0.1.md)、[完整性标准 v0.1 I2、I6、V2](../HireOS_Command_JD_Completeness_Standard_v0.1.md)、[PRD v1.3 §4.3、§6.3、§9](../HireOS_Command_JD_Management_PRD_v1.3.md)、[Interface Spec v1.3 §7.2](../HireOS_Command_JD_Management_Interface_Spec_v1.3.md) |
+| 依据 | 测试脚本 v0.1 J8（已于 #30 删除）、[完整性标准 v0.1 I2、I6、V2](../HireOS_Command_JD_Completeness_Standard_v0.1.md)、[PRD v1.3 §4.3、§6.3、§9](../HireOS_Command_JD_Management_PRD_v1.3.md)、[Interface Spec v1.3 §7.2](../HireOS_Command_JD_Management_Interface_Spec_v1.3.md) |
 
 ## 1. 背景与目标
 

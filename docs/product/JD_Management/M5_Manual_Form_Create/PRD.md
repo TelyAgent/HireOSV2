@@ -6,8 +6,8 @@
 | 版本 / 日期 | v1.0 / 2026-10-14（草稿，待评审） |
 | 主角色 | Recruiter / TA；Hiring Manager 也可使用 |
 | 同目录文档 | [User Journey](User_Journey.md) · [输入输出闭环](Loop_IO.md) |
-| 实现现状 | ✅ 前端表单校验可用；服务端校验和成功保存未在线上验证（F-008、F-009）；#34 创建失败时会静默生成本地假职位 |
-| 依据 | [User Journeys v1.0 §A3.5](../HireOS_Command_JD_Management_User_Journeys_v1.0.md)、[测试脚本 v0.1 J5](../HireOS_Command_JD_Management_User_Journeys_v0.1.md)、[完整性标准 v0.1 A8](../HireOS_Command_JD_Completeness_Standard_v0.1.md) |
+| 实现现状 | ✅ 前端表单校验可用；服务端校验和成功保存未在线上验证（F-008、F-009）；#34（创建失败时静默生成本地假职位）已由 #38 修复，需回归 |
+| 依据 | [User Journeys v1.0 §A3.5](../HireOS_Command_JD_Management_User_Journeys_v1.0.md)、测试脚本 v0.1 J5（已于 #30 删除）、[完整性标准 v0.1 A8](../HireOS_Command_JD_Completeness_Standard_v0.1.md) |
 
 ## 1. 背景与目标
 

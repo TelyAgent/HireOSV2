@@ -19,7 +19,7 @@ JD Management 按独立小闭环拆成 10 个模块（M1–M9 为业务闭环，
 | M2 职位名三版本创建 | [M2_Job_Title_Variants_Create](M2_Job_Title_Variants_Create/) | P0 | Recruiter / TA | ✅ |
 | M3 上传 JD 创建 | [M3_Upload_JD_Create](M3_Upload_JD_Create/) | P1 | Recruiter / TA | ✅ |
 | M4 粘贴链接 / 文案创建 | [M4_Paste_Link_Text_Create](M4_Paste_Link_Text_Create/) | P1 | Recruiter / TA | ✅ |
-| M5 手动表单创建 | [M5_Manual_Form_Create](M5_Manual_Form_Create/) | P0 | Recruiter / TA | ✅；#34 失败时生成假职位 |
+| M5 手动表单创建 | [M5_Manual_Form_Create](M5_Manual_Form_Create/) | P0 | Recruiter / TA | ✅（#34 已由 #38 修复，需回归） |
 | M6 Analyze 与 AI 修复 | [M6_Analyze_AI_Fix](M6_Analyze_AI_Fix/) | P0 | Recruiter / TA | ✅ |
 | M7 角色权限与审批 | [M7_Roles_Approval](M7_Roles_Approval/) | P0 | 四个角色 | ❌ 审批和服务端角色权限未实现 |
 | M8 发布与版本 | [M8_Publish_Versions](M8_Publish_Versions/) | P0 | Recruiter / TA、HR Approver | 🟡 无发布渠道、审批未实现 |

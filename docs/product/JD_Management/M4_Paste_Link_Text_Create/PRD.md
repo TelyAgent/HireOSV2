@@ -7,7 +7,7 @@
 | 主角色 | Recruiter / TA；Hiring Manager 也可使用 |
 | 同目录文档 | [User Journey](User_Journey.md) · [输入输出闭环](Loop_IO.md) |
 | 实现现状 | ✅ 后端已有导入接口和链接读取（页面上限 2MB）；线上未验证（F-007） |
-| 依据 | [User Journeys v1.0 §A3.4](../HireOS_Command_JD_Management_User_Journeys_v1.0.md)、[测试脚本 v0.1 J4](../HireOS_Command_JD_Management_User_Journeys_v0.1.md) |
+| 依据 | [User Journeys v1.0 §A3.4](../HireOS_Command_JD_Management_User_Journeys_v1.0.md)、测试脚本 v0.1 J4（已于 #30 删除） |
 
 ## 1. 背景与目标
 

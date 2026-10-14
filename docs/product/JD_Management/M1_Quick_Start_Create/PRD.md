@@ -7,7 +7,7 @@
 | 主角色 | Recruiter / TA；Hiring Manager 也可使用 |
 | 同目录文档 | [User Journey](User_Journey.md) · [输入输出闭环](Loop_IO.md) |
 | 实现现状 | ✅ 后端已有 Copilot 会话、消息、confirm-draft 接口；线上 AI 调用失败（F-001 / #32） |
-| 依据 | [PRD v1.3 §5.1–5.2](../HireOS_Command_JD_Management_PRD_v1.3.md)、[User Journeys v1.0 §A3.1](../HireOS_Command_JD_Management_User_Journeys_v1.0.md)、[测试脚本 v0.1 J1](../HireOS_Command_JD_Management_User_Journeys_v0.1.md)、[完整性标准 v0.1](../HireOS_Command_JD_Completeness_Standard_v0.1.md) |
+| 依据 | [PRD v1.3 §5.1–5.2](../HireOS_Command_JD_Management_PRD_v1.3.md)、[User Journeys v1.0 §A3.1](../HireOS_Command_JD_Management_User_Journeys_v1.0.md)、测试脚本 v0.1 J1（已于 #30 删除）、[完整性标准 v0.1](../HireOS_Command_JD_Completeness_Standard_v0.1.md) |
 
 ## 1. 背景与目标
 

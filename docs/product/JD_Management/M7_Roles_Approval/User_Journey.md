@@ -5,7 +5,7 @@
 | 模块 | M7（测试脚本 J7） |
 | 版本 / 日期 | v1.0 / 2026-10-14（草稿，待评审） |
 | 同目录文档 | [产品文档](PRD.md) · [输入输出闭环](Loop_IO.md) |
-| 来源 | [九模块 User Journey v1.0](../HireOS_Command_JD_Management_Module_User_Journeys_v1.0.md) M7 节；测试数据见 [用户旅程与测试脚本 v0.1 §3](../HireOS_Command_JD_Management_User_Journeys_v0.1.md) |
+| 来源 | [九模块 User Journey v1.0](../HireOS_Command_JD_Management_Module_User_Journeys_v1.0.md) M7 节；测试数据见 [输入输出闭环 §2](Loop_IO.md)（原测试脚本 v0.1 已于 #30 删除） |
 
 ## 角色与权限（公共，摘自 [九模块 User Journey §0.1](../HireOS_Command_JD_Management_Module_User_Journeys_v1.0.md)）
 

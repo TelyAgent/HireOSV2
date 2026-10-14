@@ -9,7 +9,7 @@ Doc ID：CMD-JD-UJ-002
 
 1. **2026-10-14 用户决定**：角色采用本文 §0.1 的四个角色；**恢复审批流程**。这两点覆盖 [#9](https://github.com/JsonSuCoder/HireOSV2/issues/9)（岗位库去掉审批）和 [#15](https://github.com/JsonSuCoder/HireOSV2/issues/15)（工作区级三档权限）中相冲突的部分；#9 的 Owner=创建者 仍有效。需要回写到 #15，并评估是否另开 Issue 恢复岗位库的审批信息
 2. [JD 完整性标准 v0.1](HireOS_Command_JD_Completeness_Standard_v0.1.md)
-3. [用户旅程与测试脚本 v0.1（正文 v0.2）](HireOS_Command_JD_Management_User_Journeys_v0.1.md)：J1–J10 步骤与测试数据
+3. 用户旅程与测试脚本 v0.1（正文 v0.2）：J1–J10 步骤与测试数据（已于 #30 删除，测试数据已并入各模块 `Loop_IO.md` 第 2 节）
 4. [JD Management PRD v1.3](HireOS_Command_JD_Management_PRD_v1.3.md)、[Interface Spec v1.3](HireOS_Command_JD_Management_Interface_Spec_v1.3.md)
 5. [User Journeys v1.0](HireOS_Command_JD_Management_User_Journeys_v1.0.md)、[评审会议总结 2026-10-13](Meeting_Summary_20261013_JD_User_Journey_Review.md)
 6. [测试闭环输入/输出清单 v0.1](JD_Test_Loops_IO_v0.1.md)
@@ -41,7 +41,7 @@ Doc ID：CMD-JD-UJ-002
 
 ### 0.3 测试数据
 
-所有测试职位名加 `[UJ-TEST]` 前缀；输入文本、文件、链接沿用 [v0.1 §3.2–3.3](HireOS_Command_JD_Management_User_Journeys_v0.1.md)。每个模块自己造数据，不依赖其他模块的结果（M6/M8/M9 的前置数据用 seed 脚本或 M5 的表单一步造出）。
+所有测试职位名加 `[UJ-TEST]` 前缀；输入文本、文件、链接见各模块 `Loop_IO.md` 第 2 节（原 v0.1 §3.2–3.3，已于 #30 删除）。每个模块自己造数据，不依赖其他模块的结果（M6/M8/M9 的前置数据用 seed 脚本或 M5 的表单一步造出）。
 
 ### 0.4 创建类模块（M1–M5）的共同骨架
 
@@ -373,7 +373,7 @@ flowchart TD
 
 **成功标准**：必填项逐项生效且服务端也校验；保存结果与表单一致。
 
-**测试映射**：闭环 A5；线上问题 F-008、F-009、#34（创建失败时静默生成本地假职位）。
+**测试映射**：闭环 A5；线上问题 F-008、F-009、#34（创建失败时静默生成本地假职位，已由 #38 修复，需回归）。
 
 **待确认**：必填项以哪套为准：v0.1 写 5 项（无概述），线上表单（测试报告 E8）包含 Role summary 和 Level，完整性标准有 9 项必填，原型 README 写 11 项。
 

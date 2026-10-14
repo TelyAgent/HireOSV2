@@ -7,7 +7,7 @@
 | 主角色 | Recruiter / TA；Hiring Manager 编辑授权字段 |
 | 同目录文档 | [User Journey](User_Journey.md) · [输入输出闭环](Loop_IO.md) |
 | 实现现状 | 🟡 后端已有职位字段更新、文档读写、rewrite、suggestions 接口；并发冲突控制未确认；线上部分验证（F-012） |
-| 依据 | [测试脚本 v0.1 J9、J10](../HireOS_Command_JD_Management_User_Journeys_v0.1.md)、[PRD v1.3 §17](../HireOS_Command_JD_Management_PRD_v1.3.md)、[完整性标准 v0.1 A4、A7](../HireOS_Command_JD_Completeness_Standard_v0.1.md) |
+| 依据 | 测试脚本 v0.1 J9、J10（已于 #30 删除）、[PRD v1.3 §17](../HireOS_Command_JD_Management_PRD_v1.3.md)、[完整性标准 v0.1 A4、A7](../HireOS_Command_JD_Completeness_Standard_v0.1.md) |
 
 ## 1. 背景与目标
 
