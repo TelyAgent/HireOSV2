@@ -11,6 +11,12 @@ export async function listDeliveries(): Promise<Delivery[]> {
   return deliveries;
 }
 
+/** Deliveries that need someone's attention (#22): still awaiting confirmation, or failed. */
+export async function countPendingDeliveries(): Promise<number> {
+  const deliveries = await apiFetch<Delivery[]>("/deliveries");
+  return deliveries.filter((d) => d.status === "awaiting_confirmation" || d.status === "failed").length;
+}
+
 export async function getDelivery(id: string): Promise<Delivery> {
   const delivery = await apiFetch<Delivery>(`/deliveries/${id}`);
   replaceDelivery(delivery);

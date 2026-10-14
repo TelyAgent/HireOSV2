@@ -556,3 +556,11 @@ a:focus-visible,button:focus-visible,[tabindex]:focus-visible,input:focus-visibl
 .decision-summary dd { margin: 0; white-space: pre-wrap; word-break: break-word; }
 .withdrawn-decision { padding: 10px 0; border-top: 1px solid var(--border); }
 .withdrawn-decision:first-of-type { border-top: 0; padding-top: 0; }
+/* Delivery package preview (#22) */
+.package-preview { display: grid; grid-template-columns: max-content 1fr; gap: 10px 16px; margin: 0; font-size: var(--fs-sm); }
+.package-preview dt { font-weight: 600; }
+.package-preview dd { margin: 0; }
+.package-dims { margin: 4px 0 0; padding-left: 18px; }
+.nav-item .nav-count { margin-left: auto; min-width: 18px; padding: 0 6px; border-radius: 9px; background: var(--danger-text); color: #fff; font-size: 11px; font-weight: 600; line-height: 18px; text-align: center; }
+.sidenav.collapsed .nav-item .nav-count { position: absolute; top: 4px; right: 4px; margin: 0; }
+.nav-item { position: relative; }
