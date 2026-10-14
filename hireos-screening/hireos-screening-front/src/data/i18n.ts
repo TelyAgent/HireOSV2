@@ -968,7 +968,6 @@ export const ZH: Record<string, string> = {
   "Something went wrong on this page": "页面出了点问题",
   "Your data is safe. Try again, or go back to the job list.": "你的数据没有丢失。可以重试，或返回职位列表。",
   "Try again": "重试",
-  "Back to job list": "返回职位列表",
   "Report the problem": "上报问题",
   "Copied — send it to your administrator": "已复制，请发给管理员",
   "Copy this and send it to your administrator:": "复制以下内容并发给管理员：",
