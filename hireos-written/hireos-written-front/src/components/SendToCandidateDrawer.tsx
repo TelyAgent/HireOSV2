@@ -93,8 +93,11 @@ export function SendToCandidateDrawer({
       setEmailSent(created.emailSent);
       setEmailError(created.emailError ?? null);
     } catch {
-      // Fixture-only demo case (no real backend Case row) -- fall back to a simulated send, same
-      // as every other demo-only candidate in this app.
+      // Never pretend it went out: the backend refuses a send outside the case's draft round (#48),
+      // and a fake "sent" would hide that the candidate got nothing.
+      setSending(false);
+      say(t("The test could not be sent. Please refresh and try again."), { type: "danger" });
+      return;
     }
 
     const invId = `inv_${caseId}_${round.id}`;

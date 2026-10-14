@@ -169,6 +169,8 @@ export interface RealEvaluation {
 
 export interface RealInvitation {
   id: string;
+  /** 1, 2, ... in send order -- each invitation is one assessment round (#48). Listed oldest first. */
+  round: number;
   token: string;
   questions: QuestionSnapshot[];
   mode: "timed" | "deadline_only";
@@ -198,7 +200,7 @@ export interface RealSubmission {
 /** Persists the finalized scoring on the case's latest submission. Throws on a fixture-only demo case (404). */
 export async function finalizeCaseEvaluation(
   caseId: string,
-  input: { overall: number; criteria: RealFinalCriterion[]; finalizedBy?: string },
+  input: { overall: number; criteria: RealFinalCriterion[]; finalizedBy?: string; invitationId?: string },
 ): Promise<{ finalizedAt: string }> {
   const response = await authFetch(`${BASE}/cases/${encodeURIComponent(caseId)}/result/finalize`, {
     method: "POST",
@@ -210,7 +212,7 @@ export async function finalizeCaseEvaluation(
 }
 
 /** Persists the published result on the case's latest submission (must already be finalized). */
-export async function releaseCaseResult(caseId: string, input: RealReleaseInput): Promise<{ releasedAt: string }> {
+export async function releaseCaseResult(caseId: string, input: RealReleaseInput & { invitationId?: string }): Promise<{ releasedAt: string }> {
   const response = await authFetch(`${BASE}/cases/${encodeURIComponent(caseId)}/result/release`, {
     method: "POST",
     headers: { "content-type": "application/json" },
@@ -232,14 +234,14 @@ export async function createInvitation(
     disclosurePolicy: "score_and_summary" | "summary_only";
     recipientEmail: string;
   },
-): Promise<{ id: string; token: string; emailSent: boolean; emailError?: string }> {
+): Promise<{ id: string; round: number; token: string; emailSent: boolean; emailError?: string }> {
   const response = await authFetch(`${BASE}/cases/${encodeURIComponent(caseId)}/invitations`, {
     method: "POST",
     headers: { "content-type": "application/json" },
     body: JSON.stringify(input),
   });
   if (!response.ok) throw new Error(`Request failed (${response.status})`);
-  return response.json() as Promise<{ id: string; token: string; emailSent: boolean; emailError?: string }>;
+  return response.json() as Promise<{ id: string; round: number; token: string; emailSent: boolean; emailError?: string }>;
 }
 
 /** What a lifecycle action (hold / resume / close / interview handoff) leaves the case as. */
@@ -400,7 +402,37 @@ export interface RealPlanItem {
   customPrompt: string | null;
   competencies: { name: string; fraction: number }[] | null;
   deliverables: string[] | null;
+  /** #48: null = in the draft round (editable); otherwise the round invitation it was sent with (read-only). */
+  invitationId: string | null;
+  round: number | null;
   createdAt: string;
+}
+
+/** A case's round state (#48): sent rounds, the single open draft round (if any), and whether one can be opened. */
+export interface RoundState {
+  roundsSent: number;
+  draftRound: { round: number; items: number } | null;
+  canOpenRound: boolean;
+}
+
+export async function getRoundState(caseId: string): Promise<RoundState> {
+  const response = await authFetch(`${BASE}/cases/${encodeURIComponent(caseId)}/rounds`);
+  if (!response.ok) throw new Error(`Request failed (${response.status})`);
+  return response.json() as Promise<RoundState>;
+}
+
+/** "Add supplemental test": opens the next round as a draft (idempotent -- never more than one). */
+export async function openDraftRound(caseId: string): Promise<RoundState> {
+  const response = await authFetch(`${BASE}/cases/${encodeURIComponent(caseId)}/rounds/draft`, { method: "POST" });
+  if (!response.ok) throw new Error(`Request failed (${response.status})`);
+  return response.json() as Promise<RoundState>;
+}
+
+/** Cancels an opened supplemental round that has no questions yet. */
+export async function discardDraftRound(caseId: string): Promise<RoundState> {
+  const response = await authFetch(`${BASE}/cases/${encodeURIComponent(caseId)}/rounds/draft`, { method: "DELETE" });
+  if (!response.ok) throw new Error(`Request failed (${response.status})`);
+  return response.json() as Promise<RoundState>;
 }
 
 /** A 404 here means a fixture-only demo case with no real backend Case row — callers should treat

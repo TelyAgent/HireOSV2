@@ -13,6 +13,7 @@ import {
   PROJECT, INVITATIONS, MAIL, RESULTS, EVALUATIONS, TASKS, CASES, CORE_CANDIDATES, CORE_JOBS, COMPARISONS,
   fmtDateShort, nowISO, type CoreCandidate, type CoreJob, type Task,
 } from "../data/fixtures";
+import { latestResultForCase } from "../data/realPlanItemsMerge";
 
 function candidateOf(caseId: string): CoreCandidate | null {
   const c = CASES[caseId];
@@ -32,7 +33,7 @@ function initials(name: string): string {
 /** Mirrors ComparisonDetailPage's unexported comparableCells() gate: only candidates that
  * already have a result or an AI/human evaluation can be pulled into a comparison. */
 function hasScoreForCase(caseId: string): boolean {
-  const result = Object.values(RESULTS).find((r) => r.caseId === caseId);
+  const result = latestResultForCase(caseId);
   const evaluation = (result ? EVALUATIONS[result.evaluationId] : undefined) || EVALUATIONS[`eval_${caseId}`] || undefined;
   return !!(result || evaluation);
 }

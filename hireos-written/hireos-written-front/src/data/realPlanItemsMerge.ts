@@ -9,7 +9,7 @@ import {
   ATTEMPTS, EVALUATIONS, PLANS, QUESTIONS, RELEASES, RESULTS,
   type Attempt, type Criterion, type Evaluation, type PlanItem, type Question,
 } from "./fixtures";
-import type { QuestionSnapshot, RealEvaluation, RealFinalCriterion, RealInvitation, RealPlanItem, RealSubmission } from "./writtenApi";
+import type { QuestionSnapshot, RealEvaluation, RealFinalCriterion, RealInvitation, RealPlanItem } from "./writtenApi";
 
 function toQuestion(item: RealPlanItem): Question {
   return {
@@ -87,44 +87,6 @@ function toOrphanedQuestion(snapshot: QuestionSnapshot): Question {
   };
 }
 
-/**
- * A sent Invitation snapshots its questions at send time (see SendToCandidateDrawer) so it never
- * needs the originating PlanItem to still exist. But before the plan-items persistence fix, a
- * question generated client-side only (never saved as a real PlanItem) could vanish from `items`
- * on the next reload while its Invitation/Submission stayed real in the backend -- leaving a
- * candidate's real submitted answer with no card to show it on. This recovers exactly those:
- * any invitation question that isn't already covered by a current plan item gets a read-only
- * synthetic PlanItem so its status/submission is never silently invisible.
- */
-/**
- * Whether a sent invitation's question snapshot is this plan item. By id first; by question code as
- * the fallback, because invitations sent before question ids were made stable (see
- * PlanPage.handleQuestionConfirm) snapshotted the in-browser AI id (`q_ai_...`), while the same item
- * reloads as `q_real_<planItemId>` -- an id-only match then showed every sent question twice.
- */
-export function snapshotMatchesPlanItem(snapshot: QuestionSnapshot, questionId: string): boolean {
-  return snapshot.questionId === questionId || (!!QUESTIONS[questionId] && QUESTIONS[questionId].code === snapshot.code);
-}
-
-export function synthesizeOrphanedInvitationItems(caseId: string, realInvitations: RealInvitation[], currentQuestionIds: Set<string>): PlanItem[] {
-  const seen = new Set<string>();
-  const orphaned: PlanItem[] = [];
-  for (const inv of realInvitations) {
-    for (const q of inv.questions) {
-      if (seen.has(q.questionId)) continue;
-      if ([...currentQuestionIds].some((id) => snapshotMatchesPlanItem(q, id))) {
-        // Still resolvable by its snapshot id (the submission/evaluation tabs look it up that way).
-        if (!QUESTIONS[q.questionId]) QUESTIONS[q.questionId] = toOrphanedQuestion(q);
-        continue;
-      }
-      seen.add(q.questionId);
-      QUESTIONS[q.questionId] = toOrphanedQuestion(q);
-      orphaned.push({ id: `orphan_${q.questionId}`, caseId, questionId: q.questionId, kind: "optional", status: inv.status, customPrompt: null });
-    }
-  }
-  return orphaned;
-}
-
 function toCriterion(c: RealEvaluation["criteria"][number]): Criterion {
   return { name: c.name, max: c.max, ai: c.score, human: null, confidence: "Medium", coverage: "Full", evidence: c.evidence, source: "AI evaluation" };
 }
@@ -137,9 +99,11 @@ function toFinalCriterion(c: RealFinalCriterion): Criterion {
 }
 
 /**
- * Writes a real submission into the ATTEMPTS/EVALUATIONS/RESULTS/RELEASES fixture dicts in exactly
- * the shape EvaluationReviewContent / ReleaseContent already expect, so reviewers get the existing
- * accept/override/finalize/publish workflow unchanged.
+ * Writes one round's real submission into the ATTEMPTS/EVALUATIONS/RESULTS/RELEASES fixture dicts in
+ * exactly the shape EvaluationReviewContent / ReleaseContent already expect, so reviewers get the
+ * existing accept/override/finalize/publish workflow unchanged. Every id is per round (#48 -- each
+ * round is scored, finalized and released on its own): `att_real_<invitationId>`, `eval_…`,
+ * `result_…`, `rel_…`.
  *
  * - A persisted finalized scoring / published result (hireos-written-backend) always wins -- that is
  *   what makes them survive a page reload.
@@ -148,15 +112,21 @@ function toFinalCriterion(c: RealFinalCriterion): Criterion {
  *
  * Returns the synthetic attemptId to pass into <EvaluationReviewContent attemptId=... />.
  */
-export function applyRealEvaluation(caseId: string, questionId: string, submission: RealSubmission): string {
-  const attemptId = `att_real_${caseId}`;
+export function applyRealEvaluation(caseId: string, invitation: RealInvitation): string | null {
+  // A round's questions are looked up by the ids frozen in its snapshot -- make sure each resolves,
+  // even if its plan item is gone or was keyed differently when it was sent.
+  for (const q of invitation.questions) if (!QUESTIONS[q.questionId]) QUESTIONS[q.questionId] = toOrphanedQuestion(q);
+  const submission = invitation.submission;
+  if (!submission) return null;
+  const key = invitation.id;
+  const attemptId = `att_real_${key}`;
   const attempt: Attempt = {
-    id: attemptId, caseId, questionId, round: 1, status: "submitted",
+    id: attemptId, caseId, questionId: invitation.questions[0]?.questionId ?? "", round: invitation.round, invitationId: invitation.id, status: "submitted",
     submittedAt: submission.submittedAt, fileRef: "", receivedAt: submission.submittedAt, processedAt: submission.submittedAt,
   };
   ATTEMPTS[attemptId] = attempt;
 
-  const evaluationId = `eval_${caseId}`;
+  const evaluationId = `eval_${key}`;
   const final = submission.finalEvaluation;
   if (final && submission.finalizedAt) {
     if (EVALUATIONS[evaluationId]?.status !== "final") {
@@ -165,12 +135,17 @@ export function applyRealEvaluation(caseId: string, questionId: string, submissi
         criteria: final.criteria.map(toFinalCriterion),
       };
     }
-    const resultId = `result_${caseId}`;
-    const relId = `rel_${caseId}`;
-    const released = !!(submission.release && submission.releasedAt);
-    RESULTS[resultId] = { id: resultId, caseId, evaluationId, overall: final.overall, status: released ? "published" : "final_not_released", releaseId: released ? relId : null };
-    if (released) {
-      RELEASES[relId] = { ...RELEASES[relId], id: relId, caseId, ...submission.release!, publishedAt: submission.releasedAt! };
+    const resultId = `result_${key}`;
+    const relId = `rel_${key}`;
+    // Never downgrade: a result published in this session stays published even if `invitation` is an
+    // older fetch from before the publish (this runs on every render).
+    const released = !!(submission.release && submission.releasedAt) || RESULTS[resultId]?.status === "published";
+    RESULTS[resultId] = {
+      id: resultId, caseId, evaluationId, overall: final.overall, status: released ? "published" : "final_not_released",
+      releaseId: released ? relId : null, invitationId: invitation.id, round: invitation.round,
+    };
+    if (submission.release && submission.releasedAt) {
+      RELEASES[relId] = { ...RELEASES[relId], id: relId, caseId, ...submission.release, publishedAt: submission.releasedAt };
     }
     return attemptId;
   }
@@ -182,4 +157,11 @@ export function applyRealEvaluation(caseId: string, questionId: string, submissi
   };
   EVALUATIONS[evaluation.id] = evaluation;
   return attemptId;
+}
+
+/** A case's latest-round result -- what task lists and comparisons summarise a candidate by. */
+export function latestResultForCase(caseId: string) {
+  return Object.values(RESULTS)
+    .filter((r) => r.caseId === caseId)
+    .sort((a, b) => (b.round ?? 0) - (a.round ?? 0))[0];
 }

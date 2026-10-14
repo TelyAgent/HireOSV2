@@ -5,7 +5,8 @@
  * resolve to a candidate Case — workspace-only tasks (plan drafts, question publishing,
  * interview handoff) are excluded from this whole subsystem.
  */
-import { CASES, CORE_APPLICATIONS, CORE_JOBS, INVITATIONS, PROJECT, RESULTS, TASKS, type CoreJob, type Task } from "../data/fixtures";
+import { CASES, CORE_APPLICATIONS, CORE_JOBS, INVITATIONS, PROJECT, TASKS, type CoreJob, type Task } from "../data/fixtures";
+import { latestResultForCase } from "../data/realPlanItemsMerge";
 
 export type WrittenTaskStatus =
   | "handed_off"
@@ -31,7 +32,7 @@ export function writtenTaskStatus(task: Task): WrittenTaskStatus {
   const c = task.sourceRef ? CASES[task.sourceRef] : undefined;
   const invitations = c ? Object.values(INVITATIONS).filter((i) => i.caseId === c.id) : [];
   const latestInvite = invitations[invitations.length - 1];
-  const result = c ? Object.values(RESULTS).find((r) => r.caseId === c.id) : undefined;
+  const result = c ? latestResultForCase(c.id) : undefined;
   const submitted =
     !!(latestInvite && latestInvite.status === "submitted") ||
     !!(c && c.rounds.some((r) => r.status === "submitted")) ||

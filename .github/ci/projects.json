@@ -55,7 +55,7 @@
       "name": "written-backend",
       "dir": "hireos-written/hireos-written-backend",
       "prisma": true,
-      "checks": ["build", "lint", "typecheck"],
+      "checks": ["build", "lint", "typecheck", "test"],
       "known_failing": []
     },
     {
