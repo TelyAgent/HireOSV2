@@ -310,6 +310,9 @@ export class DecisionsService {
         overall: evaluation.overallScore,
         coverage: evaluation.coverage,
         eligibilityStatus: evaluation.eligibilityStatus,
+        // Frozen with the package (#22): a later re-screen must not change what was sent.
+        version: evaluation.version,
+        generatedAt: (evaluation.completedAt ?? evaluation.createdAt).toISOString(),
         dimensionScores: evaluation.dimensionScores.map((item) => ({ dimensionId: item.dimensionId, name: item.name, score: item.score, status: item.status, reason: item.reason })),
       } : null,
       verificationItems: kind === 'review_only' ? [] : evaluation?.verificationItems.map((item) => ({ question: item.question, acceptance: item.acceptance, status: item.status })) || [],
@@ -324,7 +327,8 @@ export class DecisionsService {
         kind,
         transport: kind === 'review_only' ? null : 'email',
         targetLabel,
-        reviewStatus: kind === 'review_only' ? 'human_reviewed' : null,
+        // Every package comes from a decision a person recorded (#22).
+        reviewStatus: 'human_reviewed',
         status: 'package_ready',
         manifest: json({ files: ['manifest.json', 'payload.json', 'report.md'], renderer: 'local-structured-package-v1' }),
         payload: json(payload),

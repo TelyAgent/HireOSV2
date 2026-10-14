@@ -963,6 +963,15 @@ export const ZH: Record<string, string> = {
   "Mailbox address is required.": "邮箱地址为必填项。",
   "An authorization code is required for the first connection.": "首次连接需要填写授权码。",
   "IMAP and SMTP server addresses are required.": "IMAP 和 SMTP 服务器地址为必填项。",
+  /* #22 — delivery package contents & nav */
+  "Not available": "暂无",
+  "generated": "生成于",
+  "frozen when this package was created": "已在创建投递包时固化",
+  "Candidate contact details are excluded": "不包含候选人联系方式",
+  "Internal ranking and comparison notes are excluded": "不包含内部排名与对比备注",
+  "Restricted evidence is redacted": "受限证据已脱敏",
+  "Reviewed — sent on a decision recorded by a person": "已复核 —— 基于人工记录的决策发出",
+  "Not reviewed": "未复核",
   /* Issue #23 — loading, polling, disabled reasons, decision confirm & withdraw */
   "Still processing — it has been more than 90 seconds.": "仍在处理中，已超过 90 秒。",
   "Something went wrong on this page": "页面出了点问题",
