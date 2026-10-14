@@ -13,7 +13,6 @@ import { TasksModule } from './tasks/tasks.module';
 import { ScreeningModule } from './screening/screening.module';
 import { ComparisonsModule } from './comparisons/comparisons.module';
 import { DecisionsModule } from './decisions/decisions.module';
-import { DeliveriesModule } from './deliveries/deliveries.module';
 import { SettingsModule } from './settings/settings.module';
 import { CoreRecordModule } from './core-record/core-record.module';
 
@@ -34,7 +33,6 @@ import { CoreRecordModule } from './core-record/core-record.module';
     ScreeningModule,
     ComparisonsModule,
     DecisionsModule,
-    DeliveriesModule,
     SettingsModule,
     CoreRecordModule,
   ],

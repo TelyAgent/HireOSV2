@@ -1012,6 +1012,9 @@ export const ZH: Record<string, string> = {
   "Restricted evidence is redacted": "受限证据已脱敏",
   "Reviewed — sent on a decision recorded by a person": "已复核 —— 基于人工记录的决策发出",
   "Not reviewed": "未复核",
+  "The candidate is handed off to Interview automatically.": "候选人会自动交接到面试。",
+  "The candidate is handed off to Written Test automatically.": "候选人会自动交接到笔试。",
+  "Decision recorded without a downstream handoff.": "决策已记录，不交接到下游环节。",
   /* Issue #23 — loading, polling, disabled reasons, decision confirm & withdraw */
   "Still processing — it has been more than 90 seconds.": "仍在处理中，已超过 90 秒。",
   "Something went wrong on this page": "页面出了点问题",

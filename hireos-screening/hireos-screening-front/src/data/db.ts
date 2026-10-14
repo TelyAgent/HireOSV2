@@ -13,7 +13,6 @@ import type { Decision } from "./fixtures/decisions";
 import type { ComparisonSet } from "./fixtures/comparisons";
 import type { Task } from "./fixtures/tasks";
 import type { DuplicateReview } from "./fixtures/duplicateReviews";
-import type { Delivery } from "./fixtures/deliveries";
 import type { FileRecord } from "./fixtures/files";
 import type { Connection } from "./fixtures/connections";
 import type { ActivityEntry } from "./fixtures/activity";
@@ -45,7 +44,6 @@ export const db = {
   comparisons: {} as Record<string, ComparisonSet>,
   tasks: [] as Task[],
   duplicateReviews: {} as Record<string, DuplicateReview>,
-  deliveries: [] as Delivery[],
   files: [] as FileRecord[],
   connections: [] as Connection[],
   activity: [] as ActivityEntry[],

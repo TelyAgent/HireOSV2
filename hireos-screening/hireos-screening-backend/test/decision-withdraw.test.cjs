@@ -42,7 +42,6 @@ function setup({ handoffStatus } = {}) {
     ),
     application: table([{ id: 'a1', workspaceId: WS, screeningStatus: 'decided' }]),
     screeningEvaluation: table([{ id: 'ev1', workspaceId: WS, applicationId: 'a1' }]),
-    handoffPackage: table([{ id: 'p1', workspaceId: WS, decisionId: 'd1', status: 'prepared' }]),
     humanTask: table([{ id: 't1', workspaceId: WS, applicationId: 'a1', taskType: 'screening_review', status: 'completed', completionRef: 'd1', completedAt: decidedAt }]),
     auditRecord: table([]),
   };
@@ -63,7 +62,6 @@ test('AC-7: withdrawing before handoff cancels it, reopens the task and returns 
   assert.equal(decision.withdrawReason, 'wrong candidate');
   assert.ok(decision.withdrawnAt);
   assert.equal(db.screeningOutboxEvent.rows[0].status, 'cancelled');
-  assert.equal(db.handoffPackage.rows[0].status, 'cancelled');
   assert.equal(db.application.rows[0].screeningStatus, 'review_pending');
   assert.equal(db.humanTask.rows[0].status, 'open');
   assert.equal(db.humanTask.rows[0].completedAt, null);

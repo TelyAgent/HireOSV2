@@ -10,8 +10,6 @@ import { ScreeningWorkspacePage } from "./pages/ScreeningWorkspacePage";
 import { ScreeningDetailPage } from "./pages/ScreeningDetailPage";
 import { DecisionPage } from "./pages/DecisionPage";
 import { ComparePage } from "./pages/ComparePage";
-import { DeliveriesListPage } from "./pages/DeliveriesListPage";
-import { DeliveryDetailPage } from "./pages/DeliveryDetailPage";
 import { SettingsPage } from "./pages/SettingsPage";
 import { NotFoundPage } from "./pages/NotFoundPage";
 
@@ -31,8 +29,6 @@ export default function App() {
         <Route path="/applications/:id" element={<ScreeningDetailPage />} />
         <Route path="/applications/:id/decision" element={<DecisionPage />} />
         <Route path="/comparisons/:id" element={<ComparePage />} />
-        <Route path="/deliveries" element={<DeliveriesListPage />} />
-        <Route path="/deliveries/:id" element={<DeliveryDetailPage />} />
         <Route path="/settings" element={<Navigate to="/settings/profile" replace />} />
         <Route path="/settings/:section" element={<SettingsPage />} />
         <Route path="*" element={<NotFoundPage />} />

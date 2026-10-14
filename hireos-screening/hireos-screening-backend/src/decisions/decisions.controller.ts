@@ -27,11 +27,6 @@ export class DecisionsController {
     return this.decisions.withdraw(req.identity, id, decisionId, body);
   }
 
-  @Post('applications/:id/review-report')
-  reviewReport(@Req() req: { identity: Identity }, @Param('id') id: string) {
-    return this.decisions.createReviewOnlyPackage(req.identity, id);
-  }
-
   @Post('applications/:id/decline-notice')
   declineNotice(@Req() req: { identity: Identity }, @Param('id') id: string) {
     return this.decisions.sendDeclineNotice(req.identity, id);

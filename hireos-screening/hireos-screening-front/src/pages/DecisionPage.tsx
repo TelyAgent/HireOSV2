@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
-import { Link, useNavigate, useParams } from "react-router-dom";
+import { Link, useParams } from "react-router-dom";
 import { useStore } from "../store/StoreContext";
-import { generateReviewOnlyReport, recordDecision, sendDeclineNotice, withdrawDecision, type NextStepTarget } from "../data/api/decisions";
+import { recordDecision, sendDeclineNotice, withdrawDecision, type NextStepTarget } from "../data/api/decisions";
 import { getApplicationDetail } from "../data/api/screening";
 import { ApiError } from "../data/api/shared";
 import { db, getApplication, getCandidate, getConcerns, getEvaluation, getJob } from "../data/db";
@@ -23,30 +23,6 @@ const OUTCOME_META: Record<DecisionOutcome, { label: string; needsTarget: boolea
   do_not_advance: { label: "Do Not Advance", needsTarget: false },
   request_information: { label: "Request Information", needsTarget: false },
 };
-const DELIVERY_KIND_LABEL: Record<string, string> = {
-  create_assessment: "Send Assessment",
-  create_interview: "Move to Interview",
-  review_only: "Review-only report",
-};
-const DELIVERY_STATUS_LABEL: Record<string, string> = {
-  prepared: "Package ready",
-  queued: "Queued",
-  submitted: "Submitted",
-  delivered: "Delivered",
-  awaiting_confirmation: "Delivered — awaiting confirmation",
-  failed: "Failed",
-  received: "Received / Imported",
-};
-const DELIVERY_STATUS_TONE: Record<string, "outline" | "info" | "success" | "warning" | "danger"> = {
-  prepared: "outline",
-  queued: "info",
-  submitted: "info",
-  delivered: "success",
-  awaiting_confirmation: "warning",
-  failed: "danger",
-  received: "success",
-};
-
 function cap(s: string): string {
   return s ? s.charAt(0).toUpperCase() + s.slice(1) : s;
 }
@@ -139,7 +115,6 @@ function toNextStepTarget(choice: TargetChoice): NextStepTarget {
 
 function AlreadyDecidedView({ app, withdrawn, onWithdrawn }: { app: Application; withdrawn: Decision[]; onWithdrawn: () => void }) {
   const { t, state, say } = useStore();
-  const navigate = useNavigate();
   const [withdrawOpen, setWithdrawOpen] = useState(false);
   const [withdrawReason, setWithdrawReason] = useState("");
   const [withdrawing, setWithdrawing] = useState(false);
@@ -149,13 +124,6 @@ function AlreadyDecidedView({ app, withdrawn, onWithdrawn }: { app: Application;
   const [decision] = useState(() => db.decisions[app.id]!);
   const cand = getCandidate(app.candidateId)!;
   const job = getJob(app.jobId)!;
-  const delivery = db.deliveries.find((d) => d.applicationId === app.id);
-
-  const generateReport = async () => {
-    const d = await generateReviewOnlyReport(app.id);
-    say(t("Review-only report generated"), { type: "success" });
-    navigate(`/deliveries/${d.id}`);
-  };
   const [confirmDecline, setConfirmDecline] = useState(false);
   const decline = async () => {
     await sendDeclineNotice(app.id);
@@ -230,40 +198,21 @@ function AlreadyDecidedView({ app, withdrawn, onWithdrawn }: { app: Application;
           </Button>
         </div>
       </div>
-      {delivery ? (
-        <div className="card card-pad">
-          <div className="section-title">{t("Package & delivery")}</div>
-          <p style={{ fontSize: "var(--fs-sm)" }}>
-            {t(DELIVERY_KIND_LABEL[delivery.kind] || delivery.kind)} · <Badge tone={DELIVERY_STATUS_TONE[delivery.status]}>{t(DELIVERY_STATUS_LABEL[delivery.status] || delivery.status)}</Badge>
-          </p>
-          <Link className="btn btn-primary" to={`/deliveries/${delivery.id}`}>
-            {t("Open package")}
-          </Link>
-        </div>
-      ) : decision.outcome === "do_not_advance" || decision.outcome === "hold" ? (
-        <div className="card card-pad">
-          <div className="section-title">{t("Report")}</div>
-          <p className="tiny" style={{ marginBottom: 10 }}>
-            {t("You can still generate a review-only report, or send a decline notice to the candidate as a separate, explicit action.")}
-          </p>
-          <Button variant="secondary" onClick={generateReport}>
-            {t("Generate report (review only)")}
-          </Button>{" "}
-          {decision.outcome === "do_not_advance" && (
-            <Button variant="secondary" onClick={() => setConfirmDecline(true)}>
-              {t("Send candidate decline notice")}
-            </Button>
-          )}
-        </div>
-      ) : (
-        <div className="card card-pad">
-          <p className="tiny">
-            {t(
-              "Decision recorded without a downstream handoff yet. It stays open here until a next step is either sent or explicitly closed as “no next step.”",
-            )}
-          </p>
-        </div>
-      )}
+      {/* What happens next (the handoff to Interview / Written Test is sent automatically; no delivery packages). */}
+      <div className="card card-pad">
+        <p className="tiny" style={{ marginBottom: decision.outcome === "do_not_advance" ? 10 : 0 }}>
+          {decision.nextStepTarget === "move_to_interview"
+            ? t("The candidate is handed off to Interview automatically.")
+            : decision.nextStepTarget === "send_assessment"
+              ? t("The candidate is handed off to Written Test automatically.")
+              : t("Decision recorded without a downstream handoff.")}
+        </p>
+        {decision.outcome === "do_not_advance" && (
+          <Button variant="secondary" onClick={() => setConfirmDecline(true)}>
+            {t("Send candidate decline notice")}
+          </Button>
+        )}
+      </div>
       <WithdrawnHistory decisions={withdrawn} />
       <Modal
         open={withdrawOpen}
@@ -311,7 +260,6 @@ function AlreadyDecidedView({ app, withdrawn, onWithdrawn }: { app: Application;
 export function DecisionPage() {
   const { id = "" } = useParams();
   const { t, state, say } = useStore();
-  const navigate = useNavigate();
   const [app, setApp] = useState<Application | null | undefined>(undefined);
   const [outcome, setOutcome] = useState<DecisionOutcome | null>(null);
   const [target, setTarget] = useState<TargetChoice | null>(null);
@@ -374,7 +322,7 @@ export function DecisionPage() {
     const overrideAi = !!aiRec && aiRec !== outcome && !(aiRec === "strong_advance" && outcome === "advance");
     setSubmitting(true);
     try {
-      const { delivery } = await recordDecision(app.id, {
+      await recordDecision(app.id, {
         outcome,
         reason,
         decidedBy: state.currentUser,
@@ -382,14 +330,9 @@ export function DecisionPage() {
         overrideAi,
         exceptionApproved,
       });
-      if (delivery) {
-        say(t("Decision recorded — package prepared for delivery"), { type: "success" });
-        navigate(`/deliveries/${delivery.id}`);
-      } else {
-        say(t("Decision recorded"), { type: "success" });
-        setConfirmOpen(false);
-        void load();
-      }
+      say(t("Decision recorded"), { type: "success" });
+      setConfirmOpen(false);
+      void load();
     } catch (err) {
       say(decisionErrorMessage(err, t), { type: "error" });
     } finally {

@@ -55,7 +55,7 @@ export class DecisionsService {
       // step never ran (e.g. deployed after the decision was made), close the
       // task now rather than leaving it stuck open forever.
       await this.completeScreeningTask(identity, applicationId, existing.id);
-      return this.serializeDecisionResult(existing, await this.latestPackage(identity.workspaceId, applicationId));
+      return { decision: serializeDecision(existing) };
     }
     const decision = await this.db.$transaction(async (tx) => {
       const created = await tx.screeningDecision.create({
@@ -171,10 +171,8 @@ export class DecisionsService {
       }
       return created;
     });
-    const pkg = raw.nextStepTarget === 'send_assessment' || raw.nextStepTarget === 'move_to_interview'
-      ? await this.createPackage(identity, application, decision, raw.nextStepTarget)
-      : null;
-    return this.serializeDecisionResult(decision, pkg);
+    // The handoff itself is the outbox event above; there is no separate "delivery package" any more.
+    return { decision: serializeDecision(decision) };
   }
 
   /**
@@ -230,7 +228,6 @@ export class DecisionsService {
       if (cancelled.count !== handoffs.length) {
         throw new ConflictException({ code: 'HANDOFF_IN_PROGRESS', message: 'The handoff is being sent right now — try again in a moment.' });
       }
-      await tx.handoffPackage.updateMany({ where: { workspaceId: identity.workspaceId, decisionId: decision.id }, data: { status: 'cancelled' } });
       await tx.application.update({ where: { id: applicationId }, data: { screeningStatus: hasEvaluation ? 'review_pending' : 'not_started' } });
       await tx.humanTask.updateMany({
         where: { workspaceId: identity.workspaceId, applicationId, completionRef: decision.id, taskType: { in: ['screening_review', 'screening_evaluation_issue'] } },
@@ -249,16 +246,6 @@ export class DecisionsService {
       return tx.screeningDecision.findUniqueOrThrow({ where: { id: decision.id } });
     });
     return { decision: serializeDecision(withdrawn) };
-  }
-
-  async createReviewOnlyPackage(identity: Identity, applicationId: string) {
-    const application = await this.db.application.findFirst({
-      where: { id: applicationId, workspaceId: identity.workspaceId },
-      include: { job: true },
-    });
-    if (!application) throw new NotFoundException({ code: 'NOT_FOUND' });
-    const pkg = await this.createPackage(identity, application, null, 'review_only');
-    return pkg;
   }
 
   async sendDeclineNotice(identity: Identity, applicationId: string) {
@@ -289,87 +276,11 @@ export class DecisionsService {
     return { applicationId: updated.id, assessmentStatus: updated.assessmentStatus };
   }
 
-  private async createPackage(identity: Identity, application: any, decision: any, target: string) {
-    const evaluation = await this.db.screeningEvaluation.findFirst({
-      where: { applicationId: application.id, workspaceId: identity.workspaceId, freshness: 'current' },
-      orderBy: { version: 'desc' },
-      include: { dimensionScores: true, verificationItems: true },
-    });
-    const kind = target === 'send_assessment' ? 'create_assessment' : target === 'move_to_interview' ? 'create_interview' : 'review_only';
-    const targetLabel = kind === 'create_assessment'
-      ? 'assessments-intake@partner-vendor.demo'
-      : kind === 'create_interview'
-        ? 'interviews@partner-agency.demo'
-        : 'Report on file (not routed — review only)';
-    const payload = {
-      applicationId: application.id,
-      kind,
-      decisionId: decision?.id || null,
-      evaluation: evaluation ? {
-        id: evaluation.id,
-        overall: evaluation.overallScore,
-        coverage: evaluation.coverage,
-        eligibilityStatus: evaluation.eligibilityStatus,
-        // Frozen with the package (#22): a later re-screen must not change what was sent.
-        version: evaluation.version,
-        generatedAt: (evaluation.completedAt ?? evaluation.createdAt).toISOString(),
-        dimensionScores: evaluation.dimensionScores.map((item) => ({ dimensionId: item.dimensionId, name: item.name, score: item.score, status: item.status, reason: item.reason })),
-      } : null,
-      verificationItems: kind === 'review_only' ? [] : evaluation?.verificationItems.map((item) => ({ question: item.question, acceptance: item.acceptance, status: item.status })) || [],
-      accessPolicy: 'restricted_evidence_redacted',
-    };
-    const created = await this.db.handoffPackage.create({
-      data: {
-        workspaceId: identity.workspaceId,
-        applicationId: application.id,
-        jobId: application.jobId,
-        decisionId: decision?.id,
-        kind,
-        transport: kind === 'review_only' ? null : 'email',
-        targetLabel,
-        // Every package comes from a decision a person recorded (#22).
-        reviewStatus: 'human_reviewed',
-        status: 'package_ready',
-        manifest: json({ files: ['manifest.json', 'payload.json', 'report.md'], renderer: 'local-structured-package-v1' }),
-        payload: json(payload),
-        attempts: {
-          create: {
-            workspaceId: identity.workspaceId,
-            attemptNo: 1,
-            status: 'prepared',
-            transport: kind === 'review_only' ? null : 'email',
-            targetLabel,
-            history: json([{ at: new Date().toISOString(), state: 'Package ready' }]),
-          },
-        },
-      },
-      include: { attempts: true },
-    });
-    return serializePackage(created);
-  }
-
   private async completeScreeningTask(identity: Identity, applicationId: string, decisionId: string) {
     await this.db.humanTask.updateMany({
       where: { workspaceId: identity.workspaceId, applicationId, taskType: { in: ['screening_review', 'screening_evaluation_issue'] }, status: { notIn: ['completed', 'cancelled'] } },
       data: { status: 'completed', completedAt: new Date(), completionRef: decisionId },
     });
-  }
-
-  private async latestPackage(workspaceId: string, applicationId: string) {
-    return this.db.handoffPackage.findFirst({
-      where: { workspaceId, applicationId },
-      orderBy: { createdAt: 'desc' },
-      include: { attempts: { orderBy: { attemptNo: 'asc' } } },
-    });
-  }
-
-  private serializeDecisionResult(decision: any, pkg: any) {
-    return {
-      decision: serializeDecision(decision),
-      delivery: pkg
-        ? typeof pkg.createdAt === 'string' ? pkg : serializePackage(pkg)
-        : null,
-    };
   }
 }
 
@@ -388,24 +299,6 @@ export function serializeDecision(decision: any) {
     withdrawnAt: decision.withdrawnAt ? decision.withdrawnAt.toISOString() : undefined,
     withdrawnBy: decision.withdrawnBy || undefined,
     withdrawReason: decision.withdrawReason || undefined,
-  };
-}
-
-function serializePackage(pkg: any) {
-  const attempts = pkg.attempts || [];
-  const attempt = [...attempts].sort((a, b) => b.attemptNo - a.attemptNo)[0];
-  return {
-    id: pkg.id,
-    applicationId: pkg.applicationId,
-    kind: pkg.kind,
-    transport: pkg.transport || undefined,
-    targetLabel: pkg.targetLabel,
-    reviewStatus: pkg.reviewStatus || undefined,
-    status: attempt?.status === 'prepared' ? 'prepared' : attempt?.status || pkg.status,
-    createdAt: pkg.createdAt.toISOString(),
-    history: attempt?.history || [],
-    packageStatus: pkg.status,
-    attemptNo: attempt?.attemptNo || 0,
   };
 }
 
