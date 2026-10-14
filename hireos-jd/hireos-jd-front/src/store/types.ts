@@ -141,6 +141,8 @@ export interface AppState {
 
   // mutable domain data (the prototype's deep-cloned fixtures)
   jobs: Record<string, Job>;
+  /** Whether the backend job list has arrived yet (#35): "loading" must not read as "no jobs". */
+  jobsLoad: { status: "loading" | "loaded" | "failed"; error?: string };
   roleVersions: Record<string, RoleVersion>;
   requirements: Record<string, Requirement[]>;
   restricted: Record<string, RestrictedItem[]>;

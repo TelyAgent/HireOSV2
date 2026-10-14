@@ -1115,6 +1115,12 @@ export const ZH: Record<string, string> = {
   "Retry": "重试",
   "Creating…": "创建中…",
   "This conversation has expired — start a new one.": "这个会话已失效，请新建一个会话。",
+  /* #35 — job list loading, AI not configured */
+  "Loading jobs…": "正在加载职位…",
+  "Couldn’t refresh the job list — showing what was loaded before.": "职位列表刷新失败，当前显示的是之前加载的数据。",
+  "Couldn’t load the job list.": "职位列表加载失败。",
+  "Check your connection and try again.": "请检查网络后重试。",
+  "AI isn’t set up on this server yet, so Copilot can’t draft for now. Use “Create Manually”, or ask an admin to configure AI.": "服务器尚未配置 AI，Copilot 暂时无法起草。可以先用「手动创建」，或请管理员配置 AI。",
   /* #33 — Copilot request failure & recovery */
   "Your sign-in has expired. Refresh the page and sign in again, then retry.": "登录已过期，请刷新页面重新登录后再试。",
   "You don’t have permission to do this. Ask an admin for access.": "你没有执行此操作的权限，请联系管理员开通。",

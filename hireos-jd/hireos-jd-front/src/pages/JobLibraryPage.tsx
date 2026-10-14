@@ -9,6 +9,7 @@ import { SAVED_VIEWS } from "../data/fixtures/savedViews";
 import { fmtRelative } from "../lib/format";
 import { deleteJob, updateJobStatus } from "../features/jobs/jobsApi";
 import { coreJobToLocalJob } from "../features/jobs/jobsMapping";
+import { loadJobsIntoStore } from "../features/jobs/jobsLoader";
 import type { AppState } from "../store/types";
 import type { HiringStatus, Job } from "../data/types";
 
@@ -63,6 +64,8 @@ export function JobLibraryPage() {
   const view = (params.get("view") as ViewKind) || "table";
   const savedView = params.get("savedView") || "All Jobs";
   const jobs = jobsForSavedView(state, savedView);
+  const loading = state.jobsLoad.status === "loading";
+  const failed = state.jobsLoad.status === "failed";
 
   const goto = (nextView: ViewKind, nextSaved: string) =>
     navigate(`/jobs?view=${nextView}&savedView=${encodeURIComponent(nextSaved)}`);
@@ -145,11 +148,30 @@ export function JobLibraryPage() {
         </div>
         <div style={{ flex: 1 }} />
         <span className="tiny">
-          {jobs.length} {jobs.length === 1 ? t("job") : t("jobs")}
+          {loading ? t("Loading…") : `${jobs.length} ${jobs.length === 1 ? t("job") : t("jobs")}`}
         </span>
       </div>
 
-      {jobs.length === 0 ? (
+      {/* #35: loading and failure are their own states — "no jobs" only once the list really arrived. */}
+      {failed && (
+        <div className="load-error" role="alert">
+          <Icon name="cloud_off" />
+          <span>
+            {jobs.length ? t("Couldn’t refresh the job list — showing what was loaded before.") : t("Couldn’t load the job list.")} {t("Check your connection and try again.")}
+          </span>
+          <Button size="sm" variant="secondary" onClick={() => void loadJobsIntoStore(mutate)}>
+            {t("Retry")}
+          </Button>
+        </div>
+      )}
+      {loading && jobs.length === 0 ? (
+        <div className="card job-list-skeleton" aria-busy="true" aria-live="polite">
+          <span className="sr-only">{t("Loading jobs…")}</span>
+          {Array.from({ length: 5 }, (_, i) => (
+            <div key={i} className="sk-row" />
+          ))}
+        </div>
+      ) : failed && jobs.length === 0 ? null : jobs.length === 0 ? (
         <EmptyState
           icon="work_off"
           title={t("No jobs match these filters")}
