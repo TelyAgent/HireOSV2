@@ -1,5 +1,5 @@
-import { useReducer, useState } from "react";
-import { Modal, Radio } from "antd";
+import { useReducer, useState, type ReactNode } from "react";
+import { Modal, Popconfirm } from "antd";
 import { useParams, useNavigate } from "react-router-dom";
 import { useStore } from "../store/StoreContext";
 import { PageHeader, Button, EmptyState } from "../components/ui/Primitives";
@@ -13,6 +13,8 @@ import { closeCase, handoffCaseToInterview, holdCase, releaseCaseResult, resumeC
 import { latestResultForCase } from "../data/realPlanItemsMerge";
 
 type CloseReason = "passed" | "rejected" | "withdrawn";
+// "passed" is no longer offered -- a candidate who passes goes to Interview (hand-off), and closing
+// never creates an interview task. It stays here only to label cases closed that way before.
 const CLOSE_REASONS: { value: CloseReason; label: string }[] = [
   { value: "passed", label: "Passed" },
   { value: "rejected", label: "Not passed" },
@@ -59,8 +61,6 @@ export function ReleaseContent({
   const [chk1, setChk1] = useState(false);
   const [chk2, setChk2] = useState(false);
   const [handoffOpen, setHandoffOpen] = useState(false);
-  const [closeOpen, setCloseOpen] = useState(false);
-  const [closeReason, setCloseReason] = useState<CloseReason | null>(null);
   const [busy, setBusy] = useState(false);
   // What the candidate is told. Null = not edited yet, so the defaults below (which depend on the
   // result, possibly loaded after mount) apply; HR reviews and edits them before publishing.
@@ -143,12 +143,8 @@ export function ReleaseContent({
     if (await runAction(() => handoffCaseToInterview(caseId), "Interview task created. The candidate is now in Interview.")) setHandoffOpen(false);
   }
 
-  async function confirmClose() {
-    if (!closeReason) {
-      say(t("Choose why testing is ending."), { type: "danger" });
-      return;
-    }
-    if (await runAction(() => closeCase(caseId, closeReason), "Testing closed.")) setCloseOpen(false);
+  async function confirmClose(reason: CloseReason) {
+    await runAction(() => closeCase(caseId, reason), "Testing closed.");
   }
 
   function goToPlan() {
@@ -247,7 +243,6 @@ export function ReleaseContent({
           {isLatestRound && (
           <div className="card card-pad" style={{ marginTop: 16 }}>
             <h4 style={{ marginBottom: 8 }}>{t("Next action")}</h4>
-            <div className="tiny" style={{ marginBottom: 12 }}>{t("A proposal is prepared first; sending only happens after approval — sorting or comparing candidates never triggers a send.")}</div>
             {c.status === "handed_off" ? (
               <div className="banner success">
                 {t("Handed off to interview")} {fmtDate(c.handedOffAt ?? null)}. {t("The interview task was created in Interview.")}
@@ -262,11 +257,41 @@ export function ReleaseContent({
                 <Button size="sm" disabled={busy} onClick={() => void runAction(() => resumeCase(caseId), "Case resumed.")}>{t("Resume testing")}</Button>
               </div>
             ) : (
-              <div className="flex gap-2 wrap" style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-                <Button onClick={goToPlan}>{t("Add supplemental test")}</Button>
-                <Button disabled={busy} onClick={() => setHandoffOpen(true)}>{t("Prepare Interview handoff")}</Button>
-                <Button variant="ghost" disabled={busy} onClick={() => void runAction(() => holdCase(caseId), "Case placed on hold.")}>{t("Hold")}</Button>
-                <Button variant="ghost" disabled={busy} onClick={() => { setCloseReason(null); setCloseOpen(true); }}>{t("Close testing")}</Button>
+              // Every option laid out with what it actually does, so nothing has to be guessed.
+              <div className="next-actions">
+                <NextAction
+                  title={t("Move to interview")}
+                  hint={t("Creates an interview task in Interview; the written test ends. Cannot be undone.")}
+                  action={<Button variant="primary" disabled={busy} onClick={() => setHandoffOpen(true)}>{t("Move to interview")}</Button>}
+                />
+                <NextAction
+                  title={t("Add supplemental test")}
+                  hint={t("Opens another round: pick its questions in the plan, then send it.")}
+                  action={<Button onClick={goToPlan}>{t("Add supplemental test")}</Button>}
+                />
+                <NextAction
+                  title={t("Not passed")}
+                  hint={t("Ends the written test as not passed. No interview task is created. Cannot be undone.")}
+                  action={
+                    <Popconfirm title={t("End the written test as not passed?")} okText={t("Confirm")} cancelText={t("Cancel")} okButtonProps={{ danger: true }} onConfirm={() => confirmClose("rejected")}>
+                      <Button disabled={busy}>{t("Not passed")}</Button>
+                    </Popconfirm>
+                  }
+                />
+                <NextAction
+                  title={t("Candidate withdrew")}
+                  hint={t("Ends the written test because the candidate dropped out. Cannot be undone.")}
+                  action={
+                    <Popconfirm title={t("End the written test because the candidate withdrew?")} okText={t("Confirm")} cancelText={t("Cancel")} okButtonProps={{ danger: true }} onConfirm={() => confirmClose("withdrawn")}>
+                      <Button disabled={busy}>{t("Candidate withdrew")}</Button>
+                    </Popconfirm>
+                  }
+                />
+                <NextAction
+                  title={t("Hold")}
+                  hint={t("Pauses this candidate without deciding (e.g. waiting on the role or the candidate). Resume any time.")}
+                  action={<Button variant="ghost" disabled={busy} onClick={() => void runAction(() => holdCase(caseId), "Case placed on hold.")}>{t("Hold")}</Button>}
+                />
               </div>
             )}
           </div>
@@ -286,21 +311,6 @@ export function ReleaseContent({
         {t("This creates an interview task for")} <b>{cand.name}</b> {t("in Interview and ends this written test. It cannot be undone here.")}
       </Modal>
 
-      <Modal
-        open={closeOpen}
-        title={t("Close testing")}
-        okText={t("Close testing")}
-        okButtonProps={{ danger: true }}
-        cancelText={t("Cancel")}
-        confirmLoading={busy}
-        onOk={() => void confirmClose()}
-        onCancel={() => setCloseOpen(false)}
-      >
-        <div style={{ marginBottom: 12 }}>{t("Why is testing ending for")} <b>{cand.name}</b>{t("? This cannot be undone.")}</div>
-        <Radio.Group value={closeReason} onChange={(e) => setCloseReason(e.target.value as CloseReason)} style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-          {CLOSE_REASONS.map((r) => <Radio key={r.value} value={r.value}>{t(r.label)}</Radio>)}
-        </Radio.Group>
-      </Modal>
     </div>
   );
 }
@@ -308,4 +318,16 @@ export function ReleaseContent({
 export function ReleasePage() {
   const { id: caseId = "" } = useParams();
   return <ReleaseContent caseId={caseId} />;
+}
+
+function NextAction({ title, hint, action }: { title: string; hint: string; action: ReactNode }) {
+  return (
+    <div className="next-action">
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ fontWeight: 600 }}>{title}</div>
+        <div className="tiny" style={{ color: "var(--text-tertiary)" }}>{hint}</div>
+      </div>
+      {action}
+    </div>
+  );
 }
