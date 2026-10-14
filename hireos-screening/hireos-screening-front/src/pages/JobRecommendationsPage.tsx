@@ -99,7 +99,7 @@ function ConfirmLinkModal({
     try {
       const app = await confirmJobLink(rec.id, { reason: reason.trim() || undefined, confirmedBy: state.currentUser });
       onClose();
-      say(t('Linked to role — "Review screening & choose next step" added to My Tasks'), { type: "success" });
+      say(t("Linked — the candidate is now in the screening queue for this job"), { type: "success" });
       onConfirmed(app.id);
     } catch (error) {
       // Without this, a failed confirm (e.g. the recommendation went stale because the
@@ -208,7 +208,7 @@ export function JobRecommendationsPage() {
       say(t("Recommendation dismissed — candidate stays in the library"));
     } else {
       await deferRecommendation(rec.id);
-      say(t("Deferred — task remains open"));
+      say(t("Deferred — you can come back to it later"));
     }
     load();
   };
