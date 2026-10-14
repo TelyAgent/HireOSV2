@@ -9,21 +9,37 @@ export type WebAnswer = { text: string; sources: WebSource[] };
 
 @Injectable()
 export class LlmProvider {
-  private readonly client: OpenAI;
+  private client: OpenAI | null = null;
   private readonly model: string;
 
-  constructor(config: ConfigService) {
-    this.client = new OpenAI({
-      apiKey: config.get<string>('HIREOS_AI_API_KEY'),
-      baseURL: config.get<string>('HIREOS_AI_BASE_URL', 'https://api.openai.com/v1'),
-      timeout: Number(config.get<string>('HIREOS_AI_TIMEOUT_SECONDS', '60')) * 1000,
-    });
+  constructor(private readonly config: ConfigService) {
     this.model = config.get<string>('HIREOS_AI_MODEL', 'gpt-4o-mini');
   }
 
+  isConfigured(): boolean {
+    return Boolean(this.config.get<string>('HIREOS_AI_API_KEY', '')?.trim());
+  }
+
+  /**
+   * Created on first use (#35): without an API key the service still boots and serves every non-AI
+   * route; only an AI call fails, with a clear AI_NOT_CONFIGURED instead of a crash at startup.
+   */
+  private requireClient(): OpenAI {
+    if (!this.isConfigured()) {
+      throw new ServiceUnavailableException({ code: 'AI_NOT_CONFIGURED', message: 'AI is not configured on this server (HIREOS_AI_API_KEY is empty).' });
+    }
+    this.client ??= new OpenAI({
+      apiKey: this.config.get<string>('HIREOS_AI_API_KEY'),
+      baseURL: this.config.get<string>('HIREOS_AI_BASE_URL', 'https://api.openai.com/v1'),
+      timeout: Number(this.config.get<string>('HIREOS_AI_TIMEOUT_SECONDS', '60')) * 1000,
+    });
+    return this.client;
+  }
+
   async completeJson(system: string, turns: ChatTurn[]): Promise<string> {
+    const client = this.requireClient();
     try {
-      const completion = await this.client.chat.completions.create({
+      const completion = await client.chat.completions.create({
         model: this.model,
         messages: [{ role: 'system', content: system }, ...turns],
         response_format: { type: 'json_object' },
@@ -38,8 +54,9 @@ export class LlmProvider {
   }
 
   async *streamJson(system: string, turns: ChatTurn[]): AsyncGenerator<string, void, unknown> {
+    const client = this.requireClient();
     try {
-      const stream = await this.client.chat.completions.create({
+      const stream = await client.chat.completions.create({
         model: this.model,
         messages: [{ role: 'system', content: system }, ...turns],
         response_format: { type: 'json_object' },
@@ -57,8 +74,9 @@ export class LlmProvider {
 
   /** Free-text answer with the provider's hosted web search tool; citations come back as `sources`. */
   async answerWithWebSearch(instructions: string, input: string): Promise<WebAnswer> {
+    const client = this.requireClient();
     try {
-      const response = await this.client.responses.create({
+      const response = await client.responses.create({
         model: this.model,
         instructions,
         input,

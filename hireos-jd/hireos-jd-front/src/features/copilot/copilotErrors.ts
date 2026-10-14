@@ -6,6 +6,8 @@ import { CopilotRequestError } from "./copilotApi";
  */
 export function describeCopilotError(error: unknown): string {
   if (error instanceof CopilotRequestError) {
+    // The server runs without an AI key (#35): AI features are off, manual creation still works.
+    if (error.code === "AI_NOT_CONFIGURED") return "AI isn’t set up on this server yet, so Copilot can’t draft for now. Use “Create Manually”, or ask an admin to configure AI.";
     if (error.status === 401 || error.code === "AUTH_REQUIRED") return "Your sign-in has expired. Refresh the page and sign in again, then retry.";
     if (error.status === 403) return "You don’t have permission to do this. Ask an admin for access.";
     if (error.status === 429) return "Copilot is getting too many requests right now. Wait a moment, then retry.";
