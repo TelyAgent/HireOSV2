@@ -925,3 +925,11 @@ a:focus-visible, button:focus-visible, [tabindex]:focus-visible, input:focus-vis
 .topbar-btn { height: 32px; padding: 0 11px; border: 1px solid var(--border); border-radius: 9px; background: var(--surface); color: var(--text-secondary); font: inherit; font-size: 12.5px; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; flex: none; white-space: nowrap; }
 .topbar-btn:hover { background: var(--surface-alt); }
 .topbar-btn.lang { font-weight: 600; }
+/* Job Library loading / failure states (#35) */
+.load-error { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; padding: 12px 16px; margin-bottom: 14px; border-radius: 10px; background: var(--danger-bg, #fdecea); border: 1px solid var(--danger-border, #f5c2c0); color: var(--danger-text, #b42318); font-size: 13px; }
+.load-error .btn { margin-left: auto; }
+.job-list-skeleton { padding: 12px 16px; }
+.job-list-skeleton .sk-row { height: 36px; border-radius: 6px; margin: 8px 0; background: linear-gradient(90deg, rgba(0,0,0,.05) 25%, rgba(0,0,0,.09) 37%, rgba(0,0,0,.05) 63%); background-size: 400% 100%; animation: jd-sk 1.4s ease infinite; }
+@keyframes jd-sk { 0% { background-position: 100% 50%; } 100% { background-position: 0 50%; } }
+@media (prefers-reduced-motion: reduce) { .job-list-skeleton .sk-row { animation: none; } }
+.sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }

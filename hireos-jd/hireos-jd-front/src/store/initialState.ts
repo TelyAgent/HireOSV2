@@ -29,6 +29,7 @@ export const initialState: AppState = {
   // that's fine, every place that joins against `state.jobs[id]` already degrades gracefully (renders
   // without the job's name/link) when the id isn't found rather than crashing.
   jobs: {},
+  jobsLoad: { status: "loading" },
   roleVersions: clone(ROLE_VERSIONS),
   requirements: clone(REQUIREMENTS),
   restricted: clone(RESTRICTED),
