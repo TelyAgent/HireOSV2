@@ -68,6 +68,9 @@ model Case {
   resumeText          String?
   matchScore          Int?
   matchRecommendation String?
+  // A supplemental round was opened ("Add supplemental test") and hasn't been sent yet -- keeps an
+  // empty draft round visible before its first question is added (#48).
+  draftRoundOpen      Boolean  @default(false)
   createdAt           DateTime @default(now())
   updatedAt           DateTime @updatedAt
   candidate           Candidate @relation(fields: [candidateId], references: [id], onDelete: Cascade)
@@ -95,11 +98,16 @@ model PlanItem {
   customPrompt   String?
   competencies   Json?
   deliverables   Json?
+  // The round this question was sent in (#48). Null = it is in the case's current draft round and
+  // still editable; once set, the item is frozen with that invitation and read-only.
+  invitationId   String?
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
-  case           Case     @relation(fields: [caseId], references: [id], onDelete: Cascade)
+  case           Case        @relation(fields: [caseId], references: [id], onDelete: Cascade)
+  invitation     Invitation? @relation(fields: [invitationId], references: [id], onDelete: SetNull)
 
   @@index([workspaceId, caseId])
+  @@index([invitationId])
 }
 
 // A case has at most one task today (only one handoff kind — "assessment requested" — exists yet), so
@@ -157,6 +165,8 @@ model Invitation {
   durationMin      Int?
   deadline         DateTime?
   disclosurePolicy String
+  // 1, 2, ... per case in send order: each invitation is one assessment round (#48).
+  round            Int         @default(1)
   status           String      @default("sent")
   openedAt         DateTime?
   startedAt        DateTime?
@@ -164,8 +174,10 @@ model Invitation {
   updatedAt        DateTime    @updatedAt
   case             Case        @relation(fields: [caseId], references: [id], onDelete: Cascade)
   submission       Submission?
+  planItems        PlanItem[]
 
   @@index([workspaceId, caseId])
+  @@unique([caseId, round])
 }
 
 model Submission {

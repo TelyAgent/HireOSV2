@@ -429,6 +429,28 @@ export const ZH: Record<string, string> = {
   "Written": "笔试", "Easy": "易", "Hard": "难",
   "Write the question, or generate a draft from the title with AI.": "填写题目内容，或根据标题用 AI 生成草稿。",
   "Could not save to the server. Please refresh and try again.": "保存到服务器失败，请刷新后重试。",
+  /* #48 — assessment rounds */
+  "Round {n}": "第 {n} 轮",
+  "Round {n} — drafting": "第 {n} 轮草稿中",
+  "Round {n} (supplemental test · draft)": "第 {n} 轮（补充测试 · 草稿）",
+  "Round {n} (draft)": "第 {n} 轮（草稿）",
+  "Questions are frozen once this round is sent; it is not sent to the candidate until you click Send.": "本轮发送后题目即冻结；点「发送给候选人」之前不会发给候选人。",
+  "Cancel this round": "取消本轮",
+  "Add at least one question to this round before sending.": "本轮至少添加一道题后才能发送。",
+  "New supplemental test": "新建补充测试",
+  "Round {n} opened — add its questions, then send it.": "已新建第 {n} 轮，添加题目后即可发送。",
+  "Could not open a new round. Please refresh and try again.": "无法新建测评轮次，请刷新后重试。",
+  "Remove this round's questions before cancelling it.": "请先删除本轮的题目，再取消本轮。",
+  "This question was already sent and can no longer be changed.": "该题已发送，不能再修改。",
+  "Result released": "结果已发布",
+  "Finalized — not released": "已定稿，未发布",
+  "Submitted — awaiting review": "已提交，待评估",
+  "Opened — awaiting submission": "已打开，待提交",
+  "View evaluation →": "查看评估 →",
+  "Sent rounds are read-only.": "已发送的轮次只读。",
+  "Scores by round": "各轮得分",
+  "No finalized result for this round yet.": "本轮还没有定稿结果。",
+  "The test could not be sent. Please refresh and try again.": "测试发送失败，请刷新后重试。",
 };
 
 export function translate(lang: "en" | "zh", source: string): string {

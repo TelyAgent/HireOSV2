@@ -1,4 +1,4 @@
-import { Body, Controller, Param, Post, Req, UseGuards } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, Post, Req, UseGuards } from '@nestjs/common';
 import { IsIn } from 'class-validator';
 import { WorkspaceGuard, type Identity } from '../auth/workspace.guard';
 import { CLOSE_REASONS, CaseLifecycleService, type CloseReason } from './case-lifecycle.service';
@@ -13,6 +13,21 @@ class CloseCaseDto {
 @UseGuards(WorkspaceGuard)
 export class CasesController {
   constructor(private readonly lifecycle: CaseLifecycleService) {}
+
+  @Get('rounds')
+  rounds(@Param('caseId') caseId: string, @Req() req: { identity: Identity }) {
+    return this.lifecycle.roundState(req.identity, caseId);
+  }
+
+  @Post('rounds/draft')
+  openDraftRound(@Param('caseId') caseId: string, @Req() req: { identity: Identity }) {
+    return this.lifecycle.openDraftRound(req.identity, caseId);
+  }
+
+  @Delete('rounds/draft')
+  discardDraftRound(@Param('caseId') caseId: string, @Req() req: { identity: Identity }) {
+    return this.lifecycle.discardDraftRound(req.identity, caseId);
+  }
 
   @Post('hold')
   hold(@Param('caseId') caseId: string, @Req() req: { identity: Identity }) {

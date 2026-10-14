@@ -23,24 +23,28 @@ function computeOverall(criteria: Criterion[], key: "ai" | "human"): number | nu
  * same objects fresh on every render — picks the change up immediately without a page reload.
  */
 export function EvaluationReviewContent({
-  attemptId, inline = false, onViewFinalResult, hideFinalize = false,
+  attemptId, inline = false, onViewFinalResult, hideFinalize = false, movesCaseStatus = true, onFinalized,
 }: {
   attemptId: string;
   inline?: boolean;
   onViewFinalResult?: () => void;
   hideFinalize?: boolean;
+  /** False when reviewing an older round (#48): finalizing it must not move the case's status. */
+  movesCaseStatus?: boolean;
+  onFinalized?: () => void;
 }) {
   const { t, say, state } = useStore();
   const navigate = useNavigate();
   const att = ATTEMPTS[attemptId];
-  const seedEvaluation = att ? EVALUATIONS[`eval_${att.caseId}`] : undefined;
+  // Real rounds key their evaluation by invitation (#48); fixture attempts by case.
+  const seedEvaluation = att ? EVALUATIONS[`eval_${att.invitationId ?? att.caseId}`] : undefined;
   const [evaluation, setEvaluation] = useState<Evaluation | undefined>(seedEvaluation);
   const [confirmOpen, setConfirmOpen] = useState(false);
 
   if (!att) return <EmptyState title="Attempt not found." />;
 
   const cand = CORE_CANDIDATES[CASES[att.caseId].candidateId];
-  const q = QUESTIONS[att.questionId];
+  const q = QUESTIONS[att.questionId] ?? { code: "—" };
 
   if (!evaluation) {
     return (
@@ -58,7 +62,7 @@ export function EvaluationReviewContent({
   const ev = evaluation; // narrowed non-null, for the closures below (TS doesn't carry the early-return narrowing into nested function scopes)
   const overallAI = computeOverall(ev.criteria, "ai");
   const overallHuman = computeOverall(ev.criteria, "human");
-  const isFinalized = ev.status === "final" || !!Object.values(RESULTS).find((r) => r.caseId === att.caseId && ["final_not_released", "published"].includes(r.status));
+  const isFinalized = ev.status === "final" || !!Object.values(RESULTS).find((r) => r.evaluationId === ev.id && ["final_not_released", "published"].includes(r.status));
 
   function updateEvaluation(updater: (ev: Evaluation) => Evaluation) {
     setEvaluation((ev) => {
@@ -108,14 +112,21 @@ export function EvaluationReviewContent({
     if (att.id.startsWith("att_real_")) {
       finalizeCaseEvaluation(att.caseId, {
         overall,
+        invitationId: att.invitationId,
         finalizedBy: state.currentUser,
         criteria: ev.criteria.map((c) => ({ name: c.name, max: c.max, ai: c.ai, human: c.human as number, overridden: c.overridden, overrideReason: c.overrideReason })),
       }).catch(() => say(t("Could not save to the server. Please refresh and try again."), { type: "danger" }));
     }
     updateEvaluation((prev) => ({ ...prev, status: "final", finalizedBy: state.currentUser, finalizedAt: new Date().toISOString() }));
-    // Mirrors the backend's finalize transition so the page header updates without a reload.
-    CASES[att.caseId].status = "finalized";
-    RESULTS[`result_${att.caseId}`] = { id: `result_${att.caseId}`, caseId: att.caseId, evaluationId: ev.id, overall, status: "final_not_released", releaseId: null };
+    // Mirrors the backend's finalize transition so the page header updates without a reload -- only for
+    // the latest round; finalizing an older round leaves the case status alone (#48).
+    if (movesCaseStatus) CASES[att.caseId].status = "finalized";
+    const resultKey = att.invitationId ?? att.caseId;
+    RESULTS[`result_${resultKey}`] = {
+      id: `result_${resultKey}`, caseId: att.caseId, evaluationId: ev.id, overall, status: "final_not_released", releaseId: null,
+      invitationId: att.invitationId, round: att.round,
+    };
+    onFinalized?.();
     setConfirmOpen(false);
     say(`Evaluation finalized. Overall: ${overall}`, { type: "success" });
     if (onViewFinalResult) onViewFinalResult();

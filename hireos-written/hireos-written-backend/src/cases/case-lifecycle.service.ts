@@ -65,6 +65,47 @@ export class CaseLifecycleService {
     };
   }
 
+  /** Round state of a case (#48): how many rounds were sent and whether a draft round is open. */
+  async roundState(identity: Identity, caseId: string) {
+    const kase = await this.findCase(identity, caseId);
+    const [roundsSent, draftItems, latest] = await Promise.all([
+      this.db.invitation.count({ where: { caseId, workspaceId: identity.workspaceId } }),
+      this.db.planItem.count({ where: { caseId, workspaceId: identity.workspaceId, invitationId: null } }),
+      this.db.invitation.findFirst({ where: { caseId, workspaceId: identity.workspaceId }, orderBy: { round: 'desc' }, include: { submission: true } }),
+    ]);
+    const hasDraft = roundsSent === 0 || kase.draftRoundOpen || draftItems > 0;
+    // A supplemental round follows a finished one: the previous round must be scored and finalized.
+    const latestFinalized = !latest || !!latest.submission?.finalizedAt;
+    return {
+      roundsSent,
+      draftRound: hasDraft ? { round: roundsSent + 1, items: draftItems } : null,
+      canOpenRound: !TERMINAL_STATUSES.includes(kase.status) && !hasDraft && latestFinalized,
+    };
+  }
+
+  /**
+   * "Add supplemental test": opens the next round as a draft (#48). Idempotent -- with a draft
+   * already open it just returns it, so there is never more than one (AC-3).
+   */
+  async openDraftRound(identity: Identity, caseId: string) {
+    const kase = await this.findCase(identity, caseId);
+    if (TERMINAL_STATUSES.includes(kase.status)) throw new ConflictException({ code: 'CASE_ENDED', status: kase.status });
+    const state = await this.roundState(identity, caseId);
+    if (state.draftRound) return state; // already open -- never a second draft
+    if (!state.canOpenRound) throw new ConflictException({ code: 'ROUND_IN_PROGRESS', message: 'Finalize the current round before adding a supplemental test.' });
+    await this.db.case.update({ where: { id: caseId }, data: { draftRoundOpen: true } });
+    return this.roundState(identity, caseId);
+  }
+
+  /** Cancels an opened supplemental round that has no questions yet. */
+  async discardDraftRound(identity: Identity, caseId: string) {
+    await this.findCase(identity, caseId);
+    const draftItems = await this.db.planItem.count({ where: { caseId, workspaceId: identity.workspaceId, invitationId: null } });
+    if (draftItems > 0) throw new ConflictException({ code: 'DRAFT_ROUND_NOT_EMPTY', message: 'Remove its questions first.' });
+    await this.db.case.update({ where: { id: caseId }, data: { draftRoundOpen: false } });
+    return this.roundState(identity, caseId);
+  }
+
   async hold(identity: Identity, caseId: string) {
     const kase = await this.findCase(identity, caseId);
     if (kase.status === 'on_hold' || TERMINAL_STATUSES.includes(kase.status)) throw new ConflictException({ code: 'CANNOT_HOLD', status: kase.status });

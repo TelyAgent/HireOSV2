@@ -35,6 +35,11 @@ export class FinalizeEvaluationDto {
   @IsOptional()
   @IsString()
   finalizedBy?: string;
+
+  /** The round to finalize (#48); defaults to the latest submitted round. */
+  @IsOptional()
+  @IsString()
+  invitationId?: string;
 }
 
 export class ReleaseResultDto {
@@ -52,4 +57,9 @@ export class ReleaseResultDto {
 
   @IsString()
   nextStepText!: string;
+
+  /** The round to release (#48); defaults to the latest submitted round. */
+  @IsOptional()
+  @IsString()
+  invitationId?: string;
 }

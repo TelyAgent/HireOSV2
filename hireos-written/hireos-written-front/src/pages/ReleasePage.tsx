@@ -5,11 +5,12 @@ import { useStore } from "../store/StoreContext";
 import { PageHeader, Button, EmptyState } from "../components/ui/Primitives";
 import { getUser } from "../data/users";
 import {
-  ATTEMPTS, CASES, CORE_CANDIDATES, EVALUATIONS, INVITATIONS, RESULTS, RELEASES,
+  CASES, CORE_CANDIDATES, EVALUATIONS, INVITATIONS, RESULTS, RELEASES,
   fmtDate, type Release,
 } from "../data/fixtures";
 import type { UserId } from "../store/types";
 import { closeCase, handoffCaseToInterview, holdCase, releaseCaseResult, resumeCase, type CaseLifecycleState } from "../data/writtenApi";
+import { latestResultForCase } from "../data/realPlanItemsMerge";
 
 type CloseReason = "passed" | "rejected" | "withdrawn";
 const CLOSE_REASONS: { value: CloseReason; label: string }[] = [
@@ -34,14 +35,26 @@ const CLOSE_REASONS: { value: CloseReason; label: string }[] = [
  * hand off to Interview (a real call that creates the interview task), hold / resume, and close
  * testing with a reason. Handed-off and closed are terminal -- no further actions are offered.
  */
-export function ReleaseContent({ caseId, inline = false, onGoToPlan, onChanged }: { caseId: string; inline?: boolean; onGoToPlan?: () => void; onChanged?: () => void }) {
+export function ReleaseContent({
+  caseId, invitationId, isLatestRound = true, inline = false, onGoToPlan, onChanged,
+}: {
+  caseId: string;
+  /** The round whose result this shows (#48); without it, the case's latest round. */
+  invitationId?: string;
+  /** Only the latest round offers the case-level next steps (hand off / supplemental test / close). */
+  isLatestRound?: boolean;
+  inline?: boolean;
+  /** "Add supplemental test" -- the host opens the next draft round and switches to the plan. */
+  onGoToPlan?: () => void;
+  onChanged?: () => void;
+}) {
   const { t, say } = useStore();
   const navigate = useNavigate();
   const [, forceTick] = useReducer((n: number) => n + 1, 0);
 
   const c = CASES[caseId];
-  const result = Object.values(RESULTS).find((r) => r.caseId === caseId);
-  const release = Object.values(RELEASES).find((r) => r.caseId === caseId);
+  const result = invitationId ? RESULTS[`result_${invitationId}`] : latestResultForCase(caseId);
+  const release = result?.releaseId ? RELEASES[result.releaseId] : undefined;
 
   const [chk1, setChk1] = useState(false);
   const [chk2, setChk2] = useState(false);
@@ -62,7 +75,7 @@ export function ReleaseContent({ caseId, inline = false, onGoToPlan, onChanged }
       say("Both review and disclosure approval are required to publish.", { type: "danger" });
       return;
     }
-    const relId = `rel_${caseId}`;
+    const relId = `rel_${result!.invitationId ?? caseId}`;
     const rel: Release = {
       id: relId, caseId, overall: result!.overall, showScore: disclosure === "score_and_summary",
       outcomeText: result!.overall >= 65 ? "Strong performance on this assessment." : "This assessment did not meet the bar for this role.",
@@ -72,12 +85,13 @@ export function ReleaseContent({ caseId, inline = false, onGoToPlan, onChanged }
     RELEASES[relId] = rel;
     result!.status = "published";
     result!.releaseId = relId;
-    c.status = "released";
+    // Releasing an older round leaves the case where its latest round is (#48).
+    if (isLatestRound) c.status = "released";
     // Real cases persist the published result -- that is what moves the task list to "Written
     // completed" and keeps it after a reload. Fixture-only demo cases stay in-memory only.
-    if (ATTEMPTS[`att_real_${caseId}`]) {
+    if (result!.invitationId) {
       const { overall, showScore, outcomeText, feedbackText, nextStepText } = rel;
-      releaseCaseResult(caseId, { overall, showScore, outcomeText, feedbackText, nextStepText })
+      releaseCaseResult(caseId, { overall, showScore, outcomeText, feedbackText, nextStepText, invitationId: result!.invitationId })
         .catch(() => say(t("Could not save to the server. Please refresh and try again."), { type: "danger" }));
     }
     forceTick();
@@ -171,6 +185,7 @@ export function ReleaseContent({ caseId, inline = false, onGoToPlan, onChanged }
           <div className="banner success" style={{ marginTop: 16 }}>
             {t("Published")} {fmtDate(release.publishedAt)}. {t("Delivery does not guarantee delivery — a bounce would still leave the result visible internally.")}
           </div>
+          {isLatestRound && (
           <div className="card card-pad" style={{ marginTop: 16 }}>
             <h4 style={{ marginBottom: 8 }}>{t("Next action")}</h4>
             <div className="tiny" style={{ marginBottom: 12 }}>{t("A proposal is prepared first; sending only happens after approval — sorting or comparing candidates never triggers a send.")}</div>
@@ -196,6 +211,7 @@ export function ReleaseContent({ caseId, inline = false, onGoToPlan, onChanged }
               </div>
             )}
           </div>
+          )}
         </>
       )}
 

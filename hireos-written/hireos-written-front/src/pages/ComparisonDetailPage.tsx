@@ -2,7 +2,8 @@ import { useMemo, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useStore } from "../store/StoreContext";
 import { Button, EmptyState } from "../components/ui/Primitives";
-import { CASES, CORE_CANDIDATES, COMPARISONS, EVALUATIONS, RESULTS, type Criterion } from "../data/fixtures";
+import { CASES, CORE_CANDIDATES, COMPARISONS, EVALUATIONS, type Criterion } from "../data/fixtures";
+import { latestResultForCase } from "../data/realPlanItemsMerge";
 
 function computeOverall(criteria: Criterion[], key: "ai" | "human"): number | null {
   if (criteria.some((c) => c[key] == null)) return null;
@@ -10,7 +11,7 @@ function computeOverall(criteria: Criterion[], key: "ai" | "human"): number | nu
 }
 
 function comparableCells(caseId: string) {
-  const result = Object.values(RESULTS).find((r) => r.caseId === caseId);
+  const result = latestResultForCase(caseId);
   const evaluation = (result ? EVALUATIONS[result.evaluationId] : null) || EVALUATIONS[`eval_${caseId}`] || null;
   return { result, evaluation, isFinal: !!(evaluation && evaluation.status === "final") };
 }

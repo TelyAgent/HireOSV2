@@ -2,6 +2,7 @@ import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../persistence/prisma.service';
 import type { Identity } from '../auth/workspace.guard';
 import type { CreatePlanItemDto, UpdatePlanItemDto } from './plan-item.dto';
+import { assertCaseOpen, assertPlanItemEditable } from '../invitations/rounds';
 
 @Injectable()
 export class PlanItemsService {
@@ -10,6 +11,7 @@ export class PlanItemsService {
   private serialize(item: {
     id: string; kind: string; status: string; questionCode: string; questionTitle: string;
     questionPrompt: string; customPrompt: string | null; competencies: unknown; deliverables: unknown; createdAt: Date;
+    invitationId: string | null; invitation?: { round: number } | null;
   }) {
     return {
       id: item.id,
@@ -21,6 +23,9 @@ export class PlanItemsService {
       customPrompt: item.customPrompt,
       competencies: item.competencies,
       deliverables: item.deliverables,
+      // #48: null = in the draft round (editable); otherwise the round it was sent in (read-only).
+      invitationId: item.invitationId,
+      round: item.invitation?.round ?? null,
       createdAt: item.createdAt.toISOString(),
     };
   }
@@ -37,6 +42,7 @@ export class PlanItemsService {
     const items = await this.db.planItem.findMany({
       where: { caseId, workspaceId: identity.workspaceId },
       orderBy: { createdAt: 'asc' },
+      include: { invitation: { select: { round: true } } },
     });
     return items.map((item) => this.serialize(item));
   }
@@ -44,6 +50,8 @@ export class PlanItemsService {
   async create(identity: Identity, caseId: string, dto: CreatePlanItemDto) {
     const kase = await this.db.case.findFirst({ where: { id: caseId, workspaceId: identity.workspaceId } });
     if (!kase) throw new NotFoundException({ code: 'CASE_NOT_FOUND' });
+    assertCaseOpen(kase.status);
+    // New questions always go into the draft round (invitationId stays null until it is sent).
 
     const item = await this.db.planItem.create({
       data: {
@@ -64,6 +72,7 @@ export class PlanItemsService {
   async update(identity: Identity, caseId: string, id: string, dto: UpdatePlanItemDto) {
     const existing = await this.db.planItem.findFirst({ where: { id, caseId, workspaceId: identity.workspaceId } });
     if (!existing) throw new NotFoundException({ code: 'PLAN_ITEM_NOT_FOUND' });
+    assertPlanItemEditable(existing);
     const item = await this.db.planItem.update({
       where: { id },
       data: { customPrompt: dto.customPrompt, status: dto.status },
@@ -74,6 +83,7 @@ export class PlanItemsService {
   async remove(identity: Identity, caseId: string, id: string) {
     const existing = await this.db.planItem.findFirst({ where: { id, caseId, workspaceId: identity.workspaceId } });
     if (!existing) throw new NotFoundException({ code: 'PLAN_ITEM_NOT_FOUND' });
+    assertPlanItemEditable(existing);
     await this.db.planItem.delete({ where: { id } });
     return { status: 'deleted' };
   }
