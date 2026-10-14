@@ -1,0 +1,235 @@
+TAP version 13
+# Subtest: registry points at real projects with matching npm scripts
+ok 1 - registry points at real projects with matching npm scripts
+  ---
+  duration_ms: 3.561625
+  ...
+# Subtest: selects only projects touched by the diff
+ok 2 - selects only projects touched by the diff
+  ---
+  duration_ms: 0.471584
+  ...
+# Subtest: docs-only diff selects nothing; unknown diff and CI config select everything
+ok 3 - docs-only diff selects nothing; unknown diff and CI config select everything
+  ---
+  duration_ms: 0.201166
+  ...
+# Subtest: directory prefix does not match sibling names
+ok 4 - directory prefix does not match sibling names
+  ---
+  duration_ms: 0.072
+  ...
+# Subtest: known_failing must be a declared check
+ok 5 - known_failing must be a declared check
+  ---
+  duration_ms: 0.879208
+  ...
+# Subtest: accepts a consistent review report
+ok 6 - accepts a consistent review report
+  ---
+  duration_ms: 0.897334
+  ...
+# Subtest: rejects contradictory pass and mismatched identity
+ok 7 - rejects contradictory pass and mismatched identity
+  ---
+  duration_ms: 1.621375
+  ...
+# Subtest: rejects unknown fields from the model
+ok 8 - rejects unknown fields from the model
+  ---
+  duration_ms: 0.636708
+  ...
+# Subtest: publisher marks missing report as blocked, never pass
+ok 9 - publisher marks missing report as blocked, never pass
+  ---
+  duration_ms: 0.343792
+  ...
+# Subtest: accepts a QA report covering every AC exactly once
+ok 10 - accepts a QA report covering every AC exactly once
+  ---
+  duration_ms: 0.830709
+  ...
+# Subtest: rejects QA reports with missing ACs, missing evidence or a contradictory pass
+ok 11 - rejects QA reports with missing ACs, missing evidence or a contradictory pass
+  ---
+  duration_ms: 3.107459
+  ...
+# Subtest: QA comment lists every AC and marks a missing report as blocked
+ok 12 - QA comment lists every AC and marks a missing report as blocked
+  ---
+  duration_ms: 0.330833
+  ...
+# Subtest: closing-keyword parsing matches the PR contract
+ok 13 - closing-keyword parsing matches the PR contract
+  ---
+  duration_ms: 0.463417
+  ...
+# Subtest: batch QA finds the merged PR that closed the Issue and uses its merge commit
+ok 14 - batch QA finds the merged PR that closed the Issue and uses its merge commit
+  ---
+  duration_ms: 2.326375
+  ...
+# Subtest: batch QA refuses an Issue with no merged PR or that breaks the contract, with a readable reason
+ok 15 - batch QA refuses an Issue with no merged PR or that breaks the contract, with a readable reason
+  ---
+  duration_ms: 0.720791
+  ...
+# Subtest: QA no longer gates PRs: ci.yml has no qa job and the merge gate does not wait for it
+ok 16 - QA no longer gates PRs: ci.yml has no qa job and the merge gate does not wait for it
+  ---
+  duration_ms: 3.106084
+  ...
+# Subtest: merge gate rejects every failed base/classification and inappropriate review state
+ok 17 - merge gate rejects every failed base/classification and inappropriate review state
+  ---
+  duration_ms: 0.202458
+  ...
+# Subtest: all Issue forms match required schema fields and dropdown choices
+ok 18 - all Issue forms match required schema fields and dropdown choices
+  ---
+  duration_ms: 2.596417
+  ...
+# Subtest: submission and execution distinguish triage, concrete points and ledger exception
+ok 19 - submission and execution distinguish triage, concrete points and ledger exception
+  ---
+  duration_ms: 2.354583
+  ...
+# Subtest: rejects missing fields, illegal enums, duplicate headings and malformed/duplicate ACs
+ok 20 - rejects missing fields, illegal enums, duplicate headings and malformed/duplicate ACs
+  ---
+  duration_ms: 0.602209
+  ...
+# Subtest: code fences, comments and nested headings do not create fields or AC definitions
+ok 21 - code fences, comments and nested headings do not create fields or AC definitions
+  ---
+  duration_ms: 0.156542
+  ...
+# Subtest: CLI validates full body and fails invalid inputs and inaccessible files
+ok 22 - CLI validates full body and fails invalid inputs and inaccessible files
+  ---
+  duration_ms: 108.360375
+  ...
+# Subtest: merge, squash and rebase targets use the final merged SHA, never PR head or a newer branch tip
+ok 23 - merge, squash and rebase targets use the final merged SHA, never PR head or a newer branch tip
+  ---
+  duration_ms: 1.397459
+  ...
+# Subtest: updates, unmerged closes, forks and non-default-branch merges are excluded
+ok 24 - updates, unmerged closes, forks and non-default-branch merges are excluded
+  ---
+  duration_ms: 0.383375
+  ...
+# Subtest: closed-event merge SHA and PR number must match the API before QA can run
+ok 25 - closed-event merge SHA and PR number must match the API before QA can run
+  ---
+  duration_ms: 0.342
+  ...
+# Subtest: merged evidence PRs are skipped and forged reserved branches fail closed
+ok 26 - merged evidence PRs are skipped and forged reserved branches fail closed
+  ---
+  duration_ms: 0.394958
+  ...
+# Subtest: evidence classification accepts both phase records only for the matching source PR
+ok 27 - evidence classification accepts both phase records only for the matching source PR
+  ---
+  duration_ms: 0.168084
+  ...
+# Subtest: QA context contains the merged identity and complete PR changes across squash/rebase
+ok 28 - QA context contains the merged identity and complete PR changes across squash/rebase
+  ---
+  duration_ms: 5.459208
+  ...
+# Subtest: QA context rejects PR-head identity, incomplete changes and pre-merge events
+ok 29 - QA context rejects PR-head identity, incomplete changes and pre-merge events
+  ---
+  duration_ms: 0.16725
+  ...
+# Subtest: post-merge publication resolves empty PR arrays using fixed GitHub run metadata and verifies merge identity
+ok 30 - post-merge publication resolves empty PR arrays using fixed GitHub run metadata and verifies merge identity
+  ---
+  duration_ms: 0.63775
+  ...
+# Subtest: publication rejects forged phase/path/title, conflicting PRs and legacy QA runs
+ok 31 - publication rejects forged phase/path/title, conflicting PRs and legacy QA runs
+  ---
+  duration_ms: 0.766458
+  ...
+# Subtest: a delayed Review publication still binds its head when GitHub omits the now-merged PR association
+ok 32 - a delayed Review publication still binds its head when GitHub omits the now-merged PR association
+  ---
+  duration_ms: 0.786166
+  ...
+# Subtest: post-merge publication excludes unmerged closes and other target branches
+ok 33 - post-merge publication excludes unmerged closes and other target branches
+  ---
+  duration_ms: 0.158625
+  ...
+# Subtest: pre-merge Review publishes independently and deferred QA is not blocked
+ok 34 - pre-merge Review publishes independently and deferred QA is not blocked
+  ---
+  duration_ms: 1.761375
+  ...
+# Subtest: phase documents and comments preserve different commits in either publication order and on reruns
+ok 35 - phase documents and comments preserve different commits in either publication order and on reruns
+  ---
+  duration_ms: 4.017167
+  ...
+# Subtest: a later phase or retry changes the mandatory index even after the earlier ledger PR merged
+ok 36 - a later phase or retry changes the mandatory index even after the earlier ledger PR merged
+  ---
+  duration_ms: 2.418334
+  ...
+# Subtest: missing reports block only their own phase; valid failing QA is published without inventing a product Bug
+ok 37 - missing reports block only their own phase; valid failing QA is published without inventing a product Bug
+  ---
+  duration_ms: 1.878291
+  ...
+# Subtest: publisher rejects PR-head QA and forged report numbers before writing comments or files
+ok 38 - publisher rejects PR-head QA and forged report numbers before writing comments or files
+  ---
+  duration_ms: 2.335709
+  ...
+# Subtest: post-merge Bug environment and mirror record the merge SHA, not the source head
+ok 39 - post-merge Bug environment and mirror record the merge SHA, not the source head
+  ---
+  duration_ms: 4.9525
+  ...
+# Subtest: post-merge evidence runs stop publication before parsing Issue linkage or reports
+ok 40 - post-merge evidence runs stop publication before parsing Issue linkage or reports
+  ---
+  duration_ms: 1.2995
+  ...
+# Subtest: workflow wiring keeps Review in CI and QA in merged-close workflow with bounded artifacts
+ok 41 - workflow wiring keeps Review in CI and QA in merged-close workflow with bounded artifacts
+  ---
+  duration_ms: 0.301417
+  ...
+# Subtest: a failing workflow cannot publish a successful QA verdict after a guard or setup failure
+ok 42 - a failing workflow cannot publish a successful QA verdict after a guard or setup failure
+  ---
+  duration_ms: 1.370708
+  ...
+# Subtest: QA selects merged PR paths rather than mutable base/head diff
+ok 43 - QA selects merged PR paths rather than mutable base/head diff
+  ---
+  duration_ms: 1.335208
+  ...
+# Subtest: QA guard preserves untracked tests and rejects staged product edits
+ok 44 - QA guard preserves untracked tests and rejects staged product edits
+  ---
+  duration_ms: 91.360875
+  ...
+# Subtest: QA preparation installs each selected project and preserves failed installer output
+ok 45 - QA preparation installs each selected project and preserves failed installer output
+  ---
+  duration_ms: 2.8445
+  ...
+1..45
+# tests 45
+# suites 0
+# pass 45
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 162.153292

@@ -1,4 +1,4 @@
-name: Claude QA
+name: Legacy Claude QA
 
 # Batch QA for one Issue (#39): runs after merge, against the merge commit of the PR that closed
 # the Issue, and posts the result on the Issue. Called by qa-batch.yml; no longer part of PR CI.

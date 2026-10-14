@@ -105,6 +105,20 @@ body:
     validations:
       required: true
   - type: dropdown
+    id: estimate
+    attributes:
+      label: Estimate
+      description: 相对工作规模；实施前由 Owner 确认具体点数。
+      options:
+        - 'TBD'
+        - '1'
+        - '2'
+        - '3'
+        - '5'
+        - '8'
+    validations:
+      required: true
+  - type: dropdown
     id: ai_ready
     attributes:
       label: AI Ready

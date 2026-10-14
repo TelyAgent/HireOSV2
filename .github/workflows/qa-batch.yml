@@ -1,5 +1,6 @@
-name: Claude QA (batch)
+name: Legacy Claude QA (manual compatibility)
 
+# Historical compatibility only; does not replace Codex QA or publish to Quality Ledger.
 # Run QA after a batch of Issues has been merged (#39), instead of on every PR.
 # Actions → "Claude QA (batch)" → Run workflow → e.g. "23,34".
 on:

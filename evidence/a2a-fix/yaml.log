@@ -1,0 +1,12 @@
+parsed .github/workflows/claude-review.yml
+parsed .github/workflows/codex-qa.yml
+parsed .github/workflows/claude-qa.yml
+parsed .github/workflows/codex-review.yml
+parsed .github/workflows/quality-ledger.yml
+parsed .github/workflows/qa-batch.yml
+parsed .github/workflows/ci.yml
+parsed .github/ISSUE_TEMPLATE/bug.yml
+parsed .github/ISSUE_TEMPLATE/config.yml
+parsed .github/ISSUE_TEMPLATE/tech-debt.yml
+parsed .github/ISSUE_TEMPLATE/design.yml
+parsed .github/ISSUE_TEMPLATE/feature.yml

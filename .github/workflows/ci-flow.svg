@@ -1,0 +1,44 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 410" role="img" aria-labelledby="title desc">
+  <title id="title">合并前 Review 与合并后 QA</title>
+  <desc id="desc">普通产品 PR 在合并前执行基础检查、Review、安全审查和 Merge gate，经人工审批合并后固定实际合并 SHA 执行 QA。CI 和 QA 分别完成后由台账发布两个阶段的证据，QA 缺陷进入 Bug 分诊。</desc>
+  <defs>
+    <marker id="arrow" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><path d="M0 0L8 4L0 8Z" fill="#53616b"/></marker>
+    <style>
+      text { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; fill: #202b33; }
+      .node { fill: #fff; stroke: #53616b; stroke-width: 1.5; rx: 7; }
+      .check { fill: #f1f5e9; stroke: #71864c; }
+      .publish { fill: #f8f1e8; stroke: #9b7042; }
+      .edge { fill: none; stroke: #53616b; stroke-width: 1.7; marker-end: url(#arrow); }
+      .title { font-size: 16px; font-weight: 600; text-anchor: middle; }
+      .small { font-size: 14px; fill: #53616b; text-anchor: middle; }
+    </style>
+  </defs>
+  <rect width="1200" height="410" fill="#fff"/>
+  <text class="small" x="115" y="25">普通产品 PR：合并前</text>
+  <path class="edge" d="M170 78H205"/><path class="edge" d="M395 78H430"/>
+  <path class="edge" d="M610 78H645"/><path class="edge" d="M795 78H830"/>
+  <path class="edge" d="M930 112V174"/>
+  <path class="edge" d="M720 112V250H610V285"/>
+  <path class="edge" d="M830 207H745V285"/>
+  <path class="edge" d="M785 317H840"/>
+  <rect class="node" x="20" y="45" width="150" height="67"/>
+  <text class="title" x="95" y="73"><tspan x="95">PR 创建/更新</tspan><tspan x="95" dy="22">同仓库普通 PR</tspan></text>
+  <rect class="node check" x="205" y="45" width="190" height="67"/>
+  <text class="title" x="300" y="73"><tspan x="300">CI: checks</tspan><tspan x="300" dy="22">+ classify</tspan></text>
+  <rect class="node check" x="430" y="45" width="180" height="67"/>
+  <text class="title" x="520" y="73"><tspan x="520">Codex Review</tspan><tspan x="520" dy="22">含安全审查</tspan></text>
+  <rect class="node check" x="645" y="45" width="150" height="67"/>
+  <text class="title" x="720" y="85">Merge gate</text>
+  <rect class="node" x="830" y="45" width="200" height="67"/>
+  <text class="title" x="930" y="73"><tspan x="930">Human Supervisor</tspan><tspan x="930" dy="22">审批 → Merge</tspan></text>
+  <text class="small" x="1045" y="145">merged=true</text>
+  <rect class="node check" x="830" y="174" width="200" height="67"/>
+  <text class="title" x="930" y="201"><tspan x="930">合并后 Codex QA</tspan><tspan x="930" dy="22">固定实际合并 SHA</tspan></text>
+  <text class="small" x="640" y="190">CI 完成后发布 Review</text>
+  <text class="small" x="855" y="268">QA 完成后发布 QA</text>
+  <rect class="node publish" x="565" y="285" width="220" height="67"/>
+  <text class="title" x="675" y="314"><tspan x="675">Quality Ledger</tspan><tspan x="675" dy="22">两个阶段分别记录</tspan></text>
+  <rect class="node publish" x="840" y="285" width="320" height="67"/>
+  <text class="title" x="1000" y="314"><tspan x="1000">分阶段评论与质量证据 PR</tspan><tspan x="1000" dy="22">QA 可复现缺陷 → Bug 分诊</tspan></text>
+  <text class="small" x="600" y="390">QA 不属于合并门禁；未合并关闭与质量证据 PR 不执行产品 QA。阶段失败/缺失报告不能当作通过。</text>
+</svg>

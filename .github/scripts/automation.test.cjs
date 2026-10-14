@@ -106,23 +106,24 @@ test('QA comment lists every AC and marks a missing report as blocked', () => {
 const { buildIssueContext } = require('./batch-context.cjs');
 const { closingIssueNumbers, assertIssueReady } = require('./issue-contract.cjs');
 
-const READY_BODY = ['Type', 'Subsystem', 'Problem', 'User Outcome', 'Scope', 'Non-goals', 'Acceptance Criteria',
-  'References', 'Dependencies', 'Risk', 'Owner', 'AI Ready']
-  .map(f => `### ${f}\n\n${f === 'AI Ready' ? 'Yes' : f === 'Acceptance Criteria' ? '- AC-1: works' : 'x'}`).join('\n\n');
+const READY_BODY = Object.entries({ Type: 'Feature', Subsystem: 'cross-cutting', Problem: 'Missing behavior',
+  'User Outcome': 'Works', Scope: 'One feature', 'Non-goals': 'None', 'Acceptance Criteria': '- AC-1: works',
+  References: 'Fixture', Dependencies: 'None', Risk: 'low', Owner: '@supervisor', Estimate: '3',
+  'AI Ready': 'Yes', 'User Flows': 'Call feature' }).map(([k, v]) => `### ${k}\n\n${v}`).join('\n\n');
 
 function fakeGithub({ issueBody = READY_BODY, prs = [] } = {}) {
   const rest = {
     issues: { get: async ({ issue_number }) => ({ data: { number: issue_number, body: issueBody } }), listComments: async () => {} },
-    pulls: { list: async () => {}, listReviewComments: async () => {} },
+    pulls: { list: async () => {}, listFiles: async () => {}, listReviewComments: async () => {} },
     repos: { getCommit: async ({ ref }) => ({ data: { sha: ref, parents: [{ sha: 'p'.repeat(40) }] } }) },
   };
   return {
     rest,
-    paginate: async (fn, params) => (fn === rest.pulls.list ? prs : fn === rest.issues.listComments ? [{ id: params.issue_number }] : []),
+    paginate: async (fn, params) => (fn === rest.pulls.list ? prs : fn === rest.pulls.listFiles ? [{ filename: 'src/a.js' }] : fn === rest.issues.listComments ? [{ id: params.issue_number }] : []),
   };
 }
 const repo = { owner: 'o', repo: 'r' };
-const pr = (number, body, merged_at, sha = String(number).repeat(40).slice(0, 40)) => ({ number, body, merged_at, merge_commit_sha: sha });
+const pr = (number, body, merged_at, sha = String(number).repeat(40).slice(0, 40)) => ({ number, body, merged_at, merge_commit_sha: sha, changed_files: 1, head: { sha } });
 
 test('closing-keyword parsing matches the PR contract', () => {
   assert.deepEqual(closingIssueNumbers('Closes #34\nRefs #16'), [34]);
@@ -163,8 +164,23 @@ test('QA no longer gates PRs: ci.yml has no qa job and the merge gate does not w
   const ci = fs.readFileSync(path.join(ROOT, '.github/workflows/ci.yml'), 'utf8');
   assert.doesNotMatch(ci, /^ {2}qa:/m);
   assert.doesNotMatch(ci, /claude-qa\.yml/);
-  assert.match(ci, /needs: \[detect, checks, contract, review\]/);
+  assert.match(ci, /needs: \[checks, classify, review\]/);
   const batch = fs.readFileSync(path.join(ROOT, '.github/workflows/qa-batch.yml'), 'utf8');
   assert.match(batch, /workflow_dispatch/);
   assert.match(batch, /fail-fast: false/);
+});
+
+const requireStages = require('./merge-gate.cjs');
+test('merge gate rejects every failed base/classification and inappropriate review state', () => {
+  for (const state of ['failure', 'cancelled', 'skipped', undefined]) {
+    assert.throws(() => requireStages({ checks: state, classification: 'success', event: 'push' }));
+    assert.throws(() => requireStages({ checks: 'success', classification: state, event: 'push' }));
+    assert.throws(() => requireStages({ checks: 'success', classification: 'success', event: 'pull_request', evidence: 'false', review: state }));
+  }
+  for (const [evidence, review] of [['false', 'success'], ['true', 'skipped']]) {
+    requireStages({ checks: 'success', classification: 'success', event: 'pull_request', evidence, review });
+  }
+  assert.throws(() => requireStages({ checks: 'success', classification: 'success', event: 'pull_request', evidence: 'true', review: 'success' }));
+  assert.throws(() => requireStages({ checks: 'success', classification: 'success', event: 'pull_request', evidence: 'unknown', review: 'success' }));
+  requireStages({ checks: 'success', classification: 'success', event: 'push', review: 'skipped' });
 });

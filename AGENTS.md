@@ -1,112 +1,52 @@
-# HireOS Agent Instructions
+# Repository Agent Instructions
 
-这些规则适用于整个仓库，Claude Code（经 `CLAUDE.md` 引用）、Codex 等 Agent 共用。子目录可以放更深层的 `AGENTS.md` 补充模块约束；任务专属要求以 GitHub Issue、其全部评论和链接文件为准。流程总览见 [`docs/agents/dev-process.md`](docs/agents/dev-process.md)。
+这些规则适用于整个仓库。目录更深处的 `AGENTS.md` 可以补充模块专属约束；任务专用要求以 GitHub Issue、其全部评论和链接文件为准。
 
 ## 权威上下文
 
-按 Issue 执行任务时，开始前按顺序读取：
+开始工作前按顺序读取：
 
-1. 关联的 GitHub Issue 及全部评论（`gh issue view <n> --comments`）。
-2. 本文件，以及任务涉及目录下更深层的 `AGENTS.md`。
-3. Issue 明确链接的规格、设计、API、ADR（`docs/adr/`）和运行手册。
-4. 现有代码、测试、配置和目标 diff。
+1. 关联 GitHub Issue 及全部 Issue comments。
+2. `AGENTS.md` 和任务涉及目录下更深层的 `AGENTS.md`。
+3. Issue 明确链接的产品规格、设计、API、ADR 和运行手册。
+4. 现有代码、测试、配置和目标提交的 diff。
 
-GitHub 是研发决策的唯一权威来源：Files 保存长期规则，Issue 保存需求、任务和 Bug 状态，PR 保存实现、测试证据、Review 和合并决策。聊天、会议或 Slack 中影响研发的决定，必须回写到 Issue 或 PR 评论。
+GitHub 是研发决策的唯一权威来源：Files 保存长期规则，Issue 保存需求、任务和 Bug 状态，PR 保存实现、测试证据、Review 和合并决策。聊天或 Slack 中影响研发的决定必须回写 Issue 或 PR comment；Slack 只用于 `urgent`、`incident`、`security` 提醒并附 GitHub 链接。流程总览见 [`a2a_dev_process.md`](a2a_dev_process.md)，术语见 [`GLOSSARY.md`](GLOSSARY.md)。
 
-## 仓库结构
+## Issue 和 PR 门槛
 
-Monorepo，每个子项目独立维护 `package.json` 和 `package-lock.json`，没有根级 workspace，命令要在子项目目录里执行。
-
-| 子系统 | 后端（NestJS + Prisma） | 前端（Vite + React） |
-| --- | --- | --- |
-| 职位描述 | `hireos-jd/hireos-jd-backend` | `hireos-jd/hireos-jd-front` |
-| 面试 | `hireos-interview/job-Interview-backend` | `hireos-interview/job-Interview-front` |
-| 简历筛选 | `hireos-screening/hireos-screening-backend` | `hireos-screening/hireos-screening-front` |
-| 笔试 | `hireos-written/hireos-written-backend` | `hireos-written/hireos-written-front` |
-| 核心档案 | `hireos-core-record`（API 前缀 `/api/v1`） | — |
-
-- 端口、API 前缀、前端代理和网关是 [`PORTS.md`](PORTS.md) 唯一权威来源；新增服务先登记端口。
-- `gateway/` 是本地统一网关和生产 nginx 配置；`scripts/dev.sh` 管理本地启停；`scripts/deploy/`、`docker-compose*.yml` 用于部署。
-- `hireos-assessment`、`hireos-offer` 只预留了目录，还没有代码。
-
-## 命令
-
-只用子项目 `package.json` 里真实存在的 script，不凭记忆编造命令。CI 实际执行的检查登记在 [`.github/ci/projects.json`](.github/ci/projects.json)。
-
-```bash
-cd <子项目目录>
-npm ci
-npx prisma generate      # 仅后端，build/typecheck 前需要
-npm run build
-npm run lint             # interview 前端没有 lint
-npm run typecheck
-npm test                 # 仅后端：先 build，再 node --test test/*.test.cjs
-```
-
-本地启动全部服务：`scripts/dev.sh start`。CI 自动化脚本自测：`node --test .github/scripts/automation.test.cjs`。
-
-## 两种工作方式
-
-本项目只有一名开发者（仓库管理员），main 允许管理员直接 push。
-
-- **直接修改**：日常小修小改、调试、紧急修复。不需要 Issue 或 PR，按用户指示改代码；是否 commit、push 由用户决定。push 到 main 后 CI 仍会检查全部子项目，但失败不会拦住这次 push。
-- **Issue → PR 流程**：Issue 由用户口头描述、Agent 起草并创建（见“创建 Issue”）。用户说"Execute GitHub Issue #n"时，或者改动属于下面这些情况时，走完整流程：AI 实现的需求、产品经理提的需求、Prisma schema 变更、跨子系统接口变更、`.github/` 和 Agent 规则的变更。拿不准时问用户。
-
-## Issue 和 PR 门槛（走流程时）
-
-- PR 只关联一个主 Issue，正文写 `Closes #<n>`，其他依赖写 `Refs #<n>`。CI 的 `Issue contract` 检查会强制这一条。
-- Issue 必须具备 Type、Subsystem、Problem、User Outcome、Scope、Non-goals、Acceptance Criteria、References、Dependencies、Risk、Owner 和 `AI Ready`。只有 `AI Ready=Yes`、且每项 AC 都有 `AC-1`、`AC-2` 这样的编号时，才开始实现。
-- 需求、依赖或验收条件里有影响行为的未决问题时，在 Issue 留 `[AI-QUESTION]`，并停下依赖该信息的实现；不要自己猜产品意图。
-- PR 使用 [pull request template](.github/pull_request_template.md)，在分支上开发，不直接 push main。
-
-## 创建 Issue
-
-Issue 由人描述需求（用户自己的，或用户转述的产品经理需求），由 Agent 起草并创建。用户说“建个 Issue：……”或类似的话时：
-
-1. 读相关代码和文档，弄清现状，确定 Type（Feature / Bug / Design / Tech Debt）和 Subsystem。
-2. 按 `.github/ISSUE_TEMPLATE/<type>.yml` 的字段起草完整的 Issue 正文，包括该表单特有的字段（例如 Bug 的 Reproduction、Severity）。格式必须与表单渲染结果一致：每个字段写成 `### 字段名`，空一行后接内容，否则 CI 的 Issue contract 解析不了。标题沿用表单前缀，例如 `[Feature] `。Owner 默认填 `@JsonSuCoder`。
-3. AC 写成可验证的结果，用 `AC-1`、`AC-2` 编号，覆盖主流程和关键的异常情况。不要把实现方案写成 AC。
-4. **先在对话里给用户看草稿**，单独列出你的假设和不确定的点，等用户确认或修改。不要未经确认就创建。
-5. 用户确认后，用 `gh issue create` 创建：
-   - 用户确认了 AC：`AI Ready` 写 `Yes`，不加 `needs-triage`。
-   - 还有未决问题：`AI Ready` 写 `No`，加 `needs-triage`，并把问题以 `[AI-QUESTION]` 评论到 Issue 里。
-6. 返回 Issue 链接。用户说执行（或一开始就说“建好后直接做”）时才开始实现。
-
-`AI Ready=Yes` 只能来自用户对 AC 的明确确认，Agent 不能自己判定需求已经清楚。
-
-## 整理 Issue
-
-产品经理直接在 GitHub 上提了 Issue（`AI Ready=No`），用户说“整理 Issue #n”时：
-
-1. 读取 Issue 和全部评论，以及相关代码。
-2. 起草 Scope、Non-goals 和 `AC-1..n`，补全其他字段，同样先在对话里给用户看。不要改动提出人写的 Problem 和 User Outcome。
-3. 用户确认后再更新 Issue；产品层面的疑问用 `[AI-QUESTION]` 评论并 @ 提出人。
-4. 由用户确认 AC 后，才把 `AI Ready` 改为 Yes。
+- 正常工作必须关联一个主 Issue，PR 使用 `Closes #<number>`；其他依赖使用 `Refs #<number>`。
+- Issue 必须具备 Type、Subsystem、Problem、User Outcome、Scope、Non-goals、Acceptance Criteria、References、Dependencies、Risk、Owner、Estimate 和 `AI Ready`。Type 只能是 Feature、Bug、Design 或 Tech Debt；线上 Incident 使用 Bug Type 搭配 `incident` 标签。`AI Ready=Yes` 且每项 AC 使用唯一的 `AC-1`、`AC-2` 编号后，才开始实现。
+- 通过 CLI/API 创建或修改 Issue 正文时，读取并复用 [Issue Markdown 模板](.github/issue_body_template.md)，按对应 [Issue Form](.github/ISSUE_TEMPLATE/) 补齐类型专属字段。所有字段标题必须独占一行，使用 `### <字段名>`，名称与表单 `attributes.label` 完全一致；字段内容中的子标题使用四级或更深标题。提交前核对必需字段非空、字段标题唯一且均为三级、Type/Risk/Estimate/AI Ready 取值与表单一致、AC 编号唯一。CLI/API 不会自动应用 Issue Form；正文格式由创建者保证。
+- 创建或修改任意 Issue 正文字段前，对完整的最终正文运行 `node .github/scripts/issue-contract.cjs <正文文件> submission`，退出码 0 后提交；执行前使用 `execution` 模式。校验范围、人工证据职责及仅限 Ledger 的待分诊 Bug 例外见 [Issue 正文校验](.github/issue-contract.md)。局部更新也必须检查完整契约。
+- 需求、依赖或验收条件存在影响行为的未决问题时，在 Issue 留下 `[AI-QUESTION]` 并停止依赖该信息的实现；不要自行猜测产品意图。
+- 创建或提交 Issue 前、或复核 Estimate 时，调用 [estimate-issue skill](.agents/skills/estimate-issue/SKILL.md)；其他 Agent 可直接读取执行。将唯一结果写入 Estimate，保留分析依据；建议点数仍需 Owner 确认。
+- Estimate 遵循 [Estimate 管理规则](a2a_dev_process.md#estimate-管理规则)：允许 1、2、3、5、8 或 TBD；实施前由 Owner 确认具体点数，TBD 时保持 `AI Ready=No`。Agent 提供估算理由，实施后保留原估算并按规则记录范围变化。
+- PR 使用 [pull request template](.github/pull_request_template.md)，说明变更、规格引用、每项 AC、测试证据、Review、安全、风险回滚、文档和 Human Supervisor。
 
 ## 实现和验证
 
-- 先理解 Issue 和现有约束，再实现满足 AC 的最小变更；保留用户已有的改动，避免无关重构。
-- 改了 Prisma schema 必须附带 `prisma/migrations/` 下的迁移，并说明对线上已有数据的影响。
-- 改了端口、代理前缀或网关路由，要同步 `PORTS.md`、对应的 `vite.config.ts` 和 `gateway/`。
-- 跨子系统调用的接口变了，调用方和被调方要在同一个 PR 里一起改。
-- 新增或修改行为时补有意义的自动测试；在 PR 里记录实际命令和结果。没执行的测试不能写成通过。
-- `.github/ci/projects.json` 的 `known_failing` 是历史欠账清单。不要往里加新条目来让 CI 变绿；修好其中某项后要把它删掉。
-
-## 安全
-
-- 本仓库是**公开仓库**。不要提交密钥、密码、token、`.env`、生产数据或候选人个人信息；参考 `.gitignore` 里已有的排除项。
-- 不要在代码、日志或 PR 里写生产服务器的凭据。
-- Agent 不执行部署，也不操作生产环境；需要部署时，在 PR 的「Deploy」一节列出要部署的服务，由人来执行。
+- 先理解 Issue 和现有约束，再实现满足 AC 的最小变更；保持用户已有改动，避免无关重构。
+- 从仓库配置和 CI 工作流发现真实命令，不凭记忆创造测试命令。本仓库应用工程使用 npm 与 package-lock.json 安装依赖和执行脚本；命令及项目范围以 CI 注册表为准。CI 的检查顺序以 [`.github/workflows/ci.yml`](.github/workflows/ci.yml) 为准：Build、Lint、Type Check、Unit、Integration、Codex Review、Merge gate；Human Supervisor 审批并合并后，由独立的 [Codex QA 工作流](.github/workflows/codex-qa.yml) 验收实际合并提交。QA 不属于合并门禁。当前未配置 E2E 阶段；PR 分类与质量证据 PR 的适用检查以该工作流及其调用脚本为准。
+- 现有自动化脚本可用 `node --test .github/scripts/automation.test.cjs .github/scripts/post-merge.test.cjs .github/scripts/issue-contract.test.cjs .github/scripts/qa-environment.test.cjs` 验证。新增或修改功能时，补充有意义的自动测试，并在 PR 中记录实际命令、退出码和证据路径；未执行的测试不能写成通过。
+- 评估当前项目的 a2a 流程落地效果或四级评级时，调用 [eval-a2a-adoption skill](.agents/skills/eval-a2a-adoption/SKILL.md)，先递归核验流程引用文件，确认必需文件缺失即不合格；再检查最新 10 个 Issue / 10 个 PR，按最近 4 个完整周的已验收 Feature/Bug 和 Estimate 评级，交付有证据的报告。
+- 需要 QA 验收时，读取 [`.agents/skills/qa/SKILL.md`](.agents/skills/qa/SKILL.md)，逐项验证 AC，检查异常路径，并按 [`.github/schemas/qa.json`](.github/schemas/qa.json) 生成结构化报告。QA 只产生报告和证据，不替代 Review、Security Review 或 Human Supervisor。
+- 需要 Codex Review 时，遵循 [`.github/prompts/review.md`](.github/prompts/review.md) 和 [`.github/schemas/review.json`](.github/schemas/review.json)，直接检查目标 diff，不依赖 QA 结论；Review 在合并前依赖基础检查，QA 在合并后执行；两阶段分别绑定 PR head SHA 和实际合并提交 SHA。
 
 ## 证据和沟通
 
-正式评论使用以下前缀，并留在 GitHub 上：`[AI-PLAN]`、`[AI-QUESTION]`、`[AI-EVIDENCE]`、`[AI-BLOCKED]`、`[HUMAN-DECISION]`、`[AI-RESULT]`。阻塞时说明解除条件；环境问题不要伪装成产品 Bug。
+把可复核证据保存到 `evidence/` 或 PR 关联的质量记录中：命令、退出码、日志、测试结果、截图、coverage 和代码定位。长期质量摘要由 Quality Ledger 写入 [`docs/quality/README.md`](docs/quality/README.md) 规定的路径。
 
-除非用户明确要求，不 push、不 merge、不创建或关闭 Issue；任何情况下都不 force push，也不绕过 Merge gate 合并 PR。
+正式评论使用以下前缀，并在 GitHub 留存：`[AI-PLAN]`、`[AI-QUESTION]`、`[AI-EVIDENCE]`、`[AI-BLOCKED]`、`[HUMAN-DECISION]`、`[AI-RESULT]`。阻塞说明解除条件；可复现产品缺陷说明严重程度、复现步骤和证据；环境阻塞不伪装成 Bug。
 
 ## 完成标准
 
-- 每项 AC 都已实现，或有明确的阻塞/失败证据。
-- 受影响子项目的 build、lint、typecheck、test 已实际运行，结果如实记录。
-- 必需的文档（`PORTS.md`、部署指南、ADR 等）已同步，或在 PR 中说明为什么不需要。
-- PR 关联了正确的 Issue，使用了模板，包含测试证据、回滚方案和需要部署的服务。
+任务完成前，确认：
+
+- 每项 Acceptance Criterion 都有实现或明确的阻塞/失败证据。
+- 受影响的自动测试已运行，测试、构建、lint 和类型检查的状态真实记录。
+- 必需的规格、API、设计、ADR 和运行文档已同步，或在 PR 中说明 N/A 原因。
+- PR 关联正确 Issue，使用仓库模板，并包含测试证据和回滚风险。
+- 没有未记录的产品决策、未解释的失败检查或声称通过的未执行测试。
+
+除非任务或工作流明确授权，不 push、merge 或创建外部 Issue。需要正式沟通时遵循上述评论协议，由获得授权的 GitHub workflow 发布；先把结果和证据准备成可审查的变更。
