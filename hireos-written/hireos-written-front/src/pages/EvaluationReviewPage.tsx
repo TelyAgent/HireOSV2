@@ -7,6 +7,12 @@ import { Breadcrumbs, Button, EmptyState } from "../components/ui/Primitives";
 import { ATTEMPTS, CASES, CORE_CANDIDATES, EVALUATIONS, QUESTIONS, RESULTS, type Criterion, type Evaluation } from "../data/fixtures";
 import { finalizeCaseEvaluation } from "../data/writtenApi";
 
+function isValidScore(text: string, max: number): boolean {
+  if (!/^\d+$/.test(text.trim())) return false;
+  const n = Number(text);
+  return n >= 0 && n <= max;
+}
+
 function computeOverall(criteria: Criterion[], key: "ai" | "human"): number | null {
   if (criteria.some((c) => c[key] == null)) return null;
   return Math.round(criteria.reduce((sum, c) => sum + (c[key] as number), 0));
@@ -62,6 +68,7 @@ export function EvaluationReviewContent({
   const ev = evaluation; // narrowed non-null, for the closures below (TS doesn't carry the early-return narrowing into nested function scopes)
   const overallAI = computeOverall(ev.criteria, "ai");
   const overallHuman = computeOverall(ev.criteria, "human");
+  const overallMax = ev.criteria.reduce((sum, c) => sum + c.max, 0);
   const isFinalized = ev.status === "final" || !!Object.values(RESULTS).find((r) => r.evaluationId === ev.id && ["final_not_released", "published"].includes(r.status));
 
   function updateEvaluation(updater: (ev: Evaluation) => Evaluation) {
@@ -158,12 +165,12 @@ export function EvaluationReviewContent({
         <div className="grid-3">
           <div className="metric">
             <div className="label">{t("Overall (human)")}</div>
-            <div className="value">{overallHuman == null ? <span className="badge neutral">{t("Unknown")}</span> : overallHuman}</div>
+            <div className="value">{overallHuman == null ? <span className="badge neutral">{t("Unknown")}</span> : <>{overallHuman}<span className="tiny"> / {overallMax}</span></>}</div>
             <div className="sub">{t("Any missing required criterion → Unknown")}</div>
           </div>
           <div className="metric">
             <div className="label">{t("Overall (AI)")}</div>
-            <div className="value">{overallAI == null ? "—" : overallAI}</div>
+            <div className="value">{overallAI == null ? "—" : <>{overallAI}<span className="tiny"> / {overallMax}</span></>}</div>
             <div className="sub">{t("Draft only, not a hiring probability")}</div>
           </div>
           <div className="metric">
@@ -227,13 +234,17 @@ function CriterionRow({ c, locked, onChange }: { c: Criterion; locked: boolean; 
   const [syncedHuman, setSyncedHuman] = useState(c.human);
   if (!Object.is(c.human, syncedHuman)) {
     setSyncedHuman(c.human);
-    if (!Object.is(c.human, humanText === "" ? null : parseInt(humanText))) setHumanText(c.human == null ? "" : String(c.human));
+    if (!Object.is(c.human, humanText !== "" && isValidScore(humanText, c.max) ? Number(humanText) : null)) setHumanText(c.human == null ? "" : String(c.human));
   }
   const bar = Math.round(((c.human ?? c.ai) / c.max) * 100);
 
+  // Only a whole number within 0..max counts; anything else leaves the criterion unscored (so the
+  // overall shows Unknown and finalizing is blocked) until it is corrected.
+  const outOfRange = humanText !== "" && !isValidScore(humanText, c.max);
+
   function onHumanInput(v: string) {
     setHumanText(v);
-    const hv = v === "" ? null : parseInt(v);
+    const hv = v !== "" && isValidScore(v, c.max) ? Number(v) : null;
     onChange({ human: hv, overridden: hv != null && hv !== c.ai });
   }
 
@@ -248,10 +259,12 @@ function CriterionRow({ c, locked, onChange }: { c: Criterion; locked: boolean; 
             {t("Human score")}
             <input
               className="input"
-              style={{ width: 72, height: 32, borderColor: !locked && c.human == null ? "var(--accent)" : undefined }}
+              style={{ width: 72, height: 32, borderColor: outOfRange ? "var(--danger)" : !locked && c.human == null ? "var(--accent)" : undefined }}
+              aria-invalid={outOfRange}
               type="number"
               min={0}
               max={c.max}
+              step={1}
               value={humanText}
               disabled={locked}
               placeholder={t("Score")}
@@ -268,7 +281,12 @@ function CriterionRow({ c, locked, onChange }: { c: Criterion; locked: boolean; 
           <span className="badge neutral">{t("Coverage:")} {t(c.coverage)}</span>
         </div>
       </div>
-      <div className="scorebar" style={{ margin: "8px 0" }}><div style={{ width: `${bar}%` }} /></div>
+      {outOfRange && (
+        <div className="tiny" style={{ color: "var(--danger)", textAlign: "right", marginTop: 4 }}>
+          {t("Out of range — allowed:")} 0 – {c.max} {t("(whole numbers)")}
+        </div>
+      )}
+      <div className="scorebar" style={{ margin: "8px 0" }}><div style={{ width: `${Math.min(bar, 100)}%` }} /></div>
       <details>
         <summary style={{ cursor: "pointer", color: "var(--accent)", fontSize: "calc(var(--text-base)*.85)" }}>{t("View evidence")}</summary>
         <div className="evidence-excerpt" style={{ marginTop: 8 }}>

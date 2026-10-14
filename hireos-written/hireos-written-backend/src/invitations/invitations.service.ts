@@ -10,6 +10,7 @@ import type { CreateInvitationDto, QuestionSnapshotDto } from './create-invitati
 import type { SubmitAnswersDto } from './submit-answers.dto';
 import type { FinalizeEvaluationDto, ReleaseResultDto } from './case-result.dto';
 import { invitationEmail, invitationLetter } from './invitation-letter';
+import { assertValidFinalScores } from './scores';
 import { assertBeforeDeadline, assertCaseOpen, assertDraftSendable, nextRoundNumber } from './rounds';
 
 function generateToken(): string {
@@ -131,6 +132,7 @@ export class InvitationsService {
   async finalizeEvaluation(identity: Identity, caseId: string, dto: FinalizeEvaluationDto) {
     const { submission, isLatestRound } = await this.roundSubmission(identity, caseId, dto.invitationId);
     if (submission.finalizedAt) throw new ConflictException({ code: 'ALREADY_FINALIZED' });
+    assertValidFinalScores(dto);
     const updated = await this.db.submission.update({
       where: { id: submission.id },
       data: {

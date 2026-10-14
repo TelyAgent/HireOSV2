@@ -149,7 +149,7 @@ test('AC-5: finalizing an older round touches only that round and never moves th
   assert.equal(round2.submission.finalizedAt, undefined, 'round 2 untouched');
   assert.equal(db.case.rows[0].status, 'review_pending', 'an older round does not drag the case status');
 
-  await invitations.finalizeEvaluation(identity, 'c1', { ...dto, overall: 78, invitationId: 'inv-r2' });
+  await invitations.finalizeEvaluation(identity, 'c1', { overall: 78, criteria: [{ name: 'A', max: 100, ai: 60, human: 78 }], invitationId: 'inv-r2' });
   assert.equal(round2.submission.finalEvaluation.overall, 78);
   assert.equal(round1Open.submission.finalEvaluation.overall, 62);
   assert.equal(db.case.rows[0].status, 'finalized', 'the latest round moves the case');
