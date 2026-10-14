@@ -101,3 +101,70 @@ test('QA comment lists every AC and marks a missing report as blocked', () => {
   assert.match(body, /\| AC-1 \| ✅ pass \|/); assert.match(body, /\| AC-2 \| ❌ fail \| a\\\|b<br>c \|/);
   assert.match(renderQa(null, 'https://run'), /\[AI-BLOCKED\] Claude QA/);
 });
+
+// Batch QA (#39): Issue → merged PR → the same context.json the PR-time QA used.
+const { buildIssueContext } = require('./batch-context.cjs');
+const { closingIssueNumbers, assertIssueReady } = require('./issue-contract.cjs');
+
+const READY_BODY = ['Type', 'Subsystem', 'Problem', 'User Outcome', 'Scope', 'Non-goals', 'Acceptance Criteria',
+  'References', 'Dependencies', 'Risk', 'Owner', 'AI Ready']
+  .map(f => `### ${f}\n\n${f === 'AI Ready' ? 'Yes' : f === 'Acceptance Criteria' ? '- AC-1: works' : 'x'}`).join('\n\n');
+
+function fakeGithub({ issueBody = READY_BODY, prs = [] } = {}) {
+  const rest = {
+    issues: { get: async ({ issue_number }) => ({ data: { number: issue_number, body: issueBody } }), listComments: async () => {} },
+    pulls: { list: async () => {}, listReviewComments: async () => {} },
+    repos: { getCommit: async ({ ref }) => ({ data: { sha: ref, parents: [{ sha: 'p'.repeat(40) }] } }) },
+  };
+  return {
+    rest,
+    paginate: async (fn, params) => (fn === rest.pulls.list ? prs : fn === rest.issues.listComments ? [{ id: params.issue_number }] : []),
+  };
+}
+const repo = { owner: 'o', repo: 'r' };
+const pr = (number, body, merged_at, sha = String(number).repeat(40).slice(0, 40)) => ({ number, body, merged_at, merge_commit_sha: sha });
+
+test('closing-keyword parsing matches the PR contract', () => {
+  assert.deepEqual(closingIssueNumbers('Closes #34\nRefs #16'), [34]);
+  assert.deepEqual(closingIssueNumbers('Fixes #3 and resolves #3'), [3]);
+  assert.deepEqual(closingIssueNumbers('Refs #34'), []);
+});
+
+test('batch QA finds the merged PR that closed the Issue and uses its merge commit', async () => {
+  const github = fakeGithub({
+    prs: [
+      pr(36, 'Closes #18', '2026-10-14T03:00:00Z'),
+      pr(40, 'Closes #340', '2026-10-14T05:00:00Z'), // #340, not #34
+      pr(37, 'Closes #34', null), // closed without merging
+      pr(38, 'Closes #34\nRefs #16', '2026-10-14T04:00:00Z', 'b'.repeat(40)),
+    ],
+  });
+  const ctx = await buildIssueContext({ github, repo, issueNumber: 34 });
+  assert.equal(ctx.issue, 34);
+  assert.equal(ctx.pr, 38);
+  assert.equal(ctx.commit, 'b'.repeat(40));
+  assert.equal(ctx.base, 'p'.repeat(40));
+  assert.equal(ctx.issue_body, READY_BODY);
+  assert.deepEqual(ctx.issue_comments, [{ id: 34 }]);
+  assert.deepEqual(ctx.pr_comments, [{ id: 38 }]);
+  // The context must satisfy the same identity checks the QA report is validated against.
+  assert.equal(readReport('qa', writeQa({ ...qaPass, issue: 34, pr: 38, commit: 'b'.repeat(40), acceptance_criteria: [qaPass.acceptance_criteria[0]] }), ctx).result, 'pass');
+});
+
+test('batch QA refuses an Issue with no merged PR or that breaks the contract, with a readable reason', async () => {
+  await assert.rejects(buildIssueContext({ github: fakeGithub({ prs: [pr(37, 'Closes #34', null)] }), repo, issueNumber: 34 }), /no merged PR/);
+  await assert.rejects(buildIssueContext({ github: fakeGithub({ issueBody: READY_BODY.replace('### AI Ready\n\nYes', '### AI Ready\n\nNo') }), repo, issueNumber: 34 }), /AI Ready must be Yes/);
+  await assert.rejects(buildIssueContext({ github: fakeGithub({ issueBody: READY_BODY.replace('- AC-1: works', '- works') }), repo, issueNumber: 34 }), /AC-1 style/);
+  await assert.rejects(buildIssueContext({ github: fakeGithub(), repo, issueNumber: 0 }), /Invalid Issue number/);
+  assert.throws(() => assertIssueReady({ pull_request: {}, body: READY_BODY }), /points to a PR/);
+});
+
+test('QA no longer gates PRs: ci.yml has no qa job and the merge gate does not wait for it', () => {
+  const ci = fs.readFileSync(path.join(ROOT, '.github/workflows/ci.yml'), 'utf8');
+  assert.doesNotMatch(ci, /^ {2}qa:/m);
+  assert.doesNotMatch(ci, /claude-qa\.yml/);
+  assert.match(ci, /needs: \[detect, checks, contract, review\]/);
+  const batch = fs.readFileSync(path.join(ROOT, '.github/workflows/qa-batch.yml'), 'utf8');
+  assert.match(batch, /workflow_dispatch/);
+  assert.match(batch, /fail-fast: false/);
+});

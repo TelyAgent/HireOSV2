@@ -1,0 +1,54 @@
+name: Claude QA (batch)
+
+# Run QA after a batch of Issues has been merged (#39), instead of on every PR.
+# Actions → "Claude QA (batch)" → Run workflow → e.g. "23,34".
+on:
+  workflow_dispatch:
+    inputs:
+      issues:
+        description: Comma-separated Issue numbers to verify, e.g. 23,34
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  plan:
+    name: Parse Issue numbers
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    outputs:
+      issues: ${{ steps.parse.outputs.issues }}
+    steps:
+      - id: parse
+        env:
+          INPUT: ${{ inputs.issues }}
+        run: |
+          issues=$(node -e '
+            const raw = process.env.INPUT.split(/[\s,，]+/).filter(Boolean);
+            const bad = raw.filter((x) => !/^#?\d+$/.test(x));
+            if (bad.length || !raw.length) { console.error(`Not Issue numbers: ${bad.join(", ") || "(empty)"}`); process.exit(1); }
+            process.stdout.write(JSON.stringify([...new Set(raw.map((x) => Number(x.replace("#", ""))))]));
+          ')
+          echo "Issues: $issues"
+          echo "issues=$issues" >> "$GITHUB_OUTPUT"
+
+  qa:
+    name: 'QA #${{ matrix.issue }}'
+    needs: plan
+    strategy:
+      # One Issue failing (no merged PR, contract not met, ACs not satisfied) never stops the others.
+      fail-fast: false
+      matrix:
+        issue: ${{ fromJSON(needs.plan.outputs.issues) }}
+    permissions:
+      contents: read
+      issues: write
+      pull-requests: read
+    uses: ./.github/workflows/claude-qa.yml
+    with:
+      issue: ${{ matrix.issue }}
+    secrets:
+      ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+      CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}

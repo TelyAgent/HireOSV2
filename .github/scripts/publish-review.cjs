@@ -66,11 +66,12 @@ function renderQa(report, runUrl) {
   ].join('\n');
 }
 
-// Runs in a separate job with pull-requests: write; only reads the validated JSON as data.
+// Runs in a separate job with write access; only reads the validated JSON as data.
 // `kind` selects which report this call publishes; each kind keeps its own sticky comment.
-module.exports = async ({ github, context, core, reportPath, contextPath, kind = 'review' }) => {
+// `target` is the issue/PR number to comment on: the PR by default, the Issue for batch QA (#39).
+module.exports = async ({ github, context, core, reportPath, contextPath, kind = 'review', target }) => {
   const [marker, draw] = kind === 'qa' ? [QA_MARKER, renderQa] : [MARKER, render];
-  const pr = context.payload.pull_request.number;
+  const pr = target ?? context.payload.pull_request.number;
   const runUrl = `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`;
   let report = null;
   try {
