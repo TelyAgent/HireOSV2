@@ -7,11 +7,13 @@ import { ApiError } from "../data/api/shared";
 import { db, getApplication, getCandidate, getConcerns, getEvaluation, getJob } from "../data/db";
 import type { Application } from "../data/fixtures/applications";
 import type { Decision, DecisionOutcome } from "../data/fixtures/decisions";
+import type { ConcernSeverity } from "../data/fixtures/concerns";
 import { fmtDateTime } from "../lib/format";
 import { inferRecommendation } from "../lib/scoring";
 import { Badge, Button, EligibilityBadge, EmptyState, PageHeader, RecommendationBadge, ScoreRing, scoreDisplay } from "../components/ui/Primitives";
 import { ConfirmDialog, Modal } from "../components/ui/Overlays";
 import { PageSkeleton } from "../components/ui/PageSkeleton";
+import { concernTitle } from "../lib/concerns";
 
 const OUTCOME_META: Record<DecisionOutcome, { label: string; needsTarget: boolean }> = {
   strong_advance: { label: "Strong Advance", needsTarget: true },
@@ -59,6 +61,45 @@ const TARGET_LABEL: Record<TargetChoice, string> = {
 function decisionErrorMessage(err: unknown, t: (s: string) => string) {
   if (err instanceof ApiError && !err.code.startsWith("HTTP_5") && err.code !== "HTTP_0") return `${t("The decision could not be recorded")}: ${err.message}`;
   return t("The decision could not be recorded — check your connection and retry");
+}
+
+const SEVERITY_TONE: Record<ConcernSeverity, "danger" | "warning" | "info" | "outline"> = {
+  blocker: "danger",
+  high: "warning",
+  medium: "info",
+  low: "outline",
+};
+
+/** Each open concern on its own line — type, basis, severity, status — linking to it on the detail page (#27 AC-1). */
+function OpenConcernList({ applicationId }: { applicationId: string }) {
+  const { t } = useStore();
+  const open = getConcerns(applicationId).filter((c) => c.status === "open");
+  return (
+    <div className="decision-concerns">
+      <div className="tiny" style={{ marginBottom: 6 }}>
+        {t("Open concerns:")}
+      </div>
+      {open.length === 0 ? (
+        <p className="tiny" style={{ margin: 0 }}>
+          {t("No open concerns")}
+        </p>
+      ) : (
+        <ul>
+          {open.map((c) => (
+            <li key={c.id}>
+              <Link to={`/applications/${applicationId}#concern-${c.id}`}>
+                <Badge tone={SEVERITY_TONE[c.severity] ?? "outline"}>{t(cap(c.severity))}</Badge>
+                <span className="decision-concern-title">{c.restricted ? t("Restricted concern") : concernTitle(c.title, t)}</span>
+              </Link>
+              <div className="tiny">
+                {t(cap(c.type.replace(/_/g, " ")))} · {t("basis:")} {t(c.basis.replace(/_/g, " "))} · {t("status:")} {t(cap(c.status))}
+              </div>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
 }
 
 /** Earlier decisions that were withdrawn stay visible as history (#23). */
@@ -279,6 +320,8 @@ export function DecisionPage() {
   const [submitting, setSubmitting] = useState(false);
   const [withdrawn, setWithdrawn] = useState<Decision[]>([]);
   const [loadFailed, setLoadFailed] = useState(false);
+  /** Second confirmation when a blocker concern is still open (#27 AC-2). */
+  const [blockerAcknowledged, setBlockerAcknowledged] = useState(false);
 
   // Always read the server copy: whether a decision is in effect (and its withdrawn history)
   // can change from another tab, and the cache may be empty on a deep link.
@@ -367,8 +410,10 @@ export function DecisionPage() {
       say(t("Required assessment is missing — request an exception to proceed"), { type: "error" });
       return;
     }
+    setBlockerAcknowledged(false);
     setConfirmOpen(true);
   };
+  const openBlockers = getConcerns(app.id).filter((c) => c.status === "open" && c.severity === "blocker");
   const effectiveTarget: TargetChoice = OUTCOME_META[outcome ?? "hold"].needsTarget ? (target ?? "none") : "none";
 
   return (
@@ -400,9 +445,7 @@ export function DecisionPage() {
           <p className="tiny">
             {t("Assessment:")} {app.assessmentStatus === "completed" ? t("Completed") : t("Not administered")}
           </p>
-          <p className="tiny">
-            {t("Open concerns:")} {getConcerns(app.id).filter((c) => c.status === "open").length}
-          </p>
+          <OpenConcernList applicationId={app.id} />
         </div>
         <div className="card card-pad">
           <div className="eyebrow" style={{ marginBottom: 10 }}>
@@ -475,7 +518,7 @@ export function DecisionPage() {
             <Button variant="secondary" onClick={() => setConfirmOpen(false)} disabled={submitting}>
               {t("Back to edit")}
             </Button>
-            <Button variant="primary" onClick={() => void finalize(exceptionRequested)} disabled={submitting}>
+            <Button variant="primary" onClick={() => void finalize(exceptionRequested)} disabled={submitting || (openBlockers.length > 0 && !blockerAcknowledged)}>
               {submitting ? t("Submitting…") : exceptionRequested ? t("Approve exception & submit") : t("Submit decision")}
             </Button>
           </>
@@ -493,6 +536,22 @@ export function DecisionPage() {
           <dt>{t("Reason")}</dt>
           <dd>{reason}</dd>
         </dl>
+        {openBlockers.length > 0 && (
+          <div className="blocker-ack" role="alert">
+            <strong>{t("This candidate still has an open blocking concern:")}</strong>
+            <ul>
+              {openBlockers.map((c) => (
+                <li key={c.id}>
+                  {c.restricted ? t("Restricted concern") : concernTitle(c.title, t)} — {t(c.basis.replace(/_/g, " "))}
+                </li>
+              ))}
+            </ul>
+            <label className="checkbox-row">
+              <input type="checkbox" checked={blockerAcknowledged} onChange={(e) => setBlockerAcknowledged(e.target.checked)} />{" "}
+              {t("I’ve reviewed the blocking concern and still want to submit this decision")}
+            </label>
+          </div>
+        )}
         {exceptionRequested && (
           <p className="tiny" style={{ color: "var(--warning-text)", marginTop: 12 }}>
             {t(

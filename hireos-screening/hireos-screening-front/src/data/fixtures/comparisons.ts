@@ -28,4 +28,6 @@ export interface ComparisonSet {
   collaborators: PersonId[];
   snapshots: ComparisonSnapshot[];
   annotations: ComparisonAnnotation[];
+  /** Members whose concerns, verification, decision or score changed after the latest snapshot (#27). */
+  changedSinceSnapshot?: string[];
 }

@@ -3,6 +3,7 @@ import { BadRequestException, ConflictException, Injectable, NotFoundException }
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../persistence/prisma.service';
 import type { Identity } from '../auth/workspace.guard';
+import { changedSinceSnapshot, memberStateKey } from './member-state';
 
 @Injectable()
 export class ComparisonsService {
@@ -39,7 +40,38 @@ export class ComparisonsService {
       },
     });
     if (!comparison) throw new NotFoundException({ code: 'NOT_FOUND' });
-    return serializeComparison(comparison);
+    const memberIds = comparison.members.map((member: any) => member.applicationId);
+    const latest = comparison.snapshots[comparison.snapshots.length - 1];
+    const changed = latest ? changedSinceSnapshot(memberIds, latest.rankingSnapshot?.entries, await this.memberStateKeys(identity.workspaceId, memberIds)) : [];
+    return { ...serializeComparison(comparison), changedSinceSnapshot: changed };
+  }
+
+  /** Current decision-relevant state of each member, keyed for staleness checks (#27 AC-7). */
+  private async memberStateKeys(workspaceId: string, applicationIds: string[]) {
+    const [evaluations, decisions] = await Promise.all([
+      this.db.screeningEvaluation.findMany({
+        where: { workspaceId, applicationId: { in: applicationIds }, freshness: 'current' },
+        orderBy: { version: 'desc' },
+        select: { id: true, applicationId: true, overallScore: true, concerns: { select: { id: true, status: true } }, verificationItems: { select: { id: true, status: true } } },
+      }),
+      this.db.screeningDecision.findMany({
+        where: { workspaceId, applicationId: { in: applicationIds }, status: 'approved' },
+        orderBy: { createdAt: 'desc' },
+        select: { id: true, applicationId: true, status: true },
+      }),
+    ]);
+    const keys = new Map<string, string>();
+    for (const applicationId of applicationIds) {
+      const evaluation = evaluations.find((e) => e.applicationId === applicationId) ?? null;
+      const decision = decisions.find((d) => d.applicationId === applicationId) ?? null;
+      keys.set(applicationId, memberStateKey({
+        evaluation,
+        concerns: evaluation?.concerns ?? [],
+        verificationItems: evaluation?.verificationItems ?? [],
+        decision,
+      }));
+    }
+    return keys;
   }
 
   async addMember(identity: Identity, comparisonId: string, applicationId?: string) {
@@ -95,7 +127,11 @@ export class ComparisonsService {
       throw new ConflictException({ code: 'BASELINE_MISMATCH', reason: 'All evaluations must use the same confirmed criteria version.' });
     }
     const criteriaVersion = criteriaVersions.values().next().value ?? members[0].application.job.criteriaVersion;
-    const entries = members.map((member) => buildEntry(member.application, currentByApplication.get(member.applicationId)));
+    const stateKeys = await this.memberStateKeys(identity.workspaceId, members.map((member) => member.applicationId));
+    const entries = members.map((member) => ({
+      ...buildEntry(member.application, currentByApplication.get(member.applicationId)),
+      stateKey: stateKeys.get(member.applicationId),
+    }));
     const ranked = entries
       .filter((entry) => entry.overall != null)
       .sort((a, b) => (b.overall as number) - (a.overall as number));

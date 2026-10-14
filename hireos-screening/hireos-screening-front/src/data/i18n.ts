@@ -963,6 +963,18 @@ export const ZH: Record<string, string> = {
   "Mailbox address is required.": "邮箱地址为必填项。",
   "An authorization code is required for the first connection.": "首次连接需要填写授权码。",
   "IMAP and SMTP server addresses are required.": "IMAP 和 SMTP 服务器地址为必填项。",
+  /* #27 — decision concerns, workspace ordering, comparison freshness */
+  "No open concerns": "无未处理顾虑",
+  "Restricted concern": "受限顾虑",
+  "missing information": "信息缺失",
+  "hypothesis": "推测",
+  "observed mismatch": "已观察到的不符",
+  "This candidate still has an open blocking concern:": "该候选人仍有未处理的阻断性顾虑：",
+  "I’ve reviewed the blocking concern and still want to submit this decision": "我已查看该阻断性顾虑，仍要提交此决策",
+  "concern": "条顾虑",
+  "concerns": "条顾虑",
+  "Data updated since this snapshot: {names} changed (concerns, verification, decision or score). Refresh to compare the latest.": "本快照生成后数据已更新：{names} 有变化（顾虑、核实、决策或评分），刷新后可对比最新数据。",
+  "Refresh comparison": "刷新对比",
   /* Issue #23 — loading, polling, disabled reasons, decision confirm & withdraw */
   "Still processing — it has been more than 90 seconds.": "仍在处理中，已超过 90 秒。",
   "Something went wrong on this page": "页面出了点问题",

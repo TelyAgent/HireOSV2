@@ -1,4 +1,4 @@
-import { db, getApplication } from "../db";
+import { applyServerState, db } from "../db";
 import type { Decision, DecisionOutcome } from "../fixtures/decisions";
 import type { PersonId } from "../fixtures/people";
 import type { Delivery } from "../fixtures/deliveries";
@@ -23,9 +23,7 @@ export async function recordDecision(applicationId: string, input: RecordDecisio
     method: "POST",
     body: JSON.stringify(input),
   });
-  db.decisions[applicationId] = result.decision;
-  const application = getApplication(applicationId);
-  if (application) application.screeningStatus = "decided";
+  applyServerState({ applicationId, decision: result.decision, screeningStatus: "decided" });
   if (result.delivery) db.deliveries.push(result.delivery);
   return result;
 }
@@ -39,9 +37,7 @@ export async function withdrawDecision(applicationId: string, decisionId: string
     method: "POST",
     body: JSON.stringify({ reason }),
   });
-  delete db.decisions[applicationId];
-  const application = getApplication(applicationId);
-  if (application) application.screeningStatus = "review_pending";
+  applyServerState({ applicationId, decision: null, screeningStatus: "review_pending" });
   return result.decision;
 }
 
