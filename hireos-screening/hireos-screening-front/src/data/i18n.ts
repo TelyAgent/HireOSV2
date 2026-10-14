@@ -975,6 +975,15 @@ export const ZH: Record<string, string> = {
   "concerns": "条顾虑",
   "Data updated since this snapshot: {names} changed (concerns, verification, decision or score). Refresh to compare the latest.": "本快照生成后数据已更新：{names} 有变化（顾虑、核实、决策或评分），刷新后可对比最新数据。",
   "Refresh comparison": "刷新对比",
+  /* #22 — delivery package contents & nav */
+  "Not available": "暂无",
+  "generated": "生成于",
+  "frozen when this package was created": "已在创建投递包时固化",
+  "Candidate contact details are excluded": "不包含候选人联系方式",
+  "Internal ranking and comparison notes are excluded": "不包含内部排名与对比备注",
+  "Restricted evidence is redacted": "受限证据已脱敏",
+  "Reviewed — sent on a decision recorded by a person": "已复核 —— 基于人工记录的决策发出",
+  "Not reviewed": "未复核",
   /* Issue #23 — loading, polling, disabled reasons, decision confirm & withdraw */
   "Still processing — it has been more than 90 seconds.": "仍在处理中，已超过 90 秒。",
   "Something went wrong on this page": "页面出了点问题",

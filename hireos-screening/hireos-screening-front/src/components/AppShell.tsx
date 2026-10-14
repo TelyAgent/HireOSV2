@@ -1,4 +1,5 @@
-import { useLayoutEffect, type ReactNode } from "react";
+import { useEffect, useLayoutEffect, useState, type ReactNode } from "react";
+import { countPendingDeliveries } from "../data/api/deliveries";
 import { Radio } from "antd";
 import { Link, useLocation } from "react-router-dom";
 import { useStore } from "../store/StoreContext";
@@ -22,10 +23,13 @@ interface NavItem {
   label: string;
   /** Pages that belong to this section only. */
   isActive: (pathname: string) => boolean;
+  /** Shows a count badge (pending deliveries, #22). */
+  countKey?: "pendingDeliveries";
 }
 const NAV_PRIMARY: NavItem[] = [
   { to: "/jobs", icon: "work_outline", label: "Jobs", isActive: (p) => p.startsWith("/jobs") },
   { to: "/library", icon: "folder_shared", label: "Resume Library", isActive: (p) => p.startsWith("/library") || p.startsWith("/imports") },
+  { to: "/deliveries", icon: "outbox", label: "Deliveries", isActive: (p) => p.startsWith("/deliveries"), countKey: "pendingDeliveries" },
 ];
 
 /**
@@ -38,7 +42,6 @@ const SHARED_DETAIL_OWNER: Array<[prefix: string, owner: string]> = [
   ["/duplicates", "/library"],
   ["/applications", "/jobs"],
   ["/comparisons", "/jobs"],
-  ["/deliveries", "/jobs"],
 ];
 
 let lastSection: string | null = null;
@@ -108,11 +111,11 @@ export function TopBar() {
   );
 }
 
-function NavLinkItem({ item, collapsed }: { item: NavItem; collapsed: boolean }) {
+function NavLinkItem({ item, collapsed, count }: { item: NavItem; collapsed: boolean; count?: number }) {
   const { pathname } = useLocation();
   const { t } = useStore();
   const active = activeSection(pathname) === item.to;
-  const label = t(item.label);
+  const label = count ? `${t(item.label)} (${count})` : t(item.label);
   return (
     <Link
       to={item.to}
@@ -122,20 +125,42 @@ function NavLinkItem({ item, collapsed }: { item: NavItem; collapsed: boolean })
       aria-current={active ? "page" : undefined}
     >
       <Icon name={item.icon} />
-      {!collapsed && label}
+      {!collapsed && t(item.label)}
+      {count ? (
+        <span className="nav-count" aria-hidden="true">
+          {count}
+        </span>
+      ) : null}
     </Link>
   );
+}
+
+/** Pending deliveries for the nav badge, refreshed on every navigation (sending / receipts happen on other pages). */
+function usePendingDeliveries() {
+  const { pathname } = useLocation();
+  const [count, setCount] = useState(0);
+  useEffect(() => {
+    let cancelled = false;
+    countPendingDeliveries()
+      .then((n) => !cancelled && setCount(n))
+      .catch(() => undefined);
+    return () => {
+      cancelled = true;
+    };
+  }, [pathname]);
+  return count;
 }
 
 export function SideNav() {
   const { state, t, toggleSidenav } = useStore();
   const collapsed = state.sidenavCollapsed;
+  const pendingDeliveries = usePendingDeliveries();
   const toggleLabel = collapsed ? t("Expand navigation") : t("Collapse navigation");
   return (
     <nav className={`sidenav${collapsed ? " collapsed" : ""}`} aria-label="Primary">
       <div className="sidenav-section">
         {NAV_PRIMARY.map((item) => (
-          <NavLinkItem key={item.to} item={item} collapsed={collapsed} />
+          <NavLinkItem key={item.to} item={item} collapsed={collapsed} count={item.countKey === "pendingDeliveries" ? pendingDeliveries : undefined} />
         ))}
       </div>
       <div className="sidenav-section">
