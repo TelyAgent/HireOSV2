@@ -60,11 +60,19 @@ Claude 用 gh 创建 Issue（AI Ready=Yes）；有未决问题时则 AI Ready=No
 开 PR（模板，Closes #123）
    ▼
 CI：改动的子项目跑 build/lint/typecheck/test
-    → Issue contract 校验 → Claude Review（只读）+ Claude QA（按 AC 实际验证），并行
-    → 两条 PR 评论 [AI-EVIDENCE] → Merge gate
+    → Issue contract 校验 → Claude Review（只读）
+    → PR 评论 [AI-EVIDENCE] → Merge gate
    ▼
 Human Supervisor 验收业务结果 → 合并 → 按 PR 的 Deploy 一节人工部署
+   ▼
+一批 Issue 都合并后：Actions →「Claude QA (batch)」→ 填 Issue 号（如 23,34）
+    → 每个 Issue 在其已合并 PR 的合并提交上按 AC 实际验证 → 结果评论到 Issue
 ```
+
+Claude QA 不再在每个 PR 上运行，也不阻塞合并（#39）。它在合并后按需批量运行：
+- 每个 Issue 一个独立 job，互不影响；找不到已合并 PR 或不满足 Issue 契约的会单独失败并写明原因。
+- 验证的是该 PR 的合并提交，不是最新 main，所以不会发现后续 PR 造成的回归。
+- 和原来一样：QA 规则只从默认分支读取，QA 不能修改产品代码。
 
 给 Claude Code 的标准输入：
 
@@ -118,7 +126,7 @@ Rules:
 
 - 清空 `known_failing`：修复 core-record、interview、screening 后端的 lint，interview 后端测试，interview 前端 build
 - 给前端补测试（至少每个子系统的 smoke/E2E），给 written 后端补测试
-- 接入 Claude QA：按 AC 逐项验收、补充临时测试，输出 `qa.json`
+- 接入 Claude QA：按 AC 逐项验收、补充临时测试，输出 `qa.json`（已接入，合并后手动批量运行，见上文）
 - 接入 Quality Ledger：QA 发现的 Bug 自动建 Issue，并在 `docs/quality/` 下生成报告
 
 第一期不做 QA 的原因：目前大部分子项目几乎没有测试，AI QA 拿不到可执行的验证手段，结果会大多是失败或阻塞，噪音大于价值。
