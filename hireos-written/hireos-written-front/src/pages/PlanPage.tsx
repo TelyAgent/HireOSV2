@@ -5,6 +5,7 @@ import { StatusBadge } from "../utils/status";
 import { Badge, Breadcrumbs, Button, EmptyState, Tabs } from "../components/ui/Primitives";
 import { Icon } from "../components/ui/Icon";
 import { planPageSelectedTab } from "../utils/planTabState";
+import { finalOverall } from "../utils/score";
 import { AssessmentQuestionDrawer } from "../components/AssessmentQuestionDrawer";
 import { SendToCandidateDrawer } from "../components/SendToCandidateDrawer";
 import { RealSubmissionContent } from "./SubmissionDetailPage";
@@ -391,7 +392,8 @@ function SentRoundCard({
 }) {
   const { t } = useStore();
   const status = roundStatus(inv);
-  const score = inv.submission?.finalEvaluation?.overall ?? (RESULTS[`result_${inv.id}`]?.overall ?? null);
+  const final = inv.submission?.finalEvaluation;
+  const score = final ? finalOverall(final) : (RESULTS[`result_${inv.id}`]?.overall ?? null);
   return (
     <div className="card card-pad round-card" style={{ marginBottom: 12 }}>
       <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
@@ -444,7 +446,7 @@ function RoundSwitcher({ rounds, selectedId, onSelect, label }: { rounds: RealIn
 function RoundScoreSummary({ rounds, label }: { rounds: RealInvitation[]; label: (n: number) => string }) {
   const { t } = useStore();
   const scored = rounds
-    .map((inv) => ({ inv, score: RESULTS[`result_${inv.id}`]?.overall ?? inv.submission?.finalEvaluation?.overall ?? null }))
+    .map((inv) => ({ inv, score: RESULTS[`result_${inv.id}`]?.overall ?? (inv.submission?.finalEvaluation ? finalOverall(inv.submission.finalEvaluation) : null) }))
     .filter((r) => r.score != null);
   if (rounds.length < 2 || !scored.length) return null;
   return (

@@ -5,6 +5,7 @@
  * send-to-candidate preview, ...) keeps working unchanged whether the item is fixture demo data or
  * a real, backend-persisted one.
  */
+import { finalOverall } from "../utils/score";
 import {
   ATTEMPTS, EVALUATIONS, PLANS, QUESTIONS, RELEASES, RESULTS,
   type Attempt, type Criterion, type Evaluation, type PlanItem, type Question,
@@ -141,7 +142,7 @@ export function applyRealEvaluation(caseId: string, invitation: RealInvitation):
     // older fetch from before the publish (this runs on every render).
     const released = !!(submission.release && submission.releasedAt) || RESULTS[resultId]?.status === "published";
     RESULTS[resultId] = {
-      id: resultId, caseId, evaluationId, overall: final.overall, status: released ? "published" : "final_not_released",
+      id: resultId, caseId, evaluationId, overall: finalOverall(final), status: released ? "published" : "final_not_released",
       releaseId: released ? relId : null, invitationId: invitation.id, round: invitation.round,
     };
     if (submission.release && submission.releasedAt) {

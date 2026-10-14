@@ -6,6 +6,7 @@ import { StatusBadge } from "../utils/status";
 import { Breadcrumbs, Button, EmptyState } from "../components/ui/Primitives";
 import { ATTEMPTS, CASES, CORE_CANDIDATES, EVALUATIONS, QUESTIONS, RESULTS, type Criterion, type Evaluation } from "../data/fixtures";
 import { finalizeCaseEvaluation } from "../data/writtenApi";
+import { computeOverall } from "../utils/score";
 
 function isValidScore(text: string, max: number): boolean {
   if (!/^\d+$/.test(text.trim())) return false;
@@ -13,10 +14,6 @@ function isValidScore(text: string, max: number): boolean {
   return n >= 0 && n <= max;
 }
 
-function computeOverall(criteria: Criterion[], key: "ai" | "human"): number | null {
-  if (criteria.some((c) => c[key] == null)) return null;
-  return Math.round(criteria.reduce((sum, c) => sum + (c[key] as number), 0));
-}
 
 /**
  * Ported from the prototype's pageEvaluationReview(attId, opts). `inline` drops the breadcrumb (used
@@ -68,7 +65,10 @@ export function EvaluationReviewContent({
   const ev = evaluation; // narrowed non-null, for the closures below (TS doesn't carry the early-return narrowing into nested function scopes)
   const overallAI = computeOverall(ev.criteria, "ai");
   const overallHuman = computeOverall(ev.criteria, "human");
-  const overallMax = ev.criteria.reduce((sum, c) => sum + c.max, 0);
+  // Raw points, shown under the out-of-100 overall so the conversion is visible.
+  const pointsMax = ev.criteria.reduce((sum, c) => sum + c.max, 0);
+  const pointsHuman = ev.criteria.every((c) => c.human != null) ? ev.criteria.reduce((sum, c) => sum + (c.human as number), 0) : null;
+  const pointsAI = ev.criteria.reduce((sum, c) => sum + c.ai, 0);
   const isFinalized = ev.status === "final" || !!Object.values(RESULTS).find((r) => r.evaluationId === ev.id && ["final_not_released", "published"].includes(r.status));
 
   function updateEvaluation(updater: (ev: Evaluation) => Evaluation) {
@@ -165,13 +165,13 @@ export function EvaluationReviewContent({
         <div className="grid-3">
           <div className="metric">
             <div className="label">{t("Overall (human)")}</div>
-            <div className="value">{overallHuman == null ? <span className="badge neutral">{t("Unknown")}</span> : <>{overallHuman}<span className="tiny"> / {overallMax}</span></>}</div>
-            <div className="sub">{t("Any missing required criterion → Unknown")}</div>
+            <div className="value">{overallHuman == null ? <span className="badge neutral">{t("Unknown")}</span> : <>{overallHuman}<span className="tiny"> / 100</span></>}</div>
+            <div className="sub">{pointsHuman == null ? t("Any missing required criterion → Unknown") : `${t("Points:")} ${pointsHuman} / ${pointsMax} · ${t("scaled to 100")}`}</div>
           </div>
           <div className="metric">
             <div className="label">{t("Overall (AI)")}</div>
-            <div className="value">{overallAI == null ? "—" : <>{overallAI}<span className="tiny"> / {overallMax}</span></>}</div>
-            <div className="sub">{t("Draft only, not a hiring probability")}</div>
+            <div className="value">{overallAI == null ? "—" : <>{overallAI}<span className="tiny"> / 100</span></>}</div>
+            <div className="sub">{t("Points:")} {pointsAI} / {pointsMax} · {t("Draft only, not a hiring probability")}</div>
           </div>
           <div className="metric">
             <div className="label">{t("Coverage / Confidence")}</div>

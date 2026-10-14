@@ -1,4 +1,5 @@
 import { Injectable } from '@nestjs/common';
+import { percentScore } from '../invitations/scores';
 import { ConfigService } from '@nestjs/config';
 import { z } from 'zod';
 import { callAiForJson, isAiConfigured } from './ai-json-client';
@@ -78,7 +79,8 @@ export class AiEvaluatorService {
       const score = match ? Math.max(0, Math.min(r.max, Math.round(match.score))) : 0;
       return { name: r.name, max: r.max, score, evidence: match?.evidence ?? '（AI 未对该维度给出说明）' };
     });
-    const overall = criteria.reduce((sum, c) => sum + c.score, 0);
+    // Out of 100, whatever the rubric maxima add up to.
+    const overall = percentScore(criteria);
     return { overall, summary: result.summary, criteria };
   }
 }
