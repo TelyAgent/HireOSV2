@@ -3,7 +3,7 @@ import { Link, useParams } from "react-router-dom";
 import { useStore } from "../store/StoreContext";
 import { downloadDelivery, getDelivery, retryDelivery, sendDelivery } from "../data/api/deliveries";
 import { getApplication, getCandidate, getEvaluation, getJob } from "../data/db";
-import type { Delivery } from "../data/fixtures/deliveries";
+import type { Delivery, DeliveryHistoryKey } from "../data/fixtures/deliveries";
 import { fmtDateTime, pct } from "../lib/format";
 import { Button, EmptyState, PageHeader, scoreDisplay } from "../components/ui/Primitives";
 import { Icon } from "../components/ui/Icons";
@@ -16,6 +16,15 @@ const ELIG_LABEL: Record<string, string> = {
   needs_verification: "Needs verification",
   not_eligible: "Not eligible",
 };
+const DELIVERY_HISTORY_LABEL: Record<DeliveryHistoryKey, string> = {
+  package_ready: "Package ready",
+  queued: "Queued",
+  submitted: "Submitted",
+  delivered_awaiting_confirmation: "Delivered (no receipt yet — awaiting confirmation)",
+  received: "Received",
+  received_imported: "Received / Imported",
+};
+
 function cap(s: string): string {
   return s ? s.charAt(0).toUpperCase() + s.slice(1) : s;
 }
@@ -99,7 +108,7 @@ function DeliveryActions({ delivery, onChanged }: { delivery: Delivery; onChange
 
 export function DeliveryDetailPage() {
   const { id = "" } = useParams();
-  const { t } = useStore();
+  const { t, state } = useStore();
   const [delivery, setDelivery] = useState<Delivery | null | undefined>(undefined);
 
   const load = useCallback(() => {
@@ -116,8 +125,9 @@ export function DeliveryDetailPage() {
   if (delivery === null) return <EmptyState icon="search_off" title={t("Delivery not found")} />;
 
   const app = delivery.historical ? null : getApplication(delivery.applicationId!);
-  const cand = delivery.historical ? { displayName: delivery.candidateLabel || "—" } : getCandidate(app!.candidateId)!;
-  const job = delivery.historical ? { title: delivery.jobLabel || "—" } : getJob(app!.jobId)!;
+  // The delivery carries its own labels; the candidate / job caches may not be filled when arriving from the list.
+  const cand = (app && getCandidate(app.candidateId)) || { displayName: delivery.candidateLabel || "—" };
+  const job = (app && getJob(app.jobId)) || { title: delivery.jobLabel || "—" };
   const ev = app ? getEvaluation(app.id) : null;
 
   return (
@@ -183,8 +193,8 @@ export function DeliveryDetailPage() {
               <div className="flex items-center gap-8" key={i}>
                 <span className="dot-indicator" style={{ background: "var(--accent-500)" }} />
                 <div>
-                  <div style={{ fontSize: "var(--fs-sm)" }}>{t(h.state)}</div>
-                  <div className="tiny">{fmtDateTime(h.at, "en")}</div>
+                  <div style={{ fontSize: "var(--fs-sm)" }}>{h.key ? t(DELIVERY_HISTORY_LABEL[h.key]) : t(h.state)}</div>
+                  <div className="tiny">{fmtDateTime(h.at, state.lang)}</div>
                 </div>
               </div>
             ))}

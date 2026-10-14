@@ -160,7 +160,7 @@ function MatrixEvidenceDrawer({ member, dimension, onClose }: { member: Member; 
    Comparison matrix
    --------------------------------------------------------------- */
 function CompareMatrix({ job, members, diffOnly, onOpenEvidence }: { job: Job; members: Member[]; diffOnly: boolean; onOpenEvidence: (m: Member, d: Dimension) => void }) {
-  const { t } = useStore();
+  const { t, state } = useStore();
 
   interface Row {
     label: string;
@@ -203,7 +203,7 @@ function CompareMatrix({ job, members, diffOnly, onOpenEvidence }: { job: Job; m
       label: t("Compensation & location"),
       render: (m) => {
         const c = m.cand.compensationExpectation;
-        return c ? <span className="tiny">{fmtMoney(c, "en")}</span> : <Badge tone="outline">{t("Not provided")}</Badge>;
+        return c ? <span className="tiny">{fmtMoney(c, state.lang)}</span> : <Badge tone="outline">{t("Not provided")}</Badge>;
       },
     },
     {
@@ -362,7 +362,7 @@ function ExportModal({ cmp, members, onClose }: { cmp: ComparisonSet; members: M
    --------------------------------------------------------------- */
 export function ComparePage() {
   const { id = "" } = useParams();
-  const { t, say } = useStore();
+  const { t, state, say } = useStore();
   const [cmp, setCmp] = useState<ComparisonSet | null | undefined>(undefined);
   const [mode, setMode] = useState<CompareMode>("current_summary");
   const [diffOnly, setDiffOnly] = useState(false);
@@ -462,7 +462,7 @@ export function ComparePage() {
           <select value={snapIdx} onChange={(e) => setSnapIdx(Number(e.target.value))}>
             {cmp.snapshots.map((s, i) => (
               <option key={s.id} value={i}>
-                {t("Snapshot")} v{s.version} — {fmtDate(s.generatedAt, "en")}
+                {t("Snapshot")} v{s.version} — {fmtDate(s.generatedAt, state.lang)}
               </option>
             ))}
           </select>

@@ -12,6 +12,7 @@ import { inferRecommendation } from "../lib/scoring";
 import { Badge, Button, EligibilityBadge, EmptyState, PageHeader, RecommendationBadge, ScoreRing, scoreDisplay } from "../components/ui/Primitives";
 import { ConfirmDialog, Modal } from "../components/ui/Overlays";
 import { PageSkeleton } from "../components/ui/PageSkeleton";
+import { useFieldValidation } from "../lib/useFieldValidation";
 
 const OUTCOME_META: Record<DecisionOutcome, { label: string; needsTarget: boolean }> = {
   strong_advance: { label: "Strong Advance", needsTarget: true },
@@ -96,7 +97,7 @@ function toNextStepTarget(choice: TargetChoice): NextStepTarget {
 }
 
 function AlreadyDecidedView({ app, withdrawn, onWithdrawn }: { app: Application; withdrawn: Decision[]; onWithdrawn: () => void }) {
-  const { t, say } = useStore();
+  const { t, state, say } = useStore();
   const navigate = useNavigate();
   const [withdrawOpen, setWithdrawOpen] = useState(false);
   const [withdrawReason, setWithdrawReason] = useState("");
@@ -166,7 +167,7 @@ function AlreadyDecidedView({ app, withdrawn, onWithdrawn }: { app: Application;
           <strong>{t("Reason:")}</strong> {decision.reason}
         </p>
         <p className="tiny">
-          {t("Decided by")} {db.people[decision.decidedBy]?.name} · {fmtDateTime(decision.decidedAt, "en")} · {t("Status:")} {t(cap(decision.status.replace(/_/g, " ")))}
+          {t("Decided by")} {db.people[decision.decidedBy]?.name} · {fmtDateTime(decision.decidedAt, state.lang)} · {t("Status:")} {t(cap(decision.status.replace(/_/g, " ")))}
         </p>
         {decision.exceptionRef && (
           <p className="tiny" style={{ color: "var(--warning-text)" }}>
@@ -279,6 +280,7 @@ export function DecisionPage() {
   const [submitting, setSubmitting] = useState(false);
   const [withdrawn, setWithdrawn] = useState<Decision[]>([]);
   const [loadFailed, setLoadFailed] = useState(false);
+  const fields = useFieldValidation({ reason: () => (!reason.trim() ? t("Explain the basis for this decision.") : null) });
 
   // Always read the server copy: whether a decision is in effect (and its withdrawn history)
   // can change from another tab, and the cache may be empty on a deep link.
@@ -354,10 +356,7 @@ export function DecisionPage() {
 
   const submit = () => {
     if (!outcome) return;
-    if (!reason.trim()) {
-      say(t("A reason is required"), { type: "error" });
-      return;
-    }
+    if (!fields.validateAll()) return;
     const meta = OUTCOME_META[outcome];
     if (meta.needsTarget && !target) {
       say(t("Choose a next-step target"), { type: "error" });
@@ -455,8 +454,12 @@ export function DecisionPage() {
                 </div>
               )}
               <div className="field">
-                <label>{t("Reason")}</label>
-                <textarea value={reason} onChange={(e) => setReason(e.target.value)} placeholder={t("Required — explain the basis for this decision")} />
+                <label htmlFor={fields.labelFor("reason")}>
+                  {t("Reason")}
+                  <span className="required-mark">*</span>
+                </label>
+                <textarea {...fields.field("reason")} value={reason} onChange={(e) => setReason(e.target.value)} placeholder={t("Explain the basis for this decision")} />
+                {fields.error("reason")}
               </div>
               <Button variant="primary" onClick={submit} disabled={submitting}>
                 {submitting ? t("Submitting…") : t("Submit decision")}
