@@ -18,6 +18,7 @@ import { Badge, Button, CandidateAvatar, EligibilityBadge, EmptyState, Freshness
 import { EvidenceCard } from "../components/ui/EvidenceCard";
 import { Icon } from "../components/ui/Icons";
 import { Drawer, Modal } from "../components/ui/Overlays";
+import { PageSkeleton } from "../components/ui/PageSkeleton";
 
 type CompareMode = "same_stage" | "current_summary" | "round_changes";
 
@@ -383,7 +384,7 @@ export function ComparePage() {
     load();
   }, [load]);
 
-  if (cmp === undefined) return null;
+  if (cmp === undefined) return <PageSkeleton />;
   if (cmp === null) return <EmptyState icon="compare_arrows" title={t("Comparison not found")} />;
 
   if (!cmp.snapshots.length) {

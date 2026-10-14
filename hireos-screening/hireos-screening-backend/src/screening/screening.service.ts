@@ -53,7 +53,16 @@ export class ScreeningService {
       where: { workspaceId: identity.workspaceId, applicationId, status: 'approved' },
       orderBy: { createdAt: 'desc' },
     });
-    return { ...this.serializeDetail(application, evaluation, decision), screeningInProgress: this.inFlight.has(applicationId) };
+    // Withdrawn decisions stay readable as history (issue #23).
+    const withdrawnDecisions = await this.db.screeningDecision.findMany({
+      where: { workspaceId: identity.workspaceId, applicationId, status: 'withdrawn' },
+      orderBy: { withdrawnAt: 'desc' },
+    });
+    return {
+      ...this.serializeDetail(application, evaluation, decision),
+      withdrawnDecisions: withdrawnDecisions.map(serializeDecision),
+      screeningInProgress: this.inFlight.has(applicationId),
+    };
   }
 
   async listEvaluations(identity: Identity, applicationId: string) {

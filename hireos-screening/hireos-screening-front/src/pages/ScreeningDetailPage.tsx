@@ -31,6 +31,9 @@ import {
 import { EvidenceCard } from "../components/ui/EvidenceCard";
 import { Icon } from "../components/ui/Icons";
 import { ConfirmDialog, Drawer, Modal } from "../components/ui/Overlays";
+import { useBoundedPolling } from "../lib/usePolling";
+import { StillProcessingNotice } from "../components/ui/StillProcessing";
+import { PageSkeleton } from "../components/ui/PageSkeleton";
 
 const RESTRICTED_VIEWERS = ["emma", "daniel"];
 
@@ -298,13 +301,9 @@ export function ScreeningDetailPage() {
   // Confirming a link starts screening in the background, so the page can open before
   // that run finishes -- keep polling until the result lands.
   const inProgress = !!detail && !detail.evaluation && !!detail.screeningInProgress;
-  useEffect(() => {
-    if (!inProgress) return;
-    const timer = window.setInterval(load, 3000);
-    return () => window.clearInterval(timer);
-  }, [inProgress, load]);
+  const screeningPoll = useBoundedPolling(inProgress, load, 3000);
 
-  if (detail === undefined) return null;
+  if (detail === undefined) return <PageSkeleton />;
   if (detail === null) return <EmptyState icon="search_off" title={t("Application not found")} />;
 
   const { application, evaluation, concerns, verificationItems } = detail;
@@ -365,6 +364,7 @@ export function ScreeningDetailPage() {
           subtitle={inProgress || running ? t("Linked, screening in progress.") : t("Linked, screening not yet run.")}
           back={`/jobs/${job.id}/screening`}
         />
+        {screeningPoll.overdue && <StillProcessingNotice style={{ marginBottom: 16 }} onRetry={screeningPoll.retry} />}
         <div className="card">
           <EmptyState
             icon={inProgress || running ? "hourglass_top" : "fact_check"}

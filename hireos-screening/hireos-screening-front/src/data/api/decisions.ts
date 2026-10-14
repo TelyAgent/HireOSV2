@@ -30,6 +30,21 @@ export async function recordDecision(applicationId: string, input: RecordDecisio
   return result;
 }
 
+/**
+ * Withdraws the active decision (issue #23). Refused with HANDOFF_ALREADY_SENT once the handoff has
+ * reached Interview / Written; otherwise the application goes back to awaiting a decision.
+ */
+export async function withdrawDecision(applicationId: string, decisionId: string, reason: string): Promise<Decision> {
+  const result = await apiFetch<{ decision: Decision }>(`/applications/${applicationId}/decisions/${decisionId}/withdraw`, {
+    method: "POST",
+    body: JSON.stringify({ reason }),
+  });
+  delete db.decisions[applicationId];
+  const application = getApplication(applicationId);
+  if (application) application.screeningStatus = "review_pending";
+  return result.decision;
+}
+
 export async function generateReviewOnlyReport(applicationId: string): Promise<Delivery> {
   const delivery = await apiFetch<Delivery>(`/applications/${applicationId}/review-report`, { method: "POST" });
   db.deliveries.push(delivery);

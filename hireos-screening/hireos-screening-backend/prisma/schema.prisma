@@ -776,7 +776,11 @@ model ScreeningDecision {
   outcome            String
   reason             String
   actorId            String
+  /// approved | withdrawn — only the latest approved decision is in effect; withdrawn ones stay as history.
   status             String                      @default("approved")
+  withdrawnAt        DateTime?
+  withdrawnBy        String?
+  withdrawReason     String?
   overrideAi         Boolean                     @default(false)
   nextStepTarget     String                      @default("record_only")
   exceptionRef       String?

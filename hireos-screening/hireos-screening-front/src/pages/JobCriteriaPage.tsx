@@ -10,6 +10,8 @@ import { computeAggregate, round2 } from "../lib/scoring";
 import { Badge, Button, EmptyState, PageHeader, scoreDisplay } from "../components/ui/Primitives";
 import { Icon } from "../components/ui/Icons";
 import { ConfirmDialog } from "../components/ui/Overlays";
+import { PageSkeleton } from "../components/ui/PageSkeleton";
+import { WithDisabledReason } from "../components/ui/DisabledReason";
 
 function JobStatusBadge({ status }: { status: Job["status"] }) {
   const { t } = useStore();
@@ -93,7 +95,7 @@ export function JobCriteriaPage() {
     load();
   }, [load]);
 
-  if (job === undefined) return null;
+  if (job === undefined) return <PageSkeleton />;
   if (job === null) return <EmptyState icon="work_off" title={t("Job not found")} />;
 
   const editable = job.criteriaStatus !== "confirmed" || editingNew;
@@ -102,8 +104,19 @@ export function JobCriteriaPage() {
   const countOk = dimensions.length >= 3 && dimensions.length <= 8;
   const reqsOk = requirements.every((r) => r.label.trim());
   const canConfirm = weightOk && countOk && reqsOk;
+  /** Shown under "Confirm this version" whenever it is disabled for a reason the user can fix (#23). */
+  const confirmBlockedReason = !weightOk
+    ? t("Weights must add up to 100% before confirming.")
+    : !countOk
+      ? t("A role needs between 3 and 8 scoring dimensions.")
+      : !reqsOk
+        ? t("Every requirement needs a label before confirming.")
+        : editingNew && !touched
+          ? t("Make a change before confirming a new version")
+          : null;
   const usedNames = new Set(dimensions.map((d) => d.name));
   const remainingPool = DIMENSION_POOL.filter((n) => !usedNames.has(n));
+  const dimensionLimitReason = dimensions.length >= 8 ? t("Up to 8 scoring dimensions — remove one to add another.") : !remainingPool.length ? t("Every available dimension is already in use.") : null;
 
 
   const addRequirement = () => {
@@ -216,14 +229,11 @@ export function JobCriteriaPage() {
                     {t("Cancel editing")}
                   </Button>
                 )}
-                <Button
-                  variant="primary"
-                  disabled={!canConfirm || confirming || (editingNew && !touched)}
-                  title={editingNew && !touched ? t("Make a change before confirming a new version") : undefined}
-                  onClick={handleConfirmClick}
-                >
-                  {t("Confirm this version")}
-                </Button>
+                <WithDisabledReason reason={confirmBlockedReason}>
+                  <Button variant="primary" disabled={!canConfirm || confirming || (editingNew && !touched)} onClick={handleConfirmClick}>
+                    {t("Confirm this version")}
+                  </Button>
+                </WithDisabledReason>
               </>
             )}
           </>
@@ -374,13 +384,20 @@ export function JobCriteriaPage() {
 
         {editable && (
           <div className="flex items-center gap-8" style={{ marginTop: 12 }}>
-            <DimensionPicker options={remainingPool} onAdd={addDimension} disabled={dimensions.length >= 8} />
+            <WithDisabledReason align="start" reason={dimensionLimitReason}>
+              <DimensionPicker options={remainingPool} onAdd={addDimension} disabled={dimensions.length >= 8} />
+            </WithDisabledReason>
             <Button variant="secondary" size="sm" onClick={distributeEvenly}>
               {t("Distribute evenly")}
             </Button>
           </div>
         )}
-        {!countOk && <p className="tiny error-inline" style={{ marginTop: 8 }}>A role needs between 3 and 8 scoring dimensions.</p>}
+        {!countOk && <p className="tiny error-inline" style={{ marginTop: 8 }}>{t("A role needs between 3 and 8 scoring dimensions.")}</p>}
+        {editable && dimensions.length <= 3 && countOk && (
+          <p className="disabled-reason" role="status" style={{ marginTop: 6, maxWidth: "none" }}>
+            {t("At least 3 scoring dimensions are required, so none can be removed right now.")}
+          </p>
+        )}
         <div className="divider" />
         <ScoringMethodologyNote />
       </div>

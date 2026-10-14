@@ -11,9 +11,11 @@ import { fmtDate, fmtMoney, relTime } from "../lib/format";
 import { Icon } from "../components/ui/Icons";
 import { Button, CandidateAvatar, EmptyState, PageHeader } from "../components/ui/Primitives";
 import { Modal } from "../components/ui/Overlays";
+import { useBoundedPolling } from "../lib/usePolling";
+import { StillProcessingNotice } from "../components/ui/StillProcessing";
+import { PageSkeleton } from "../components/ui/PageSkeleton";
 
 const MATCH_POLL_INTERVAL_MS = 3000;
-const MATCH_POLL_TIMEOUT_MS = 90_000;
 const PARSE_POLL_INTERVAL_MS = 3000;
 
 const REC_STATUS_TONE: Record<string, string> = {
@@ -211,31 +213,16 @@ export function CandidateProfilePage() {
   // A match already in flight (auto-triggered on paste/upload, or a prior manual
   // click) has no completion event to subscribe to yet -- poll until it settles so
   // the "run matching" control doesn't stay disabled forever and results appear
-  // without a manual refresh.
-  useEffect(() => {
-    if (!detail?.jobDiscovery.isMatching) return;
-    const startedAt = Date.now();
-    const timer = window.setInterval(() => {
-      if (Date.now() - startedAt > MATCH_POLL_TIMEOUT_MS) {
-        window.clearInterval(timer);
-        return;
-      }
-      load();
-    }, MATCH_POLL_INTERVAL_MS);
-    return () => window.clearInterval(timer);
-  }, [detail?.jobDiscovery.isMatching, load]);
+  // without a manual refresh. Past 90 s the page says so instead of going quiet (#23).
+  const matchPoll = useBoundedPolling(!!detail?.jobDiscovery.isMatching, load, MATCH_POLL_INTERVAL_MS);
 
   // The profile fields stay blank until the resume parse finishes (it runs in the
   // background and retries on transient AI failures) -- poll so they fill in by themselves.
   const parseStatus = detail ? latestParseStatus(detail.resumeVersions) : undefined;
-  useEffect(() => {
-    if (parseStatus !== "pending") return;
-    const timer = window.setInterval(load, PARSE_POLL_INTERVAL_MS);
-    return () => window.clearInterval(timer);
-  }, [parseStatus, load]);
+  const parsePoll = useBoundedPolling(parseStatus === "pending", load, PARSE_POLL_INTERVAL_MS);
   const [reparsing, setReparsing] = useState(false);
 
-  if (detail === undefined) return null;
+  if (detail === undefined) return <PageSkeleton />;
   if (detail === null) {
     return (
       <EmptyState
@@ -366,6 +353,16 @@ export function CandidateProfilePage() {
             </Button>
           )}
         </div>
+      )}
+
+      {(matchPoll.overdue || parsePoll.overdue) && (
+        <StillProcessingNotice
+          style={{ marginBottom: 16 }}
+          onRetry={() => {
+            matchPoll.retry();
+            parsePoll.retry();
+          }}
+        />
       )}
 
       <div className="two-col">

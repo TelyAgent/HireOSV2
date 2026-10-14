@@ -8,6 +8,7 @@ import { fmtDateTime, pct } from "../lib/format";
 import { Button, EmptyState, PageHeader, scoreDisplay } from "../components/ui/Primitives";
 import { Icon } from "../components/ui/Icons";
 import { DELIVERY_KIND_LABEL } from "./DeliveriesListPage";
+import { PageSkeleton } from "../components/ui/PageSkeleton";
 
 const ELIG_LABEL: Record<string, string> = {
   eligible: "Eligible",
@@ -111,7 +112,7 @@ export function DeliveryDetailPage() {
     load();
   }, [load]);
 
-  if (delivery === undefined) return null;
+  if (delivery === undefined) return <PageSkeleton />;
   if (delivery === null) return <EmptyState icon="search_off" title={t("Delivery not found")} />;
 
   const app = delivery.historical ? null : getApplication(delivery.applicationId!);

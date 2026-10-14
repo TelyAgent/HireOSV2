@@ -1,15 +1,17 @@
 import { useCallback, useEffect, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { useStore } from "../store/StoreContext";
-import { generateReviewOnlyReport, recordDecision, sendDeclineNotice, type NextStepTarget } from "../data/api/decisions";
-import { findTaskForApplication, claimTask } from "../data/api/tasks";
+import { generateReviewOnlyReport, recordDecision, sendDeclineNotice, withdrawDecision, type NextStepTarget } from "../data/api/decisions";
+import { getApplicationDetail } from "../data/api/screening";
+import { ApiError } from "../data/api/shared";
 import { db, getApplication, getCandidate, getConcerns, getEvaluation, getJob } from "../data/db";
 import type { Application } from "../data/fixtures/applications";
-import type { DecisionOutcome } from "../data/fixtures/decisions";
+import type { Decision, DecisionOutcome } from "../data/fixtures/decisions";
 import { fmtDateTime } from "../lib/format";
 import { inferRecommendation } from "../lib/scoring";
 import { Badge, Button, EligibilityBadge, EmptyState, PageHeader, RecommendationBadge, ScoreRing, scoreDisplay } from "../components/ui/Primitives";
-import { ConfirmDialog } from "../components/ui/Overlays";
+import { ConfirmDialog, Modal } from "../components/ui/Overlays";
+import { PageSkeleton } from "../components/ui/PageSkeleton";
 
 const OUTCOME_META: Record<DecisionOutcome, { label: string; needsTarget: boolean }> = {
   strong_advance: { label: "Strong Advance", needsTarget: true },
@@ -47,15 +49,62 @@ function cap(s: string): string {
 }
 
 type TargetChoice = "none" | "assessment" | "interview";
+const TARGET_LABEL: Record<TargetChoice, string> = {
+  none: "Record only (no handoff yet)",
+  assessment: "Send Assessment",
+  interview: "Move to Interview",
+};
+
+/** Plain-language failure for a decision submit (#23): the backend's validation message, or a network hint. */
+function decisionErrorMessage(err: unknown, t: (s: string) => string) {
+  if (err instanceof ApiError && !err.code.startsWith("HTTP_5") && err.code !== "HTTP_0") return `${t("The decision could not be recorded")}: ${err.message}`;
+  return t("The decision could not be recorded — check your connection and retry");
+}
+
+/** Earlier decisions that were withdrawn stay visible as history (#23). */
+function WithdrawnHistory({ decisions }: { decisions: Decision[] }) {
+  const { t, state } = useStore();
+  if (!decisions.length) return null;
+  return (
+    <div className="card card-pad" style={{ marginTop: 16 }}>
+      <div className="section-title">{t("Withdrawn decisions")}</div>
+      {decisions.map((d) => (
+        <div key={d.id} className="withdrawn-decision">
+          <div className="flex items-center gap-8" style={{ marginBottom: 4 }}>
+            <RecommendationBadge outcome={d.outcome} />
+            <Badge tone="outline">{t("Withdrawn")}</Badge>
+          </div>
+          <p className="tiny">
+            <strong>{t("Reason:")}</strong> {d.reason}
+          </p>
+          <p className="tiny">
+            <strong>{t("Withdrawal reason:")}</strong> {d.withdrawReason}
+          </p>
+          <p className="tiny">
+            {t("Withdrawn by")} {(db.people as Record<string, { name: string } | undefined>)[d.withdrawnBy ?? ""]?.name ?? d.withdrawnBy} · {d.withdrawnAt ? fmtDateTime(d.withdrawnAt, state.lang) : ""}
+          </p>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 function toNextStepTarget(choice: TargetChoice): NextStepTarget {
   if (choice === "assessment") return "send_assessment";
   if (choice === "interview") return "move_to_interview";
   return "record_only";
 }
 
-function AlreadyDecidedView({ app }: { app: Application }) {
+function AlreadyDecidedView({ app, withdrawn, onWithdrawn }: { app: Application; withdrawn: Decision[]; onWithdrawn: () => void }) {
   const { t, say } = useStore();
-  const decision = db.decisions[app.id]!;
+  const navigate = useNavigate();
+  const [withdrawOpen, setWithdrawOpen] = useState(false);
+  const [withdrawReason, setWithdrawReason] = useState("");
+  const [withdrawing, setWithdrawing] = useState(false);
+  const [withdrawError, setWithdrawError] = useState<string | null>(null);
+  // Snapshot: after a withdraw the cache entry is gone while this view is still mounted (it
+  // re-renders on the toast before the parent swaps back to the form).
+  const [decision] = useState(() => db.decisions[app.id]!);
   const cand = getCandidate(app.candidateId)!;
   const job = getJob(app.jobId)!;
   const delivery = db.deliveries.find((d) => d.applicationId === app.id);
@@ -63,12 +112,42 @@ function AlreadyDecidedView({ app }: { app: Application }) {
   const generateReport = async () => {
     const d = await generateReviewOnlyReport(app.id);
     say(t("Review-only report generated"), { type: "success" });
-    window.location.assign(`/deliveries/${d.id}`);
+    navigate(`/deliveries/${d.id}`);
   };
   const [confirmDecline, setConfirmDecline] = useState(false);
   const decline = async () => {
     await sendDeclineNotice(app.id);
     say(t("Decline notice sent (demo) — logged independently of the decision"), { type: "success" });
+  };
+  const withdraw = async () => {
+    if (!withdrawReason.trim()) {
+      setWithdrawError(t("Explain why the decision is being withdrawn."));
+      return;
+    }
+    setWithdrawing(true);
+    setWithdrawError(null);
+    try {
+      await withdrawDecision(app.id, decision.id, withdrawReason.trim());
+      say(t("Decision withdrawn — the candidate is awaiting a decision again"), { type: "success" });
+      setWithdrawOpen(false);
+      onWithdrawn();
+    } catch (err) {
+      if (err instanceof ApiError && err.code === "HANDOFF_ALREADY_SENT") {
+        setWithdrawError(
+          err.details.target === "written"
+            ? t("Already handed off to Written — it can't be withdrawn here. Handle it in the Written subsystem.")
+            : t("Already handed off to Interview — it can't be withdrawn here. Handle it in the Interview subsystem."),
+        );
+      } else if (err instanceof ApiError && err.code === "HANDOFF_IN_PROGRESS") {
+        setWithdrawError(t("The handoff is being sent right now — try again in a moment."));
+      } else if (err instanceof ApiError && err.code === "DECISION_NOT_ACTIVE") {
+        setWithdrawError(t("This decision is no longer in effect — refresh the page."));
+      } else {
+        setWithdrawError(t("The decision could not be withdrawn — check your connection and retry"));
+      }
+    } finally {
+      setWithdrawing(false);
+    }
   };
 
   return (
@@ -94,6 +173,20 @@ function AlreadyDecidedView({ app }: { app: Application }) {
             {t("Exception approved by HR + HM to route around the required-assessment policy.")}
           </p>
         )}
+        <div style={{ marginTop: 10 }}>
+          <Button
+            size="sm"
+            variant="secondary"
+            icon="undo"
+            onClick={() => {
+              setWithdrawReason("");
+              setWithdrawError(null);
+              setWithdrawOpen(true);
+            }}
+          >
+            {t("Withdraw decision")}
+          </Button>
+        </div>
       </div>
       {delivery ? (
         <div className="card card-pad">
@@ -129,6 +222,36 @@ function AlreadyDecidedView({ app }: { app: Application }) {
           </p>
         </div>
       )}
+      <WithdrawnHistory decisions={withdrawn} />
+      <Modal
+        open={withdrawOpen}
+        onClose={() => !withdrawing && setWithdrawOpen(false)}
+        title={t("Withdraw decision")}
+        footer={
+          <>
+            <Button variant="secondary" onClick={() => setWithdrawOpen(false)} disabled={withdrawing}>
+              {t("Cancel")}
+            </Button>
+            <Button variant="danger-solid" onClick={() => void withdraw()} disabled={withdrawing}>
+              {withdrawing ? t("Withdrawing…") : t("Withdraw decision")}
+            </Button>
+          </>
+        }
+      >
+        <p className="tiny" style={{ marginBottom: 12 }}>
+          {t("Withdrawing cancels a handoff that hasn't been sent yet and puts the candidate back to awaiting a decision. The withdrawn decision stays in the history.")}
+        </p>
+        <div className="field">
+          <label>{t("Withdrawal reason")}</label>
+          <textarea value={withdrawReason} onChange={(e) => setWithdrawReason(e.target.value)} placeholder={t("Required — why is this decision being withdrawn?")} />
+        </div>
+        {withdrawError && (
+          <div className="error-inline" role="alert">
+            <span className="material-icons-o">error_outline</span>
+            <div>{withdrawError}</div>
+          </div>
+        )}
+      </Modal>
       {confirmDecline && (
         <ConfirmDialog
           open
@@ -152,34 +275,45 @@ export function DecisionPage() {
   const [target, setTarget] = useState<TargetChoice | null>(null);
   const [exceptionRequested, setExceptionRequested] = useState(false);
   const [reason, setReason] = useState("");
-  const [confirmException, setConfirmException] = useState(false);
+  const [confirmOpen, setConfirmOpen] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const [withdrawn, setWithdrawn] = useState<Decision[]>([]);
+  const [loadFailed, setLoadFailed] = useState(false);
 
-  const load = useCallback(() => {
-    const a = getApplication(id);
-    setApp(a ?? null);
+  // Always read the server copy: whether a decision is in effect (and its withdrawn history)
+  // can change from another tab, and the cache may be empty on a deep link.
+  const load = useCallback(async () => {
+    setLoadFailed(false);
+    try {
+      const detail = await getApplicationDetail(id);
+      setWithdrawn(detail.withdrawnDecisions ?? []);
+      setApp(getApplication(id) ?? null);
+    } catch (err) {
+      if (err instanceof ApiError && (err.code === "HTTP_404" || err.code.endsWith("NOT_FOUND"))) setApp(null);
+      else setLoadFailed(true);
+    }
   }, [id]);
 
   useEffect(() => {
-    load();
+    void load();
   }, [load]);
 
-  // Landing on the decision page is the real signal that someone has started
-  // working this — claim the "screening_review" task (open -> in_progress) so
-  // the task list reflects it without a separate manual step. Best-effort: a
-  // missing/already-claimed task or a transient failure never blocks the page.
-  useEffect(() => {
-    if (!id) return;
-    findTaskForApplication(id)
-      .then((task) => {
-        if (task && task.status === "open") return claimTask(task.id, state.currentUser);
-      })
-      .catch(() => undefined);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [id]);
-
-  if (app === undefined) return null;
+  if (loadFailed)
+    return (
+      <EmptyState
+        icon="cloud_off"
+        title={t("This page could not be loaded")}
+        body={t("Check your connection and try again.")}
+        actions={
+          <Button variant="primary" icon="refresh" onClick={() => void load()}>
+            {t("Retry")}
+          </Button>
+        }
+      />
+    );
+  if (app === undefined) return <PageSkeleton />;
   if (app === null) return <EmptyState icon="search_off" title={t("Application not found")} />;
-  if (db.decisions[app.id]) return <AlreadyDecidedView app={app} />;
+  if (db.decisions[app.id]) return <AlreadyDecidedView app={app} withdrawn={withdrawn} onWithdrawn={() => void load()} />;
 
   const cand = getCandidate(app.candidateId)!;
   const job = getJob(app.jobId)!;
@@ -191,8 +325,9 @@ export function DecisionPage() {
   const needsExceptionUi = target === "interview" && requiredAssessment && assessmentMissing;
 
   const finalize = async (exceptionApproved: boolean) => {
-    if (!outcome) return;
+    if (!outcome || submitting) return;
     const overrideAi = !!aiRec && aiRec !== outcome && !(aiRec === "strong_advance" && outcome === "advance");
+    setSubmitting(true);
     try {
       const { delivery } = await recordDecision(app.id, {
         outcome,
@@ -207,10 +342,13 @@ export function DecisionPage() {
         navigate(`/deliveries/${delivery.id}`);
       } else {
         say(t("Decision recorded"), { type: "success" });
-        load();
+        setConfirmOpen(false);
+        void load();
       }
     } catch (err) {
-      say(err instanceof Error ? err.message : t("Something went wrong rendering this page"), { type: "error" });
+      say(decisionErrorMessage(err, t), { type: "error" });
+    } finally {
+      setSubmitting(false);
     }
   };
 
@@ -229,12 +367,9 @@ export function DecisionPage() {
       say(t("Required assessment is missing — request an exception to proceed"), { type: "error" });
       return;
     }
-    if (exceptionRequested) {
-      setConfirmException(true);
-      return;
-    }
-    finalize(false);
+    setConfirmOpen(true);
   };
+  const effectiveTarget: TargetChoice = OUTCOME_META[outcome ?? "hold"].needsTarget ? (target ?? "none") : "none";
 
   return (
     <>
@@ -323,26 +458,50 @@ export function DecisionPage() {
                 <label>{t("Reason")}</label>
                 <textarea value={reason} onChange={(e) => setReason(e.target.value)} placeholder={t("Required — explain the basis for this decision")} />
               </div>
-              <Button variant="primary" onClick={submit}>
-                {t("Submit decision")}
+              <Button variant="primary" onClick={submit} disabled={submitting}>
+                {submitting ? t("Submitting…") : t("Submit decision")}
               </Button>
             </>
           )}
         </div>
       </div>
 
-      {confirmException && (
-        <ConfirmDialog
-          open
-          onClose={() => setConfirmException(false)}
-          title={t("Approve exception — requires HR + HM")}
-          body={t(
-            "Moving to Interview without a completed Assessment requires approval from both an HR and a Hiring Manager approver. In this demo, confirming records both approvals under this decision.",
-          )}
-          confirmLabel={t("Approve exception & submit")}
-          onConfirm={() => finalize(true)}
-        />
-      )}
+      <Modal
+        open={confirmOpen && !!outcome}
+        onClose={() => !submitting && setConfirmOpen(false)}
+        title={exceptionRequested ? t("Approve exception — requires HR + HM") : t("Confirm decision")}
+        footer={
+          <>
+            <Button variant="secondary" onClick={() => setConfirmOpen(false)} disabled={submitting}>
+              {t("Back to edit")}
+            </Button>
+            <Button variant="primary" onClick={() => void finalize(exceptionRequested)} disabled={submitting}>
+              {submitting ? t("Submitting…") : exceptionRequested ? t("Approve exception & submit") : t("Submit decision")}
+            </Button>
+          </>
+        }
+      >
+        <dl className="decision-summary">
+          <dt>{t("Candidate")}</dt>
+          <dd>{cand.displayName}</dd>
+          <dt>{t("Job")}</dt>
+          <dd>{job.title}</dd>
+          <dt>{t("Outcome")}</dt>
+          <dd>{outcome ? t(OUTCOME_META[outcome].label) : ""}</dd>
+          <dt>{t("Next step")}</dt>
+          <dd>{t(TARGET_LABEL[effectiveTarget])}</dd>
+          <dt>{t("Reason")}</dt>
+          <dd>{reason}</dd>
+        </dl>
+        {exceptionRequested && (
+          <p className="tiny" style={{ color: "var(--warning-text)", marginTop: 12 }}>
+            {t(
+              "Moving to Interview without a completed Assessment requires approval from both an HR and a Hiring Manager approver. In this demo, confirming records both approvals under this decision.",
+            )}
+          </p>
+        )}
+      </Modal>
+      <WithdrawnHistory decisions={withdrawn} />
     </>
   );
 }

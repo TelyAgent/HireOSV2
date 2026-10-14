@@ -22,6 +22,11 @@ export class DecisionsController {
     return this.decisions.record(req.identity, id, body);
   }
 
+  @Post('applications/:id/decisions/:decisionId/withdraw')
+  withdraw(@Req() req: { identity: Identity }, @Param('id') id: string, @Param('decisionId') decisionId: string, @Body() body: { reason?: string }) {
+    return this.decisions.withdraw(req.identity, id, decisionId, body);
+  }
+
   @Post('applications/:id/review-report')
   reviewReport(@Req() req: { identity: Identity }, @Param('id') id: string) {
     return this.decisions.createReviewOnlyPackage(req.identity, id);

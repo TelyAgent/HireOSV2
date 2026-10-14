@@ -22,6 +22,7 @@ import { MembersSection } from "../features/members/MembersSection";
 import { ACCOUNT_URL, authFetch, useSessionUser } from "../lib/session";
 import { Icon } from "../components/ui/Icons";
 import { Drawer, ConfirmDialog } from "../components/ui/Overlays";
+import { WithDisabledReason } from "../components/ui/DisabledReason";
 
 interface ProviderPreset {
   label: string;
@@ -398,16 +399,17 @@ function MailboxCard({ mailbox, onEdit, onSync, syncing }: { mailbox: CorporateM
           )}
         </div>
         <div className="flex gap-8">
-          <Button
-            variant="secondary"
-            size="sm"
-            icon="sync"
-            onClick={onSync}
-            disabled={syncing || !mailbox.purposes.inbound || !enabled}
-            title={mailbox.purposes.inbound ? undefined : t("Enable Inbound / Recruiting Inbox to sync")}
-          >
-            {t("Sync Recruiting Inbox now")}
-          </Button>
+          <WithDisabledReason reason={!enabled ? t("This mailbox is disabled — enable it to sync.") : !mailbox.purposes.inbound ? t("Enable Inbound / Recruiting Inbox to sync") : null}>
+            <Button
+              variant="secondary"
+              size="sm"
+              icon="sync"
+              onClick={onSync}
+              disabled={syncing || !mailbox.purposes.inbound || !enabled}
+            >
+              {t("Sync Recruiting Inbox now")}
+            </Button>
+          </WithDisabledReason>
           <Button variant="icon" onClick={onEdit} aria-label={t("Configure corporate mailbox")}>
             <Icon name="settings" />
           </Button>

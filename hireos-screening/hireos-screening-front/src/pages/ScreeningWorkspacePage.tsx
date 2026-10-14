@@ -24,6 +24,8 @@ import {
   RecommendationBadge,
   ScoreRing,
 } from "../components/ui/Primitives";
+import { PageSkeleton } from "../components/ui/PageSkeleton";
+import { WithDisabledReason } from "../components/ui/DisabledReason";
 
 type EligFilter = "all" | EligibilityStatus;
 
@@ -192,7 +194,7 @@ export function ScreeningWorkspacePage() {
     }
   };
 
-  if (job === undefined) return null;
+  if (job === undefined) return <PageSkeleton />;
 
   if (job === null) return <EmptyState icon="work_off" title={t("Job not found")} />;
 
@@ -230,21 +232,31 @@ export function ScreeningWorkspacePage() {
         </div>
       </div>
 
+      {!criteriaConfirmed && (
+        <div className="criteria-guide" role="status">
+          <Icon name="rule" />
+          <span>{t("Confirm the requirements & rubric to start matching resumes for this job.")}</span>
+          <Link to={`/jobs/${job.id}/criteria`}>{t("Confirm the rubric")} →</Link>
+        </div>
+      )}
+
       <ResumeUploadStrip onOpen={openImport} />
 
       <div className="candidate-section-heading">
         {t("AI Suggested candidates")} <span className="cnt">{suggested.length}</span>
         <span className="heading-action flex gap-8">
-          <Button
-            size="sm"
-            variant="secondary"
-            icon="refresh"
-            onClick={handleMatchAgain}
-            disabled={matching || job.criteriaStatus !== "confirmed"}
-            title={job.criteriaStatus !== "confirmed" ? t("Confirm the job criteria before matching") : t("Re-match the resume library against the current criteria")}
-          >
-            {t("Match again")}
-          </Button>
+          <WithDisabledReason reason={criteriaConfirmed ? null : t("Confirm the job criteria before matching")}>
+            <Button
+              size="sm"
+              variant="secondary"
+              icon="refresh"
+              onClick={handleMatchAgain}
+              disabled={matching || !criteriaConfirmed}
+              title={criteriaConfirmed ? t("Re-match the resume library against the current criteria") : undefined}
+            >
+              {t("Match again")}
+            </Button>
+          </WithDisabledReason>
           {!criteriaConfirmed && <Badge tone="warning">{t("Rubric not confirmed")}</Badge>}
           <Link className="btn btn-sm btn-secondary" to={`/jobs/${job.id}/criteria`}>
             {t("Requirements & rubric")}
@@ -275,9 +287,11 @@ export function ScreeningWorkspacePage() {
             title={t("No pending recommendations")}
             body={t("AI-proposed matches for this role will appear here before anyone confirms them.")}
             actions={
-              <Button variant="primary" onClick={handleMatchAgain} disabled={matching || job.criteriaStatus !== "confirmed"}>
-                {t("Match again")}
-              </Button>
+              <WithDisabledReason align="start" reason={criteriaConfirmed ? null : t("Confirm the job criteria before matching")}>
+                <Button variant="primary" onClick={handleMatchAgain} disabled={matching || !criteriaConfirmed}>
+                  {t("Match again")}
+                </Button>
+              </WithDisabledReason>
             }
           />
         )}
@@ -288,15 +302,11 @@ export function ScreeningWorkspacePage() {
           {t("Linked candidates")} <span className="cnt">{rows.length}</span>
         </div>
         <div className="actions">
-          <Button
-            size="sm"
-            variant="secondary"
-            onClick={handleCompare}
-            disabled={rows.length < 2 || creatingComparison}
-            title={rows.length < 2 ? t("Link at least two candidates to this job before comparing.") : undefined}
-          >
-            {t("Compare candidates")}
-          </Button>
+          <WithDisabledReason reason={rows.length < 2 ? t("Link at least two candidates to this job before comparing.") : null}>
+            <Button size="sm" variant="secondary" onClick={handleCompare} disabled={rows.length < 2 || creatingComparison}>
+              {t("Compare candidates")}
+            </Button>
+          </WithDisabledReason>
         </div>
       </div>
       <div className="card">
