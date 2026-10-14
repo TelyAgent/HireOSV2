@@ -97,6 +97,7 @@ function toNextStepTarget(choice: TargetChoice): NextStepTarget {
 
 function AlreadyDecidedView({ app, withdrawn, onWithdrawn }: { app: Application; withdrawn: Decision[]; onWithdrawn: () => void }) {
   const { t, say } = useStore();
+  const navigate = useNavigate();
   const [withdrawOpen, setWithdrawOpen] = useState(false);
   const [withdrawReason, setWithdrawReason] = useState("");
   const [withdrawing, setWithdrawing] = useState(false);
@@ -111,7 +112,7 @@ function AlreadyDecidedView({ app, withdrawn, onWithdrawn }: { app: Application;
   const generateReport = async () => {
     const d = await generateReviewOnlyReport(app.id);
     say(t("Review-only report generated"), { type: "success" });
-    window.location.assign(`/deliveries/${d.id}`);
+    navigate(`/deliveries/${d.id}`);
   };
   const [confirmDecline, setConfirmDecline] = useState(false);
   const decline = async () => {
