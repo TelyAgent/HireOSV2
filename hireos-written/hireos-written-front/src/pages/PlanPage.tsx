@@ -317,7 +317,7 @@ export function PlanPage() {
             attemptId={selectedAttemptId}
             inline
             movesCaseStatus={isSelectedLatest}
-            onFinalized={forceTick}
+            onFinalized={() => void reload()}
             onViewFinalResult={() => setActiveTab("result")}
           />
         ) : (
@@ -336,7 +336,7 @@ export function PlanPage() {
             isLatestRound={isSelectedLatest && !draftRound}
             inline
             onGoToPlan={() => void startSupplementalRound()}
-            onChanged={forceTick}
+            onChanged={() => void reload()}
           />
         ) : (
           <EmptyState title="No finalized result for this round yet." />

@@ -137,13 +137,15 @@ export function applyRealEvaluation(caseId: string, invitation: RealInvitation):
     }
     const resultId = `result_${key}`;
     const relId = `rel_${key}`;
-    const released = !!(submission.release && submission.releasedAt);
+    // Never downgrade: a result published in this session stays published even if `invitation` is an
+    // older fetch from before the publish (this runs on every render).
+    const released = !!(submission.release && submission.releasedAt) || RESULTS[resultId]?.status === "published";
     RESULTS[resultId] = {
       id: resultId, caseId, evaluationId, overall: final.overall, status: released ? "published" : "final_not_released",
       releaseId: released ? relId : null, invitationId: invitation.id, round: invitation.round,
     };
-    if (released) {
-      RELEASES[relId] = { ...RELEASES[relId], id: relId, caseId, ...submission.release!, publishedAt: submission.releasedAt! };
+    if (submission.release && submission.releasedAt) {
+      RELEASES[relId] = { ...RELEASES[relId], id: relId, caseId, ...submission.release, publishedAt: submission.releasedAt };
     }
     return attemptId;
   }

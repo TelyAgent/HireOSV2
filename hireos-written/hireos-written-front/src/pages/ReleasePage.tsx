@@ -70,7 +70,8 @@ export function ReleaseContent({
   const inv = Object.values(INVITATIONS).find((i) => i.caseId === caseId);
   const disclosure = inv ? inv.disclosurePolicy : "score_and_summary";
 
-  function publish() {
+  async function publish() {
+    if (busy) return;
     if (!chk1 || !chk2) {
       say("Both review and disclosure approval are required to publish.", { type: "danger" });
       return;
@@ -91,8 +92,14 @@ export function ReleaseContent({
     // completed" and keeps it after a reload. Fixture-only demo cases stay in-memory only.
     if (result!.invitationId) {
       const { overall, showScore, outcomeText, feedbackText, nextStepText } = rel;
-      releaseCaseResult(caseId, { overall, showScore, outcomeText, feedbackText, nextStepText, invitationId: result!.invitationId })
-        .catch(() => say(t("Could not save to the server. Please refresh and try again."), { type: "danger" }));
+      setBusy(true);
+      try {
+        await releaseCaseResult(caseId, { overall, showScore, outcomeText, feedbackText, nextStepText, invitationId: result!.invitationId });
+      } catch {
+        say(t("Could not save to the server. Please refresh and try again."), { type: "danger" });
+      } finally {
+        setBusy(false);
+      }
     }
     forceTick();
     onChanged?.();
@@ -178,7 +185,7 @@ export function ReleaseContent({
           <label className="checkbox-row" style={{ marginBottom: 12, display: "flex" }}>
             <input type="checkbox" checked={chk2} onChange={(e) => setChk2(e.target.checked)} /> {t("Disclosure content approved for release")}
           </label>
-          <Button variant="primary" onClick={publish}>{t("Finalize & publish result")}</Button>
+          <Button variant="primary" disabled={busy} onClick={() => void publish()}>{t("Finalize & publish result")}</Button>
         </div>
       ) : (
         <>
