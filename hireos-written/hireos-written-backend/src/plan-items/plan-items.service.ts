@@ -1,8 +1,8 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../persistence/prisma.service';
 import type { Identity } from '../auth/workspace.guard';
 import type { CreatePlanItemDto, UpdatePlanItemDto } from './plan-item.dto';
-import { assertCaseOpen, assertPlanItemEditable } from '../invitations/rounds';
+import { assertCaseOpen, assertPlanItemEditable, hasDraftRound } from '../invitations/rounds';
 
 @Injectable()
 export class PlanItemsService {
@@ -51,7 +51,15 @@ export class PlanItemsService {
     const kase = await this.db.case.findFirst({ where: { id: caseId, workspaceId: identity.workspaceId } });
     if (!kase) throw new NotFoundException({ code: 'CASE_NOT_FOUND' });
     assertCaseOpen(kase.status);
-    // New questions always go into the draft round (invitationId stays null until it is sent).
+    // New questions always go into the draft round (invitationId stays null until it is sent) -- which
+    // must exist: after a send, a new one only opens via "Add supplemental test" (rounds/draft).
+    const [roundsSent, draftItems] = await Promise.all([
+      this.db.invitation.count({ where: { caseId, workspaceId: identity.workspaceId } }),
+      this.db.planItem.count({ where: { caseId, workspaceId: identity.workspaceId, invitationId: null } }),
+    ]);
+    if (!hasDraftRound({ roundsSent, draftRoundOpen: kase.draftRoundOpen, draftItems })) {
+      throw new ConflictException({ code: 'NO_DRAFT_ROUND', message: 'Open a supplemental round before adding questions.' });
+    }
 
     const item = await this.db.planItem.create({
       data: {

@@ -155,3 +155,19 @@ test('AC-5: finalizing an older round touches only that round and never moves th
   assert.equal(db.case.rows[0].status, 'finalized', 'the latest round moves the case');
   await assert.rejects(invitations.finalizeEvaluation(identity, 'c1', { ...dto, invitationId: 'inv-r2' }), (e) => code(e) === 'ALREADY_FINALIZED');
 });
+
+test('a question can only be added while a draft round is open', async () => {
+  const { planItems, db } = setup({ status: 'review_pending', invitations: [{ ...round1, submission: { id: 's1', answers: [] } }] });
+  const item = { kind: 'required', questionCode: 'Q', questionTitle: 'T', questionPrompt: 'P' };
+  await assert.rejects(planItems.create(identity, 'c1', item), (e) => code(e) === 'NO_DRAFT_ROUND');
+  assert.equal(db.planItem.rows.length, 0, 'no stray draft item that would bypass the finalize-first rule');
+  const open = setup({ draftRoundOpen: true, invitations: [round1] });
+  await open.planItems.create(identity, 'c1', item);
+  assert.ok(!open.db.planItem.rows[0].invitationId, 'lands in the draft round');
+});
+
+test('a concurrent second send of the same round is a readable 409, not a 500', async () => {
+  const { invitations, db } = setup({ draftRoundOpen: true, invitations: [round1], planItems: [{ id: 'new', workspaceId: WS, caseId: 'c1', invitationId: null }] });
+  db.$transaction = async () => { throw Object.assign(new Error('Unique constraint failed'), { code: 'P2002' }); };
+  await assert.rejects(invitations.create(identity, 'c1', sendDto), (e) => e.getStatus() === 409 && code(e) === 'ROUND_ALREADY_SENT');
+});

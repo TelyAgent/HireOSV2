@@ -33,6 +33,8 @@ export class InvitationsService {
     assertCaseOpen(kase.status);
 
     // #48: this send turns the case's draft round into round N -- its questions are frozen with it.
+    // A concurrent second send computes the same round number and hits the (caseId, round) unique
+    // index; that is reported as a 409, not a 500.
     const invitation = await this.db.$transaction(async (tx) => {
       const sent = await tx.invitation.findMany({ where: { caseId, workspaceId: identity.workspaceId }, select: { round: true } });
       const draftItems = await tx.planItem.findMany({ where: { caseId, workspaceId: identity.workspaceId, invitationId: null }, select: { id: true } });
@@ -53,6 +55,11 @@ export class InvitationsService {
       await tx.planItem.updateMany({ where: { id: { in: draftItems.map((i) => i.id) } }, data: { invitationId: created.id } });
       await tx.case.update({ where: { id: caseId }, data: { draftRoundOpen: false } });
       return created;
+    }).catch((error: unknown) => {
+      if ((error as { code?: string })?.code === 'P2002') {
+        throw new ConflictException({ code: 'ROUND_ALREADY_SENT', message: 'This round was just sent. Refresh to see it.' });
+      }
+      throw error;
     });
     // A supplemental round re-enters the normal flow: sent -> awaiting submission -> review (AC-7).
     await this.lifecycle.advance(caseId, 'invited');
