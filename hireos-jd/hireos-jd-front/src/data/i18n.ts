@@ -1109,6 +1109,12 @@ export const ZH: Record<string, string> = {
   "Please enter a work location.": "请输入工作地点。",
   "Please add at least one responsibility.": "请至少填写一条职责。",
   "Please add at least one requirement.": "请至少填写一条要求。",
+  /* #34 — create job failure */
+  "The job was not created — %s": "职位未创建 —— %s",
+  "Nothing was saved and your input is kept.": "没有保存任何内容，你填写的信息都还在。",
+  "Retry": "重试",
+  "Creating…": "创建中…",
+  "This conversation has expired — start a new one.": "这个会话已失效，请新建一个会话。",
 };
 
 /**
