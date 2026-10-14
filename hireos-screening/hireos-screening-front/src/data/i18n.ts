@@ -1004,6 +1004,25 @@ export const ZH: Record<string, string> = {
   "Back to edit": "返回修改",
   "Submitting…": "提交中…",
   "Outcome": "结论",
+  /* #19 — evaluation metadata & snapshot history */
+  "AI": "AI",
+  "model not recorded": "未记录模型",
+  "Rule-based (no AI)": "规则评估（未使用 AI）",
+  "Not recorded": "未记录",
+  "Snapshot history": "历史快照",
+  "Generated": "生成时间",
+  "Scored by": "评估方式",
+  "Current": "当前",
+  "View": "查看",
+  "This snapshot could not be loaded — check your connection and try again.": "快照加载失败，请检查网络后重试。",
+  "Weight": "权重",
+  "Score": "分数",
+  "Inputs unchanged — kept the previous evaluation ({n} snapshots in history)": "输入未变化，沿用上次评估结果（历史共 {n} 个快照）",
+  "New snapshot created ({n} snapshots in history) — earlier results are kept": "已创建新快照（历史共 {n} 个快照），此前的结果均已保留",
+  "The AI evaluation call failed — nothing was saved. Retry in a moment.": "AI 评估调用失败，未保存任何结果，请稍后重试。",
+  "Confirm the job criteria before running screening.": "请先确认职位评分标准，再运行初筛。",
+  "The resume hasn’t been parsed yet — wait for parsing to finish, then retry.": "简历尚未解析完成，请等解析结束后重试。",
+  "This result was scored by local rules, not AI (AI isn’t configured or the resume has no readable text). Treat it as a rough guide only.": "该结果由本地规则估算，未使用 AI（未配置 AI 或简历没有可读文本），仅供粗略参考。",
 };
 
 export function translate(lang: "en" | "zh", source: string, key?: string): string {

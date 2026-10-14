@@ -26,8 +26,9 @@ export interface Evaluation {
   applicationId: string;
   version?: number;
   status: "completed";
-  evaluationMode: "ai_assisted" | "manual";
-  aiStatus: "available" | "unavailable" | "not_requested";
+  /** ai: scored by the model; rules: local rule-based fallback (no AI); manual / ai_assisted: legacy values. */
+  evaluationMode: "ai" | "rules" | "ai_assisted" | "manual";
+  aiStatus: "succeeded" | "not_used" | "failed" | "available" | "unavailable" | "not_requested";
   eligibilityStatus: EligibilityStatus;
   eligibilityResults: EligibilityResult[];
   overall: number | null;
