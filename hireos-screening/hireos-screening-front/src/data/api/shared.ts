@@ -2,9 +2,12 @@ import { authFetch } from "../../lib/session";
 
 export class ApiError extends Error {
   code: string;
-  constructor(code: string, message?: string) {
+  /** The rest of the error body, e.g. `target` on HANDOFF_ALREADY_SENT. */
+  details: Record<string, unknown>;
+  constructor(code: string, message?: string, details: Record<string, unknown> = {}) {
     super(message ?? code);
     this.code = code;
+    this.details = details;
   }
 }
 
@@ -27,8 +30,8 @@ export async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> 
   });
   const body = await parseResponse(response) as { code?: string; message?: string } | T;
   if (!response.ok) {
-    const errorBody = body as { code?: string; message?: string };
-    throw new ApiError(errorBody.code || `HTTP_${response.status}`, errorBody.message || `Request failed (${response.status})`);
+    const errorBody = (body && typeof body === "object" ? body : {}) as { code?: string; message?: string } & Record<string, unknown>;
+    throw new ApiError(errorBody.code || `HTTP_${response.status}`, errorBody.message || `Request failed (${response.status})`, errorBody);
   }
   return body as T;
 }

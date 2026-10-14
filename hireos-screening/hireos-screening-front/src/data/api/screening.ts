@@ -14,6 +14,8 @@ export interface ApplicationDetail {
   verificationItems: VerificationItem[];
   humanAssessments: HumanAssessment[];
   decision: (typeof db.decisions)[string] | null;
+  /** Earlier decisions that were withdrawn (issue #23), newest first. */
+  withdrawnDecisions?: (typeof db.decisions)[string][];
   /** A screening run for this application is still in progress on the server. */
   screeningInProgress?: boolean;
 }
@@ -40,6 +42,7 @@ export async function getApplicationDetail(id: string): Promise<ApplicationDetai
   for (const item of detail.verificationItems) db.verificationItems[item.id] = item;
   db.humanAssessments[id] = detail.humanAssessments;
   if (detail.decision) db.decisions[id] = detail.decision;
+  else delete db.decisions[id];
   return detail;
 }
 

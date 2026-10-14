@@ -24,6 +24,7 @@ import { Button, EmptyState, PageHeader } from "../components/ui/Primitives";
 import { Modal } from "../components/ui/Overlays";
 import { Icon } from "../components/ui/Icons";
 import { NoJobState, latestParseStatus } from "./CandidateProfilePage";
+import { PageSkeleton } from "../components/ui/PageSkeleton";
 
 function ChooseAnotherRoleModal({
   candidate,
@@ -188,7 +189,7 @@ export function JobRecommendationsPage() {
     load();
   }, [load]);
 
-  if (detail === undefined) return null;
+  if (detail === undefined) return <PageSkeleton />;
   if (detail === null) return <EmptyState icon="person_off" title={t("Candidate not found")} />;
 
   const { candidate, recommendations, applications, jobDiscovery: jd } = detail;

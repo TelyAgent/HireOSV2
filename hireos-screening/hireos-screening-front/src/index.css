@@ -602,3 +602,8 @@ a:focus-visible,button:focus-visible,[tabindex]:focus-visible,input:focus-visibl
 .with-disabled-reason.align-end .disabled-reason { text-align: right; }
 .criteria-guide { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; padding: 12px 16px; margin-bottom: 16px; border-radius: 12px; background: var(--warning-bg); border: 1px solid var(--warning-border); color: var(--warning-text); font-size: var(--fs-sm); }
 .criteria-guide a { margin-left: auto; font-weight: 600; color: inherit; }
+.decision-summary { display: grid; grid-template-columns: max-content 1fr; gap: 6px 16px; margin: 0; font-size: var(--fs-sm); }
+.decision-summary dt { color: var(--text-tertiary); }
+.decision-summary dd { margin: 0; white-space: pre-wrap; word-break: break-word; }
+.withdrawn-decision { padding: 10px 0; border-top: 1px solid var(--border); }
+.withdrawn-decision:first-of-type { border-top: 0; padding-top: 0; }

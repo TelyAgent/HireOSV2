@@ -6,6 +6,7 @@ import type { DuplicateReview, DuplicateResolutionOutcome } from "../data/fixtur
 import { getCandidate, getPerson } from "../data/db";
 import { fmtDateTime } from "../lib/format";
 import { Button, EmptyState, PageHeader } from "../components/ui/Primitives";
+import { PageSkeleton } from "../components/ui/PageSkeleton";
 
 const KIND_COPY: Record<string, { title: string; desc: string }> = {
   exact_file: { title: "This file already exists", desc: "File content is byte-identical to a file already on record. It can be reused; this upload is still kept as a new source in history." },
@@ -35,7 +36,7 @@ export function DuplicateDetailPage() {
     }
   };
 
-  if (review === undefined) return null;
+  if (review === undefined) return <PageSkeleton />;
 
   if (review === null) {
     return (
