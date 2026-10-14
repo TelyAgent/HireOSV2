@@ -451,6 +451,10 @@ export const ZH: Record<string, string> = {
   "Scores by round": "各轮得分",
   "No finalized result for this round yet.": "本轮还没有定稿结果。",
   "The test could not be sent. Please refresh and try again.": "测试发送失败，请刷新后重试。",
+  "Sender:": "发件邮箱：",
+  "Change in Settings": "在设置中更改",
+  "No corporate mailbox is set up, so no email will be sent — you'll get a link to send yourself.": "尚未配置企业邮箱，不会自动发送邮件；发送后会给你一个链接，需自行发给候选人。",
+  "Set one up in Settings": "去设置中配置",
 };
 
 export function translate(lang: "en" | "zh", source: string): string {

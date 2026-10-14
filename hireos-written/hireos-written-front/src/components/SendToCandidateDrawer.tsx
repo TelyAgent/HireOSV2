@@ -4,7 +4,7 @@ import { Drawer } from "antd";
 import { useStore } from "../store/StoreContext";
 import { Button } from "./ui/Primitives";
 import { API_BASE_URL } from "../utils/apiBase";
-import { createInvitation } from "../data/writtenApi";
+import { createInvitation, listMailAccounts, type MailAccount } from "../data/writtenApi";
 import { CASES, CORE_APPLICATIONS, CORE_JOBS, CORE_CANDIDATES, INVITATIONS, QUESTIONS, type PlanItem, type Round } from "../data/fixtures";
 
 type Step = "form" | "preview" | "sent";
@@ -48,6 +48,21 @@ export function SendToCandidateDrawer({
   const [sentLink, setSentLink] = useState<string | null>(null);
   const [emailSent, setEmailSent] = useState(false);
   const [emailError, setEmailError] = useState<string | null>(null);
+
+  // The mailbox the backend will actually send from: its first enabled account, oldest first
+  // (MailAccountsService.sendFromWorkspaceAccount) -- shown so HR can see the sender before sending.
+  const [sender, setSender] = useState<MailAccount | null | undefined>(undefined);
+  useEffect(() => {
+    if (!open) return;
+    let cancelled = false;
+    setSender(undefined);
+    listMailAccounts()
+      .then((accounts) => { if (!cancelled) setSender(accounts.find((a) => a.enabled) ?? null); })
+      .catch(() => { if (!cancelled) setSender(null); });
+    return () => {
+      cancelled = true;
+    };
+  }, [open]);
 
   useEffect(() => {
     if (!open) return;
@@ -201,9 +216,15 @@ export function SendToCandidateDrawer({
             </div>
           </div>
 
-          <div className="banner info tiny">
-            {t("The email will be sent from the corporate mailbox configured in")} <Link to="/settings">{t("Settings")}</Link>.
-          </div>
+          {sender === undefined ? null : sender ? (
+            <div className="banner info tiny">
+              {t("Sender:")} <b>{sender.name ? `${sender.name} <${sender.email}>` : sender.email}</b> · <Link to="/settings">{t("Change in Settings")}</Link>
+            </div>
+          ) : (
+            <div className="banner warning tiny">
+              {t("No corporate mailbox is set up, so no email will be sent — you'll get a link to send yourself.")} <Link to="/settings">{t("Set one up in Settings")}</Link>
+            </div>
+          )}
         </>
       )}
 
