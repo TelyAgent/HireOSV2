@@ -54,7 +54,7 @@ export class CandidatesService {
       }
       let profile = await tx.candidateProfile.findFirst({ where: { candidateId: created.id }, orderBy: { version: 'desc' } });
       if (!profile && (input.location || input.notes)) {
-        const missingFields = ['compensation_expectation', 'work_authorization'];
+        const missingFields = ['compensation_expectation'];
         if (!input.location) missingFields.push('location');
         profile = await tx.candidateProfile.create({
           data: {
@@ -216,7 +216,8 @@ export class CandidatesService {
       retention: candidate.retention,
       libraryStatus: 'available' as const,
       compensationExpectation: compensation,
-      missingFields: asArray(profile?.missingFields).map(String),
+      // Profiles parsed before work authorization stopped counting as missing still carry it.
+      missingFields: asArray(profile?.missingFields).map(String).filter((field) => field !== 'work_authorization'),
       employment: asArray(profile?.employmentHistory),
       skills: asArray(profile?.skills).map((skill) => typeof skill === 'object' && skill && 'name' in skill ? String(skill.name) : String(skill)),
       education: asArray(profile?.education),

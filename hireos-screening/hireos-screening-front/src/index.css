@@ -157,7 +157,7 @@ table.data-table{ width:100%; border-collapse:collapse; font-size:var(--fs-sm); 
 /* ---------- Forms ---------- */
 .field{ margin-bottom:16px; }
 .field label{ display:block; font-size:var(--fs-xs); font-weight:600; color:var(--text-secondary); margin-bottom:6px; text-transform:uppercase; letter-spacing:.03em; }
-.field input[type=text], .field input[type=search], .field input[type=email], .field input[type=number], .field input[type=password], .field select, .field textarea{
+.field input[type=text], .field input[type=search], .field input[type=email], .field input[type=tel], .field input[type=number], .field input[type=password], .field select, .field textarea{
   width:100%; padding:9px 12px; border:1px solid var(--border-strong); border-radius:6px; background:var(--surface); color:var(--text); font-size:var(--fs-sm); font-family:inherit;
 }
 .field textarea{ resize:vertical; min-height:80px; }
@@ -396,7 +396,7 @@ body{ letter-spacing:-.006em; }
 .underline-tabs{ min-height:38px; gap:20px; overflow-x:auto; }
 .u-tab{ min-height:38px; padding:9px 2px; border-bottom-width:2px; }
 .field{ margin-bottom:14px; }
-.field input[type=text],.field input[type=search],.field input[type=email],.field input[type=number],.field input[type=password],.field select,.field textarea{ padding:8px 10px; border-radius:9px; }
+.field input[type=text],.field input[type=search],.field input[type=email],.field input[type=tel],.field input[type=number],.field input[type=password],.field select,.field textarea{ padding:8px 10px; border-radius:9px; }
 input[type="checkbox"],input[type="radio"]{ accent-color:var(--accent-600); }
 .score-ring{ color:var(--score-on); }
 

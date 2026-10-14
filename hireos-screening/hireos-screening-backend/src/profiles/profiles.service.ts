@@ -18,6 +18,9 @@ const MAX_ATTEMPTS = 3;
 const RETRY_BASE_DELAY_MS = 30_000;
 const NON_RETRYABLE_ERRORS = new Set(['SOURCE_MATERIAL_NOT_READY', 'AI_NOT_CONFIGURED']);
 
+/** Currencies offered when correcting a salary expectation. */
+export const COMPENSATION_CURRENCIES = ['CNY', 'USD', 'HKD', 'EUR', 'GBP', 'SGD', 'JPY'] as const;
+
 @Injectable()
 export class ProfilesService implements OnModuleInit, OnModuleDestroy {
   private timer?: ReturnType<typeof globalThis.setInterval>;
@@ -76,11 +79,18 @@ export class ProfilesService implements OnModuleInit, OnModuleDestroy {
 
   async correct(identity: Identity, candidateId: string, raw: unknown) {
     const input = z.object({
+      displayName: z.string().trim().min(1).max(200).optional(),
+      // An empty string clears a wrongly parsed contact rather than leaving it in place.
+      email: z.union([z.literal(''), z.string().trim().toLowerCase().email().max(320)]).optional(),
+      phone: z.union([z.literal(''), z.string().trim().regex(/^\+?[\d\s()-]{5,40}$/)]).optional(),
       location: z.string().trim().max(200).optional(),
-      compensationMin: z.number().finite().optional(),
-      compensationMax: z.number().finite().optional(),
+      compensationMin: z.number().finite().nonnegative().optional(),
+      compensationMax: z.number().finite().nonnegative().optional(),
+      compensationCurrency: z.enum(COMPENSATION_CURRENCIES).optional(),
       reason: z.string().trim().min(1).max(1000),
-    }).strict().safeParse(raw);
+    }).strict().refine((v) => (v.compensationMin == null) === (v.compensationMax == null), { message: 'min and max go together' })
+      .refine((v) => v.compensationMin == null || v.compensationMax! >= v.compensationMin, { message: 'max below min' })
+      .safeParse(raw);
     if (!input.success) throw new BadRequestException({ code: 'INVALID_INPUT' });
     const candidate = await this.db.candidate.findFirst({
       where: { id: candidateId, workspaceId: identity.workspaceId },
@@ -89,22 +99,54 @@ export class ProfilesService implements OnModuleInit, OnModuleDestroy {
     if (!candidate) throw new NotFoundException({ code: 'NOT_FOUND' });
     const current = candidate.profiles[0];
     if (!current) throw new BadRequestException({ code: 'PROFILE_NOT_READY' });
-    const nextLocation = input.data.location
-      ? { value: input.data.location, status: 'known', evidence: { source: 'human_correction', actorId: identity.actorId } }
+
+    // Only fields whose value actually changes are corrected and logged.
+    const data = input.data;
+    const currentLocation = (asRecord(current.location)?.value as string | undefined) ?? '';
+    const currentCompensation = asRecord(current.compensationExpectation);
+    const changed = {
+      displayName: data.displayName !== undefined && data.displayName !== (current.displayName || candidate.displayName),
+      email: data.email !== undefined && data.email !== (candidate.email ?? ''),
+      phone: data.phone !== undefined && data.phone !== (candidate.phone ?? ''),
+      location: !!data.location && data.location !== currentLocation,
+      compensation: data.compensationMin != null && (
+        data.compensationMin !== currentCompensation?.min || data.compensationMax !== currentCompensation?.max ||
+        (data.compensationCurrency ?? 'CNY') !== currentCompensation?.currency || currentCompensation?.period !== 'month'
+      ),
+    };
+    const fieldPaths = [
+      ...(changed.displayName ? ['display_name'] : []),
+      ...(changed.email ? ['email'] : []),
+      ...(changed.phone ? ['phone'] : []),
+      ...(changed.location ? ['location'] : []),
+      ...(changed.compensation ? ['compensation_expectation'] : []),
+    ];
+    if (!fieldPaths.length) throw new BadRequestException({ code: 'NO_CHANGES' });
+
+    const nextLocation = changed.location
+      ? { value: data.location, status: 'known', evidence: { source: 'human_correction', actorId: identity.actorId } }
       : current.location;
-    const nextCompensation = input.data.compensationMin != null && input.data.compensationMax != null
-      ? { min: input.data.compensationMin, max: input.data.compensationMax, currency: 'USD', period: 'year', basis: 'gross', status: 'known' }
+    // Salary expectations are recorded per month (as written in résumés here); currency is chosen.
+    const nextCompensation = changed.compensation
+      ? { min: data.compensationMin, max: data.compensationMax, currency: data.compensationCurrency ?? 'CNY', period: 'month', basis: 'gross', status: 'known' }
       : current.compensationExpectation;
+    const correctedAt = new Date().toISOString();
     const corrections = [
       ...asArray(current.corrections),
-      {
-        fieldPath: input.data.location ? 'location' : 'compensation_expectation',
-        reason: input.data.reason,
-        correctedBy: identity.actorId,
-        correctedAt: new Date().toISOString(),
-      },
+      ...fieldPaths.map((fieldPath) => ({ fieldPath, reason: data.reason, correctedBy: identity.actorId, correctedAt })),
     ];
     const profile = await this.db.$transaction(async (tx) => {
+      // Name and contacts live on the Candidate identity record; the profile keeps its own name copy.
+      if (changed.displayName || changed.email || changed.phone) {
+        await tx.candidate.update({
+          where: { id: candidateId },
+          data: {
+            ...(changed.displayName ? { displayName: data.displayName } : {}),
+            ...(changed.email ? { email: data.email || null } : {}),
+            ...(changed.phone ? { phone: data.phone || null } : {}),
+          },
+        });
+      }
       const created = await tx.candidateProfile.create({
         data: {
           workspaceId: identity.workspaceId,
@@ -114,7 +156,7 @@ export class ProfilesService implements OnModuleInit, OnModuleDestroy {
           parseStatus: 'succeeded',
           dataStatus: current.dataStatus,
           parserVersion: current.parserVersion,
-          displayName: current.displayName,
+          displayName: changed.displayName ? data.displayName! : current.displayName,
           sourceEntries: toJson(current.sourceEntries),
           resumeVersionRefs: toJson(current.resumeVersionRefs),
           employmentHistory: toJson(current.employmentHistory),
@@ -126,8 +168,8 @@ export class ProfilesService implements OnModuleInit, OnModuleDestroy {
           workAuthorization: toJson(current.workAuthorization),
           languages: toJson(current.languages),
           ...(nextCompensation ? { compensationExpectation: toJson(nextCompensation) } : {}),
-          missingFields: toJson(asArray(current.missingFields).filter((field) => (
-            field !== (input.data.location ? 'location' : 'compensation_expectation')
+          missingFields: toJson(asArray(current.missingFields).filter((field) => !(
+            (field === 'location' && changed.location) || (field === 'compensation_expectation' && changed.compensation)
           ))),
           corrections: toJson(corrections),
         },
@@ -139,7 +181,7 @@ export class ProfilesService implements OnModuleInit, OnModuleDestroy {
           action: 'candidate_profile_corrected',
           objectType: 'CandidateProfile',
           objectId: created.id,
-          payload: { candidateId, reason: input.data.reason },
+          payload: { candidateId, reason: data.reason, fields: fieldPaths },
         },
       });
       return created;
@@ -342,7 +384,8 @@ export class ProfilesService implements OnModuleInit, OnModuleDestroy {
     const ai = await this.aiParser.parse(material.text, fallbackName);
     const missingFields = [
       ...(ai.location.status === 'unknown' ? ['location'] : []),
-      ...(ai.workAuthorization.status === 'unknown' ? ['work_authorization'] : []),
+      // Work authorization is still parsed but never flagged as missing: most roles here are
+      // domestic, where résumés don't state it and its absence means nothing.
       ...(ai.employmentHistory.length ? [] : ['employment_history']),
       ...(ai.education.length ? [] : ['education']),
       ...(ai.compensationExpectation ? [] : ['compensation_expectation']),
@@ -367,6 +410,10 @@ export class ProfilesService implements OnModuleInit, OnModuleDestroy {
       parserVersion: 'ai-resume-parser-v1' as const,
     };
   }
+}
+
+function asRecord(value: unknown): Record<string, unknown> | null {
+  return value && typeof value === 'object' && !Array.isArray(value) ? value as Record<string, unknown> : null;
 }
 
 function asArray(value: unknown): unknown[] {

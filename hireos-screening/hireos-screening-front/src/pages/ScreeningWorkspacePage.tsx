@@ -413,7 +413,9 @@ export function ScreeningWorkspacePage() {
                       <td>
                         {c.reason === "below_threshold" ? <Badge tone="outline">{t("Below threshold")}</Badge> : <Badge tone="neutral">{t("Dismissed")}</Badge>}
                       </td>
-                      <td className="secondary-copy">{c.rationale}</td>
+                      <td>
+                        <div className="secondary-copy" title={c.rationale}>{c.rationale}</div>
+                      </td>
                       <td className="text-right">
                         <Link className="btn btn-sm btn-secondary" to={`/candidates/${c.candidateId}`} onClick={(e) => e.stopPropagation()}>
                           {t("Open", "Open (action)")}
@@ -459,7 +461,9 @@ function RecommendationRow({ recommendation, confidence }: { recommendation: Job
       <td>
         <span className="confidence-chip">{confidence}</span>
       </td>
-      <td className="secondary-copy">{recommendation.rationale}</td>
+      <td>
+        <div className="secondary-copy" title={recommendation.rationale}>{recommendation.rationale}</div>
+      </td>
       <td className="text-right">
         <Link className="btn btn-sm btn-primary" to={`/candidates/${recommendation.candidateId}/jobs`} onClick={(e) => e.stopPropagation()}>
           {t("Review", "Review (action)")}

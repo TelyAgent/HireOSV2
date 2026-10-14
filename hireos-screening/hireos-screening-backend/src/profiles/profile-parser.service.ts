@@ -74,7 +74,6 @@ export class ProfileParserService {
       compensationExpectation: null,
       missingFields: [
         ...(location ? [] : ['location']),
-        ...(workAuthorization ? [] : ['work_authorization']),
         'employment_history',
         'education',
         'compensation_expectation',

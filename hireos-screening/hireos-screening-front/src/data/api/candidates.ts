@@ -48,10 +48,19 @@ export async function getCandidateDetail(id: string): Promise<CandidateDetail> {
   return { ...detail, jobDiscovery: toJobDiscovery(detail.matching) };
 }
 
+/** Currencies the backend accepts for a corrected salary expectation (always per month). */
+export const COMPENSATION_CURRENCIES = ["CNY", "USD", "HKD", "EUR", "GBP", "SGD", "JPY"] as const;
+export type CompensationCurrency = (typeof COMPENSATION_CURRENCIES)[number];
+
 export interface CorrectProfileInput {
+  displayName?: string;
+  /** "" clears a wrongly parsed value. */
+  email?: string;
+  phone?: string;
   location?: string;
   compensationMin?: number;
   compensationMax?: number;
+  compensationCurrency?: CompensationCurrency;
   reason: string;
 }
 

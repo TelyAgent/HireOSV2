@@ -1,7 +1,14 @@
 import { useCallback, useEffect, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { useStore } from "../store/StoreContext";
-import { getCandidateDetail, correctProfile, reparseCandidate, type CandidateDetail } from "../data/api/candidates";
+import {
+  getCandidateDetail,
+  correctProfile,
+  reparseCandidate,
+  COMPENSATION_CURRENCIES,
+  type CandidateDetail,
+  type CompensationCurrency,
+} from "../data/api/candidates";
 import { runMatchAgain } from "../data/api/library";
 import { ApiError } from "../data/api/shared";
 import { db, getJob, getPerson } from "../data/db";
@@ -135,25 +142,52 @@ export function NoJobState({
 
 function CorrectProfileModal({ candidate, onClose, onSaved }: { candidate: Candidate; onClose: () => void; onSaved: () => void }) {
   const { t, say } = useStore();
+  // Only a monthly figure can prefill the monthly fields; yearly ones start empty (left empty = unchanged).
+  const comp = candidate.compensationExpectation?.period === "month" ? candidate.compensationExpectation : null;
+  const [name, setName] = useState(candidate.displayName);
+  const [email, setEmail] = useState(candidate.contact.email);
+  const [phone, setPhone] = useState(candidate.contact.phone);
   const [location, setLocation] = useState(candidate.contact.location.value);
-  const [min, setMin] = useState(candidate.compensationExpectation ? String(candidate.compensationExpectation.min) : "");
-  const [max, setMax] = useState(candidate.compensationExpectation ? String(candidate.compensationExpectation.max) : "");
+  const [currency, setCurrency] = useState<CompensationCurrency>(
+    COMPENSATION_CURRENCIES.find((c) => c === comp?.currency) ?? "CNY",
+  );
+  const [min, setMin] = useState(comp?.min != null ? String(comp.min) : "");
+  const [max, setMax] = useState(comp?.max != null ? String(comp.max) : "");
   const [reason, setReason] = useState("");
-  const amount = (v: string) => (v.trim() && !/^\d+$/.test(v.trim()) ? t("Enter a whole number, e.g. 160000.") : null);
+  const [saving, setSaving] = useState(false);
+  const amount = (v: string) => (v.trim() && !/^\d+$/.test(v.trim()) ? t("Enter a whole number, e.g. 30000.") : null);
   const fields = useFieldValidation({
-    min: () => amount(min),
-    max: () => amount(max) ?? (min.trim() && max.trim() && Number(max) < Number(min) ? t("The maximum can't be lower than the minimum.") : null),
+    name: () => (!name.trim() ? t("Name can't be empty.") : null),
+    email: () => (email.trim() && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim()) ? t("Enter a valid email address.") : null),
+    phone: () => (phone.trim() && !/^\+?[\d\s()-]{5,40}$/.test(phone.trim()) ? t("Enter a valid phone number.") : null),
+    min: () => amount(min) ?? (!min.trim() && max.trim() ? t("Enter both the minimum and the maximum.") : null),
+    max: () =>
+      amount(max) ??
+      (min.trim() && !max.trim() ? t("Enter both the minimum and the maximum.") : null) ??
+      (min.trim() && max.trim() && Number(max) < Number(min) ? t("The maximum can't be lower than the minimum.") : null),
     reason: () => (!reason.trim() ? t("Say why the profile is being corrected — it is kept in the log.") : null),
   });
 
   const save = async () => {
     if (!fields.validateAll()) return;
-    await correctProfile(candidate.id, {
-      location: location.trim() || undefined,
-      compensationMin: min.trim() ? parseInt(min, 10) : undefined,
-      compensationMax: max.trim() ? parseInt(max, 10) : undefined,
-      reason: reason.trim(),
-    });
+    setSaving(true);
+    try {
+      await correctProfile(candidate.id, {
+        displayName: name.trim(),
+        email: email.trim(),
+        phone: phone.trim(),
+        location: location.trim() || undefined,
+        ...(min.trim() && max.trim()
+          ? { compensationMin: parseInt(min, 10), compensationMax: parseInt(max, 10), compensationCurrency: currency }
+          : {}),
+        reason: reason.trim(),
+      });
+    } catch (error) {
+      const code = error instanceof ApiError ? error.code : "";
+      say(code === "NO_CHANGES" ? t("Nothing was changed.") : t("Couldn't save the correction. Check the fields and try again."), { type: "error" });
+      setSaving(false);
+      return;
+    }
     onClose();
     say(t("Profile corrected — affected screenings marked stale for refresh"), { type: "success" });
     onSaved();
@@ -169,7 +203,7 @@ function CorrectProfileModal({ candidate, onClose, onSaved }: { candidate: Candi
           <Button variant="secondary" onClick={onClose}>
             {t("Cancel")}
           </Button>
-          <Button variant="primary" onClick={save}>
+          <Button variant="primary" onClick={save} disabled={saving}>
             {t("Save correction")}
           </Button>
         </>
@@ -179,18 +213,45 @@ function CorrectProfileModal({ candidate, onClose, onSaved }: { candidate: Candi
         {t("Corrections create a new profile snapshot and are logged with a reason. They don’t rewrite the original source material.")}
       </p>
       <div className="field">
+        <label htmlFor={fields.labelFor("name")}>{t("Name")}</label>
+        <input type="text" {...fields.field("name")} value={name} onChange={(e) => setName(e.target.value)} />
+        {fields.error("name")}
+      </div>
+      <div className="flex gap-16">
+        <div className="field" style={{ flex: 1 }}>
+          <label htmlFor={fields.labelFor("email")}>{t("Email")}</label>
+          <input type="email" {...fields.field("email", { required: false })} value={email} onChange={(e) => setEmail(e.target.value)} />
+          {fields.error("email")}
+        </div>
+        <div className="field" style={{ flex: 1 }}>
+          <label htmlFor={fields.labelFor("phone")}>{t("Phone")}</label>
+          <input type="tel" {...fields.field("phone", { required: false })} value={phone} onChange={(e) => setPhone(e.target.value)} />
+          {fields.error("phone")}
+        </div>
+      </div>
+      <div className="field">
         <label>{t("Location")}</label>
         <input type="text" value={location} onChange={(e) => setLocation(e.target.value)} />
       </div>
       <div className="flex gap-16">
+        <div className="field" style={{ width: 120 }}>
+          <label>{t("Currency")}</label>
+          <select value={currency} onChange={(e) => setCurrency(e.target.value as CompensationCurrency)}>
+            {COMPENSATION_CURRENCIES.map((c) => (
+              <option key={c} value={c}>
+                {t(c, `currency.${c}`)}
+              </option>
+            ))}
+          </select>
+        </div>
         <div className="field" style={{ flex: 1 }}>
-          <label htmlFor={fields.labelFor("min")}>{t("Compensation expectation — min (USD/yr)")}</label>
-          <input type="text" inputMode="numeric" {...fields.field("min", { required: false })} value={min} onChange={(e) => setMin(e.target.value)} placeholder="e.g. 160000" />
+          <label htmlFor={fields.labelFor("min")}>{t("Monthly salary expectation — min")}</label>
+          <input type="text" inputMode="numeric" {...fields.field("min", { required: false })} value={min} onChange={(e) => setMin(e.target.value)} placeholder="e.g. 30000" />
           {fields.error("min")}
         </div>
         <div className="field" style={{ flex: 1 }}>
-          <label htmlFor={fields.labelFor("max")}>{t("Compensation expectation — max (USD/yr)")}</label>
-          <input type="text" inputMode="numeric" {...fields.field("max", { required: false })} value={max} onChange={(e) => setMax(e.target.value)} placeholder="e.g. 190000" />
+          <label htmlFor={fields.labelFor("max")}>{t("Monthly salary expectation — max")}</label>
+          <input type="text" inputMode="numeric" {...fields.field("max", { required: false })} value={max} onChange={(e) => setMax(e.target.value)} placeholder="e.g. 40000" />
           {fields.error("max")}
         </div>
       </div>
@@ -205,6 +266,14 @@ function CorrectProfileModal({ candidate, onClose, onSaved }: { candidate: Candi
     </Modal>
   );
 }
+
+/** English labels for the profile fields the parser reports as missing (zh via `missingField.*`). */
+const MISSING_FIELD_LABELS: Record<string, string> = {
+  location: "Location",
+  employment_history: "Work experience",
+  education: "Education",
+  compensation_expectation: "Salary expectation",
+};
 
 export function CandidateProfilePage() {
   const { id = "" } = useParams();
@@ -436,7 +505,7 @@ export function CandidateProfilePage() {
               </div>
               <ul style={{ margin: "8px 0 0", paddingLeft: 18, fontSize: "var(--fs-sm)" }}>
                 {candidate.missingFields.map((f) => (
-                  <li key={f}>{f.replace(/_/g, " ")}</li>
+                  <li key={f}>{t(MISSING_FIELD_LABELS[f] ?? f.replace(/_/g, " "), `missingField.${f}`)}</li>
                 ))}
               </ul>
               <p className="tiny" style={{ marginTop: 6 }}>
