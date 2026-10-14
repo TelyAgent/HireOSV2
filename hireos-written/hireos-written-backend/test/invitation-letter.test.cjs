@@ -17,6 +17,8 @@ test('greets the candidate by name and signs off as the sending HR mailbox', () 
 test('falls back to the hiring team when no mailbox is configured', () => {
   const letter = invitationLetter({ ...base, senderName: null, mode: 'deadline_only', durationMin: null });
   assert.deepEqual(letter.signature, ['「全栈工程师」招聘团队']);
+  assert.equal(letter.deadlineText, '2026-10-15 11:31（北京时间）');
+  assert.equal(letter.timingText, '不限作答时长');
   assert.match(letter.paragraphs[1], /不限作答时长/);
 });
 
@@ -26,5 +28,8 @@ test('email carries the letter and the link, without the "system generated" foot
   assert.match(email.text, /https:\/\/example.com\/apply\/t/);
   assert.match(email.text, /招聘专员\n「全栈工程师」招聘团队$/);
   assert.doesNotMatch(email.text, /系统自动发送/);
+  assert.match(email.text, /截止时间：2026-10-15 11:31（北京时间）/);
+  assert.match(email.html, /截止时间<\/div>.*2026-10-15 11:31（北京时间）/);
+  assert.match(email.subject, /请于 10-15 11:31 前提交/);
   assert.match(email.html, /&lt;b&gt;x&lt;\/b&gt;，您好/);
 });

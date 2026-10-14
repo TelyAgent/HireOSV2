@@ -368,6 +368,10 @@ export async function listCaseInvitations(caseId: string): Promise<RealInvitatio
 
 /** The covering letter (greeting, introduction, HR sign-off) -- built by the backend, same as the email. */
 export interface InvitationLetter {
+  /** e.g. "2026-10-15 23:42（北京时间）"; null when no deadline is set. */
+  deadlineText: string | null;
+  /** e.g. "限时 90 分钟，打开题目后开始计时" or "不限作答时长". */
+  timingText: string;
   greeting: string;
   paragraphs: string[];
   closing: string;

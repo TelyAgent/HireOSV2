@@ -14,6 +14,10 @@ export interface InvitationLetterInput {
 }
 
 export interface InvitationLetter {
+  /** e.g. "2026-10-15 23:42（北京时间）" -- shown prominently, not only inside a paragraph. */
+  deadlineText: string | null;
+  /** e.g. "限时 90 分钟，打开题目后开始计时" or "不限作答时长". */
+  timingText: string;
   greeting: string;
   paragraphs: string[];
   closing: string;
@@ -28,11 +32,13 @@ export function formatDeadline(deadline: Date): string {
 }
 
 export function invitationLetter(input: InvitationLetterInput): InvitationLetter {
-  const timing = input.mode === 'timed' && input.durationMin
-    ? `本次笔试限时 ${input.durationMin} 分钟，打开题目后开始计时`
-    : '本次笔试不限作答时长';
-  const deadline = input.deadline ? `，请在 ${formatDeadline(input.deadline)}（北京时间）前提交` : '';
+  const timingText = input.mode === 'timed' && input.durationMin ? `限时 ${input.durationMin} 分钟，打开题目后开始计时` : '不限作答时长';
+  const deadlineText = input.deadline ? `${formatDeadline(input.deadline)}（北京时间）` : null;
+  const timing = `本次笔试${timingText}`;
+  const deadline = deadlineText ? `，请在 ${deadlineText}前提交` : '';
   return {
+    deadlineText,
+    timingText,
     greeting: `${input.candidateName}，您好：`,
     paragraphs: [
       `感谢您对「${input.jobTitle}」岗位的关注。我们认真阅读了您的简历，诚挚邀请您参加该岗位的笔试，以便更全面地了解您的专业能力。`,
@@ -51,11 +57,13 @@ function escapeHtml(value: string): string {
 export function invitationEmail(input: InvitationLetterInput, link: string): { subject: string; text: string; html: string } {
   const letter = invitationLetter(input);
   const linkLine = '请点击以下链接查看题目并提交作答：';
+  const deadlineLine = letter.deadlineText ? `截止时间：${letter.deadlineText}（${letter.timingText}），请务必在截止前提交。` : null;
   const text = [
     letter.greeting,
     '',
     letter.paragraphs[0],
     '',
+    ...(deadlineLine ? [deadlineLine, ''] : []),
     letter.paragraphs[1],
     '',
     linkLine,
@@ -67,13 +75,21 @@ export function invitationEmail(input: InvitationLetterInput, link: string): { s
     ...letter.signature,
   ].join('\n');
   const p = (s: string) => `<p>${escapeHtml(s)}</p>`;
+  const deadlineBox = letter.deadlineText
+    ? `<div style="margin:16px 0;padding:12px 16px;border-left:4px solid #d97706;background:#fff7ed;border-radius:4px">`
+      + `<div style="font-size:13px;color:#92400e">截止时间</div>`
+      + `<div style="font-size:18px;font-weight:bold;color:#b45309;margin:2px 0">${escapeHtml(letter.deadlineText)}</div>`
+      + `<div style="font-size:13px;color:#92400e">${escapeHtml(letter.timingText)}，请务必在截止前提交。</div></div>`
+    : '';
   const html = [
     p(letter.greeting),
     p(letter.paragraphs[0]),
+    deadlineBox,
     p(letter.paragraphs[1]),
     `<p>${escapeHtml(linkLine)}<br/><a href="${escapeHtml(link)}">${escapeHtml(link)}</a></p>`,
     p(letter.paragraphs[2]),
     `<p>${escapeHtml(letter.closing)}<br/>${letter.signature.map(escapeHtml).join('<br/>')}</p>`,
   ].join('');
-  return { subject: `「${input.jobTitle}」笔试邀请 · ${input.candidateName}`, text, html };
+  const subjectDeadline = input.deadline ? `（请于 ${formatDeadline(input.deadline).slice(5)} 前提交）` : '';
+  return { subject: `「${input.jobTitle}」笔试邀请 · ${input.candidateName}${subjectDeadline}`, text, html };
 }

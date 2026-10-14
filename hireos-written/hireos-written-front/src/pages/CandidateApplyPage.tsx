@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
 import { useStore } from "../store/StoreContext";
 import { Button } from "../components/ui/Primitives";
-import { InvitationLetterCard } from "../components/InvitationLetterCard";
+import { DeadlineBanner, InvitationLetterCard } from "../components/InvitationLetterCard";
 import { fetchPublicInvitation, submitPublicInvitation, type PublicInvitation } from "../data/writtenApi";
 
 /**
@@ -67,6 +67,7 @@ export function CandidateApplyPage() {
 
         {state.status === "ready" && !state.data.submission && !justSubmitted && (
           <>
+            {state.data.letter && <DeadlineBanner letter={state.data.letter} deadline={state.data.deadline} />}
             {state.data.letter && <InvitationLetterCard letter={state.data.letter} />}
             <div className="card card-pad" style={{ marginBottom: 16 }}>
               <h2 style={{ marginBottom: 4 }}>{state.data.jobTitle}</h2>
@@ -77,7 +78,8 @@ export function CandidateApplyPage() {
                 {state.data.mode === "timed"
                   ? `${t("Timed")} · ${state.data.durationMin} ${t("min timed")}`
                   : t("Deadline only")}
-                {state.data.deadline && <> · {t("deadline")} {new Date(state.data.deadline).toLocaleString()}</>}
+                {/* Without a letter (older backend) the deadline banner isn't shown, so keep it here. */}
+                {!state.data.letter && state.data.deadline && <> · {t("deadline")} {new Date(state.data.deadline).toLocaleString()}</>}
               </div>
             </div>
 
