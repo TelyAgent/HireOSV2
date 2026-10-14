@@ -1,0 +1,17 @@
+{
+  "common": ["Type", "Problem", "User Outcome", "Scope", "Non-goals", "Acceptance Criteria", "References", "Dependencies", "Risk", "Owner", "Estimate", "AI Ready"],
+  "types": {
+    "Feature": ["User Flows"],
+    "Bug": ["Reproduction", "Expected / Actual", "Environment", "Severity"],
+    "Design": ["User Flow", "Target Platforms", "Component Constraints", "UI States", "Design Handoff"],
+    "Tech Debt": ["Technical Evidence", "Compatibility / Rollback"]
+  },
+  "enums": {
+    "Type": ["Feature", "Bug", "Design", "Tech Debt"],
+    "Risk": ["low", "medium", "high"],
+    "Estimate": ["TBD", "1", "2", "3", "5", "8"],
+    "AI Ready": ["No", "Yes"],
+    "Severity": ["S1", "S2", "S3", "S4"]
+  },
+  "extra": ["Evidence"]
+}

@@ -1,0 +1,14 @@
+flowchart TD
+    A[普通产品 PR 创建或更新] --> B[CI: checks + classify]
+    B -->|成功| R[Codex Review: 代码与安全]
+    B --> E[Merge gate]
+    R --> E
+    E -->|通过| H[Human Supervisor 审批]
+    H --> M[Merge 到默认分支]
+    M -->|closed 且 merged=true| T[验证来源、排除证据 PR、固定合并 SHA]
+    T --> Q[Codex QA: 验收实际合并提交]
+    E -->|CI 完成，无论成功或失败| L[Quality Ledger: Review 阶段]
+    Q -->|QA 完成，无论成功或失败| K[Quality Ledger: QA 阶段]
+    L --> V[分阶段评论和文档，保留各自 SHA]
+    K --> V
+    K --> I[可复现 QA 缺陷创建待分诊 Bug]
