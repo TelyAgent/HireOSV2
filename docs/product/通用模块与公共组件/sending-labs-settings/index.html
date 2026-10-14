@@ -1,0 +1,2237 @@
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1"><style>:root{color-scheme:light}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#faf9f5;color:#141413}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<title>Sending Labs Settings</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+/* ============================================================
+   TOKENS
+   ============================================================ */
+:root{
+  /* --- light (default) --- */
+  --canvas:#F4F6FB;
+  --surface:#FFFFFF;
+  --surface-2:#F0F2F8;
+  --surface-3:#E7EAF3;
+  --text:#1B2033;
+  --text-muted:#5B6178;
+  --text-faint:#8890A6;
+  --border:#E1E4EE;
+  --border-strong:#C9CEDE;
+  --focus-ring:rgba(59,99,224,.35);
+  --success:#137A4E;
+  --success-bg:#E6F5EC;
+  --warning:#9A6300;
+  --warning-bg:#FCF1DA;
+  --error:#C23434;
+  --error-bg:#FBE9E8;
+  --info:#2565C7;
+  --info-bg:#E8F0FD;
+  --shadow-sm:0 1px 2px rgba(20,24,40,.06);
+  --shadow-md:0 6px 20px -6px rgba(20,24,40,.18);
+  --shadow-lg:0 20px 48px -12px rgba(20,24,40,.28);
+  --brand-panel:#0B1830;
+  --brand-panel-2:#0F2142;
+  --brand-line:#1E3860;
+
+  /* accent: blue (default) */
+  --accent:#3B63E0;
+  --accent-hover:#2F51C4;
+  --accent-active:#28459E;
+  --accent-soft:#E8EDFD;
+  --accent-soft-strong:#D3DCFA;
+  --accent-text-on:#FFFFFF;
+
+  --font-ui:'Inter',system-ui,-apple-system,'Segoe UI',sans-serif;
+  --font-mono:'JetBrains Mono',ui-monospace,'SFMono-Regular',Menlo,monospace;
+
+  --fs-body:16px;
+  --fs-aux:14px;
+  --fs-cap:12.5px;
+  --fs-group:13px;
+  --fs-h1:24px;
+  --fs-h2:18px;
+  --radius-sm:6px;
+  --radius-md:8px;
+  --radius-lg:12px;
+}
+:root[data-accent="teal"]{
+  --accent:#0E8F82; --accent-hover:#0B7A6F; --accent-active:#08655C;
+  --accent-soft:#E3F5F2; --accent-soft-strong:#C6ecE4; --focus-ring:rgba(14,143,130,.35);
+}
+:root[data-accent="violet"]{
+  --accent:#7C5CD9; --accent-hover:#6A4AC2; --accent-active:#563BA3;
+  --accent-soft:#EFE9FC; --accent-soft-strong:#DCCFF7; --focus-ring:rgba(124,92,217,.35);
+}
+:root[data-textsize="small"]{ --fs-body:14px; --fs-aux:12.5px; --fs-cap:11.5px; --fs-h1:20px; --fs-h2:16px; }
+:root[data-textsize="large"]{ --fs-body:18px; --fs-aux:16px; --fs-cap:14px; --fs-h1:27px; --fs-h2:20px; }
+
+/* --- dark --- */
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]):not([data-theme="deep"]){
+    --canvas:#12141C; --surface:#1A1D28; --surface-2:#20232F; --surface-3:#282C3A;
+    --text:#E9EAF2; --text-muted:#A3A8BC; --text-faint:#767C92;
+    --border:#2C3040; --border-strong:#3B3F52;
+    --success:#3FCE8F; --success-bg:#123326; --warning:#E8B646; --warning-bg:#3A2E10;
+    --error:#F3746D; --error-bg:#3A1919; --info:#6FA6F2; --info-bg:#152A47;
+    --shadow-sm:0 1px 2px rgba(0,0,0,.4); --shadow-md:0 8px 24px -8px rgba(0,0,0,.55); --shadow-lg:0 24px 56px -16px rgba(0,0,0,.65);
+    --accent-soft:#20304F; --accent-soft-strong:#28405F;
+  }
+}
+:root[data-theme="dark"]{
+  --canvas:#12141C; --surface:#1A1D28; --surface-2:#20232F; --surface-3:#282C3A;
+  --text:#E9EAF2; --text-muted:#A3A8BC; --text-faint:#767C92;
+  --border:#2C3040; --border-strong:#3B3F52;
+  --success:#3FCE8F; --success-bg:#123326; --warning:#E8B646; --warning-bg:#3A2E10;
+  --error:#F3746D; --error-bg:#3A1919; --info:#6FA6F2; --info-bg:#152A47;
+  --shadow-sm:0 1px 2px rgba(0,0,0,.4); --shadow-md:0 8px 24px -8px rgba(0,0,0,.55); --shadow-lg:0 24px 56px -16px rgba(0,0,0,.65);
+  --accent-soft:#20304F; --accent-soft-strong:#28405F;
+}
+/* --- deep (deep navy / sea) --- */
+:root[data-theme="deep"]{
+  --canvas:#071427; --surface:#0C1F3B; --surface-2:#102A4A; --surface-3:#163556;
+  --text:#E4EEFB; --text-muted:#8EA9C9; --text-faint:#6483A6;
+  --border:#1B3A5C; --border-strong:#25507B;
+  --success:#37C98E; --success-bg:#0C2A24; --warning:#E7B84C; --warning-bg:#332510;
+  --error:#F0736D; --error-bg:#331616; --info:#5FA8F5; --info-bg:#0E2745;
+  --shadow-sm:0 1px 2px rgba(0,0,0,.4); --shadow-md:0 10px 26px -8px rgba(0,4,20,.6); --shadow-lg:0 26px 60px -16px rgba(0,4,20,.7);
+  --accent-soft:#12335A; --accent-soft-strong:#17436F;
+}
+
+*,*::before,*::after{box-sizing:border-box;}
+html{-webkit-text-size-adjust:100%;}
+body{
+  margin:0; background:var(--canvas); color:var(--text);
+  font-family:var(--font-ui); font-size:var(--fs-body); line-height:1.5;
+  -webkit-font-smoothing:antialiased; text-rendering:optimizeLegibility;
+}
+h1,h2,h3,h4{ margin:0; font-weight:600; text-wrap:balance; }
+p{margin:0;}
+a{color:var(--accent);}
+button{font-family:inherit;}
+img{max-width:100%;display:block;}
+::selection{background:var(--accent-soft-strong);}
+:focus-visible{outline:2px solid var(--accent); outline-offset:2px; border-radius:4px;}
+.tabular{ font-variant-numeric:tabular-nums; }
+
+/* ============================================================
+   PRIMITIVES
+   ============================================================ */
+.btn{
+  appearance:none; border:1px solid var(--border-strong); background:var(--surface); color:var(--text);
+  font-size:var(--fs-aux); font-weight:500; padding:0 14px; height:38px; border-radius:var(--radius-sm);
+  cursor:pointer; display:inline-flex; align-items:center; gap:6px; white-space:nowrap;
+  transition:background .12s,border-color .12s,box-shadow .12s;
+}
+.btn:hover{background:var(--surface-2);}
+.btn:active{transform:translateY(0.5px);}
+.btn:disabled{opacity:.5; cursor:not-allowed;}
+.btn-primary{ background:var(--accent); border-color:var(--accent); color:var(--accent-text-on); }
+.btn-primary:hover{ background:var(--accent-hover); border-color:var(--accent-hover); }
+.btn-primary:active{ background:var(--accent-active); }
+.btn-danger{ background:transparent; border-color:var(--error); color:var(--error); }
+.btn-danger:hover{ background:var(--error-bg); }
+.btn-ghost{ border-color:transparent; background:transparent; }
+.btn-ghost:hover{ background:var(--surface-2); }
+.btn-sm{ height:30px; padding:0 10px; font-size:var(--fs-cap); border-radius:6px; }
+.btn-block{width:100%; justify-content:center;}
+.btn-icon{width:34px;height:34px;padding:0;justify-content:center;}
+
+.field{ display:flex; flex-direction:column; gap:6px; }
+.field label{ font-size:var(--fs-cap); font-weight:600; color:var(--text-muted); }
+.field .hint{ font-size:var(--fs-cap); color:var(--text-faint); }
+.field .err{ font-size:var(--fs-cap); color:var(--error); display:flex; align-items:center; gap:5px;}
+input[type=text],input[type=email],input[type=search],input[type=password],select,textarea{
+  font:inherit; font-size:var(--fs-aux); color:var(--text); background:var(--surface);
+  border:1px solid var(--border-strong); border-radius:var(--radius-sm); padding:0 12px; height:40px;
+  min-width:0;
+}
+textarea{ padding:10px 12px; height:auto; resize:vertical; }
+input:focus,select:focus,textarea:focus{ outline:none; border-color:var(--accent); box-shadow:0 0 0 3px var(--focus-ring); }
+input:disabled,select:disabled{ background:var(--surface-2); color:var(--text-faint); cursor:not-allowed; }
+input.invalid{ border-color:var(--error); }
+.select-wrap{position:relative;}
+.select-wrap select{appearance:none; width:100%; padding-right:32px;}
+.select-wrap::after{content:"";position:absolute;right:12px;top:50%;width:8px;height:8px;border-right:1.5px solid var(--text-faint);border-bottom:1.5px solid var(--text-faint);transform:translateY(-65%) rotate(45deg);pointer-events:none;}
+.checkbox-row{display:flex;align-items:flex-start;gap:10px;font-size:var(--fs-aux);}
+.checkbox-row input{width:16px;height:16px;margin-top:3px;accent-color:var(--accent);}
+
+.badge{ display:inline-flex; align-items:center; gap:5px; font-size:var(--fs-cap); font-weight:600; padding:3px 9px; border-radius:999px; line-height:1.4; white-space:nowrap;}
+.badge .dot{width:6px;height:6px;border-radius:50%;background:currentColor;flex:none;}
+.badge-neutral{ background:var(--surface-3); color:var(--text-muted); }
+.badge-success{ background:var(--success-bg); color:var(--success); }
+.badge-warning{ background:var(--warning-bg); color:var(--warning); }
+.badge-error{ background:var(--error-bg); color:var(--error); }
+.badge-info{ background:var(--info-bg); color:var(--info); }
+.badge-accent{ background:var(--accent-soft); color:var(--accent); }
+
+.card{ background:var(--surface); border:1px solid var(--border); border-radius:var(--radius-lg); }
+.chip{ display:inline-flex; align-items:center; gap:6px; background:var(--surface-2); border:1px solid var(--border); border-radius:999px; padding:4px 10px 4px 4px; font-size:var(--fs-cap); font-weight:500;}
+.avatar{ width:30px; height:30px; border-radius:50%; background:var(--accent-soft); color:var(--accent); display:flex; align-items:center; justify-content:center; font-weight:700; font-size:12px; flex:none; }
+.avatar-lg{width:52px;height:52px;font-size:18px;}
+
+/* tables */
+.table-wrap{ overflow-x:auto; border:1px solid var(--border); border-radius:var(--radius-lg); background:var(--surface); }
+table{ width:100%; border-collapse:collapse; font-size:var(--fs-aux); min-width:640px; }
+thead th{ position:sticky; top:0; background:var(--surface-2); text-align:left; font-size:var(--fs-cap); font-weight:600; color:var(--text-muted); text-transform:uppercase; letter-spacing:.03em; padding:0 16px; height:38px; border-bottom:1px solid var(--border); white-space:nowrap; }
+tbody td{ padding:12px 16px; border-bottom:1px solid var(--border); vertical-align:middle; }
+tbody tr:last-child td{border-bottom:none;}
+tbody tr.clickable{cursor:pointer;}
+tbody tr.clickable:hover{background:var(--surface-2);}
+.cell-primary{font-weight:600;}
+.cell-sub{color:var(--text-faint); font-size:var(--fs-cap); margin-top:2px;}
+
+/* tabs */
+.tabs{ display:flex; gap:4px; border-bottom:1px solid var(--border); }
+.tab{ appearance:none; background:none; border:none; padding:11px 4px; margin-right:22px; font-size:var(--fs-aux); font-weight:500; color:var(--text-muted); cursor:pointer; position:relative; }
+.tab:hover{color:var(--text);}
+.tab.active{ color:var(--accent); font-weight:600; }
+.tab.active::after{content:"";position:absolute;left:0;right:0;bottom:-1px;height:2px;background:var(--accent);border-radius:2px 2px 0 0;}
+
+/* toast */
+#toast-region{ position:fixed; right:20px; bottom:20px; display:flex; flex-direction:column; gap:8px; z-index:900; max-width:380px;}
+.toast{ background:var(--text); color:var(--canvas); border-radius:var(--radius-md); padding:11px 14px; font-size:var(--fs-aux); box-shadow:var(--shadow-lg); display:flex; align-items:center; gap:10px; animation:toast-in .18s ease-out; }
+:root[data-theme="dark"] .toast,:root[data-theme="deep"] .toast{background:var(--surface-3); color:var(--text); border:1px solid var(--border-strong);}
+@media (prefers-color-scheme:dark){ :root:not([data-theme=light]) .toast{background:var(--surface-3); color:var(--text); border:1px solid var(--border-strong);} }
+.toast.error{background:var(--error);color:#fff;}
+.toast .toast-action{color:inherit; text-decoration:underline; font-weight:600; cursor:pointer; white-space:nowrap; background:none; border:none; font-size:inherit; padding:0;}
+@keyframes toast-in{from{opacity:0; transform:translateY(6px);} to{opacity:1; transform:none;}}
+
+/* modal */
+.modal-overlay{ position:fixed; inset:0; background:rgba(10,14,26,.5); display:flex; align-items:center; justify-content:center; z-index:950; padding:20px; }
+.modal{ background:var(--surface); border-radius:var(--radius-lg); box-shadow:var(--shadow-lg); width:100%; max-width:480px; max-height:88vh; overflow:auto; border:1px solid var(--border);}
+.modal-wide{max-width:640px;}
+.modal-head{padding:18px 22px; border-bottom:1px solid var(--border); display:flex; align-items:center; justify-content:space-between; gap:12px;}
+.modal-head h3{font-size:var(--fs-h2);}
+.modal-body{padding:20px 22px; display:flex; flex-direction:column; gap:14px;}
+.modal-foot{padding:16px 22px; border-top:1px solid var(--border); display:flex; justify-content:flex-end; gap:10px;}
+
+/* drawer (member/mailbox detail slide-over on narrow contexts not needed; using page nav instead) */
+
+/* empty / status states */
+.empty-state{ display:flex; flex-direction:column; align-items:center; text-align:center; gap:10px; padding:56px 20px; color:var(--text-muted); }
+.empty-state .icon{width:44px;height:44px;border-radius:12px;background:var(--surface-2);display:flex;align-items:center;justify-content:center;color:var(--text-faint);}
+.status-line{display:flex;align-items:center;gap:8px;font-size:var(--fs-aux);color:var(--text-muted);}
+.skeleton{background:linear-gradient(90deg,var(--surface-2) 25%,var(--surface-3) 37%,var(--surface-2) 63%);background-size:400% 100%;animation:sk 1.4s ease infinite;border-radius:6px;}
+@keyframes sk{0%{background-position:100% 50%}100%{background-position:0 50%}}
+
+/* ============================================================
+   APP SHELL
+   ============================================================ */
+#app{min-height:100vh;}
+.appshell{ display:flex; flex-direction:column; min-height:100vh; }
+.topbar{ position:sticky; top:0; z-index:40; height:56px; background:var(--surface); border-bottom:1px solid var(--border); display:flex; align-items:center; justify-content:space-between; padding:0 20px; grid-column:1/-1; }
+.topbar-left{display:flex;align-items:center;gap:14px;min-width:0;}
+.backlink{display:flex;align-items:center;gap:6px;color:var(--text-muted);font-size:var(--fs-aux);text-decoration:none;cursor:pointer;background:none;border:none;font-family:inherit;}
+.backlink:hover{color:var(--text);}
+.brandmark{display:flex;align-items:center;gap:9px;font-weight:700;font-size:15px;letter-spacing:-.01em;}
+.brandmark .sq{width:16px;height:16px;border-radius:4px;background:#3D9A50;position:relative;flex:none;}
+.brandmark .sq::after{content:"";position:absolute;inset:3px;border-radius:2px;background:var(--surface);}
+.org-switcher{display:flex;align-items:center;gap:8px;padding:6px 10px 6px 6px;border-radius:999px;border:1px solid var(--border);background:var(--surface);cursor:default;font-size:var(--fs-cap);}
+.org-switcher .org-dot{width:22px;height:22px;border-radius:6px;background:var(--brand-panel);display:flex;align-items:center;justify-content:center;}
+.org-switcher .org-dot .sq{width:9px;height:9px;border-radius:2.5px;}
+.topbar-right{display:flex;align-items:center;gap:10px;}
+
+.shell-body{ display:flex; flex:1; min-height:0; width:100%; }
+.sidenav{ width:236px; flex:none; border-right:1px solid var(--border); padding:18px 12px 24px; display:flex; flex-direction:column; gap:18px; position:sticky; top:56px; align-self:flex-start; height:calc(100vh - 56px); overflow-y:auto;}
+.nav-search{position:relative;}
+.nav-search input{width:100%; padding-left:34px; height:36px; background:var(--surface-2); border-color:transparent;}
+.nav-search input:focus{background:var(--surface); }
+.nav-search svg{position:absolute; left:10px; top:50%; transform:translateY(-50%); color:var(--text-faint);}
+.nav-group-label{ font-size:11px; font-weight:700; letter-spacing:.07em; color:var(--text-faint); text-transform:uppercase; padding:0 10px; margin-top:4px;}
+.nav-list{display:flex;flex-direction:column;gap:1px;}
+.nav-item{ display:flex; align-items:center; gap:10px; padding:8px 10px; border-radius:8px; color:var(--text-muted); font-size:var(--fs-aux); font-weight:500; text-decoration:none; cursor:pointer; border:none; background:none; width:100%; text-align:left; font-family:inherit;}
+.nav-item:hover{background:var(--surface-2); color:var(--text);}
+.nav-item.active{background:var(--accent-soft); color:var(--accent); font-weight:600;}
+.nav-item svg{flex:none;opacity:.85;}
+.nav-empty{padding:12px 10px;font-size:var(--fs-cap);color:var(--text-faint);}
+
+.content{ flex:1; min-width:0; padding:28px 32px 80px; }
+.content-inner{max-width:920px;}
+.content-inner.wide{max-width:1180px;}
+.page-header{ display:flex; align-items:flex-start; justify-content:space-between; gap:20px; margin-bottom:22px; flex-wrap:wrap;}
+.page-header h1{font-size:var(--fs-h1);}
+.page-sub{color:var(--text-muted); font-size:var(--fs-aux); margin-top:4px; max-width:64ch;}
+.page-header-actions{display:flex;gap:10px;flex:none;}
+.scope-row{display:flex;align-items:center;gap:8px;margin-top:8px;flex-wrap:wrap;}
+
+.section{ margin-bottom:26px; }
+.section-head{margin-bottom:12px;}
+.section-head h2{font-size:var(--fs-h2);}
+.section-head .desc{color:var(--text-muted); font-size:var(--fs-aux); margin-top:3px; max-width:70ch;}
+.divider{height:1px;background:var(--border);margin:24px 0;}
+
+.option-cards{display:flex;gap:12px;flex-wrap:wrap;}
+.option-card{ border:1.5px solid var(--border); border-radius:var(--radius-md); padding:12px 14px; cursor:pointer; min-width:120px; display:flex; flex-direction:column; gap:8px; background:var(--surface); }
+.option-card:hover{border-color:var(--border-strong);}
+.option-card.selected{ border-color:var(--accent); box-shadow:0 0 0 1px var(--accent); background:var(--accent-soft); }
+.option-card .swatch{ height:38px; border-radius:6px; }
+.option-card .label{font-size:var(--fs-aux); font-weight:600; display:flex; align-items:center; justify-content:space-between;}
+.option-card .check{width:16px;height:16px;border-radius:50%;background:var(--accent);color:#fff;display:none;align-items:center;justify-content:center;font-size:10px;}
+.option-card.selected .check{display:flex;}
+
+.save-bar{ position:sticky; bottom:0; background:var(--surface); border-top:1px solid var(--border); padding:12px 0; margin-top:18px; display:flex; align-items:center; justify-content:space-between; gap:14px; z-index:20;}
+.save-bar .status{display:flex;align-items:center;gap:8px;font-size:var(--fs-aux);color:var(--text-muted);}
+.save-bar .status.saved{color:var(--success);}
+.save-bar .status.error{color:var(--error);}
+.save-bar-actions{display:flex;gap:10px;}
+
+.list-row{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:14px 0;border-bottom:1px solid var(--border);}
+.list-row:last-child{border-bottom:none;}
+.list-row .lr-main{display:flex;align-items:center;gap:12px;min-width:0;}
+.list-row .lr-title{font-weight:600;font-size:var(--fs-aux);}
+.list-row .lr-sub{color:var(--text-faint);font-size:var(--fs-cap);margin-top:2px;}
+
+.kv{display:grid; grid-template-columns:180px 1fr; gap:6px 16px; font-size:var(--fs-aux);}
+.kv dt{color:var(--text-muted);}
+.kv dd{margin:0;}
+
+.filter-bar{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:14px;}
+.filter-bar .search-input{position:relative; flex:1; min-width:180px; max-width:320px;}
+.filter-bar .search-input input{width:100%;padding-left:32px;}
+.filter-bar .search-input svg{position:absolute;left:10px;top:50%;transform:translateY(-50%);color:var(--text-faint);}
+.filter-select select{height:36px;font-size:var(--fs-cap);}
+.result-count{font-size:var(--fs-cap); color:var(--text-faint); margin-left:auto;}
+.link-btn{background:none;border:none;color:var(--accent);font-weight:600;font-size:inherit;cursor:pointer;padding:0;font-family:inherit;}
+.link-btn:hover{text-decoration:underline;}
+.text-faint{color:var(--text-faint);}
+.text-muted{color:var(--text-muted);}
+.mono{font-family:var(--font-mono);}
+.demo-tag{display:inline-flex;align-items:center;gap:4px;background:var(--warning-bg);color:var(--warning);font-size:10.5px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;padding:2px 7px;border-radius:5px;}
+
+/* ============================================================
+   AUTH / ONBOARDING SCREENS
+   ============================================================ */
+.auth-shell{ min-height:100vh; display:flex; }
+.auth-brand{ width:44%; min-width:360px; background:linear-gradient(160deg,var(--brand-panel),var(--brand-panel-2)); position:relative; overflow:hidden; display:flex; flex-direction:column; justify-content:space-between; padding:44px; }
+.auth-brand::before{content:"";position:absolute;inset:0;background-image:radial-gradient(circle at 15% 85%,rgba(61,154,80,.18),transparent 45%),radial-gradient(circle at 85% 10%,rgba(90,140,220,.15),transparent 45%);}
+.auth-brand-logo{position:relative;z-index:1;}
+.auth-brand-logo img{width:190px;}
+.auth-brand-quote{position:relative;z-index:1;color:#CBD8ED;font-size:15px;line-height:1.65;max-width:380px;}
+.auth-brand-quote b{color:#fff;}
+.auth-brand-grid{position:absolute; inset:0; background-image:linear-gradient(var(--brand-line) 1px,transparent 1px),linear-gradient(90deg,var(--brand-line) 1px,transparent 1px); background-size:44px 44px; opacity:.35;}
+.auth-main{ flex:1; display:flex; align-items:center; justify-content:center; padding:40px 24px; background:var(--canvas);}
+.auth-card{ width:100%; max-width:400px; }
+.auth-card h1{font-size:22px; margin-bottom:6px;}
+.auth-card .lead{color:var(--text-muted); font-size:var(--fs-aux); margin-bottom:26px;}
+.auth-form{display:flex;flex-direction:column;gap:16px;}
+.auth-foot{margin-top:22px;font-size:var(--fs-cap);color:var(--text-faint);text-align:center;}
+.code-input-row{display:flex;gap:8px;}
+.code-box{width:44px;height:52px;text-align:center;font-size:20px;font-weight:700;font-family:var(--font-mono);}
+.auth-steps{display:flex;gap:6px;margin-bottom:28px;}
+.auth-steps .s{height:3px;flex:1;background:var(--border-strong);border-radius:3px;}
+.auth-steps .s.done{background:var(--accent);}
+.org-pick-row{display:flex;align-items:center;justify-content:space-between;gap:14px;padding:14px 16px;border:1px solid var(--border);border-radius:var(--radius-md);margin-bottom:10px;cursor:pointer;background:var(--surface);}
+.org-pick-row:hover{border-color:var(--accent);}
+.timer{font-variant-numeric:tabular-nums;color:var(--text-faint);font-size:var(--fs-cap);}
+
+/* demo controls */
+#demo-controls{ position:fixed; right:16px; bottom:16px; z-index:850; }
+.demo-fab{width:46px;height:46px;border-radius:50%;background:var(--text);color:var(--canvas);border:none;box-shadow:var(--shadow-lg);cursor:pointer;display:flex;align-items:center;justify-content:center;}
+.demo-panel{position:absolute; bottom:56px; right:0; width:290px; background:var(--surface); border:1px solid var(--border); border-radius:var(--radius-lg); box-shadow:var(--shadow-lg); padding:16px; display:flex; flex-direction:column; gap:12px;}
+.demo-panel h4{font-size:12px; text-transform:uppercase; letter-spacing:.05em; color:var(--text-faint);}
+.demo-role-grid{display:grid;grid-template-columns:1fr 1fr;gap:6px;}
+.demo-role-btn{border:1px solid var(--border); background:var(--surface-2); border-radius:7px; padding:7px 8px; font-size:11.5px; font-weight:600; cursor:pointer; text-align:left; color:var(--text-muted);}
+.demo-role-btn.active{border-color:var(--accent); background:var(--accent-soft); color:var(--accent);}
+.demo-links a,.demo-links button{display:block; width:100%; text-align:left; background:none; border:none; padding:6px 2px; font-size:var(--fs-cap); color:var(--accent); cursor:pointer; font-family:inherit;}
+
+/* ai models / usage grids */
+.stat-grid{display:grid; grid-template-columns:repeat(auto-fit,minmax(160px,1fr)); gap:12px;}
+.stat-tile{border:1px solid var(--border); border-radius:var(--radius-md); padding:14px 16px; background:var(--surface);}
+.stat-tile .lbl{font-size:var(--fs-cap); color:var(--text-faint); margin-bottom:6px;}
+.stat-tile .val{font-size:22px; font-weight:700; font-variant-numeric:tabular-nums;}
+.stat-tile .sub{font-size:var(--fs-cap); color:var(--text-muted); margin-top:4px;}
+
+.progress{height:6px;border-radius:4px;background:var(--surface-3);overflow:hidden;}
+.progress > span{display:block;height:100%;background:var(--accent);border-radius:4px;}
+
+.pipeline{display:flex;align-items:center;flex-wrap:wrap;gap:0;font-size:var(--fs-cap);}
+.pipeline .step{display:flex;align-items:center;gap:6px;padding:6px 10px;border-radius:999px;background:var(--surface-2);color:var(--text-muted);}
+.pipeline .step.done{background:var(--success-bg);color:var(--success);}
+.pipeline .step.current{background:var(--accent-soft);color:var(--accent);font-weight:700;}
+.pipeline .arrow{color:var(--text-faint);padding:0 4px;}
+
+/* responsive */
+@media (max-width:980px){
+  .sidenav{ position:fixed; left:0; top:56px; bottom:0; z-index:60; transform:translateX(-100%); transition:transform .18s; box-shadow:var(--shadow-lg); background:var(--surface);}
+  .sidenav.open{transform:translateX(0);}
+  .content{padding:20px 16px 80px;}
+  .auth-brand{display:none;}
+}
+@media (max-width:520px){
+  .code-box{width:38px;height:46px;font-size:17px;}
+  .kv{grid-template-columns:1fr;}
+  .topbar{padding:0 10px; gap:6px;}
+  .backlink span,.backlink{font-size:0;}
+  .backlink svg{margin:0;}
+  .backlink.hidden-mobile-toggle{font-size:inherit;}
+  .brandmark{font-size:0;}
+  .brandmark .sq{margin:0 auto;}
+  .org-switcher{display:none;}
+  .topbar-left{gap:6px;}
+}
+.hide{display:none !important;}
+.hidden-mobile-toggle{display:none;}
+@media (max-width:980px){ .hidden-mobile-toggle{display:inline-flex;} }
+</style>
+<div id="app"></div>
+<div id="toast-region"></div>
+
+<script>
+"use strict";
+
+/* ============================================================
+   DATA — Sending Labs reference (from Mock Data v1.2)
+   ============================================================ */
+const ORG = { id:"demo-org-001", display_name:"Sending Labs", logo:"assets/sending-labs-logo.png" };
+
+const PRODUCT_GROUPS = ["Public","Pythra","Predx","Telyclaw"];
+
+const PEOPLE_SEED = [
+  { id:"ref-person-01", name:"Mason", product_group:"Public", job_title:"Acting COO", email:"masonyang@sending.me",
+    management_scope:{ scope:"Group-wide, all companies", functions:["HR","Operations","Finance"] },
+    source:"image_2", historical_title:"CEO", title_source:"User correction, 2026-09-13" },
+  { id:"ref-person-02", name:"Arthur", product_group:"Pythra", job_title:"CEO of PallaX", email:"arthur@sendinglabs.com",
+    management_scope:{ company:"PallaX", position:"CEO" },
+    source:"image_2", historical_title:"Product Manager", title_source:"User correction, 2026-09-13",
+    product_group_note:"Pythra is the historical product group from the screenshot; the confirmed title (CEO of PallaX) doesn't imply a group rename." },
+  { id:"ref-person-03", name:"Louis", product_group:"Pythra", job_title:"CTO", email:"louisyang@sding.me", source:"image_2" },
+  { id:"ref-person-04", name:"Jay", product_group:"Predx", job_title:"Product Manager", email:"jayhoracewen@sding.me", source:"image_2" },
+  { id:"ref-person-05", name:"Coral", product_group:"Telyclaw", job_title:"Tech. Leader", email:"coralchen@sding.me", source:"image_2" },
+  { id:"ref-person-06", name:"Oliver", product_group:"Public", job_title:"HR Lead", email:"olivertan@sding.me", source:"image_2" },
+  { id:"ref-person-07", name:"Aurorac", product_group:"Predx", job_title:"Tech. Leader", email:"auroraccheng@sding.me", source:"image_2" },
+  { id:"ref-person-08", name:null, display_label:"john.falsis@sendinglabsph.com", product_group:null, job_title:null,
+    email:"john.falsis@sendinglabsph.com", source:"user_followup_2026-09-13", note:"Recruiting scope confirmed by the user; name, formal title and system role not provided." },
+  { id:"ref-person-09", name:null, display_label:"siaxia@sding.me", product_group:null, job_title:null,
+    email:"siaxia@sding.me", source:"user_followup_2026-09-13", note:"Recruiting scope confirmed by the user; name, formal title and system role not provided." },
+];
+
+// demo overlay — synthetic role assignments for prototype walk-throughs only
+const DEMO_ROLE_OVERLAY = {
+  "ref-person-01":"super_admin",
+  "ref-person-02":"hiring_manager",
+  "ref-person-03":"employee",
+  "ref-person-04":"employee",
+  "ref-person-05":"employee",
+  "ref-person-06":"hr",
+  "ref-person-07":"employee",
+  "ref-person-08":null,
+  "ref-person-09":null,
+};
+
+const SYNTHETIC_PEOPLE = [
+  { id:"demo-consultant-01", name:"Demo Consultant", email:"consultant@example.com", job_title:null, product_group:null,
+    role:"external_consultant", is_synthetic:true, project:"Pythra recruiting (demo project)" },
+  { id:"demo-candidate-01", name:"Demo Candidate", email:"candidate@example.org", job_title:null, product_group:null,
+    role:"candidate", is_synthetic:true },
+];
+
+const MAILBOXES_SEED = [
+  { id:"ref-mailbox-01", email:"hr@sding.me", company_label:null, purposes:["Domestic HR mailbox","Domestic inbound resumes"],
+    note:"Recruiting mostly happens inside platform ATSs; this mailbox is used occasionally for offers / campus hiring.", source_rows:"rows 2, 4" },
+  { id:"ref-mailbox-02", email:"hr@sending.me", company_label:null, purposes:["International HR mailbox"], source_rows:"row 3" },
+  { id:"ref-mailbox-03", email:"contact@sending.me", company_label:"SDM", purposes:["Company mailbox"], source_rows:"row 5" },
+  { id:"ref-mailbox-04", email:"admin@pallax.ai", company_label:"pallax inc", purposes:["Company mailbox"], source_rows:"row 6" },
+  { id:"ref-mailbox-05", email:"service@aipollo.io", company_label:"Aipollo", purposes:["Company mailbox"], source_rows:"row 7" },
+  { id:"ref-mailbox-06", email:"hi@predx.pro", company_label:"predex", purposes:["Company mailbox"], source_rows:"row 8" },
+  { id:"ref-mailbox-07", email:"contact@telyclaw.ai", company_label:"telyclaw", purposes:["Company mailbox"], source_rows:"row 9" },
+];
+
+const RESPONSIBILITIES_SEED = [
+  { id:"responsibility-intl-non-rd", label:"Core international business · Non-R&D roles", owners:["ref-person-08"] },
+  { id:"responsibility-rd", label:"R&D roles", owners:["ref-person-06","ref-person-09"] },
+];
+
+const ROLE_LABELS = {
+  super_admin:"Super Admin", hiring_manager:"Hiring Manager", hr:"HR",
+  employee:"Employee", external_consultant:"External Consultant", candidate:"Candidate",
+};
+const ROLE_ORDER = ["super_admin","hiring_manager","hr","employee","external_consultant","candidate"];
+
+
+/* ---- region / locale formatting reference (PRD §4.2) ---- */
+const REGIONS = {
+  "en-US":{ label:"United States", date:"9/12/2026", time:"3:30 PM", currency:"USD", amount:"USD 1,234.56", tz:"America/New_York", weekStart:"Sunday" },
+  "en-GB":{ label:"United Kingdom", date:"12/09/2026", time:"15:30", currency:"GBP", amount:"GBP 1,234.56", tz:"Europe/London", weekStart:"Monday" },
+  "en-AU":{ label:"Australia", date:"12/9/2026", time:"3:30 pm", currency:"AUD", amount:"AUD 1,234.56", tz:"Australia/Sydney", weekStart:"Monday" },
+  "en-CA":{ label:"Canada", date:"2026-09-12", time:"3:30 p.m.", currency:"CAD", amount:"CAD 1,234.56", tz:"America/Toronto", weekStart:"Sunday" },
+};
+const TIMEZONES = [
+  {id:"America/New_York", label:"New York (GMT-4)"}, {id:"America/Toronto", label:"Toronto (GMT-4)"},
+  {id:"America/Vancouver", label:"Vancouver (GMT-7)"}, {id:"Europe/London", label:"London (GMT+1)"},
+  {id:"Australia/Sydney", label:"Sydney (GMT+10)"}, {id:"Australia/Perth", label:"Perth (GMT+8)"},
+  {id:"Asia/Shanghai", label:"Shanghai (GMT+8)"}, {id:"Asia/Ho_Chi_Minh", label:"Ho Chi Minh City (GMT+7)"},
+  {id:"UTC", label:"UTC (GMT+0)"},
+];
+
+/* ---- Activity seed ---- */
+const ACTIVITY_SEED = [
+  { id:"a1", ts:"2026-09-14T09:12:00", actor:"Mason", type:"Configuration change", object:"Organization Defaults", summary:"Updated organization time zone to America/New_York" },
+  { id:"a2", ts:"2026-09-13T17:40:00", actor:"Oliver", type:"Member", object:"Louis", summary:"Role kept as Employee; product group unchanged" },
+  { id:"a3", ts:"2026-09-13T11:05:00", actor:"Mason", type:"Connection", object:"hr@sding.me", summary:"Reauthorization requested — provider session expired" },
+  { id:"a4", ts:"2026-09-12T15:22:00", actor:"System", type:"Run", object:"Read run #4821", summary:"Folder scan completed — 0 matched, 0 skipped" },
+  { id:"a5", ts:"2026-09-11T08:03:00", actor:"Mason", type:"Model", object:"Screening · resume-parse", summary:"Published policy v3 (primary: Claude Sonnet, fallback: GPT-4.1 mini)" },
+];
+
+/* ---- AI Models seed (SHARED-11) ---- */
+const AI_CATALOG_SEED = [
+  { id:"m1", provider:"Anthropic", account:"sending-labs-prod", model:"Claude Opus 4.1", status:"Active", capability:"Reasoning, long context", region:"us-east", price:"Known", priceVersion:"2026-09-01" },
+  { id:"m2", provider:"Anthropic", account:"sending-labs-prod", model:"Claude Sonnet 4.5", status:"Active", capability:"General, fast", region:"us-east", price:"Known", priceVersion:"2026-09-01" },
+  { id:"m3", provider:"OpenAI", account:"sl-openai-01", model:"GPT-4.1 mini", status:"Active", capability:"Fallback, low latency", region:"us-central", price:"Known", priceVersion:"2026-08-20" },
+  { id:"m4", provider:"OpenAI", account:"sl-openai-01", model:"GPT-4.1", status:"Needs reauthorization", capability:"General", region:"us-central", price:"Unknown", priceVersion:null },
+  { id:"m5", provider:"Local / self-hosted", account:"on-prem-eval", model:"Llama transcription eval", status:"Not evaluated", capability:"Audio transcription", region:"self-hosted", price:"Unknown", priceVersion:null },
+];
+const AI_TASK_POLICIES_SEED = [
+  { id:"p1", module:"Screening", task:"resume-parse", inherits:"Workspace default", primary:"Claude Sonnet 4.5", fallback:"GPT-4.1 mini", status:"Active", version:"v3" },
+  { id:"p2", module:"Screening", task:"eligibility-score", inherits:"Module override", primary:"Claude Opus 4.1", fallback:"Claude Sonnet 4.5", status:"Active", version:"v2" },
+  { id:"p3", module:"Interview", task:"scorecard-summary", inherits:"Workspace default", primary:"Claude Sonnet 4.5", fallback:"GPT-4.1 mini", status:"Draft", version:"v4 (unpublished)" },
+  { id:"p4", module:"Interview", task:"transcription", inherits:"Module override", primary:"Llama transcription eval", fallback:"No eligible model", status:"Draft", version:"v1 (unpublished)" },
+];
+const AI_EVAL_SEED = [
+  { id:"e1", task:"resume-parse", language:"English", dataset:"Sample data · 240 resumes", quality:"92% match", cost:"$0.006 / doc", p50:"1.1s", p95:"2.4s", failRate:"0.4%", measured:"2026-09-10" },
+  { id:"e2", task:"eligibility-score", language:"English", dataset:"Sample data · 180 profiles", quality:"88% agreement", cost:"$0.021 / doc", p50:"2.0s", p95:"4.1s", failRate:"1.1%", measured:"2026-09-09" },
+  { id:"e3", task:"transcription", language:"Vietnamese", dataset:"Sample data · 12 clips", quality:"Not evaluated", cost:"Unknown", p50:"—", p95:"—", failRate:"—", measured:"Not yet run" },
+];
+const AI_USAGE_SEED = [
+  { id:"u1", scope:"Screening", period:"Last 30 days", calls:18420, estCost:"$418.20", actualCost:"$402.65", pending:"$4.10", currency:"USD" },
+  { id:"u2", scope:"Interview", period:"Last 30 days", calls:6210, estCost:"$205.40", actualCost:"$198.90", pending:"$0.00", currency:"USD" },
+];
+const AI_VERSIONS_SEED = [
+  { id:"v1", policy:"Screening · resume-parse", version:"v3", state:"Active", publishedBy:"Mason", date:"2026-09-11" },
+  { id:"v2", policy:"Screening · resume-parse", version:"v2", state:"Superseded", publishedBy:"Oliver", date:"2026-08-02" },
+  { id:"v3", policy:"Screening · eligibility-score", version:"v2", state:"Active", publishedBy:"Mason", date:"2026-09-05" },
+];
+
+/* ---- Connections seed (mailbox connections, calendar, file source) ---- */
+function freshConnections(){
+  return [
+    { id:"c-hr-sding", label:"hr@sding.me", kind:"Email", scope:"Inbox · resume label", status:"Authorization required", lastRun:"2026-09-13 11:05", errorNote:"Provider session expired 4 days ago." },
+    { id:"c-hr-sending", label:"hr@sending.me", kind:"Email", scope:"Inbox, full", status:"Not connected", lastRun:null },
+    { id:"c-calendar", label:"Sending Labs shared calendar", kind:"Calendar", scope:"Interview scheduling", status:"Connected", lastRun:"2026-09-14 08:02" },
+    { id:"c-folder", label:"Screening intake / Drive folder", kind:"Folder", scope:"New files, recursive", status:"Paused", lastRun:"2026-09-10 22:11" },
+  ];
+}
+
+
+/* ============================================================
+   STATE
+   ============================================================ */
+const STORAGE_KEY = "hireos_settings_demo_v2";
+
+function defaultState(){
+  return {
+    booted:false,
+    route:"#/auth",
+    // auth/session
+    session:{ signedIn:false, userId:null, orgId:null, pendingEmail:"", verified:false },
+    verify:{ email:"", code:"482913", input:"", attempts:0, sentAt:Date.now(), expiresInMs: 10*60*1000, cooldownUntil:0, lastError:null, locked:false },
+    onboardingName:"",
+    demoRole:"super_admin", // overlay role used to drive visible permissions
+    // personal preferences (per current user, single-user demo)
+    appearance:{ theme:"light", accent:"blue", textSize:"medium", font:"system", syncFailed:false },
+    locale:{ language:"en", region:"en-US", timezone:"America/New_York", timeFormat:"region", weekStart:"region" },
+    account:{ name:"Mason Yang", email:"masonyang@sending.me", pendingEmail:null,
+      sessions:[
+        {id:"s1", device:"Chrome on macOS · Cupertino, US", current:true, last:"Active now"},
+        {id:"s2", device:"HireOS iOS App · iPhone", current:false, last:"2 hours ago"},
+        {id:"s3", device:"Chrome on Windows · Singapore", current:false, last:"6 days ago"},
+      ] },
+    notifications:{
+      categories:{ taskAssigned:{channel:"both"}, scheduleChange:{channel:"email"}, approvalNeeded:{channel:"inapp"}, weeklyDigest:{channel:"email"} },
+      quietHours:{ enabled:true, start:"20:00", end:"08:00" },
+    },
+    homeViews:{ module:"screening",
+      modules:{
+        screening:{ cards:{myTasks:true, teamOverview:true, modelHealth:false}, collapsedT2:true, collapsedT3:true, density:"comfortable" },
+        interview:{ cards:{myWork:true, workspaceOverview:true}, collapsedT2:false, collapsedT3:true, density:"comfortable" },
+      } },
+    // org data (mutable copies)
+    people: PEOPLE_SEED.map(p=>({...p, system_role: DEMO_ROLE_OVERLAY[p.id]||null, status:"active"})),
+    syntheticPeople: SYNTHETIC_PEOPLE.slice(),
+    mailboxes: MAILBOXES_SEED.map(m=>({...m, connection_status:"Not connected", sending_status:"Sending not authorized", manager:null})),
+    responsibilities: RESPONSIBILITIES_SEED.slice(),
+    invitations:[
+      { id:"inv1", email:"newhire@sending.me", role:"employee", scope:null, invitedBy:"Mason", sentAt:"2026-09-12", expiresAt:"2026-09-19", status:"pending" },
+      { id:"inv2", email:"priya@partneragency.com", role:"external_consultant", scope:"Pythra recruiting (demo project)", invitedBy:"Arthur", sentAt:"2026-08-28", expiresAt:"2026-09-04", status:"expired" },
+      { id:"inv3", email:"formercontractor@gmail.com", role:"employee", scope:null, invitedBy:"Oliver", sentAt:"2026-09-01", expiresAt:"2026-09-08", status:"revoked" },
+      { id:"inv4", email:"louisyang@sding.me", role:"employee", scope:null, invitedBy:"Mason", sentAt:"2026-08-01", expiresAt:"2026-08-08", status:"accepted" },
+    ],
+    connections: freshConnections(),
+    orgDefaults:{ language:"en", region:"en-US", timezone:"America/New_York", currency:"USD", draft:null, conflict:false },
+    aiModels:{
+      catalog: AI_CATALOG_SEED.map(m=>({...m})),
+      policies: AI_TASK_POLICIES_SEED.map(p=>({...p})),
+      evaluations: AI_EVAL_SEED.slice(),
+      usage: AI_USAGE_SEED.slice(),
+      versions: AI_VERSIONS_SEED.slice(),
+      automation:{
+        priceSync:{ supported:true, schedule:"Weekly, Mondays 03:00 UTC", lastRun:"2026-09-08 03:00", status:"Succeeded" },
+        qualityRegression:{ task:"resume-parse", language:"English", schedule:"Weekly", threshold:"-3% quality", lastResult:"No degradation detected", date:"2026-09-08" },
+        rollout:{ scope:"Screening · eligibility-score", pct:10, budgetCap:"$50/day", stopCondition:"Failure rate > 2%", status:"Running" },
+        alerts:{ rule:"Quality regression > 3%", recipients:"AI Models admins (HR, Super Admin)", frequency:"Immediate, deduped 1/hr", history:2 },
+      },
+    },
+    activity: ACTIVITY_SEED.slice(),
+    dataPolicies:[
+      { id:"dp1", category:"Candidate resumes & attachments", purpose:"Screening, matching", retention:"24 months after last activity", source:"Organization default", version:"v1", status:"In effect" },
+      { id:"dp2", category:"Interview recordings & transcripts", purpose:"Evaluation, evidence", retention:"12 months after decision", source:"Organization default", version:"v1", status:"In effect" },
+      { id:"dp3", category:"Internal salary & compensation notes", purpose:"Offer decisions", retention:"Not configured", source:"—", version:"—", status:"Not configured" },
+    ],
+    toasts:[],
+    ui:{ demoPanelOpen:false, navOpen:false, saveStatus:{}, memberFilter:{q:"", role:"all", group:"all"}, invFilter:"all" },
+  };
+}
+
+let STATE = null;
+function loadState(){
+  try{
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if(raw){
+      const parsed = JSON.parse(raw);
+      STATE = Object.assign(defaultState(), parsed);
+      // guard against stale/missing nested shape from older demo versions
+      STATE.aiModels = Object.assign(defaultState().aiModels, parsed.aiModels||{});
+      return;
+    }
+  }catch(e){ /* corrupted or unavailable storage: fall back silently */ }
+  STATE = defaultState();
+}
+function persist(){
+  try{ localStorage.setItem(STORAGE_KEY, JSON.stringify(STATE)); }catch(e){ /* private mode / quota: demo continues in memory */ }
+}
+function resetDemo(){
+  try{ localStorage.removeItem(STORAGE_KEY); }catch(e){}
+  STATE = defaultState();
+  navigate("#/auth", true);
+  toast("Demo reset to its initial state.");
+}
+
+
+/* ============================================================
+   UTILITIES
+   ============================================================ */
+function esc(s){ if(s===null||s===undefined) return ""; return String(s).replace(/[&<>"']/g, c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c])); }
+function qs(sel,root){ return (root||document).querySelector(sel); }
+function qsa(sel,root){ return Array.from((root||document).querySelectorAll(sel)); }
+function personName(p){ return p.name || p.display_label || p.email; }
+function initials(p){ const n = p.name || p.display_label || p.email || "?"; const parts = n.replace(/@.*/,"").split(/[.\s]+/).filter(Boolean); return (parts[0]?.[0]||"").toUpperCase() + (parts[1]?.[0]||"").toUpperCase() || n[0].toUpperCase(); }
+function findPerson(id){ return STATE.people.find(p=>p.id===id) || STATE.syntheticPeople.find(p=>p.id===id); }
+function fmtDateTime(iso){ if(!iso) return "—"; const d=new Date(iso); if(isNaN(d)) return iso;
+  return d.toLocaleString("en-US",{month:"short",day:"numeric",year:"numeric",hour:"numeric",minute:"2-digit"}); }
+function icon(name, size){
+  size = size||16;
+  const P = {
+    search:'<circle cx="7" cy="7" r="5.2"/><path d="M15 15l-3.5-3.5"/>',
+    back:'<path d="M11 4L5 10l6 6"/>',
+    chevronRight:'<path d="M7 4l6 6-6 6"/>',
+    chevronDown:'<path d="M4 7l6 6 6-6"/>',
+    check:'<path d="M4 10l4 4 8-9"/>',
+    close:'<path d="M5 5l10 10M15 5L5 15"/>',
+    appearance:'<circle cx="10" cy="10" r="7"/><path d="M10 3a7 7 0 000 14z" fill="currentColor" stroke="none"/>',
+    globe:'<circle cx="10" cy="10" r="7"/><path d="M3 10h14M10 3c2.4 2 2.4 12 0 14M10 3c-2.4 2-2.4 12 0 14"/>',
+    user:'<circle cx="10" cy="7.5" r="3.2"/><path d="M3.8 17c1-3.2 3.6-4.8 6.2-4.8s5.2 1.6 6.2 4.8"/>',
+    grid:'<rect x="3" y="3" width="6" height="6" rx="1"/><rect x="11" y="3" width="6" height="6" rx="1"/><rect x="3" y="11" width="6" height="6" rx="1"/><rect x="11" y="11" width="6" height="6" rx="1"/>',
+    bell:'<path d="M5 15h10l-1.4-2v-3.6a3.6 3.6 0 00-7.2 0V13z"/><path d="M8.3 17a1.8 1.8 0 003.4 0"/>',
+    building:'<rect x="4" y="3" width="12" height="14" rx="1"/><path d="M7 7h1.4M7 10h1.4M7 13h1.4M11.6 7H13M11.6 10H13M11.6 13H13"/>',
+    key:'<circle cx="7" cy="13" r="3"/><path d="M9.2 10.8L16 4M13 7l2 2M15.5 4.5l2 2"/>',
+    sliders:'<path d="M4 5h5M12 5h4M4 10h9M16 10h0M4 15h7M14 15h2"/><circle cx="10" cy="5" r="1.4" fill="var(--sidenav-bg,currentColor)"/><circle cx="12" cy="10" r="1.4"/><circle cx="12" cy="15" r="1.4"/>',
+    cpu:'<rect x="6" y="6" width="8" height="8" rx="1"/><path d="M10 2v4M10 14v4M2 10h4M14 10h4"/>',
+    plug:'<path d="M7 3v4M13 3v4M5 7h10v3a5 5 0 01-10 0z"/><path d="M10 15v3"/>',
+    shield:'<path d="M10 3l6 2.2v4.4c0 4-2.6 6.5-6 7.4-3.4-.9-6-3.4-6-7.4V5.2z"/>',
+    clock:'<circle cx="10" cy="10" r="7"/><path d="M10 6.5V10l2.6 1.6"/>',
+    dot:'<circle cx="10" cy="10" r="4"/>',
+    mail:'<rect x="3" y="4.5" width="14" height="11" rx="1.4"/><path d="M3.5 5.5L10 11l6.5-5.5"/>',
+  };
+  return '<svg width="'+size+'" height="'+size+'" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">'+(P[name]||P.dot)+'</svg>';
+}
+
+/* ---- toast ---- */
+function toast(msg, opts){
+  opts = opts||{};
+  const id = "t"+Math.random().toString(36).slice(2);
+  const region = qs("#toast-region");
+  const el = document.createElement("div");
+  el.className = "toast"+(opts.error?" error":"");
+  el.id = id;
+  el.innerHTML = '<span style="flex:1">'+esc(msg)+'</span>'+(opts.actionLabel? '<button class="toast-action" data-action="'+esc(opts.action||"")+'">'+esc(opts.actionLabel)+'</button>' : '');
+  region.appendChild(el);
+  setTimeout(()=>{ el.style.transition="opacity .25s"; el.style.opacity="0"; setTimeout(()=>el.remove(), 260); }, opts.duration||3600);
+}
+
+/* ---- modal ---- */
+let modalCloseFn = null;
+function openModal(html, opts){
+  opts = opts||{};
+  closeModal();
+  const overlay = document.createElement("div");
+  overlay.className = "modal-overlay";
+  overlay.id = "modal-overlay";
+  overlay.innerHTML = '<div class="modal'+(opts.wide?" modal-wide":"")+'" role="dialog" aria-modal="true">'+html+'</div>';
+  document.body.appendChild(overlay);
+  overlay.addEventListener("mousedown", (e)=>{ if(e.target===overlay) closeModal(); });
+  document.addEventListener("keydown", escHandler);
+  modalCloseFn = ()=>{ overlay.remove(); document.removeEventListener("keydown", escHandler); };
+  const first = overlay.querySelector("input,button,select,textarea");
+  if(first) first.focus();
+}
+function escHandler(e){ if(e.key==="Escape") closeModal(); }
+function closeModal(){ if(modalCloseFn){ modalCloseFn(); modalCloseFn=null; } }
+
+/* ---- save status per page/field group ---- */
+function setSaveStatus(key, status){ STATE.ui.saveStatus[key] = status; persist(); rerenderSaveBar(key); }
+function rerenderSaveBar(key){
+  const el = qs('[data-savebar="'+key+'"]');
+  if(el) el.outerHTML = renderSaveBarHTML(key);
+}
+function renderSaveBarHTML(key, opts){
+  opts = opts||{};
+  const status = STATE.ui.saveStatus[key] || "idle";
+  let inner = "";
+  if(status==="saving") inner = '<span class="status"><svg width="14" height="14" viewBox="0 0 20 20" style="animation:sk 1s linear infinite"><circle cx="10" cy="10" r="7" fill="none" stroke="currentColor" stroke-width="2" stroke-dasharray="30 14"/></svg> Saving…</span>';
+  else if(status==="saved") inner = '<span class="status saved">'+icon("check",14)+' Saved</span>';
+  else if(status==="error") inner = '<span class="status error">'+icon("close",14)+' '+(opts.errorMsg||"Your changes haven’t been saved.")+'</span>';
+  else inner = '<span class="status text-faint">'+(opts.idleMsg||"No changes")+'</span>';
+  return '<div class="save-bar" data-savebar="'+key+'">'+inner+
+    '<div class="save-bar-actions">'+
+    (status==="error" ? '<button class="btn btn-sm" data-action="save-retry" data-key="'+key+'">Retry</button>' : '') +
+    '</div></div>';
+}
+
+/* ============================================================
+   ROUTER
+   ============================================================ */
+let currentRouteHandler = null;
+function navigate(hash, replace){
+  if(location.hash===hash){ render(); return; }
+  if(replace) location.replace(hash); else location.hash = hash;
+}
+window.addEventListener("hashchange", render);
+function currentRoute(){ return location.hash || "#/auth"; }
+function routeParts(){ return currentRoute().replace(/^#\//,"").split("/").filter(Boolean); }
+
+
+/* ============================================================
+   NAV CONFIG
+   ============================================================ */
+const NAV_PERSONAL = [
+  {key:"appearance", label:"Appearance", route:"#/settings/appearance", icon:"appearance"},
+  {key:"language-region", label:"Language & Region", route:"#/settings/language-region", icon:"globe"},
+  {key:"account", label:"My Account & Security", route:"#/settings/account", icon:"user"},
+  {key:"home-views", label:"Home & Views", route:"#/settings/home-views", icon:"grid"},
+  {key:"notifications", label:"Notifications", route:"#/settings/notifications", icon:"bell"},
+];
+const NAV_ORG = [
+  {key:"organization", label:"Organization & Members", route:"#/settings/organization", icon:"building", roles:["super_admin","hiring_manager","hr","employee"]},
+  {key:"access", label:"Access & Sign-in", route:"#/settings/access", icon:"key", roles:["super_admin","hr"]},
+  {key:"defaults", label:"Organization Defaults", route:"#/settings/defaults", icon:"sliders", roles:["super_admin","hr"]},
+  {key:"ai-models", label:"AI Models", route:"#/settings/ai-models", icon:"cpu", roles:["super_admin","hr"]},
+  {key:"connections", label:"Connections & Delivery", route:"#/settings/connections", icon:"plug", roles:["super_admin","hr"]},
+  {key:"data-policies", label:"Data Policies", route:"#/settings/data-policies", icon:"shield", roles:["super_admin","hr"]},
+  {key:"activity", label:"Activity", route:"#/settings/activity", icon:"clock", roles:["super_admin","hr","hiring_manager"]},
+];
+function navAllowed(item){
+  if(!item.roles) return true;
+  return item.roles.includes(STATE.demoRole);
+}
+
+function currentUser(){
+  return STATE.people.find(p=>p.email===STATE.account.email) || STATE.people[0];
+}
+
+/* ============================================================
+   APP SHELL
+   ============================================================ */
+function applyThemeAttrs(){
+  const root = document.documentElement;
+  const t = STATE.appearance.theme;
+  if(t==="system") root.removeAttribute("data-theme"); else root.setAttribute("data-theme", t);
+  root.setAttribute("data-accent", STATE.appearance.accent);
+  root.setAttribute("data-textsize", STATE.appearance.textSize);
+}
+
+function renderShell(activeKey, bodyHtml, opts){
+  opts = opts || {};
+  const role = STATE.demoRole;
+  const personalHtml = NAV_PERSONAL.map(item=>navItemHtml(item, activeKey)).join("");
+  const orgItems = NAV_ORG.filter(navAllowed);
+  const orgHtml = orgItems.length ? orgItems.map(item=>navItemHtml(item, activeKey)).join("")
+    : '<div class="nav-empty">No organization settings are available for this role.</div>';
+  const user = currentUser();
+
+  return '<div class="appshell">'+
+    '<div class="topbar">'+
+      '<div class="topbar-left">'+
+        '<button class="backlink hidden-mobile-toggle" data-action="toggle-nav" aria-label="Menu">'+icon("grid",18)+'</button>'+
+        (opts.backTo ? '<button class="backlink" data-action="nav" data-href="'+opts.backTo+'">'+icon("back",16)+' '+esc(opts.backLabel||"Back to workspace")+'</button>' :
+          '<button class="backlink" data-action="nav" data-href="#/home">'+icon("back",16)+' Back to workspace</button>') +
+      '</div>'+
+      '<div class="brandmark">'+
+        '<span class="sq"></span> Settings'+
+      '</div>'+
+      '<div class="topbar-right">'+
+        '<div class="org-switcher"><span class="org-dot"><span class="sq"></span></span> '+esc(ORG.display_name)+'</div>'+
+        '<div class="avatar" title="'+esc(user?personName(user):STATE.account.name)+'">'+esc(initials(user||{name:STATE.account.name}))+'</div>'+
+      '</div>'+
+    '</div>'+
+    '<div class="shell-body">'+
+      '<nav class="sidenav'+(STATE.ui.navOpen?" open":"")+'" id="sidenav">'+
+        '<div class="nav-search"><span style="position:absolute;left:10px;top:50%;transform:translateY(-50%);color:var(--text-faint)">'+icon("search",15)+'</span>'+
+          '<input type="search" id="settings-search" placeholder="Search settings" value="'+esc(opts.searchQ||"")+'" data-action="settings-search"/></div>'+
+        (opts.searchResults ? opts.searchResults :
+          '<div><div class="nav-group-label">Personal</div><div class="nav-list">'+personalHtml+'</div></div>'+
+          '<div><div class="nav-group-label">Organization</div><div class="nav-list">'+orgHtml+'</div></div>'
+        )+
+        '<div style="margin-top:auto;padding:10px 10px 0;border-top:1px solid var(--border);">'+
+          '<div class="nav-group-label" style="padding:0 0 6px">Viewing as</div>'+
+          '<div style="font-size:var(--fs-cap);font-weight:600">'+esc(ROLE_LABELS[role])+'</div>'+
+          '<div class="text-faint" style="font-size:11px;margin-top:2px">Use Demo controls (bottom right) to switch role.</div>'+
+        '</div>'+
+      '</nav>'+
+      '<main class="content"><div class="content-inner'+(opts.wide?" wide":"")+'">'+bodyHtml+'</div></main>'+
+    '</div>'+
+  '</div>';
+}
+function navItemHtml(item, activeKey){
+  return '<button class="nav-item'+(item.key===activeKey?" active":"")+'" data-action="nav" data-href="'+item.route+'">'+icon(item.icon,17)+'<span>'+esc(item.label)+'</span></button>';
+}
+
+function pageHeader(title, sub, actionsHtml, scopeHtml){
+  return '<div class="page-header"><div><h1>'+esc(title)+'</h1>'+
+    (sub?'<div class="page-sub">'+sub+'</div>':'')+
+    (scopeHtml?'<div class="scope-row">'+scopeHtml+'</div>':'')+
+    '</div>'+(actionsHtml?'<div class="page-header-actions">'+actionsHtml+'</div>':'')+'</div>';
+}
+function fieldSelect(id,label,options,selected,hint){
+  const opts = options.map(o=>'<option value="'+esc(o.value)+'"'+(o.value===selected?" selected":"")+'>'+esc(o.label)+'</option>').join("");
+  return '<div class="field"><label for="'+id+'">'+esc(label)+'</label><div class="select-wrap"><select id="'+id+'">'+opts+'</select></div>'+(hint?'<div class="hint">'+hint+'</div>':'')+'</div>';
+}
+function fieldText(id,label,value,hint,type){
+  return '<div class="field"><label for="'+id+'">'+esc(label)+'</label><input type="'+(type||"text")+'" id="'+id+'" value="'+esc(value)+'"/>'+(hint?'<div class="hint">'+hint+'</div>':'')+'</div>';
+}
+function tabsHtml(tabs, active, action){
+  return '<div class="tabs">'+tabs.map(t=>'<button class="tab'+(t.key===active?" active":"")+'" data-action="'+action+'" data-tab="'+t.key+'">'+esc(t.label)+'</button>').join("")+'</div>';
+}
+function statusBadge(text, kind){
+  const map = {success:"badge-success",warning:"badge-warning",error:"badge-error",info:"badge-info",neutral:"badge-neutral",accent:"badge-accent"};
+  return '<span class="badge '+(map[kind]||"badge-neutral")+'"><span class="dot"></span>'+esc(text)+'</span>';
+}
+function emptyState(title, sub, actionHtml){
+  return '<div class="empty-state"><div class="icon">'+icon("search",20)+'</div><div style="font-weight:600;color:var(--text)">'+esc(title)+'</div>'+
+    (sub?'<div style="font-size:var(--fs-aux)">'+sub+'</div>':'')+(actionHtml||'')+'</div>';
+}
+function demoBadge(){ return '<span class="demo-tag">'+icon("dot",9)+' Demo</span>'; }
+
+
+/* ============================================================
+   MAIN RENDER DISPATCH
+   ============================================================ */
+function render(){
+  applyThemeAttrs();
+  const app = qs("#app");
+  const parts = routeParts(); // e.g. ["settings","appearance"]
+  window.wirePageExtra = null;
+  let html = "";
+  const AUTH_PREFIXES = ["auth","onboarding","organizations","invites"];
+  try{
+    if(AUTH_PREFIXES.includes(parts[0])){
+      html = renderAuthRoute(parts);
+    } else if(!STATE.session.signedIn){
+      html = renderAuthRoute(["auth"]);
+    } else if(parts[0]==="settings"){
+      html = renderSettingsRoute(parts);
+    } else if(parts[0]==="home"){
+      html = renderHomeStub();
+    } else {
+      html = renderSettingsRoute(["settings","appearance"]);
+    }
+  }catch(err){
+    console.error(err);
+    html = '<div style="padding:60px;text-align:center;color:var(--error)">Something went wrong rendering this screen.<br><span class="text-faint" style="font-size:12px">'+esc(err.message)+'</span></div>';
+  }
+  app.innerHTML = html;
+  window.scrollTo(0,0);
+  mountDemoControls();
+  if(qs("#code-row")) wireCodeBoxes();
+  if(qs("#region-select")) wireLocaleInputs();
+  if(window.wirePageExtra) window.wirePageExtra();
+  const focusEl = qs("[data-autofocus]");
+  if(focusEl) focusEl.focus();
+}
+
+function renderHomeStub(){
+  return '<div style="min-height:100vh;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:14px;background:var(--canvas)">'+
+    '<div class="brandmark" style="font-size:20px">'+icon("grid",22)+' HireOS Workspace</div>'+
+    '<div class="text-muted" style="max-width:440px;text-align:center">This prototype focuses on the shared Settings, Organization, Account & Access module. Business workspaces (Screening, Interview, JD) aren’t part of this build.</div>'+
+    '<button class="btn btn-primary" data-action="nav" data-href="#/settings/appearance">Open Settings</button>'+
+  '</div>';
+}
+
+/* ============================================================
+   GLOBAL EVENT DELEGATION
+   ============================================================ */
+document.addEventListener("click", (e)=>{
+  const t = e.target.closest("[data-action]");
+  if(!t) return;
+  const action = t.getAttribute("data-action");
+  handleAction(action, t, e);
+});
+document.addEventListener("change", (e)=>{
+  const t = e.target.closest("[data-onchange]");
+  if(!t) return;
+  handleAction(t.getAttribute("data-onchange"), t, e);
+});
+document.addEventListener("submit", (e)=>{
+  const t = e.target.closest("form[data-onsubmit]");
+  if(!t) return;
+  e.preventDefault();
+  handleAction(t.getAttribute("data-onsubmit"), t, e);
+});
+document.addEventListener("keydown",(e)=>{
+  if(e.key==="Enter"){
+    const t = e.target.closest("[data-enter-action]");
+    if(t){ e.preventDefault(); handleAction(t.getAttribute("data-enter-action"), t, e); }
+  }
+});
+
+function handleAction(action, el, evt){
+  const ACTIONS = window.__ACTIONS__;
+  if(ACTIONS && ACTIONS[action]){ ACTIONS[action](el, evt); return; }
+  console.warn("No handler for action:", action);
+}
+window.__ACTIONS__ = {};
+function on(name, fn){ window.__ACTIONS__[name] = fn; }
+
+on("nav", (el)=>{ navigate(el.getAttribute("data-href")); });
+on("toggle-nav", ()=>{ STATE.ui.navOpen = !STATE.ui.navOpen; const sn=qs("#sidenav"); if(sn) sn.classList.toggle("open", STATE.ui.navOpen); });
+on("noop", ()=>{});
+
+
+/* ============================================================
+   AUTH SHELL WRAPPER
+   ============================================================ */
+function authWrap(cardHtml, quote){
+  return '<div class="auth-shell">'+
+    '<div class="auth-brand"><div class="auth-brand-grid"></div>'+
+      '<div class="auth-brand-logo"><img src="assets/sending-labs-logo.png" alt="Sending Labs"/></div>'+
+      '<div class="auth-brand-quote">'+(quote||'<b>One workspace, six roles.</b><br>HireOS Command keeps hiring, sign-in and permissions consistent across every module your team uses — whatever email they sign up with.')+'</div>'+
+    '</div>'+
+    '<div class="auth-main"><div class="auth-card">'+cardHtml+'</div></div>'+
+  '</div>';
+}
+function authFoot(html){ return '<div class="auth-foot">'+html+'</div>'; }
+
+function renderAuthRoute(parts){
+  const p0 = parts[0]||"auth", p1 = parts[1];
+  if(p0==="auth" && p1==="verify") return renderAuthVerify();
+  if(p0==="auth" && p1==="recovery") return renderAuthRecovery();
+  if(p0==="onboarding" && p1==="profile") return renderOnboardingProfile();
+  if(p0==="organizations" && p1==="new") return renderOrganizationsNew();
+  if(p0==="organizations") return renderOrganizations();
+  if(p0==="invites") return renderInvite(p1);
+  return renderAuthEmail();
+}
+
+/* ---- 1. Continue with email ---- */
+function renderAuthEmail(){
+  const val = esc(STATE.verify.email||"");
+  return authWrap(
+    '<h1>Sign in to HireOS</h1>'+
+    '<div class="lead">Use your work or personal email.</div>'+
+    '<div class="auth-form">'+
+      fieldText("email-input","Email address", val, "", "email").replace('id="email-input"','id="email-input" data-autofocus placeholder="you@company.com" data-enter-action="auth-continue"')+
+      '<button class="btn btn-primary btn-block" data-action="auth-continue">Continue</button>'+
+    '</div>'+
+    authFoot('No company domain required — personal Gmail, Outlook or any working address is fine.<br>Trouble signing in? <button class="link-btn" data-action="nav" data-href="#/auth/recovery">Recover your account</button>')
+  );
+}
+on("auth-continue", ()=>{
+  const input = qs("#email-input");
+  const email = (input.value||"").trim();
+  if(!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)){
+    input.classList.add("invalid");
+    let hint = qs("#email-input").parentElement.querySelector(".err");
+    if(!hint){ hint = document.createElement("div"); hint.className="err"; hint.innerHTML = icon("close",12)+" Enter a valid email address."; input.parentElement.appendChild(hint); }
+    input.focus();
+    return;
+  }
+  STATE.verify.email = email;
+  STATE.verify.code = "482913";
+  STATE.verify.input = "";
+  STATE.verify.attempts = 0;
+  STATE.verify.locked = false;
+  STATE.verify.sentAt = Date.now();
+  STATE.verify.cooldownUntil = Date.now() + 60000;
+  STATE.verify.lastError = null;
+  persist();
+  navigate("#/auth/verify");
+});
+
+/* ---- 2. Verify email ---- */
+function renderAuthVerify(){
+  const v = STATE.verify;
+  const boxes = (v.input||"").padEnd(6," ").split("").map((c,i)=>
+    '<input class="code-box" maxlength="1" inputmode="numeric" data-code-idx="'+i+'" value="'+(c.trim()?esc(c):"")+'"'+(i===0?' data-autofocus':'')+'/>'
+  ).join("");
+  let errorHtml = "";
+  if(v.lastError==="wrong") errorHtml = '<div class="field err">'+icon("close",12)+" That code isn't valid. Try again. ("+(5-v.attempts)+" attempt"+((5-v.attempts)===1?"":"s")+" left)</div>";
+  if(v.lastError==="expired") errorHtml = '<div class="field err">'+icon("close",12)+" This code has expired. Send a new code.</div>";
+  if(v.locked) errorHtml = '<div class="field err">'+icon("close",12)+" Too many incorrect attempts. Request a new code to continue.</div>";
+  const cooldownLeft = Math.max(0, Math.ceil((v.cooldownUntil-Date.now())/1000));
+  return authWrap(
+    '<h1>Enter your code</h1>'+
+    '<div class="lead">We sent a 6-digit code to <b>'+esc(v.email||"your email")+'</b>.</div>'+
+    '<div class="auth-form">'+
+      '<div class="code-input-row" id="code-row">'+boxes+'</div>'+
+      errorHtml+
+      '<button class="btn btn-primary btn-block" data-action="verify-submit" '+(v.locked?"disabled":"")+'>Verify and continue</button>'+
+      '<div style="display:flex;justify-content:space-between;align-items:center;">'+
+        '<button class="link-btn" data-action="nav" data-href="#/auth">Change email</button>'+
+        (cooldownLeft>0
+          ? '<span class="timer" id="resend-timer">Resend in '+cooldownLeft+'s</span>'
+          : '<button class="link-btn" data-action="verify-resend">Resend code</button>')+
+      '</div>'+
+    '</div>'+
+    authFoot('Demo code for this walkthrough: <b class="mono">482913</b>. Use Demo controls to jump straight to an expired or locked state.')
+  );
+}
+function wireCodeBoxes(){
+  const boxes = qsa("#code-row .code-box");
+  boxes.forEach((b,i)=>{
+    b.addEventListener("input", ()=>{
+      b.value = b.value.replace(/[^0-9]/g,"").slice(0,1);
+      const arr = boxes.map(x=>x.value||" ");
+      STATE.verify.input = arr.join("").replace(/\s+$/,"");
+      if(b.value && boxes[i+1]) boxes[i+1].focus();
+    });
+    b.addEventListener("keydown",(e)=>{
+      if(e.key==="Backspace" && !b.value && boxes[i-1]) boxes[i-1].focus();
+      if(e.key==="Enter") window.__ACTIONS__["verify-submit"]();
+    });
+    b.addEventListener("paste",(e)=>{
+      e.preventDefault();
+      const txt = (e.clipboardData.getData("text")||"").replace(/[^0-9]/g,"").slice(0,6);
+      txt.split("").forEach((ch,idx)=>{ if(boxes[idx]) boxes[idx].value = ch; });
+      STATE.verify.input = txt;
+      const last = boxes[Math.min(txt.length,6)-1]; if(last) last.focus();
+    });
+  });
+}
+on("verify-resend", ()=>{
+  const v = STATE.verify;
+  if(Date.now() < v.cooldownUntil) return;
+  v.code = "482913"; v.sentAt = Date.now(); v.attempts = 0; v.locked=false; v.lastError=null; v.input="";
+  v.cooldownUntil = Date.now()+60000;
+  persist(); render();
+  toast("A new code was sent. Any earlier code is now invalid.");
+});
+on("verify-submit", ()=>{
+  const v = STATE.verify;
+  if(v.locked) return;
+  if(Date.now() > v.sentAt + v.expiresInMs){ v.lastError="expired"; persist(); render(); return; }
+  if((v.input||"").length!==6){ v.lastError="wrong"; persist(); render(); return; }
+  if(v.input !== v.code){
+    v.attempts++;
+    if(v.attempts>=5){ v.locked = true; }
+    v.lastError="wrong"; persist(); render(); return;
+  }
+  // success
+  completeVerification(v.email);
+});
+function completeVerification(email){
+  STATE.verify.lastError = null;
+  const existing = STATE.people.find(p=>p.email.toLowerCase()===email.toLowerCase());
+  if(existing){
+    signIn(existing.id);
+    toast("Signed in as "+personName(existing)+".");
+    navigate("#/settings/appearance", true);
+    return;
+  }
+  STATE.onboardingName = "";
+  navigate("#/onboarding/profile", true);
+}
+function signIn(personId){
+  STATE.session.signedIn = true;
+  STATE.session.userId = personId;
+  STATE.session.orgId = ORG.id;
+  const p = findPerson(personId);
+  if(p){ STATE.account.email = p.email; STATE.account.name = personName(p);
+    STATE.demoRole = p.system_role || (p.role) || "employee"; }
+  persist();
+}
+
+/* ---- 3. Complete profile (first-time email) ---- */
+function renderOnboardingProfile(){
+  return authWrap(
+    '<h1>Welcome to HireOS</h1>'+
+    '<div class="lead">A couple of details before we continue with <b>'+esc(STATE.verify.email)+'</b>.</div>'+
+    '<div class="auth-form">'+
+      fieldText("name-input","Full name", STATE.onboardingName||"", "Shown to teammates in HireOS.").replace('id="name-input"','id="name-input" data-autofocus placeholder="Jordan Lee"') +
+      '<button class="btn btn-primary btn-block" data-action="profile-continue">Continue</button>'+
+    '</div>'+
+    authFoot('This creates your personal HireOS account. It doesn’t join or create an organization yet.')
+  );
+}
+on("profile-continue", ()=>{
+  const val = (qs("#name-input").value||"").trim();
+  if(!val){ qs("#name-input").classList.add("invalid"); qs("#name-input").focus(); return; }
+  STATE.onboardingName = val;
+  // create a fresh personal account not tied to Sending Labs yet
+  const newId = "new-"+Math.random().toString(36).slice(2,8);
+  const newPerson = { id:newId, name:val, email:STATE.verify.email, product_group:null, job_title:null, system_role:null, is_new:true };
+  STATE.people.push(newPerson);
+  STATE.session.signedIn = true;
+  STATE.session.userId = newId;
+  STATE.session.orgId = null;
+  STATE.account.email = newPerson.email; STATE.account.name = val;
+  persist();
+  navigate("#/organizations", true);
+});
+
+/* ---- 4. Your organizations ---- */
+function renderOrganizations(){
+  const hasOrg = !!STATE.session.orgId;
+  return authWrap(
+    '<h1>Your organizations</h1>'+
+    (hasOrg
+      ? '<div class="lead">You’re a member of one organization.</div>'+
+        '<div class="org-pick-row" data-action="nav" data-href="#/settings/appearance"><div class="lr-main"><span class="avatar" style="background:var(--brand-panel);color:#fff">SL</span><div><div class="lr-title">'+esc(ORG.display_name)+'</div><div class="lr-sub">'+esc(ROLE_LABELS[STATE.demoRole]||"Member")+'</div></div></div>'+icon("chevronRight",16)+'</div>'
+      : '<div class="lead">You’re not part of an organization yet.</div>'+
+        emptyState("No organizations", "Create one to start hiring, or wait for an invitation to arrive at "+esc(STATE.verify.email||STATE.account.email)+".")
+    )+
+    '<div style="margin-top:18px;display:flex;flex-direction:column;gap:10px;">'+
+      '<button class="btn btn-primary btn-block" data-action="nav" data-href="#/organizations/new">Create an organization</button>'+
+    '</div>'+
+    authFoot('Looking to join an existing team instead? Ask an admin to invite '+esc(STATE.verify.email||STATE.account.email)+'.')
+  );
+}
+
+/* ---- 5. Create organization ---- */
+function renderOrganizationsNew(){
+  return authWrap(
+    '<h1>Create your organization</h1>'+
+    '<div class="lead">You’ll become its Super Admin. This doesn’t claim any existing company by name or domain.</div>'+
+    '<div class="auth-form">'+
+      fieldText("org-name","Organization name","","e.g. Acme Talent").replace('id="org-name"','id="org-name" data-autofocus placeholder="Acme Talent"')+
+      fieldSelect("org-region","Region format", Object.keys(REGIONS).map(k=>({value:k,label:REGIONS[k].label})), "en-US")+
+      fieldSelect("org-tz","Organization time zone", TIMEZONES.map(t=>({value:t.id,label:t.label})), "America/New_York")+
+      fieldSelect("org-currency","Default business currency", [{value:"USD",label:"USD — US Dollar"},{value:"GBP",label:"GBP — British Pound"},{value:"AUD",label:"AUD — Australian Dollar"},{value:"CAD",label:"CAD — Canadian Dollar"}], "USD")+
+      '<button class="btn btn-primary btn-block" data-action="org-create">Create organization</button>'+
+    '</div>'+
+    authFoot('These become the organization’s defaults — they don’t apply to your personal display preferences.')
+  );
+}
+on("org-create", ()=>{
+  const name = (qs("#org-name").value||"").trim();
+  if(!name){ qs("#org-name").classList.add("invalid"); qs("#org-name").focus(); return; }
+  STATE.session.orgId = "demo-org-new";
+  STATE.demoRole = "super_admin";
+  const me = findPerson(STATE.session.userId);
+  if(me){ me.system_role = "super_admin"; }
+  persist();
+  toast("Organization “"+name+"” created. You’re its Super Admin.");
+  navigate("#/settings/organization", true);
+});
+
+/* ---- 6. Invitation preview / accept ---- */
+function renderInvite(id){
+  const inv = STATE.invitations.find(i=>i.id===id) || STATE.invitations[0];
+  const roleLabel = ROLE_LABELS[inv.role]||inv.role;
+  let body = "";
+  if(inv.status==="pending"){
+    body = '<div class="lead">'+esc(inv.invitedBy)+' invited you to join <b>'+esc(ORG.display_name)+'</b> as <b>'+esc(roleLabel)+'</b>'+(inv.scope?' on '+esc(inv.scope):'')+'.</div>'+
+      '<div class="card" style="padding:14px 16px;margin:6px 0 18px"><dl class="kv"><dt>Invited email</dt><dd>'+esc(inv.email)+'</dd><dt>Expires</dt><dd>'+esc(inv.expiresAt)+'</dd></dl></div>'+
+      '<div class="auth-form">'+
+        '<button class="btn btn-primary btn-block" data-action="invite-accept" data-id="'+inv.id+'">Accept invitation</button>'+
+        '<button class="btn btn-block" data-action="invite-mismatch" data-id="'+inv.id+'">I’m signed in with a different email</button>'+
+      '</div>';
+  } else if(inv.status==="expired"){
+    body = '<div class="lead">This invitation to join <b>'+esc(ORG.display_name)+'</b> has expired.</div>'+
+      emptyState("Invitation no longer available","Ask "+esc(inv.invitedBy)+" to send a new one to "+esc(inv.email)+".")+
+      '<div class="auth-form" style="margin-top:16px"><button class="btn btn-primary btn-block" data-action="invite-request-new" data-id="'+inv.id+'">Request a new invitation</button></div>';
+  } else if(inv.status==="revoked"){
+    body = '<div class="lead">This invitation was revoked by an admin.</div>'+
+      emptyState("This invitation is no longer available","Contact an organization admin if you still need access.");
+  } else if(inv.status==="accepted"){
+    body = '<div class="lead">You’ve already joined <b>'+esc(ORG.display_name)+'</b> with this invitation.</div>'+
+      '<div class="auth-form"><button class="btn btn-primary btn-block" data-action="nav" data-href="#/settings/appearance">Go to workspace</button></div>';
+  }
+  return authWrap('<h1>Join organization</h1>'+body,
+    '<b>Invitations are scoped.</b><br>A link only ever unlocks the organization, role and email it was created for — never more.');
+}
+on("invite-accept", (el)=>{
+  const inv = STATE.invitations.find(i=>i.id===el.getAttribute("data-id"));
+  if(!inv || inv.status!=="pending") return;
+  inv.status = "accepted";
+  let person = STATE.people.find(p=>p.email.toLowerCase()===inv.email.toLowerCase());
+  if(!person){
+    person = { id:"new-"+Math.random().toString(36).slice(2,8), name:null, display_label:inv.email, email:inv.email, product_group:null, job_title:null, system_role:inv.role };
+    STATE.people.push(person);
+  } else { person.system_role = inv.role; }
+  STATE.activity.unshift({id:"a"+Date.now(), ts:new Date().toISOString(), actor:person.name||inv.email, type:"Member", object:ORG.display_name, summary:"Accepted invitation and joined as "+(ROLE_LABELS[inv.role]||inv.role)});
+  signIn(person.id);
+  persist();
+  toast("Welcome to "+ORG.display_name+".");
+  navigate("#/settings/organization", true);
+});
+on("invite-mismatch", (el)=>{
+  openModal(
+    '<div class="modal-head"><h3>Switch accounts</h3><button class="btn btn-icon btn-ghost" data-action="modal-close">'+icon("close",16)+'</button></div>'+
+    '<div class="modal-body">This invitation is for a specific email address. Continue with that email to accept it — switching won’t automatically bind or upgrade your current account.'+
+    '<div class="field" style="margin-top:6px">'+fieldText("switch-email","Continue with the invited email","","")+'</div></div>'+
+    '<div class="modal-foot"><button class="btn" data-action="modal-close">Cancel</button><button class="btn btn-primary" data-action="invite-switch-confirm" data-id="'+el.getAttribute("data-id")+'">Continue</button></div>'
+  );
+});
+on("invite-switch-confirm", (el)=>{
+  const inv = STATE.invitations.find(i=>i.id===el.getAttribute("data-id"));
+  closeModal();
+  STATE.verify.email = inv.email; STATE.verify.code="482913"; STATE.verify.input=""; STATE.verify.attempts=0; STATE.verify.locked=false; STATE.verify.sentAt=Date.now(); STATE.verify.cooldownUntil=Date.now()+60000;
+  persist();
+  toast("Verify "+inv.email+" to continue accepting this invitation.");
+  navigate("#/auth/verify");
+});
+on("invite-request-new", (el)=>{
+  toast("Requested — this is simulated; no email was actually sent.");
+});
+on("modal-close", closeModal);
+
+/* ---- 7. Account recovery ---- */
+function renderAuthRecovery(){
+  return authWrap(
+    '<h1>Recover your account</h1>'+
+    '<div class="lead">Can’t access your email anymore? We’ll verify ownership manually — this can’t be used to take over someone else’s account.</div>'+
+    '<div class="auth-form">'+
+      fieldText("recovery-email","Email you can no longer access","","").replace('id="recovery-email"','id="recovery-email" data-autofocus')+
+      '<textarea id="recovery-note" placeholder="Tell us how we can verify it’s you (optional)" rows="3"></textarea>'+
+      '<button class="btn btn-primary btn-block" data-action="recovery-submit">Submit recovery request</button>'+
+      '<button class="btn btn-ghost btn-block" data-action="nav" data-href="#/auth">Back to sign in</button>'+
+    '</div>'
+  );
+}
+on("recovery-submit", ()=>{
+  const v = (qs("#recovery-email").value||"").trim();
+  if(!v){ qs("#recovery-email").classList.add("invalid"); return; }
+  const card = qs(".auth-card");
+  card.innerHTML = '<h1>Request submitted</h1><div class="lead">Recovery request submitted.</div>'+
+    emptyState("We’ll review this by hand","Account recovery is handled by HireOS platform support, not an org admin — no one can take over your account without proof of ownership.")+
+    '<div class="auth-form" style="margin-top:16px"><button class="btn btn-primary btn-block" data-action="nav" data-href="#/auth">Back to sign in</button></div>';
+});
+
+
+/* ============================================================
+   DEMO CONTROLS (independent of any real form — PRD §5)
+   ============================================================ */
+function mountDemoControls(){
+  let host = qs("#demo-controls");
+  if(!host){ host = document.createElement("div"); host.id="demo-controls"; document.body.appendChild(host); }
+  const open = STATE.ui.demoPanelOpen;
+  host.innerHTML = '<button class="demo-fab" data-action="demo-toggle" aria-label="Demo controls" title="Demo controls">'+icon("sliders",20)+'</button>'+
+    (open ? '<div class="demo-panel">'+
+      '<div><h4>Viewing as (role overlay)</h4><div class="demo-role-grid">'+
+        ROLE_ORDER.map(r=>'<button class="demo-role-btn'+(STATE.demoRole===r?" active":"")+'" data-action="demo-role" data-role="'+r+'">'+esc(ROLE_LABELS[r])+'</button>').join("")+
+      '</div><div class="hint" style="margin-top:6px">Simulated only — server-side checks aren’t implemented in this prototype.</div></div>'+
+      '<div><h4>Jump to</h4><div class="demo-links">'+
+        '<button data-action="nav" data-href="#/auth">Sign-in · continue with email</button>'+
+        '<button data-action="demo-jump-verify-error">Sign-in · wrong / locked code</button>'+
+        '<button data-action="demo-jump-neworg">Sign-in · new email → create org</button>'+
+        '<button data-action="nav" data-href="#/invites/inv1">Invite · pending</button>'+
+        '<button data-action="nav" data-href="#/invites/inv2">Invite · expired</button>'+
+        '<button data-action="nav" data-href="#/invites/inv3">Invite · revoked</button>'+
+        '<button data-action="nav" data-href="#/invites/inv4">Invite · already accepted</button>'+
+        '<button data-action="nav" data-href="#/auth/recovery">Account recovery</button>'+
+        '<button data-action="demo-jump-settings">Settings workspace (signed in as Mason)</button>'+
+      '</div></div>'+
+      '<div><h4>Session</h4><div class="demo-links">'+
+        '<button data-action="demo-signout">Sign out</button>'+
+        '<button data-action="demo-reset">Reset demo data</button>'+
+        '<button data-action="about-open">About this prototype</button>'+
+      '</div></div>'+
+    '</div>' : '');
+}
+on("demo-toggle", ()=>{ STATE.ui.demoPanelOpen = !STATE.ui.demoPanelOpen; mountDemoControls(); });
+on("demo-role", (el)=>{ STATE.demoRole = el.getAttribute("data-role"); persist(); render(); toast("Viewing as "+ROLE_LABELS[STATE.demoRole]+"."); });
+on("demo-reset", resetDemo);
+on("demo-signout", ()=>{ STATE.session.signedIn=false; STATE.session.userId=null; STATE.session.orgId=null; persist(); navigate("#/auth", true); toast("Signed out of this device."); });
+on("demo-jump-verify-error", ()=>{
+  STATE.verify.email = "reviewer@example.com"; STATE.verify.code="482913"; STATE.verify.input="111111";
+  STATE.verify.attempts = 4; STATE.verify.locked=false; STATE.verify.lastError="wrong"; STATE.verify.sentAt = Date.now(); STATE.verify.cooldownUntil = Date.now()+45000;
+  persist(); navigate("#/auth/verify"); toast("One more wrong attempt will lock this code.");
+});
+on("demo-jump-neworg", ()=>{
+  STATE.verify.email = "founder@newcompany.io"; STATE.verify.code="482913"; STATE.verify.input=""; STATE.verify.attempts=0; STATE.verify.locked=false; STATE.verify.sentAt=Date.now(); STATE.verify.cooldownUntil=0;
+  persist(); navigate("#/auth/verify");
+});
+on("demo-jump-settings", ()=>{ signIn("ref-person-01"); navigate("#/settings/appearance", true); });
+
+
+/* ============================================================
+   SETTINGS ROUTE DISPATCH
+   ============================================================ */
+const SETTINGS_SEARCH_INDEX = [
+  {key:"appearance", label:"Appearance", group:"Personal", terms:"theme dark light deep accent color text size font"},
+  {key:"language-region", label:"Language & Region", group:"Personal", terms:"language timezone locale date format currency"},
+  {key:"account", label:"My Account & Security", group:"Personal", terms:"email password device session sign out"},
+  {key:"home-views", label:"Home & Views", group:"Personal", terms:"homepage cards collapse module dashboard"},
+  {key:"notifications", label:"Notifications", group:"Personal", terms:"email alerts quiet hours digest"},
+  {key:"organization", label:"Organization & Members", group:"Organization", terms:"members roles invite team people responsibilities"},
+  {key:"access", label:"Access & Sign-in", group:"Organization", terms:"invitations join rules verification"},
+  {key:"defaults", label:"Organization Defaults", group:"Organization", terms:"default currency timezone region"},
+  {key:"ai-models", label:"AI Models", group:"Organization", terms:"model catalog policy budget fallback evaluation usage cost"},
+  {key:"connections", label:"Connections & Delivery", group:"Organization", terms:"mailbox email calendar folder sending from reply-to"},
+  {key:"data-policies", label:"Data Policies", group:"Organization", terms:"retention privacy policy audit"},
+  {key:"activity", label:"Activity", group:"Organization", terms:"audit log history changes"},
+];
+function renderSettingsRoute(parts){
+  const page = parts[1];
+  if(page==="members" && parts[2]) return renderMemberDetail(parts[2]);
+  const map = {
+    "appearance": renderAppearance,
+    "language-region": renderLanguageRegion,
+    "account": renderAccount,
+    "home-views": renderHomeViews,
+    "notifications": renderNotifications,
+    "organization": renderOrganization,
+    "access": renderAccess,
+    "defaults": renderDefaults,
+    "ai-models": renderAiModels,
+    "connections": renderConnections,
+    "data-policies": renderDataPolicies,
+    "activity": renderActivity,
+  };
+  const orgOnly = ["organization","access","defaults","ai-models","connections","data-policies","activity"];
+  const navItem = NAV_ORG.find(n=>n.key===page);
+  if(orgOnly.includes(page) && navItem && !navAllowed(navItem)){
+    return renderShell(page, '<div style="padding-top:60px">'+emptyState("You don't have access to this page","Your current role ("+esc(ROLE_LABELS[STATE.demoRole])+") doesn't include this area.", '<button class="btn" style="margin-top:8px" data-action="nav" data-href="#/settings/appearance">Back to settings</button>')+'</div>');
+  }
+  const fn = map[page] || renderAppearance;
+  return fn();
+}
+on("settings-search", (el)=>{
+  const q = el.value.toLowerCase();
+  const results = q ? SETTINGS_SEARCH_INDEX.filter(i=> (i.label+" "+i.terms).toLowerCase().includes(q)) : null;
+  let html;
+  if(!q){ html = null; }
+  else if(results.length===0){ html = '<div class="nav-empty">'+emptyState("No settings match your search",'', '<button class="link-btn" data-action="search-clear">Clear search</button>')+'</div>'; }
+  else{
+    const groups = {};
+    results.forEach(r=>{ (groups[r.group]=groups[r.group]||[]).push(r); });
+    html = Object.keys(groups).map(g=>'<div><div class="nav-group-label">'+g+'</div><div class="nav-list">'+
+      groups[g].map(r=>navItemHtml({key:r.key,label:r.label,route:"#/settings/"+r.key,icon:(NAV_PERSONAL.concat(NAV_ORG).find(n=>n.key===r.key)||{}).icon||"dot"}, "")).join("")+
+      '</div></div>').join("");
+  }
+  const parts = routeParts();
+  const activeKey = parts[1];
+  const cur = qs(".sidenav");
+  const wrap = document.createElement("div"); wrap.innerHTML = renderShell(activeKey, "", {searchQ:el.value, searchResults:html});
+  const freshNav = wrap.querySelector(".sidenav");
+  cur.replaceWith(freshNav);
+  qs("#settings-search").focus();
+  qs("#settings-search").setSelectionRange(el.value.length, el.value.length);
+});
+on("search-clear", ()=>{ render(); });
+
+/* small helper: current member scope note used across pages */
+function scopeNote(scopeText, editableText){
+  return '<span class="badge badge-neutral">'+esc(scopeText)+'</span>'+(editableText?'<span class="text-faint" style="font-size:var(--fs-cap)">'+esc(editableText)+'</span>':'');
+}
+
+
+/* ============================================================
+   PERSONAL · APPEARANCE
+   ============================================================ */
+function renderAppearance(){
+  const a = STATE.appearance;
+  const themes = [
+    {v:"light", label:"Light", sw:"linear-gradient(135deg,#fff,#eef1f8)"},
+    {v:"dark", label:"Dark", sw:"linear-gradient(135deg,#1c202c,#12141c)"},
+    {v:"deep", label:"Deep", sw:"linear-gradient(135deg,#0c1f3b,#071427)"},
+    {v:"system", label:"System", sw:"linear-gradient(135deg,#fff 50%,#12141c 50%)"},
+  ];
+  const accents = [
+    {v:"blue", label:"Blue", sw:"#3B63E0"}, {v:"teal", label:"Teal", sw:"#0E8F82"}, {v:"violet", label:"Violet", sw:"#7C5CD9"},
+  ];
+  const sizes = [{v:"small",label:"Small"},{v:"medium",label:"Medium"},{v:"large",label:"Large"}];
+
+  const body =
+    pageHeader("Appearance","Applies across every HireOS module on this account.")+
+    (a.syncFailed ? '<div class="card" style="padding:12px 16px;margin-bottom:18px;border-color:var(--warning);background:var(--warning-bg);display:flex;justify-content:space-between;align-items:center;gap:12px">'+
+      '<span class="status-line" style="color:var(--warning)">'+icon("close",15)+' Applied on this device. Sync failed.</span>'+
+      '<button class="btn btn-sm" data-action="appearance-retry-sync">Retry</button></div>' : '')+
+    '<div class="section"><div class="section-head"><h2>Theme</h2></div>'+
+      '<div class="option-cards">'+themes.map(t=>optionCard("theme",t.v,t.label,t.sw,a.theme)).join("")+'</div></div>'+
+    '<div class="section"><div class="section-head"><h2>Accent color</h2></div>'+
+      '<div class="option-cards">'+accents.map(t=>optionCardSolid("accent",t.v,t.label,t.sw,a.accent)).join("")+'</div></div>'+
+    '<div class="section"><div class="section-head"><h2>Text size</h2><div class="desc">Body text 14 / 16 / 18px — headings, buttons and tables scale with it.</div></div>'+
+      '<div class="option-cards">'+sizes.map(t=>'<div class="option-card'+(a.textSize===t.v?" selected":"")+'" data-action="appearance-set" data-key="textSize" data-val="'+t.v+'"><div class="label" style="font-size:'+(t.v==="small"?"13px":t.v==="large"?"19px":"16px")+'">'+t.label+'<span class="check">'+icon("check",10)+'</span></div></div>').join("")+'</div></div>'+
+    '<div class="section"><div class="section-head"><h2>Font</h2><div class="desc">System default — matches the OS, and renders Chinese and Vietnamese characters correctly.</div></div>'+
+      '<div class="option-cards"><div class="option-card selected" style="cursor:default"><div class="label">System default<span class="check">'+icon("check",10)+'</span></div></div></div></div>'+
+    '<div class="section"><div class="section-head"><h2>Preview</h2></div>'+renderAppearancePreview()+'</div>'+
+    '<div class="divider"></div>'+
+    '<div style="display:flex;gap:10px">'+
+      '<button class="btn" data-action="appearance-reset">Reset to defaults</button>'+
+      '<button class="btn btn-ghost" data-action="appearance-toggle-fail">'+(a.syncFailed?"Simulate sync success":"Simulate sync failure")+'</button>'+
+    '</div>';
+  return renderShell("appearance", body);
+}
+function optionCard(key,val,label,swatch,current){
+  return '<div class="option-card'+(current===val?" selected":"")+'" data-action="appearance-set" data-key="'+key+'" data-val="'+val+'">'+
+    '<div class="swatch" style="background:'+swatch+';border:1px solid var(--border)"></div>'+
+    '<div class="label">'+label+'<span class="check">'+icon("check",10)+'</span></div></div>';
+}
+function optionCardSolid(key,val,label,color,current){
+  return '<div class="option-card'+(current===val?" selected":"")+'" data-action="appearance-set" data-key="'+key+'" data-val="'+val+'">'+
+    '<div class="swatch" style="background:'+color+'"></div>'+
+    '<div class="label">'+label+'<span class="check">'+icon("check",10)+'</span></div></div>';
+}
+function renderAppearancePreview(){
+  return '<div class="card" style="padding:18px;display:flex;flex-direction:column;gap:14px;background:var(--surface)">'+
+    '<div style="display:flex;justify-content:space-between;align-items:center"><div style="font-weight:700;font-size:var(--fs-h2)">Members</div><button class="btn btn-primary btn-sm">Invite</button></div>'+
+    '<div class="list-row"><div class="lr-main"><div class="avatar">MY</div><div><div class="lr-title">Mason Yang</div><div class="lr-sub">Acting COO · masonyang@sending.me</div></div></div>'+statusBadge("Super Admin","accent")+'</div>'+
+    '<div class="list-row"><div class="lr-main"><div class="avatar">AR</div><div><div class="lr-title">Arthur</div><div class="lr-sub">CEO of PallaX</div></div></div>'+statusBadge("Hiring Manager","neutral")+'</div>'+
+    '<div class="status-line">'+statusBadge("Not connected","warning")+' <span class="text-faint">Example status colors keep meaning in every theme.</span></div>'+
+  '</div>';
+}
+on("appearance-set", (el)=>{
+  const key = el.getAttribute("data-key"), val = el.getAttribute("data-val");
+  STATE.appearance[key] = val;
+  persist();
+  render();
+  setSaveStatus("appearance","saved");
+  toast(STATE.appearance.syncFailed ? "Applied on this device. Sync failed." : "Appearance updated.");
+});
+on("appearance-reset", ()=>{
+  STATE.appearance = Object.assign(defaultState().appearance, {syncFailed:STATE.appearance.syncFailed});
+  persist(); render();
+  toast("Appearance reset to defaults. Language, notifications and drafts are unchanged.");
+});
+on("appearance-toggle-fail", ()=>{ STATE.appearance.syncFailed = !STATE.appearance.syncFailed; persist(); render(); });
+on("appearance-retry-sync", ()=>{ STATE.appearance.syncFailed=false; persist(); render(); toast("Synced across your devices."); });
+
+
+/* ============================================================
+   PERSONAL · LANGUAGE & REGION
+   ============================================================ */
+function renderLanguageRegion(){
+  const l = STATE.locale;
+  const region = REGIONS[l.region];
+  const tzLabel = (TIMEZONES.find(t=>t.id===l.timezone)||{}).label || l.timezone;
+  const time12 = l.timeFormat==="region" ? (region.time.includes("M")) : l.timeFormat==="12h";
+  const body =
+    pageHeader("Language & Region","Independent choices — changing how something displays never changes the underlying time, currency or historical record.")+
+    '<div class="section">'+fieldSelect("lang-select","Interface language",[
+      {value:"en",label:"English"},{value:"zh",label:"简体中文 (coming soon)"},{value:"vi",label:"Tiếng Việt (coming soon)"}
+    ], l.language, "Only English is available in this release. Chinese and Vietnamese ship in later language packs.")+'</div>'+
+    '<div class="section">'+fieldSelect("region-select","Region format", Object.keys(REGIONS).map(k=>({value:k,label:REGIONS[k].label})), l.region)+'</div>'+
+    '<div class="section">'+fieldSelect("tz-select","Time zone", TIMEZONES.map(t=>({value:t.id,label:t.label})), l.timezone, "Confirmed once — travel, IP address or a language change never silently overrides it.")+'</div>'+
+    '<div class="section">'+fieldSelect("timefmt-select","Time format",[{value:"region",label:"Follow region"},{value:"12h",label:"12-hour"},{value:"24h",label:"24-hour"}], l.timeFormat)+'</div>'+
+    '<div class="section">'+fieldSelect("week-select","Week starts on",[{value:"region",label:"Follow region"},{value:"monday",label:"Monday"},{value:"sunday",label:"Sunday"}], l.weekStart, "Changes calendar display only — never the statistics week definition.")+'</div>'+
+    '<div class="divider"></div>'+
+    '<div class="section"><div class="section-head"><h2>Preview</h2><div class="desc">A fixed interview slot, shown with your current selections.</div></div>'+renderLocalePreview()+'</div>'+
+    renderSaveBarHTML("locale");
+  return renderShell("language-region", body);
+}
+function renderLocalePreview(){
+  const l = STATE.locale; const region = REGIONS[l.region];
+  const timeDisp = l.timeFormat==="24h" ? "15:30" : (l.timeFormat==="12h" ? "3:30 PM" : region.time);
+  return '<div class="card" style="padding:16px 18px;display:flex;flex-direction:column;gap:10px">'+
+    '<div class="list-row" style="padding:0 0 10px"><div><div class="lr-title">Interview · Backend Engineer, Pythra</div>'+
+      '<div class="lr-sub">'+esc(region.date)+' · '+esc(timeDisp)+' <span class="text-faint">('+esc((TIMEZONES.find(t=>t.id===l.timezone)||{}).label||l.timezone)+')</span></div></div>'+
+      statusBadge("Confirmed","success")+'</div>'+
+    '<div class="kv"><dt>Your time</dt><dd class="tabular">'+esc(region.date)+', '+esc(timeDisp)+'</dd>'+
+      '<dt>Activity time zone</dt><dd class="tabular">GMT'+((l.timezone==="Europe/London")?"+1":(l.timezone.includes("Sydney")?"+10":(l.timezone.includes("Shanghai")||l.timezone.includes("Ho_Chi_Minh"))?"+8/+7":"-4"))+'</dd>'+
+      '<dt>Recorded salary (unaffected)</dt><dd class="tabular mono">'+esc(region.amount)+'</dd></dl></div>'+
+  '</div>';
+}
+function wireLocaleInputs(){
+  ["lang-select","region-select","tz-select","timefmt-select","week-select"].forEach(id=>{
+    const el = qs("#"+id); if(!el) return;
+    el.addEventListener("change", ()=>{
+      const map = {"lang-select":"language","region-select":"region","tz-select":"timezone","timefmt-select":"timeFormat","week-select":"weekStart"};
+      STATE.locale[map[id]] = el.value;
+      persist();
+      const prev = qs("#locale-preview-slot");
+      render();
+      setSaveStatus("locale","saved");
+    });
+  });
+}
+on("save-retry", (el)=>{
+  const key = el.getAttribute("data-key");
+  setSaveStatus(key,"saving");
+  setTimeout(()=>{ setSaveStatus(key,"saved"); toast("Saved."); }, 500);
+});
+
+
+/* ============================================================
+   PERSONAL · MY ACCOUNT & SECURITY
+   ============================================================ */
+function renderAccount(){
+  const a = STATE.account;
+  const body =
+    pageHeader("My Account & Security","Your personal sign-in identity — separate from any organization.")+
+    '<div class="section"><div class="section-head"><h2>Profile</h2></div>'+
+      '<div class="card" style="padding:18px;display:flex;gap:16px;align-items:center">'+
+        '<div class="avatar avatar-lg">'+esc(initials({name:a.name}))+'</div>'+
+        '<div style="flex:1"><div style="font-weight:700;font-size:16px">'+esc(a.name)+'</div><div class="text-muted" style="font-size:var(--fs-aux)">'+esc(a.email)+'</div></div>'+
+        '<button class="btn btn-sm" data-action="account-edit-name">Edit name</button>'+
+      '</div></div>'+
+    '<div class="section"><div class="section-head"><h2>Sign-in email</h2><div class="desc">Changing this keeps your user ID, preferences and organization history — it never creates a new hiring identity.</div></div>'+
+      '<div class="card" style="padding:16px 18px;display:flex;justify-content:space-between;align-items:center">'+
+        '<div><div class="lr-title">'+esc(a.email)+'</div>'+(a.pendingEmail?'<div class="lr-sub">Verifying '+esc(a.pendingEmail)+'…</div>':'<div class="lr-sub">Verified</div>')+'</div>'+
+        '<button class="btn btn-sm" data-action="account-change-email">Change email</button>'+
+      '</div></div>'+
+    '<div class="section"><div class="section-head"><h2>Devices & sessions</h2></div>'+
+      '<div class="card" style="padding:6px 18px">'+
+      a.sessions.map(s=>'<div class="list-row"><div class="lr-main"><div>'+
+        '<div class="lr-title">'+esc(s.device)+(s.current?' <span class="badge badge-accent" style="margin-left:6px">This device</span>':'')+'</div>'+
+        '<div class="lr-sub">'+esc(s.last)+'</div></div></div>'+
+        (s.current? '' : '<button class="btn btn-sm btn-danger" data-action="account-signout-device" data-id="'+s.id+'">Sign out</button>')+
+      '</div>').join("")+
+      '</div>'+
+      '<div style="margin-top:12px"><button class="btn btn-danger btn-sm" data-action="account-signout-all">Sign out of all devices</button></div>'+
+    '</div>'+
+    '<div class="divider"></div>'+
+    '<div class="section"><div class="section-head"><h2>Account recovery</h2><div class="desc">Lost access to your email? Support can verify ownership by hand.</div></div>'+
+      '<button class="btn" data-action="nav" data-href="#/auth/recovery">Start recovery</button></div>';
+  return renderShell("account", body);
+}
+on("account-edit-name", ()=>{
+  openModal('<div class="modal-head"><h3>Edit name</h3><button class="btn btn-icon btn-ghost" data-action="modal-close">'+icon("close",16)+'</button></div>'+
+    '<div class="modal-body">'+fieldText("edit-name-input","Full name",STATE.account.name,"").replace('id="edit-name-input"','id="edit-name-input" data-autofocus')+'</div>'+
+    '<div class="modal-foot"><button class="btn" data-action="modal-close">Cancel</button><button class="btn btn-primary" data-action="account-save-name">Save</button></div>');
+});
+on("account-save-name", ()=>{
+  const v = (qs("#edit-name-input").value||"").trim();
+  if(!v) return;
+  STATE.account.name = v;
+  const me = currentUser(); if(me) me.name = v;
+  persist(); closeModal(); render();
+  toast("Name updated.");
+});
+on("account-change-email", ()=>{
+  openModal('<div class="modal-head"><h3>Change sign-in email</h3><button class="btn btn-icon btn-ghost" data-action="modal-close">'+icon("close",16)+'</button></div>'+
+    '<div class="modal-body">'+
+    '<div class="status-line">'+icon("check",14)+' Step 1 of 3 — we’ll re-verify your current email first.</div>'+
+    fieldText("new-email-input","New email address","","").replace('id="new-email-input"','id="new-email-input" data-autofocus placeholder="you@newcompany.com"')+
+    '</div><div class="modal-foot"><button class="btn" data-action="modal-close">Cancel</button><button class="btn btn-primary" data-action="account-change-email-confirm">Send verification</button></div>');
+});
+on("account-change-email-confirm", ()=>{
+  const v = (qs("#new-email-input").value||"").trim();
+  if(!v || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v)){ qs("#new-email-input").classList.add("invalid"); return; }
+  const taken = STATE.people.some(p=>p.email.toLowerCase()===v.toLowerCase());
+  closeModal();
+  if(taken){ toast("That email is already in use by another account.", {error:true}); return; }
+  STATE.account.pendingEmail = v;
+  persist(); render();
+  toast("Verification sent to "+v+" (simulated). Once confirmed, your old and new email are both notified.");
+  setTimeout(()=>{
+    STATE.account.email = v; STATE.account.pendingEmail = null;
+    const me = currentUser(); if(me) me.email = v;
+    persist();
+    if(qs('[data-action="account-change-email"]')) render();
+    toast("Email updated to "+v+". Other sessions were signed out.");
+  }, 2200);
+});
+on("account-signout-device", (el)=>{
+  STATE.account.sessions = STATE.account.sessions.filter(s=>s.id!==el.getAttribute("data-id"));
+  persist(); render(); toast("Signed out of that device.");
+});
+on("account-signout-all", ()=>{
+  STATE.account.sessions = STATE.account.sessions.filter(s=>s.current);
+  persist(); render(); toast("Signed out of all other devices.");
+});
+
+
+/* ============================================================
+   PERSONAL · HOME & VIEWS
+   ============================================================ */
+const HOME_MODULE_DEFS = {
+  screening:{ label:"Resume Screening", cards:[{k:"myTasks",l:"My Tasks"},{k:"teamOverview",l:"Team overview"},{k:"modelHealth",l:"Model health (T3)"}] },
+  interview:{ label:"Interview", cards:[{k:"myWork",l:"My Work"},{k:"workspaceOverview",l:"Workspace Overview"}] },
+};
+function renderHomeViews(){
+  const hv = STATE.homeViews;
+  const mod = HOME_MODULE_DEFS[hv.module];
+  const cfg = hv.modules[hv.module];
+  const body =
+    pageHeader("Home & Views","Only affects your own display — never metric formulas, approval rules or other people's views.")+
+    '<div class="section">'+fieldSelect("home-module-select","Module", Object.keys(HOME_MODULE_DEFS).filter(k=>navAllowedForModule(k)).map(k=>({value:k,label:HOME_MODULE_DEFS[k].label})), hv.module)+'</div>'+
+    '<div class="section"><div class="section-head"><h2>Cards shown on '+esc(mod.label)+' home</h2></div>'+
+      '<div class="card" style="padding:6px 18px">'+
+      mod.cards.map(c=>'<div class="list-row"><div class="lr-title">'+esc(c.l)+'</div>'+
+        '<label class="checkbox-row" style="gap:8px"><input type="checkbox" data-action="home-toggle-card" data-card="'+c.k+'" '+(cfg.cards[c.k]?"checked":"")+'/> Show</label></div>').join("")+
+      '</div></div>'+
+    '<div class="section"><div class="section-head"><h2>Default folding</h2></div>'+
+      '<label class="checkbox-row" style="margin-bottom:8px"><input type="checkbox" data-action="home-toggle" data-key="collapsedT2" '+(cfg.collapsedT2?"checked":"")+'/> Collapse T2 statistics by default</label>'+
+      '<label class="checkbox-row"><input type="checkbox" data-action="home-toggle" data-key="collapsedT3" '+(cfg.collapsedT3?"checked":"")+'/> Collapse T3 statistics by default</label></div>'+
+    '<div class="section"><div class="section-head"><h2>List density</h2></div>'+
+      '<div class="option-cards">'+["comfortable","compact"].map(d=>'<div class="option-card'+(cfg.density===d?" selected":"")+'" data-action="home-set-density" data-val="'+d+'"><div class="label" style="text-transform:capitalize">'+d+'<span class="check">'+icon("check",10)+'</span></div></div>').join("")+'</div></div>'+
+    '<div class="divider"></div>'+
+    '<button class="btn" data-action="home-reset-module">Reset current module views</button>';
+  window.wirePageExtra = window.wirePageExtra_home;
+  return renderShell("home-views", body);
+}
+function navAllowedForModule(){ return true; }
+on("home-toggle-card", (el)=>{
+  const hv = STATE.homeViews; hv.modules[hv.module].cards[el.getAttribute("data-card")] = el.checked;
+  persist(); toast("Saved for you on "+HOME_MODULE_DEFS[hv.module].label+"."); 
+});
+on("home-toggle", (el)=>{
+  const hv = STATE.homeViews; hv.modules[hv.module][el.getAttribute("data-key")] = el.checked;
+  persist(); toast("Saved.");
+});
+on("home-set-density", (el)=>{
+  const hv = STATE.homeViews; hv.modules[hv.module].density = el.getAttribute("data-val");
+  persist(); render();
+});
+window.wirePageExtra_home = function(){
+  const sel = qs("#home-module-select");
+  if(sel) sel.addEventListener("change", ()=>{ STATE.homeViews.module = sel.value; persist(); render(); });
+};
+on("home-reset-module", ()=>{
+  const hv = STATE.homeViews; const d = defaultState().homeViews.modules[hv.module];
+  hv.modules[hv.module] = JSON.parse(JSON.stringify(d));
+  persist(); render();
+  toast("Display defaults restored for "+HOME_MODULE_DEFS[hv.module].label+". Saved views and drafts are untouched.");
+});
+
+/* ============================================================
+   PERSONAL · NOTIFICATIONS
+   ============================================================ */
+const NOTIF_CATEGORIES = [
+  {k:"taskAssigned", l:"Task assigned to me", required:false},
+  {k:"scheduleChange", l:"Interview / schedule changes", required:false},
+  {k:"approvalNeeded", l:"Approval needed", required:false},
+  {k:"weeklyDigest", l:"Weekly digest", required:false},
+];
+function renderNotifications(){
+  const n = STATE.notifications;
+  const body =
+    pageHeader("Notifications","Account verification and security notices always reach you, regardless of these settings.")+
+    '<div class="section"><div class="section-head"><h2>Categories & channels</h2></div>'+
+      '<div class="card" style="padding:6px 18px">'+
+      NOTIF_CATEGORIES.map(c=>'<div class="list-row"><div class="lr-title">'+esc(c.l)+'</div>'+
+        '<div class="select-wrap" style="width:170px"><select data-action="notif-channel" data-cat="'+c.k+'">'+
+          ["both","email","inapp","off"].map(v=>'<option value="'+v+'"'+(n.categories[c.k].channel===v?" selected":"")+'>'+({both:"Email + in-app",email:"Email only",inapp:"In-app only",off:"Off"})[v]+'</option>').join("")+
+        '</select></div></div>').join("")+
+      '</div></div>'+
+    '<div class="section"><div class="section-head"><h2>Quiet hours</h2><div class="desc">Uses your local time zone ('+esc((TIMEZONES.find(t=>t.id===STATE.locale.timezone)||{}).label||STATE.locale.timezone)+'); supports spans that cross midnight.</div></div>'+
+      '<label class="checkbox-row" style="margin-bottom:10px"><input type="checkbox" id="quiet-enabled" '+(n.quietHours.enabled?"checked":"")+'/> Enable quiet hours</label>'+
+      '<div style="display:flex;gap:14px;max-width:340px">'+fieldText("quiet-start","From",n.quietHours.start,"","text")+fieldText("quiet-end","To",n.quietHours.end,"","text")+'</div>'+
+      '<div class="hint" id="quiet-preview" style="margin-top:8px">Next quiet window: today '+esc(n.quietHours.start)+' → tomorrow '+esc(n.quietHours.end)+'.</div>'+
+    '</div>'+
+    renderSaveBarHTML("notifications");
+  window.wirePageExtra = window.wirePageExtra_notifications;
+  return renderShell("notifications", body);
+}
+on("notif-channel", (el)=>{
+  STATE.notifications.categories[el.getAttribute("data-cat")].channel = el.value;
+  persist(); setSaveStatus("notifications","saved"); toast("Saved.");
+});
+window.wirePageExtra_notifications = function(){
+  ["quiet-enabled","quiet-start","quiet-end"].forEach(id=>{
+    const el = qs("#"+id); if(!el) return;
+    el.addEventListener("change", ()=>{
+      const n = STATE.notifications.quietHours;
+      n.enabled = qs("#quiet-enabled").checked; n.start = qs("#quiet-start").value; n.end = qs("#quiet-end").value;
+      persist();
+      const prev = qs("#quiet-preview");
+      if(prev) prev.textContent = n.enabled ? "Next quiet window: today "+n.start+" → tomorrow "+n.end+"." : "Quiet hours are off — notifications can arrive any time.";
+      setSaveStatus("notifications","saved");
+    });
+  });
+};
+
+/* ============================================================
+   ORGANIZATION · ORGANIZATION & MEMBERS
+   ============================================================ */
+function canManageMembers(){ return ["super_admin","hr"].includes(STATE.demoRole); }
+function canEditOrgProfile(){ return STATE.demoRole==="super_admin"; }
+
+function renderOrganization(){
+  STATE.ui.orgTab = STATE.ui.orgTab || "members";
+  const tab = STATE.ui.orgTab;
+  const tabs = [{key:"profile",label:"Organization"},{key:"members",label:"Members"},{key:"responsibilities",label:"Responsibilities"}];
+  const body =
+    pageHeader("Organization & Members", "One organization — different email domains and legal entities all share it.",
+      canManageMembers() && tab==="members" ? '<button class="btn btn-primary" data-action="member-invite-open">Invite</button>' : "")+
+    tabsHtml(tabs, tab, "org-tab")+
+    '<div style="margin-top:20px">'+
+    (tab==="profile" ? renderOrgProfileTab() : tab==="members" ? renderMembersTab() : renderResponsibilitiesTab())+
+    '</div>';
+  if(tab==="members") window.wirePageExtra = window.wirePageExtra_members;
+  return renderShell("organization", body, {wide: tab==="members"});
+}
+on("org-tab", (el)=>{ STATE.ui.orgTab = el.getAttribute("data-tab"); persist(); render(); });
+
+function renderOrgProfileTab(){
+  return '<div class="card" style="padding:0;overflow:hidden">'+
+    '<div style="background:var(--brand-panel);padding:32px 28px;display:flex;align-items:center;justify-content:center;">'+
+      '<img src="assets/sending-labs-logo.png" alt="Sending Labs" style="width:min(320px,80%)"/>'+
+    '</div>'+
+    '<div style="padding:20px 22px"><dl class="kv">'+
+      '<dt>Organization name</dt><dd>'+esc(ORG.display_name)+'</dd>'+
+      '<dt>Organization ID</dt><dd class="mono text-faint">'+esc(ORG.id)+'</dd>'+
+      '<dt>Members</dt><dd>'+STATE.people.length+' people · 7 functional mailboxes</dd>'+
+      '<dt>Created</dt><dd>2026-01-14 (demo baseline)</dd>'+
+    '</dl></div>'+
+    (canEditOrgProfile() ? '<div style="padding:0 22px 20px"><button class="btn btn-sm" data-action="org-rename">Edit organization name</button></div>'
+      : '<div style="padding:0 22px 20px" class="text-faint" style="font-size:var(--fs-cap)">Only a Super Admin can edit the organization profile.</div>')+
+  '</div>'+
+  '<div class="hint" style="margin-top:12px">Different legal entities and email domains (sending.me, sendinglabs.com, sding.me, sendinglabsph.com) all use this one organization — HiOS never splits them automatically.</div>';
+}
+on("org-rename", ()=>{ toast("This demo keeps the organization name fixed to Sending Labs."); });
+
+function renderMembersTab(){
+  const f = STATE.ui.memberFilter;
+  const all = STATE.people.filter(p=>!p.is_new).concat(); // real + invited members only
+  const filtered = all.filter(p=>{
+    const q = f.q.toLowerCase();
+    const matchQ = !q || (personName(p).toLowerCase().includes(q) || p.email.toLowerCase().includes(q));
+    const matchRole = f.role==="all" || p.system_role===f.role;
+    const matchGroup = f.group==="all" || p.product_group===f.group;
+    return matchQ && matchRole && matchGroup;
+  });
+  const rows = filtered.map(p=>{
+    const role = p.system_role ? ROLE_LABELS[p.system_role] : null;
+    return '<tr class="clickable" data-action="nav" data-href="#/settings/members/'+p.id+'">'+
+      '<td><div style="display:flex;align-items:center;gap:10px"><div class="avatar">'+esc(initials(p))+'</div>'+
+        '<div><div class="cell-primary">'+esc(p.name||"Not specified")+'</div><div class="cell-sub">'+esc(p.email)+'</div></div></div></td>'+
+      '<td>'+esc(p.job_title||"Not specified")+'</td>'+
+      '<td>'+(role? statusBadge(role,"accent") : statusBadge("Role not configured","neutral"))+'</td>'+
+      '<td>'+esc(p.product_group||"—")+'</td>'+
+      '<td>'+statusBadge("Active","success")+'</td>'+
+    '</tr>';
+  }).join("");
+  const table = filtered.length ?
+    '<div class="table-wrap"><table><thead><tr><th>Name / Email</th><th>Job title</th><th>Role</th><th>Product group</th><th>Status</th></tr></thead><tbody>'+rows+'</tbody></table></div>' :
+    '<div class="table-wrap">'+emptyState("No members match these filters","", '<button class="link-btn" data-action="member-filter-clear">Clear filters</button>')+'</div>';
+  return '<div class="filter-bar">'+
+      '<div class="search-input">'+icon("search",15)+'<input type="search" id="member-search" placeholder="Search people…" value="'+esc(f.q)+'"/></div>'+
+      '<div class="filter-select select-wrap">'+fieldSelectInlineId("member-role-filter",[{value:"all",label:"All roles"}].concat(ROLE_ORDER.map(r=>({value:r,label:ROLE_LABELS[r]}))), f.role)+'</div>'+
+      '<div class="filter-select select-wrap">'+fieldSelectInlineId("member-group-filter",[{value:"all",label:"All product groups"}].concat(PRODUCT_GROUPS.map(g=>({value:g,label:g}))), f.group)+'</div>'+
+      '<div class="result-count">'+filtered.length+' of '+all.length+'</div>'+
+    '</div>'+table;
+}
+function fieldSelectInlineId(id, options, selected){
+  return '<select id="'+id+'">'+options.map(o=>'<option value="'+esc(o.value)+'"'+(o.value===selected?" selected":"")+'>'+esc(o.label)+'</option>').join("")+'</select>';
+}
+window.wirePageExtra_members = function(){
+  const s = qs("#member-search"); if(s) s.addEventListener("input", ()=>{ STATE.ui.memberFilter.q = s.value; persist(); softUpdateMembers(); });
+  const r = qs("#member-role-filter"); if(r) r.addEventListener("change", ()=>{ STATE.ui.memberFilter.role = r.value; persist(); render(); });
+  const g = qs("#member-group-filter"); if(g) g.addEventListener("change", ()=>{ STATE.ui.memberFilter.group = g.value; persist(); render(); });
+};
+function softUpdateMembers(){
+  const container = qs("#app .content-inner > div:last-child");
+  if(container){ container.innerHTML = renderMembersTab(); window.wirePageExtra_members(); const s=qs("#member-search"); if(s){ s.focus(); s.setSelectionRange(s.value.length,s.value.length);} }
+}
+on("member-filter-clear", ()=>{ STATE.ui.memberFilter = {q:"",role:"all",group:"all"}; persist(); render(); });
+on("member-invite-open", ()=>{
+  openModal('<div class="modal-head"><h3>Invite member</h3><button class="btn btn-icon btn-ghost" data-action="modal-close">'+icon("close",16)+'</button></div>'+
+    '<div class="modal-body">'+
+    fieldText("invite-email","Email","","Any normal email works — personal or company domain.").replace('id="invite-email"','id="invite-email" data-autofocus placeholder="name@company.com"')+
+    fieldSelect("invite-role","Role", ROLE_ORDER.filter(r=>r!=="candidate").map(r=>({value:r,label:ROLE_LABELS[r]})), "employee")+
+    '<div class="hint">Sent as a pending invitation — not an active member until it’s accepted.</div>'+
+    '</div><div class="modal-foot"><button class="btn" data-action="modal-close">Cancel</button><button class="btn btn-primary" data-action="member-invite-send">Send invite</button></div>');
+});
+on("member-invite-send", ()=>{
+  const email = (qs("#invite-email").value||"").trim();
+  const role = qs("#invite-role").value;
+  if(!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)){ qs("#invite-email").classList.add("invalid"); return; }
+  STATE.invitations.unshift({id:"inv"+Date.now(), email, role, scope:null, invitedBy: (currentUser()||{}).name || STATE.account.name, sentAt:new Date().toISOString().slice(0,10), expiresAt:new Date(Date.now()+7*86400000).toISOString().slice(0,10), status:"pending"});
+  STATE.activity.unshift({id:"a"+Date.now(), ts:new Date().toISOString(), actor:STATE.account.name, type:"Member", object:email, summary:"Invited as "+ROLE_LABELS[role]+" — invitation simulated"});
+  closeModal(); persist();
+  toast("Invitation simulated — "+email+" now shows Pending on Access & Sign-in.");
+  navigate("#/settings/access");
+});
+
+function renderResponsibilitiesTab(){
+  const rows = STATE.responsibilities.map(r=>{
+    const owners = r.owners.map(id=>{ const p=findPerson(id); return p? personName(p) : id; });
+    return '<div class="card" style="padding:16px 18px;margin-bottom:12px">'+
+      '<div style="font-weight:700">'+esc(r.label)+'</div>'+
+      '<div class="text-muted" style="font-size:var(--fs-aux);margin-top:6px">Primary owners: '+owners.map(o=>'<span class="badge badge-neutral" style="margin-right:4px">'+esc(o)+'</span>').join("")+'</div>'+
+      '<div class="hint" style="margin-top:8px">A recruiting scope, not a system role or salary permission — it only suggests owners when a job or project is created.</div>'+
+    '</div>';
+  }).join("");
+  return '<div class="section-head" style="margin-bottom:14px"><div class="desc">Simple list — recruiting scope, primary owners, notes. Not an org chart, and it never grants HM/HR access or salary visibility on its own.</div></div>'+rows;
+}
+
+
+/* ============================================================
+   ORGANIZATION · MEMBER DETAIL
+   ============================================================ */
+function renderMemberDetail(id){
+  const p = findPerson(id);
+  if(!p){ return renderShell("organization", pageHeader("Member not found")+emptyState("This member no longer exists","", '<button class="btn" data-action="nav" data-href="#/settings/organization">Back to members</button>')); }
+  STATE.ui.memberTab = STATE.ui.memberTab || "profile";
+  const tab = STATE.ui.memberTab;
+  const tabs = [{key:"profile",label:"Profile"},{key:"access",label:"Access"},{key:"responsibilities",label:"Responsibilities"},{key:"activity",label:"Activity"}];
+  const isLastSuperAdmin = p.system_role==="super_admin" && STATE.people.filter(x=>x.system_role==="super_admin").length<=1;
+  const body =
+    '<button class="backlink" style="margin-bottom:14px" data-action="nav" data-href="#/settings/organization">'+icon("back",15)+' Back to Members</button>'+
+    '<div style="display:flex;align-items:center;gap:16px;margin-bottom:6px"><div class="avatar avatar-lg">'+esc(initials(p))+'</div>'+
+      '<div><h1 style="font-size:var(--fs-h1)">'+esc(personName(p))+'</h1><div class="page-sub">'+esc(p.job_title||"Job title not specified")+(p.product_group?" · "+esc(p.product_group):"")+'</div></div></div>'+
+    tabsHtml(tabs, tab, "member-tab")+
+    '<div style="margin-top:20px">'+
+    (tab==="profile" ? memberProfileTab(p) : tab==="access" ? memberAccessTab(p,isLastSuperAdmin) : tab==="responsibilities" ? memberResponsibilitiesTab(p) : memberActivityTab(p))+
+    '</div>';
+  return renderShell("organization", body);
+}
+on("member-tab", (el)=>{ STATE.ui.memberTab = el.getAttribute("data-tab"); persist(); render(); });
+
+function memberProfileTab(p){
+  return '<div class="card" style="padding:18px 20px"><dl class="kv">'+
+    '<dt>Full name</dt><dd>'+esc(p.name||"Not specified")+'</dd>'+
+    '<dt>Email</dt><dd>'+esc(p.email)+'</dd>'+
+    '<dt>Job title</dt><dd>'+esc(p.job_title||"Not specified")+(p.historical_title? ' <span class="text-faint" style="font-size:var(--fs-cap)">(was "'+esc(p.historical_title)+'" — '+esc(p.title_source)+')</span>' : '')+'</dd>'+
+    '<dt>Product group</dt><dd>'+esc(p.product_group||"—")+(p.product_group_note?'<div class="hint">'+esc(p.product_group_note)+'</div>':'')+'</dd>'+
+    (p.management_scope ? '<dt>Management scope</dt><dd>'+(p.management_scope.scope? esc(p.management_scope.scope)+" — "+(p.management_scope.functions||[]).join(", ") : "CEO of "+esc(p.management_scope.company))+'</dd>' : '')+
+  '</dl></div>'+
+  '<div class="hint" style="margin-top:10px">Job title and management scope are business descriptions — kept separate from the system Role tab, and neither is inferred from the other.</div>';
+}
+function canSeeSalary(){ return ["super_admin","hr","hiring_manager"].includes(STATE.demoRole); }
+function memberAccessTab(p, isLastSuperAdmin){
+  const canEdit = canManageMembers() && !p.is_synthetic;
+  const salaryHtml = canSeeSalary()
+    ? '<dl class="kv"><dt>Salary band</dt><dd class="mono">USD 128,000 – 152,000 (internal)</dd><dt>Visible to</dt><dd>Super Admin · HR · HM for their own projects</dd></dl>'
+    : emptyState("You can view these settings but can't edit them.".replace("edit them","see salary"), "Employees, consultants and candidates never see internal compensation — in the UI, the API, files, search, logs or AI output.");
+  return '<div class="section"><div class="section-head"><h2>Sensitive information (demo)</h2><div class="desc">Illustrates the salary-visibility rule under the current role overlay.</div></div>'+
+    '<div class="card" style="padding:16px 18px">'+salaryHtml+'</div></div>'+
+    '<div class="section"><div class="section-head"><h2>System role</h2></div>'+
+    '<div class="card" style="padding:16px 18px;display:flex;justify-content:space-between;align-items:center">'+
+      '<div>'+(p.system_role? statusBadge(ROLE_LABELS[p.system_role],"accent") : statusBadge("Role not configured","neutral"))+
+      (isLastSuperAdmin? '<div class="hint" style="margin-top:8px;color:var(--warning)">'+icon("close",12)+" This organization's last Super Admin — hand off before removing this role.</div>" : '')+'</div>'+
+      (canEdit ? '<button class="btn btn-sm" data-action="member-role-edit" data-id="'+p.id+'" '+(isLastSuperAdmin?"disabled":"")+'>Change role</button>' : '')+
+    '</div></div>'+
+    '<div class="section"><div class="section-head"><h2>Applicable projects</h2></div>'+
+    (p.system_role==="hiring_manager" ? '<div class="chip">Pythra recruiting (demo project)</div>' :
+     p.system_role==="external_consultant" ? '<div class="chip">Pythra recruiting (demo project)</div>' :
+     '<div class="text-faint" style="font-size:var(--fs-aux)">No project-scoped access — this role applies organization-wide within its permissions.</div>')+
+    '</div>';
+}
+on("member-role-edit", (el)=>{
+  const p = findPerson(el.getAttribute("data-id"));
+  openModal('<div class="modal-head"><h3>Change role — '+esc(personName(p))+'</h3><button class="btn btn-icon btn-ghost" data-action="modal-close">'+icon("close",16)+'</button></div>'+
+    '<div class="modal-body">'+
+    '<div class="pipeline"><span class="step done">'+(p.system_role?ROLE_LABELS[p.system_role]:"Not configured")+'</span><span class="arrow">'+icon("chevronRight",14)+'</span><span class="step current" id="role-preview-chip">'+(p.system_role?ROLE_LABELS[p.system_role]:"Not configured")+'</span></div>'+
+    fieldSelect("role-edit-select","New role", ROLE_ORDER.filter(r=>r!=="candidate").map(r=>({value:r,label:ROLE_LABELS[r]})), p.system_role||"employee")+
+    '<div class="hint">Updates the list, this detail page and Activity together. Adjusting the role never changes recruiting-scope assignments.</div>'+
+    '</div><div class="modal-foot"><button class="btn" data-action="modal-close">Cancel</button><button class="btn btn-primary" data-action="member-role-save" data-id="'+p.id+'">Save</button></div>');
+  qs("#role-edit-select").addEventListener("change", (e)=>{ qs("#role-preview-chip").textContent = ROLE_LABELS[e.target.value]; });
+});
+on("member-role-save", (el)=>{
+  const p = findPerson(el.getAttribute("data-id"));
+  const newRole = qs("#role-edit-select").value;
+  const oldRole = p.system_role;
+  p.system_role = newRole;
+  STATE.activity.unshift({id:"a"+Date.now(), ts:new Date().toISOString(), actor:STATE.account.name, type:"Member", object:personName(p), summary:"Role changed from "+(oldRole?ROLE_LABELS[oldRole]:"Not configured")+" to "+ROLE_LABELS[newRole]});
+  closeModal(); persist(); render();
+  toast(personName(p)+" is now "+ROLE_LABELS[newRole]+".");
+});
+function memberResponsibilitiesTab(p){
+  const owns = STATE.responsibilities.filter(r=>r.owners.includes(p.id));
+  if(!owns.length) return emptyState("No recruiting scope on file","This person isn't listed as a primary owner of any recruiting responsibility.");
+  return owns.map(r=>'<div class="card" style="padding:14px 18px;margin-bottom:10px"><div style="font-weight:600">'+esc(r.label)+'</div>'+
+    '<div class="hint" style="margin-top:4px">Primary owner alongside: '+r.owners.filter(o=>o!==p.id).map(o=>{const op=findPerson(o); return esc(op?personName(op):o);}).join(", ")||"— no co-owner —"+'</div></div>').join("");
+}
+function memberActivityTab(p){
+  const items = STATE.activity.filter(a=>a.object===personName(p) || a.actor===personName(p));
+  if(!items.length) return emptyState("No recorded activity for this member yet");
+  return '<div class="card" style="padding:6px 18px">'+items.map(a=>activityRow(a)).join("")+'</div>';
+}
+
+
+/* ============================================================
+   ORGANIZATION · ACCESS & SIGN-IN
+   ============================================================ */
+function invStatusBadge(s){
+  return {pending:statusBadge("Pending","warning"), accepted:statusBadge("Accepted","success"),
+    expired:statusBadge("Expired","neutral"), revoked:statusBadge("Revoked","error")}[s] || statusBadge(s,"neutral");
+}
+function renderAccess(){
+  const f = STATE.ui.invFilter||"all";
+  const invs = STATE.invitations.filter(i=> f==="all" || i.status===f);
+  const rows = invs.map(inv=>{
+    const actions = inv.status==="pending" ?
+      '<button class="btn btn-sm" data-action="inv-resend" data-id="'+inv.id+'">Resend</button> <button class="btn btn-sm btn-danger" data-action="inv-revoke" data-id="'+inv.id+'">Revoke</button>'
+      : inv.status==="expired" ? '<button class="btn btn-sm" data-action="inv-resend" data-id="'+inv.id+'">Resend</button>'
+      : '';
+    return '<tr><td class="cell-primary">'+esc(inv.email)+'</td><td>'+esc(ROLE_LABELS[inv.role]||inv.role)+'</td><td>'+esc(inv.scope||"—")+'</td>'+
+      '<td>'+esc(inv.invitedBy)+'</td><td class="tabular">'+esc(inv.expiresAt)+'</td><td>'+invStatusBadge(inv.status)+'</td><td>'+actions+'</td></tr>';
+  }).join("");
+  const table = invs.length ? '<div class="table-wrap"><table><thead><tr><th>Email</th><th>Invited role</th><th>Scope</th><th>Invited by</th><th>Expires</th><th>Status</th><th></th></tr></thead><tbody>'+rows+'</tbody></table></div>'
+    : '<div class="table-wrap">'+emptyState("No invitations in this state")+'</div>';
+  const body =
+    pageHeader("Access & Sign-in","How people get into this organization — kept simple on purpose.")+
+    '<div class="section"><div class="card" style="padding:16px 18px;display:flex;flex-wrap:wrap;gap:8px 20px">'+
+      statusBadge("Work and personal emails supported","neutral")+statusBadge("Invite-only membership","neutral")+statusBadge("Email verification required","neutral")+
+    '</div><div class="hint" style="margin-top:8px">No self-serve domain join, custom code lifetimes, or policy editor yet — Google/Microsoft sign-in and SSO are later scope.</div></div>'+
+    '<div class="section"><div class="section-head" style="display:flex;justify-content:space-between;align-items:center"><h2>Invitations</h2>'+
+      (canManageMembers()?'<button class="btn btn-sm btn-primary" data-action="member-invite-open">Invite</button>':'')+'</div>'+
+      '<div class="filter-bar">'+["all","pending","accepted","expired","revoked"].map(s=>
+        '<button class="btn btn-sm'+(f===s?" btn-primary":"")+'" data-action="inv-filter" data-val="'+s+'" style="text-transform:capitalize">'+s+'</button>').join("")+'</div>'+
+      table+
+    '</div>';
+  return renderShell("access", body, {wide:true});
+}
+on("inv-filter", (el)=>{ STATE.ui.invFilter = el.getAttribute("data-val"); persist(); render(); });
+on("inv-resend", (el)=>{
+  const inv = STATE.invitations.find(i=>i.id===el.getAttribute("data-id"));
+  inv.status = "pending"; inv.sentAt = new Date().toISOString().slice(0,10); inv.expiresAt = new Date(Date.now()+7*86400000).toISOString().slice(0,10);
+  persist(); render(); toast("Invitation resent. The previous link is no longer valid.");
+});
+on("inv-revoke", (el)=>{
+  const inv = STATE.invitations.find(i=>i.id===el.getAttribute("data-id"));
+  inv.status = "revoked"; persist(); render(); toast("Invitation revoked.");
+});
+
+/* ============================================================
+   ORGANIZATION · ORGANIZATION DEFAULTS
+   ============================================================ */
+function renderDefaults(){
+  const d = STATE.orgDefaults;
+  const body =
+    pageHeader("Organization Defaults","Applies to unset personal preferences and new records only — never overrides what someone already chose, and never rewrites existing job currencies.")+
+    (d.conflict ? '<div class="card" style="padding:14px 16px;margin-bottom:18px;border-color:var(--warning);background:var(--warning-bg)">'+
+      '<div style="font-weight:700;color:var(--warning)">These settings changed while you were editing.</div>'+
+      '<div class="hint" style="margin-top:4px">Oliver updated the organization time zone a moment ago. Review before saving your change.</div>'+
+      '<div style="display:flex;gap:8px;margin-top:10px"><button class="btn btn-sm" data-action="defaults-conflict-reload">Reload current settings</button><button class="btn btn-sm btn-primary" data-action="defaults-conflict-keep">Keep editing my change</button></div>'+
+    '</div>' : '')+
+    '<div class="section">'+fieldSelect("def-region","Organization region format", Object.keys(REGIONS).map(k=>({value:k,label:REGIONS[k].label})), d.region)+'</div>'+
+    '<div class="section">'+fieldSelect("def-tz","Organization time zone", TIMEZONES.map(t=>({value:t.id,label:t.label})), d.timezone)+'</div>'+
+    '<div class="section">'+fieldSelect("def-currency","Default business currency", [{value:"USD",label:"USD — US Dollar"},{value:"GBP",label:"GBP — British Pound"},{value:"AUD",label:"AUD — Australian Dollar"},{value:"CAD",label:"CAD — Canadian Dollar"}], d.currency)+'</div>'+
+    '<div class="card" style="padding:14px 16px;background:var(--info-bg);border-color:transparent"><div class="status-line" style="color:var(--info)">'+icon("check",14)+' Impact preview: affects new members without a saved preference and new job records only. Existing job currencies and anyone’s saved locale are untouched.</div></div>'+
+    renderSaveBarHTML("defaults")+
+    '<div style="margin-top:10px"><button class="btn btn-ghost btn-sm" data-action="defaults-simulate-conflict">Simulate a concurrent edit conflict</button></div>';
+  window.wirePageExtra = function(){
+    ["def-region","def-tz","def-currency"].forEach(id=>{
+      const el = qs("#"+id); if(!el) return;
+      el.addEventListener("change", ()=>{
+        const map = {"def-region":"region","def-tz":"timezone","def-currency":"currency"};
+        STATE.orgDefaults[map[id]] = el.value; persist(); setSaveStatus("defaults","saved");
+        STATE.activity.unshift({id:"a"+Date.now(), ts:new Date().toISOString(), actor:STATE.account.name, type:"Configuration change", object:"Organization Defaults", summary:"Updated "+map[id]+" to "+el.value});
+      });
+    });
+  };
+  return renderShell("defaults", body);
+}
+on("defaults-conflict-reload", ()=>{ STATE.orgDefaults.conflict=false; persist(); render(); toast("Reloaded current organization settings."); });
+on("defaults-conflict-keep", ()=>{ STATE.orgDefaults.conflict=false; persist(); render(); toast("Your changes were kept — saved over the previous update."); });
+on("defaults-simulate-conflict", ()=>{ STATE.orgDefaults.conflict=true; persist(); render(); });
+
+
+/* ============================================================
+   ORGANIZATION · DATA POLICIES (read-only)
+   ============================================================ */
+function renderDataPolicies(){
+  const rows = STATE.dataPolicies.map(d=>{
+    const configured = d.status==="In effect";
+    return '<tr class="clickable" data-action="dp-view" data-id="'+d.id+'"><td class="cell-primary">'+esc(d.category)+'</td><td>'+esc(d.purpose)+'</td>'+
+      '<td>'+esc(d.retention)+'</td><td>'+esc(d.source)+'</td><td class="mono">'+esc(d.version)+'</td>'+
+      '<td>'+(configured?statusBadge("In effect","success"):statusBadge("Not configured","neutral"))+'</td></tr>';
+  }).join("");
+  const body =
+    pageHeader("Data Policies","Read-only for this release — a view into rules already in effect, not an editor.")+
+    '<div class="table-wrap"><table><thead><tr><th>Category</th><th>Purpose</th><th>Retention</th><th>Source</th><th>Version</th><th>Status</th></tr></thead><tbody>'+rows+'</tbody></table></div>'+
+    '<div class="hint" style="margin-top:12px">Deleting or withdrawing a specific candidate’s or file’s data happens from its own authorized page — not as a bulk action here.</div>';
+  return renderShell("data-policies", body, {wide:true});
+}
+on("dp-view", (el)=>{
+  const d = STATE.dataPolicies.find(x=>x.id===el.getAttribute("data-id"));
+  const configured = d.status==="In effect";
+  openModal('<div class="modal-head"><h3>'+esc(d.category)+'</h3><button class="btn btn-icon btn-ghost" data-action="modal-close">'+icon("close",16)+'</button></div>'+
+    '<div class="modal-body">'+
+    (configured ? '<dl class="kv"><dt>Purpose</dt><dd>'+esc(d.purpose)+'</dd><dt>Retention</dt><dd>'+esc(d.retention)+'</dd><dt>Source</dt><dd>'+esc(d.source)+'</dd><dt>Version</dt><dd class="mono">'+esc(d.version)+'</dd><dt>Status</dt><dd>'+statusBadge(d.status,"success")+'</dd></dl>'+
+      '<div class="hint">This is a summary of the rule already in effect. Editing happens through platform configuration, not from this page.</div>'
+      : emptyState("Not configured","No retention rule has been recorded for this category yet — nothing is being invented here, including a default retention period."))+
+    '</div><div class="modal-foot"><button class="btn btn-primary" data-action="modal-close">Close</button></div>');
+});
+
+/* ============================================================
+   ORGANIZATION · ACTIVITY
+   ============================================================ */
+function activityRow(a){
+  return '<div class="list-row"><div class="lr-main"><div class="avatar" style="width:26px;height:26px;font-size:10px">'+esc(initials({name:a.actor}))+'</div>'+
+    '<div><div class="lr-title">'+esc(a.summary)+'</div><div class="lr-sub">'+esc(a.actor)+' · '+esc(a.type)+' · '+esc(a.object)+'</div></div></div>'+
+    '<div class="text-faint tabular" style="font-size:var(--fs-cap);white-space:nowrap">'+fmtDateTime(a.ts)+'</div></div>';
+}
+function renderActivity(){
+  STATE.ui.activityFilter = STATE.ui.activityFilter || "all";
+  const f = STATE.ui.activityFilter;
+  const types = ["all","Configuration change","Member","Connection","Run","Model"];
+  const items = STATE.activity.filter(a=> f==="all" || a.type===f);
+  const body =
+    pageHeader("Activity","Configuration audit and automated runs — kept separate from My Tasks (human work) and business evidence review.")+
+    '<div class="filter-bar">'+types.map(t=>'<button class="btn btn-sm'+(f===t?" btn-primary":"")+'" data-action="activity-filter" data-val="'+t+'">'+t+'</button>').join("")+
+      '<div class="result-count">'+items.length+' entries</div></div>'+
+    '<div class="card" style="padding:6px 18px">'+(items.length? items.map(activityRow).join("") : emptyState("No activity in this category yet"))+'</div>';
+  return renderShell("activity", body, {wide:true});
+}
+on("activity-filter", (el)=>{ STATE.ui.activityFilter = el.getAttribute("data-val"); persist(); render(); });
+
+
+/* ============================================================
+   ORGANIZATION · AI MODELS
+   ============================================================ */
+function aiModelStatusBadge(s){
+  return {Active:statusBadge("Active","success"), "Needs reauthorization":statusBadge("Needs reauthorization","warning"),
+    "Not evaluated":statusBadge("Not evaluated","neutral"), Draft:statusBadge("Draft","warning"), Superseded:statusBadge("Superseded","neutral")}[s] || statusBadge(s,"neutral");
+}
+function renderAiModels(){
+  STATE.ui.aiTab = STATE.ui.aiTab || "catalog";
+  const tab = STATE.ui.aiTab;
+  const tabs = [{key:"catalog",label:"Model catalog"},{key:"policies",label:"Task policies"},{key:"compare",label:"Compare & evaluate"},{key:"usage",label:"Usage & cost"},{key:"versions",label:"Activity & versions"}];
+  const renderers = {catalog:aiCatalogTab, policies:aiPoliciesTab, compare:aiCompareTab, usage:aiUsageTab, versions:aiVersionsTab};
+  const body =
+    pageHeader("AI Models","One shared model layer — every module inherits it instead of wiring up its own.",
+      tab==="catalog" ? '<button class="btn btn-primary" data-action="ai-add-connection">Add connection</button>' : '')+
+    tabsHtml(tabs, tab, "ai-tab")+
+    '<div style="margin-top:20px">'+renderers[tab]()+'</div>'+
+    '<div class="divider"></div>'+
+    aiAutomationSection();
+  return renderShell("ai-models", body, {wide:true});
+}
+on("ai-tab", (el)=>{ STATE.ui.aiTab = el.getAttribute("data-tab"); persist(); render(); });
+
+function aiCatalogTab(){
+  const rows = STATE.aiModels.catalog.map(m=>
+    '<tr><td class="cell-primary">'+esc(m.model)+'<div class="cell-sub">'+esc(m.provider)+' · '+esc(m.account)+'</div></td>'+
+    '<td>'+esc(m.capability)+'</td><td>'+esc(m.region)+'</td>'+
+    '<td>'+(m.price==="Known"? '<span class="mono">Known</span>' : statusBadge("Unknown","neutral"))+'</td>'+
+    '<td>'+aiModelStatusBadge(m.status)+'</td>'+
+    '<td>'+(m.status==="Needs reauthorization" ? '<button class="btn btn-sm" data-action="ai-reauth" data-id="'+m.id+'">Reauthorize</button>' : '<button class="btn btn-sm btn-ghost" data-action="ai-test" data-id="'+m.id+'">Test</button>')+'</td></tr>').join("");
+  return '<div class="table-wrap"><table><thead><tr><th>Model</th><th>Capability</th><th>Region</th><th>Price</th><th>Status</th><th></th></tr></thead><tbody>'+rows+'</tbody></table></div>'+
+    '<div class="hint" style="margin-top:10px">Prices, latency and quality figures in this prototype are Sample data — unknown values show Unknown, never “free.”</div>';
+}
+on("ai-add-connection", ()=>{
+  openModal('<div class="modal-head"><h3>Add connection</h3><button class="btn btn-icon btn-ghost" data-action="modal-close">'+icon("close",16)+'</button></div>'+
+    '<div class="modal-body">'+fieldSelect("ai-provider","Provider",[{value:"Anthropic",label:"Anthropic"},{value:"OpenAI",label:"OpenAI"},{value:"Google",label:"Google"},{value:"Local",label:"Local / self-hosted"}],"Anthropic")+
+    fieldText("ai-account","Account alias","","e.g. sending-labs-prod")+
+    '<div class="hint">Credentials are stored — never re-displayed and never written to Activity.</div></div>'+
+    '<div class="modal-foot"><button class="btn" data-action="modal-close">Cancel</button><button class="btn btn-primary" data-action="ai-add-connection-save">Test & save</button></div>');
+});
+on("ai-add-connection-save", ()=>{
+  const provider = qs("#ai-provider").value, account = (qs("#ai-account").value||"new-account").trim();
+  STATE.aiModels.catalog.push({id:"m"+Date.now(), provider, account, model:provider+" (pending evaluation)", status:"Not evaluated", capability:"—", region:"—", price:"Unknown", priceVersion:null});
+  closeModal(); persist(); render();
+  toast("Connection added — capabilities and pricing will show once evaluated.");
+});
+on("ai-reauth", (el)=>{
+  const m = STATE.aiModels.catalog.find(x=>x.id===el.getAttribute("data-id"));
+  m.status = "Active"; persist(); render(); toast(m.model+" reauthorized.");
+});
+on("ai-test", (el)=>{ toast("Connection test succeeded (simulated)."); });
+
+function aiPoliciesTab(){
+  const rows = STATE.aiModels.policies.map(p=>
+    '<tr><td class="cell-primary">'+esc(p.module)+' · '+esc(p.task)+'<div class="cell-sub">Inherits: '+esc(p.inherits)+'</div></td>'+
+    '<td>'+esc(p.primary)+'</td><td>'+esc(p.fallback)+'</td><td class="mono">'+esc(p.version)+'</td>'+
+    '<td>'+(p.status==="Active"?statusBadge("Active","success"):statusBadge("Draft","warning"))+'</td>'+
+    '<td>'+(p.status==="Draft" ? '<button class="btn btn-sm btn-primary" data-action="ai-publish" data-id="'+p.id+'">Publish</button>' : '<button class="btn btn-sm btn-ghost" data-action="ai-rollback" data-id="'+p.id+'">Roll back</button>')+'</td></tr>').join("");
+  return '<div class="table-wrap"><table><thead><tr><th>Module · Task</th><th>Primary model</th><th>Fallback</th><th>Version</th><th>Status</th><th></th></tr></thead><tbody>'+rows+'</tbody></table></div>'+
+    '<div class="section" style="margin-top:16px"><div class="section-head"><h2>Fallback in action</h2><div class="desc">A simulated timeout on the primary model, walking through the qualified fallback chain.</div></div>'+
+    '<div class="card" style="padding:16px 18px"><div class="pipeline">'+
+      '<span class="step done">Claude Opus 4.1 <span class="text-faint">(timeout)</span></span><span class="arrow">'+icon("chevronRight",13)+'</span>'+
+      '<span class="step done">Re-check budget & quality gate</span><span class="arrow">'+icon("chevronRight",13)+'</span>'+
+      '<span class="step current">Claude Sonnet 4.5 <span class="text-faint">(used)</span></span>'+
+    '</div><div class="hint" style="margin-top:10px">Every retry and fallback re-checks the hard constraints — never a silent downgrade of privacy or quality gates. No eligible model returns a clear failure, not a guess.</div>'+
+    '<button class="btn btn-sm btn-ghost" style="margin-top:10px" data-action="ai-simulate-no-fallback">Simulate: no eligible fallback</button></div></div>';
+}
+on("ai-publish", (el)=>{ const p = STATE.aiModels.policies.find(x=>x.id===el.getAttribute("data-id")); p.status="Active"; p.version = p.version.replace(" (unpublished)",""); persist(); render(); toast("Policy published. Only new tasks use it — evaluated results keep their original model and inputs."); });
+on("ai-rollback", (el)=>{ toast("Rolled back to the last approved version (simulated)."); });
+on("ai-simulate-no-fallback", ()=>{
+  openModal('<div class="modal-head"><h3>No eligible model</h3><button class="btn btn-icon btn-ghost" data-action="modal-close">'+icon("close",16)+'</button></div>'+
+    '<div class="modal-body"><div class="status-line" style="color:var(--error)">'+icon("close",14)+' No eligible model for this task under current data, budget and quality constraints.</div>'+
+    '<div class="hint">HireOS never relaxes a privacy or quality gate to force a result — the task fails clearly instead.</div></div>'+
+    '<div class="modal-foot"><button class="btn btn-primary" data-action="modal-close">Close</button></div>');
+});
+
+function aiCompareTab(){
+  const rows = STATE.aiModels.evaluations.map(e=>
+    '<tr><td class="cell-primary">'+esc(e.task)+'</td><td>'+esc(e.language)+'</td><td>'+esc(e.dataset)+'</td>'+
+    '<td>'+esc(e.quality)+'</td><td class="mono">'+esc(e.cost)+'</td><td class="mono">'+esc(e.p50)+' / '+esc(e.p95)+'</td>'+
+    '<td class="mono">'+esc(e.failRate)+'</td><td class="text-faint">'+esc(e.measured)+'</td></tr>').join("");
+  return '<div class="table-wrap"><table><thead><tr><th>Task</th><th>Language</th><th>Dataset</th><th>Quality</th><th>Cost</th><th>P50 / P95</th><th>Fail rate</th><th>Measured</th></tr></thead><tbody>'+rows+'</tbody></table></div>'+
+    '<div class="hint" style="margin-top:10px">Selecting Chinese or Vietnamese here doesn’t mean the interface language has shipped, or that this model has passed evaluation for that task yet.</div>';
+}
+function aiUsageTab(){
+  const tiles = STATE.aiModels.usage.map(u=>'<div class="stat-tile"><div class="lbl">'+esc(u.scope)+' · '+esc(u.period)+'</div>'+
+    '<div class="val tabular">'+u.calls.toLocaleString()+'</div><div class="sub">calls</div>'+
+    '<div class="kv" style="grid-template-columns:1fr 1fr;margin-top:10px;font-size:var(--fs-cap)"><dt>Estimated</dt><dd class="tabular">'+esc(u.estCost)+'</dd><dt>Actual</dt><dd class="tabular">'+esc(u.actualCost)+'</dd><dt>Pending reconciliation</dt><dd class="tabular">'+esc(u.pending)+'</dd></div></div>').join("");
+  return '<div class="stat-grid">'+tiles+'</div>'+
+    '<div class="hint" style="margin-top:14px">Every retry and fallback attempt is billed to the same logical task — pending reconciliation covers costs not yet confirmed by the provider, never a promise of zero duplicate billing.</div>';
+}
+function aiVersionsTab(){
+  const rows = STATE.aiModels.versions.map(v=>'<tr><td class="cell-primary">'+esc(v.policy)+'</td><td class="mono">'+esc(v.version)+'</td>'+
+    '<td>'+(v.state==="Active"?statusBadge("Active","success"):statusBadge("Superseded","neutral"))+'</td><td>'+esc(v.publishedBy)+'</td><td class="text-faint">'+esc(v.date)+'</td></tr>').join("");
+  return '<div class="table-wrap"><table><thead><tr><th>Policy</th><th>Version</th><th>State</th><th>Published by</th><th>Date</th></tr></thead><tbody>'+rows+'</tbody></table></div>';
+}
+function aiAutomationSection(){
+  const a = STATE.aiModels.automation;
+  return '<div class="section-head"><h2>Automation</h2><div class="desc">Full scope stays available even in this settings-focused prototype — nothing here is trimmed as an “advanced” placeholder.</div></div>'+
+  '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:14px">'+
+    '<div class="card" style="padding:16px 18px"><div style="font-weight:700;margin-bottom:8px">Price sync</div>'+
+      '<dl class="kv" style="grid-template-columns:110px 1fr;font-size:var(--fs-cap)"><dt>Support</dt><dd>'+statusBadge(a.priceSync.supported?"Supported":"Unsupported", a.priceSync.supported?"success":"neutral")+'</dd>'+
+      '<dt>Schedule</dt><dd>'+esc(a.priceSync.schedule)+'</dd><dt>Last run</dt><dd class="tabular">'+esc(a.priceSync.lastRun)+' · '+esc(a.priceSync.status)+'</dd></dl>'+
+      '<button class="btn btn-sm" style="margin-top:10px" data-action="ai-price-sync-retry">Retry now</button></div>'+
+    '<div class="card" style="padding:16px 18px"><div style="font-weight:700;margin-bottom:8px">Quality regression</div>'+
+      '<dl class="kv" style="grid-template-columns:110px 1fr;font-size:var(--fs-cap)"><dt>Task</dt><dd>'+esc(a.qualityRegression.task)+' · '+esc(a.qualityRegression.language)+'</dd>'+
+      '<dt>Schedule</dt><dd>'+esc(a.qualityRegression.schedule)+'</dd><dt>Threshold</dt><dd>'+esc(a.qualityRegression.threshold)+'</dd>'+
+      '<dt>Last result</dt><dd>'+esc(a.qualityRegression.lastResult)+' ('+esc(a.qualityRegression.date)+')</dd></dl></div>'+
+    '<div class="card" style="padding:16px 18px"><div style="font-weight:700;margin-bottom:8px">Controlled rollout</div>'+
+      '<dl class="kv" style="grid-template-columns:110px 1fr;font-size:var(--fs-cap)"><dt>Scope</dt><dd>'+esc(a.rollout.scope)+'</dd>'+
+      '<dt>Traffic</dt><dd>'+a.rollout.pct+'%</dd><dt>Budget cap</dt><dd>'+esc(a.rollout.budgetCap)+'</dd><dt>Stop if</dt><dd>'+esc(a.rollout.stopCondition)+'</dd></dl>'+
+      '<div class="progress" style="margin-top:8px"><span style="width:'+a.rollout.pct+'%"></span></div>'+
+      '<div style="display:flex;gap:8px;margin-top:10px"><button class="btn btn-sm btn-danger" data-action="ai-rollout-stop">Stop rollout</button></div></div>'+
+    '<div class="card" style="padding:16px 18px"><div style="font-weight:700;margin-bottom:8px">Alerts</div>'+
+      '<dl class="kv" style="grid-template-columns:110px 1fr;font-size:var(--fs-cap)"><dt>Rule</dt><dd>'+esc(a.alerts.rule)+'</dd>'+
+      '<dt>Recipients</dt><dd>'+esc(a.alerts.recipients)+'</dd><dt>Frequency</dt><dd>'+esc(a.alerts.frequency)+'</dd><dt>History</dt><dd>'+a.alerts.history+' alerts, last 30 days</dd></dl></div>'+
+  '</div>';
+}
+on("ai-price-sync-retry", ()=>{ STATE.aiModels.automation.priceSync.lastRun = new Date().toISOString().slice(0,16).replace("T"," "); persist(); render(); toast("Price sync re-run — succeeded."); });
+on("ai-rollout-stop", ()=>{ STATE.aiModels.automation.rollout.status="Stopped"; STATE.aiModels.automation.rollout.pct=0; persist(); render(); toast("Controlled rollout stopped. No further requests route to the candidate model."); });
+
+
+/* ============================================================
+   ORGANIZATION · CONNECTIONS & DELIVERY
+   ============================================================ */
+function connStatusBadge(s){
+  return {Connected:statusBadge("Connected","success"), "Not connected":statusBadge("Not connected","neutral"),
+    "Authorization required":statusBadge("Authorization required","warning"), Paused:statusBadge("Paused","neutral"),
+    Failed:statusBadge("Failed","error"), Connecting:statusBadge("Connecting…","info")}[s] || statusBadge(s,"neutral");
+}
+function renderConnections(){
+  STATE.ui.connTab = STATE.ui.connTab || "mailboxes";
+  const tab = STATE.ui.connTab;
+  const tabs = [{key:"mailboxes",label:"Mailboxes"},{key:"connections",label:"Connections"},{key:"delivery",label:"Delivery"}];
+  const body =
+    pageHeader("Connections & Delivery","Public mailboxes, read/send authorization and outbound identity — kept separate from anyone's personal login.")+
+    tabsHtml(tabs, tab, "conn-tab")+
+    '<div style="margin-top:20px">'+
+    (tab==="mailboxes"?connMailboxesTab():tab==="connections"?connConnectionsTab():connDeliveryTab())+
+    '</div>';
+  return renderShell("connections", body, {wide:true});
+}
+on("conn-tab", (el)=>{ STATE.ui.connTab = el.getAttribute("data-tab"); persist(); render(); });
+
+function connMailboxesTab(){
+  const rows = STATE.mailboxes.map(m=>
+    '<tr class="clickable" data-action="mailbox-open" data-id="'+m.id+'"><td class="cell-primary">'+esc(m.email)+(m.company_label?'<div class="cell-sub">'+esc(m.company_label)+'</div>':'')+'</td>'+
+    '<td>'+m.purposes.map(p=>'<span class="badge badge-neutral" style="margin:1px 3px 1px 0">'+esc(p)+'</span>').join("")+'</td>'+
+    '<td>'+esc(m.manager||"Not specified")+'</td>'+
+    '<td>'+connStatusBadge(m.connection_status)+'</td>'+
+    '<td>'+(m.sending_status==="Authorized"?statusBadge("Authorized","success"):statusBadge("Sending not authorized","neutral"))+'</td></tr>').join("");
+  return '<div class="table-wrap"><table><thead><tr><th>Email</th><th>Purpose</th><th>Manager</th><th>Connection</th><th>Sending status</th></tr></thead><tbody>'+rows+'</tbody></table></div>'+
+    '<div class="hint" style="margin-top:10px">hr@sding.me carries two purposes on one resource — it isn’t split into duplicate mailboxes. Registering an address never creates a personal login, and <span class="mono">admin@pallax.ai</span> never becomes a Super Admin on its own.</div>';
+}
+on("mailbox-open", (el)=>{
+  const m = STATE.mailboxes.find(x=>x.id===el.getAttribute("data-id"));
+  openModal('<div class="modal-head"><h3>'+esc(m.email)+'</h3><button class="btn btn-icon btn-ghost" data-action="modal-close">'+icon("close",16)+'</button></div>'+
+    '<div class="modal-body">'+
+    '<dl class="kv"><dt>Purposes</dt><dd>'+m.purposes.join(", ")+'</dd>'+
+    '<dt>Company / project label</dt><dd>'+esc(m.company_label||"Not specified")+'</dd>'+
+    '<dt>Manager</dt><dd>'+esc(m.manager||"Not specified")+'</dd>'+
+    '<dt>Connection</dt><dd>'+connStatusBadge(m.connection_status)+'</dd>'+
+    '<dt>Sending</dt><dd>'+(m.sending_status==="Authorized"?statusBadge("Authorized","success"):statusBadge("Not authorized","neutral"))+'</dd>'+
+    (m.note?'<dt>Note</dt><dd>'+esc(m.note)+'</dd>':'')+'</dl>'+
+    '</div><div class="modal-foot">'+
+    (m.connection_status==="Not connected" ? '<button class="btn btn-primary" data-action="mailbox-connect" data-id="'+m.id+'">Connect</button>'
+      : m.connection_status==="Authorization required" ? '<button class="btn btn-primary" data-action="mailbox-connect" data-id="'+m.id+'">Reauthorize</button>'
+      : '<button class="btn btn-danger" data-action="mailbox-disconnect" data-id="'+m.id+'">Disconnect</button>')+
+    '<button class="btn" data-action="modal-close">Close</button></div>');
+});
+on("mailbox-connect", (el)=>{
+  const m = STATE.mailboxes.find(x=>x.id===el.getAttribute("data-id"));
+  closeModal();
+  toast("Opening provider authorization (simulated)…");
+  setTimeout(()=>{
+    m.connection_status="Connected"; m.sending_status="Authorized"; m.manager = m.manager || STATE.account.name;
+    STATE.activity.unshift({id:"a"+Date.now(), ts:new Date().toISOString(), actor:STATE.account.name, type:"Connection", object:m.email, summary:"Connected and authorized for sending (demo)"});
+    persist(); render();
+    toast(m.email+" connected. This is a demo authorization — no real mailbox is linked.");
+  }, 900);
+});
+on("mailbox-disconnect", (el)=>{
+  const m = STATE.mailboxes.find(x=>x.id===el.getAttribute("data-id"));
+  m.connection_status="Not connected"; m.sending_status="Sending not authorized";
+  closeModal(); persist(); render(); toast(m.email+" disconnected. Prior activity history is kept.");
+});
+
+function connConnectionsTab(){
+  const rows = STATE.connections.map(c=>
+    '<tr><td class="cell-primary">'+esc(c.label)+'<div class="cell-sub">'+esc(c.kind)+' · '+esc(c.scope)+'</div></td>'+
+    '<td>'+connStatusBadge(c.status)+(c.errorNote?'<div class="cell-sub" style="color:var(--warning)">'+esc(c.errorNote)+'</div>':'')+'</td>'+
+    '<td class="tabular">'+(c.lastRun||"—")+'</td>'+
+    '<td>'+connActionButtons(c)+'</td></tr>').join("");
+  return '<div class="table-wrap"><table><thead><tr><th>Connection</th><th>Status</th><th>Last run</th><th></th></tr></thead><tbody>'+rows+'</tbody></table></div>';
+}
+function connActionButtons(c){
+  const btns = [];
+  if(c.status==="Authorization required") btns.push('<button class="btn btn-sm btn-primary" data-action="conn-reauth" data-id="'+c.id+'">Reauthorize</button>');
+  if(c.status==="Connected"){ btns.push('<button class="btn btn-sm" data-action="conn-readnow" data-id="'+c.id+'">Read now</button>'); btns.push('<button class="btn btn-sm btn-ghost" data-action="conn-pause" data-id="'+c.id+'">Pause</button>'); }
+  if(c.status==="Paused") btns.push('<button class="btn btn-sm" data-action="conn-resume" data-id="'+c.id+'">Resume</button>');
+  if(c.status==="Not connected") btns.push('<button class="btn btn-sm btn-primary" data-action="conn-connect" data-id="'+c.id+'">Connect</button>');
+  btns.push('<button class="btn btn-sm btn-ghost" data-action="conn-test" data-id="'+c.id+'">Test</button>');
+  return btns.join(" ");
+}
+function connFind(id){ return STATE.connections.find(x=>x.id===id); }
+on("conn-reauth", (el)=>{ const c=connFind(el.getAttribute("data-id")); c.status="Connected"; c.errorNote=null; c.lastRun=new Date().toISOString().slice(0,16).replace("T"," "); persist(); render(); toast(c.label+" reauthorized."); });
+on("conn-readnow", (el)=>{
+  const c=connFind(el.getAttribute("data-id"));
+  toast("Reading now…");
+  setTimeout(()=>{ c.lastRun=new Date().toISOString().slice(0,16).replace("T"," "); persist(); render(); toast("Read complete — matched=0. Empty scans still record success."); }, 700);
+});
+on("conn-pause", (el)=>{ const c=connFind(el.getAttribute("data-id")); c.status="Paused"; persist(); render(); toast(c.label+" paused. History is kept."); });
+on("conn-resume", (el)=>{ const c=connFind(el.getAttribute("data-id")); c.status="Connected"; persist(); render(); toast(c.label+" resumed — checkpoint re-scan queued, already-successful items won’t be redone."); });
+on("conn-connect", (el)=>{ const c=connFind(el.getAttribute("data-id")); c.status="Connected"; c.lastRun=new Date().toISOString().slice(0,16).replace("T"," "); persist(); render(); toast(c.label+" connected (demo)."); });
+on("conn-test", ()=>{ toast("Connection test succeeded (simulated)."); });
+
+function connDeliveryTab(){
+  const authorized = STATE.mailboxes.filter(m=>m.sending_status==="Authorized");
+  return '<div class="section"><div class="section-head"><h2>Sending identity</h2><div class="desc">From / Reply-to always come from an authorized resource for this project — never a hard-coded address.</div></div>'+
+    '<div class="card" style="padding:16px 18px;display:flex;flex-direction:column;gap:12px">'+
+    fieldSelect("delivery-from","From", authorized.length ? authorized.map(m=>({value:m.email,label:m.email})) : [{value:"",label:"No authorized mailbox available"}], authorized[0]?authorized[0].email:"")+
+    (authorized.length===0 ? '<div class="field err">'+icon("close",12)+' No mailbox is authorized to send yet. <button class="link-btn" data-action="conn-tab-jump-mailboxes">Configure one</button></div>' : '')+
+    '<div class="kv"><dt>Reply-to</dt><dd>Same as From, unless overridden per project</dd><dt>Recipient language</dt><dd>Detected from recipient, English fallback</dd><dt>Recipient time zone</dt><dd>Shown alongside sender’s time zone</dd></div>'+
+    '<button class="btn btn-primary" style="align-self:flex-start" data-action="delivery-send-preview" '+(authorized.length===0?"disabled":"")+'>Preview & send test (demo)</button>'+
+    '</div></div>'+
+    '<div class="section"><div class="section-head"><h2>Recent deliveries</h2></div>'+
+    '<div class="card" style="padding:6px 18px">'+
+    '<div class="list-row"><div class="lr-main"><div><div class="lr-title">Interview invite — Backend Engineer</div><div class="lr-sub">To candidate · via '+(authorized[0]?esc(authorized[0].email):"—")+'</div></div></div>'+statusBadge("Delivered","success")+'</div>'+
+    '<div class="list-row"><div class="lr-main"><div><div class="lr-title">Offer acknowledgement</div><div class="lr-sub">To hiring manager</div></div></div>'+statusBadge("Outcome unknown","warning")+'<button class="btn btn-sm" data-action="delivery-check-status" style="margin-left:8px">Check status</button></div>'+
+    '</div></div>';
+}
+on("conn-tab-jump-mailboxes", ()=>{ STATE.ui.connTab="mailboxes"; persist(); render(); });
+on("delivery-send-preview", ()=>{
+  toast("Sending is simulated in this prototype — no real message is delivered.");
+});
+on("delivery-check-status", (el)=>{
+  toast("Checking… delivery confirmed (simulated).");
+});
+
+
+/* ============================================================
+   ABOUT / SCOPE NOTE
+   ============================================================ */
+on("about-open", ()=>{
+  openModal('<div class="modal-head"><h3>About this prototype</h3><button class="btn btn-icon btn-ghost" data-action="modal-close">'+icon("close",16)+'</button></div>'+
+    '<div class="modal-body">'+
+    '<p>A click-through, high-fidelity prototype of HireOS Command’s <b>shared Settings, Organization, Account & Access</b> module for Sending Labs — built from the Settings PRD v2.4, Shared Capabilities PRD v1.1 and the Shared Settings Design Brief v1.1.</p>'+
+    '<p class="hint">Real reference data: 9 people, 7 functional mailboxes and 2 confirmed recruiting responsibilities from the company reference and Mock Data v1.2. Everything else — connections, model runs, invitations, deliveries — is simulated locally in your browser; nothing is sent anywhere.</p>'+
+    '<p class="hint">Scoped down from the full brief: business workspaces (Screening/Interview/JD), the candidate comparison framework (SHARED-12) and true multi-admin concurrency are out of scope here — this build focuses on Settings itself. Role switching in Demo controls simulates visibility only; a real build still needs server-side checks.</p>'+
+    '</div><div class="modal-foot"><button class="btn btn-primary" data-action="modal-close">Got it</button></div>');
+});
+
+/* ============================================================
+   INIT
+   ============================================================ */
+function boot(){
+  loadState();
+  applyThemeAttrs();
+  if(!location.hash) location.hash = STATE.session.signedIn ? "#/settings/appearance" : "#/auth";
+  render();
+}
+if(document.readyState==="loading") document.addEventListener("DOMContentLoaded", boot); else boot();
+</script>
+
+</body></html>
