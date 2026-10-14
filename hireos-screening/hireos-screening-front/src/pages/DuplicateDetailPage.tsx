@@ -30,7 +30,7 @@ export function DuplicateDetailPage() {
     const updated = await resolveDuplicateReview(id, outcome, { resolvedBy: state.currentUser });
     setReview(updated);
     if (outcome === "defer") {
-      say(t("Deferred — task remains open"));
+      say(t("Deferred — you can come back to it later"));
     } else {
       say(t("Duplicate review resolved"), { type: "success" });
     }

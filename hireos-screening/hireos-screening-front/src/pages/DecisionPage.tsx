@@ -217,7 +217,7 @@ function AlreadyDecidedView({ app, withdrawn, onWithdrawn }: { app: Application;
         <div className="card card-pad">
           <p className="tiny">
             {t(
-              "Decision recorded without a downstream handoff yet. A task remains until a next step is either sent or explicitly closed as “no next step.”",
+              "Decision recorded without a downstream handoff yet. It stays open here until a next step is either sent or explicitly closed as “no next step.”",
             )}
           </p>
         </div>
