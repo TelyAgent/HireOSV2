@@ -58,6 +58,8 @@ export function EvaluationReviewContent({
   const [confirmOpen, setConfirmOpen] = useState(false);
   // Turned on by a blocked finalize: missing scores and reasons are then outlined in red.
   const [showErrors, setShowErrors] = useState(false);
+  // > 0 while asking whether "accept all" may overwrite that many typed scores.
+  const [replaceCount, setReplaceCount] = useState(0);
 
   if (!att) return <EmptyState title="Attempt not found." />;
 
@@ -99,9 +101,20 @@ export function EvaluationReviewContent({
     updateEvaluation((ev) => ({ ...ev, criteria: ev.criteria.map((c, i) => (i === index ? { ...c, ...patch } : c)) }));
   }
 
-  function acceptAll() {
+  function applyAcceptAll() {
+    setReplaceCount(0);
     updateEvaluation((ev) => ({ ...ev, criteria: ev.criteria.map((c) => ({ ...c, human: c.ai, overridden: false })) }));
     say(t("All AI scores filled in — adjust any of them under \"Human score\" on each criterion."), { type: "success" });
+  }
+
+  // Never silently overwrite scores the reviewer typed: "accept all" replaces every human score.
+  function acceptAll() {
+    const typed = ev.criteria.filter((c) => c.human != null && c.human !== c.ai).length;
+    if (!typed) {
+      applyAcceptAll();
+      return;
+    }
+    setReplaceCount(typed);
   }
 
   function reRunAi() {
@@ -231,6 +244,17 @@ export function EvaluationReviewContent({
           <Button variant="primary" onClick={onFinalizeClick}>{t(isFinalized ? "View final result" : "Finalize evaluation")}</Button>
         )}
       </div>
+
+      <Modal
+        open={replaceCount > 0}
+        onCancel={() => setReplaceCount(0)}
+        onOk={applyAcceptAll}
+        title={t("Replace your scores with the AI's?")}
+        okText={t("Replace with AI scores")}
+        cancelText={t("Keep my scores")}
+      >
+        {replaceCount} {t("criteria have a human score different from the AI suggestion. Accepting all AI scores replaces them.")}
+      </Modal>
 
       <Modal
         open={confirmOpen}

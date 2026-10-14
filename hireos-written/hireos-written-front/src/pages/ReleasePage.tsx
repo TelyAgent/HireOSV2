@@ -151,11 +151,23 @@ export function ReleaseContent({
       <div className="two-col">
         <div className="card card-pad">
           <h4 style={{ marginBottom: 8 }}>{t("Internal reference")}</h4>
-          <div className="tiny" style={{ marginBottom: 8 }}>{t("Overall (human)")}: <b>{result.overall}</b></div>
+          <div style={{ marginBottom: 4 }}>{t("Final overall (human)")}: <b style={{ fontSize: 18 }}>{result.overall}</b><span className="tiny"> / 100</span></div>
+          {/* Say exactly where the number comes from: the reviewer's finalized scores, not the AI's. */}
+          <div className="tiny" style={{ color: "var(--text-tertiary)", marginBottom: 8 }}>
+            {t("Sum of the human scores below")} ({evaluation.criteria.reduce((sum, cr) => sum + (cr.human ?? 0), 0)} / {evaluation.criteria.reduce((sum, cr) => sum + cr.max, 0)}){t(", scaled to 100. AI suggestions are shown for reference only and are not counted.")}
+          </div>
+          <div className="tiny" style={{ display: "flex", justifyContent: "space-between", color: "var(--text-tertiary)", paddingBottom: 4, borderBottom: "1px solid var(--border)" }}>
+            <span>{t("Criteria")}</span>
+            <span>{t("Human score")} · {t("AI suggests")}</span>
+          </div>
           {evaluation.criteria.map((cr) => (
             <div key={cr.name} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "6px 0", borderBottom: "1px solid var(--border)" }}>
               <span>{cr.name}</span>
-              <span>{cr.human}/{cr.max}{cr.overridden ? <span className="tiny"> ({t("overridden")})</span> : null}</span>
+              <span>
+                <b>{cr.human}</b>/{cr.max}
+                <span className="tiny" style={{ color: "var(--text-tertiary)" }}> · AI {cr.ai}</span>
+                {cr.human !== cr.ai ? <span className="tiny"> ({t("overridden")})</span> : null}
+              </span>
             </div>
           ))}
           <div className="tiny" style={{ marginTop: 8 }}>
