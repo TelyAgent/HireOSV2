@@ -19,6 +19,18 @@ function idempotencyKey(prefix: string): string {
   return `${prefix}-${safeRandomUUID()}`;
 }
 
+/** A Copilot request the backend refused; `status`/`code` let the panel explain it in plain words (#33). */
+export class CopilotRequestError extends Error {
+  readonly status: number;
+  readonly code?: string;
+  constructor(status: number, problem: { code?: string; message?: string }) {
+    super(problem.message || problem.code || `Copilot request failed (${status})`);
+    this.name = "CopilotRequestError";
+    this.status = status;
+    this.code = problem.code;
+  }
+}
+
 export interface CopilotJdFields {
   title?: string;
   department?: string;
@@ -73,13 +85,14 @@ async function request<T>(path: string, init: RequestInit & { idempotencyKey: st
   const body = await response.json().catch(() => ({}));
   if (!response.ok) {
     const problem = body as { code?: string; message?: string };
-    throw new Error(problem.message || problem.code || `Copilot request failed (${response.status})`);
+    throw new CopilotRequestError(response.status, problem);
   }
   return body as T;
 }
 
-export function createCopilotConversation(): Promise<CopilotConversationDto> {
-  return request(BASE, { method: "POST", body: "{}", idempotencyKey: idempotencyKey("copilot-conv") });
+/** `key` lets a retry reuse the key of a create whose response was lost, so it can't make a second conversation. */
+export function createCopilotConversation(key = idempotencyKey("copilot-conv")): Promise<CopilotConversationDto> {
+  return request(BASE, { method: "POST", body: "{}", idempotencyKey: key });
 }
 
 /** History list: each item's `messages` is empty (the backend keeps list responses lightweight). */
@@ -88,7 +101,7 @@ export async function listCopilotConversations(): Promise<CopilotConversationDto
   const body = await response.json().catch(() => []);
   if (!response.ok) {
     const problem = body as { code?: string; message?: string };
-    throw new Error(problem.message || problem.code || `Copilot request failed (${response.status})`);
+    throw new CopilotRequestError(response.status, problem);
   }
   return body as CopilotConversationDto[];
 }
@@ -98,7 +111,7 @@ export async function getCopilotConversation(conversationId: string): Promise<Co
   const body = await response.json().catch(() => ({}));
   if (!response.ok) {
     const problem = body as { code?: string; message?: string };
-    throw new Error(problem.message || problem.code || `Copilot request failed (${response.status})`);
+    throw new CopilotRequestError(response.status, problem);
   }
   return body as CopilotConversationDto;
 }
@@ -122,7 +135,7 @@ export async function streamCopilotMessage(
   });
   if (!response.ok || !response.body) {
     const problem = (await response.json().catch(() => ({}))) as { code?: string; message?: string };
-    throw new Error(problem.message || problem.code || `Copilot request failed (${response.status})`);
+    throw new CopilotRequestError(response.status, problem);
   }
 
   const reader = response.body.getReader();
@@ -142,7 +155,7 @@ export async function streamCopilotMessage(
         return JSON.parse(event.data) as CopilotConversationDto;
       } else if (event?.type === "error") {
         const problem = JSON.parse(event.data) as { code?: string; message?: string };
-        throw new Error(problem.message || problem.code || "Copilot stream error");
+        throw new CopilotRequestError(0, problem);
       }
       boundary = buffer.indexOf("\n\n");
     }
@@ -177,7 +190,7 @@ export async function uploadCopilotAttachment(conversationId: string, file: File
   const body = await response.json().catch(() => ({}));
   if (!response.ok) {
     const problem = body as { code?: string; message?: string };
-    throw new Error(problem.message || problem.code || `Copilot request failed (${response.status})`);
+    throw new CopilotRequestError(response.status, problem);
   }
   return body as CopilotConversationDto;
 }

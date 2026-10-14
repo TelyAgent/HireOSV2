@@ -1115,6 +1115,15 @@ export const ZH: Record<string, string> = {
   "Retry": "重试",
   "Creating…": "创建中…",
   "This conversation has expired — start a new one.": "这个会话已失效，请新建一个会话。",
+  /* #33 — Copilot request failure & recovery */
+  "Your sign-in has expired. Refresh the page and sign in again, then retry.": "登录已过期，请刷新页面重新登录后再试。",
+  "You don’t have permission to do this. Ask an admin for access.": "你没有执行此操作的权限，请联系管理员开通。",
+  "Copilot is getting too many requests right now. Wait a moment, then retry.": "Copilot 当前请求过多，请稍等片刻再重试。",
+  "Copilot is temporarily unavailable. Your input is kept — retry in a moment.": "Copilot 暂时不可用，你的输入已保留，请稍后重试。",
+  "Couldn’t reach Copilot. Check your connection, then retry.": "无法连接到 Copilot，请检查网络后重试。",
+  "Sorry, Copilot couldn’t process that just now. Your input is kept — please retry.": "抱歉，Copilot 暂时无法处理这条请求，你的输入已保留，请重试。",
+  "Choose the file again": "重新选择文件",
+  "Start over": "重新开始",
 };
 
 /**

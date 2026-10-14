@@ -99,6 +99,8 @@ export type GeminiMsg =
   | { role: "ai"; kind: "form"; text: string; done?: boolean }
   /** Creating the job failed (#34): nothing was saved, the reason is shown and `retry` re-runs the same create. `done` once retried. */
   | { role: "ai"; kind: "create-failed"; text: string; retry: GeminiCreateRetry; done?: boolean }
+  /** An AI request failed (#33): plain-language reason, Retry re-sends `retry` (when it can be replayed), Start over resets. */
+  | { role: "ai"; kind: "request-failed"; text: string; retry?: GeminiRequestRetry; done?: boolean }
   /** "Start with a job title" result: three styles to pick from. `picked` once a job was created from one. */
   | {
       role: "ai";
@@ -116,6 +118,12 @@ export type GeminiMsg =
 export type GeminiCreateRetry =
   | { source: "fields"; fields: CopilotJdFieldsLike; label: string; seniority?: string; formIndex?: number; variant?: { index: number; variantIndex: number } }
   | { source: "draft"; draftIndex: number; draft: GeminiDraft };
+/** What a failed AI request needs to be re-sent with the user's original input (kept serializable). */
+export type GeminiRequestRetry =
+  | { action: "chat" | "questions" | "title" | "link"; text: string }
+  | { action: "refine"; text: string; index: number }
+  /** Uploads can't be replayed from storage; Retry re-opens the file picker. */
+  | { action: "upload"; fileName: string };
 /** Structural stand-in for `CopilotJdFields` (store types don't import feature modules). */
 export type CopilotJdFieldsLike = Record<string, unknown>;
 

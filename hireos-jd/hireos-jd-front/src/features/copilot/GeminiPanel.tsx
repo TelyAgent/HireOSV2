@@ -30,7 +30,9 @@ import { VoiceInputButton, type VoiceInputHandle, type VoiceInputStatus } from "
 import { mergeVoiceTranscript } from "../../lib/voice-stream";
 import { fmtRelative } from "../../lib/format";
 import type { Audience, Requirement } from "../../data/types";
-import type { ConversationActionOption, GeminiCreatePath, GeminiCreateRetry, GeminiDraft, GeminiMsg, GeminiOrigin, GeminiVariant } from "../../store/types";
+import type { ConversationActionOption, GeminiCreatePath, GeminiCreateRetry, GeminiDraft, GeminiMsg, GeminiOrigin, GeminiRequestRetry, GeminiVariant } from "../../store/types";
+import { describeCopilotError } from "./copilotErrors";
+import { safeRandomUUID } from "../../lib/uuid";
 
 /** Converts a fetched conversation's raw messages back into the panel's bubble shapes. There's no
  * per-message phase snapshot server-side, so a conversation that's currently ready to confirm gets its
@@ -296,8 +298,9 @@ export function GeminiPanel({ ctx }: { ctx: GeminiCtx }) {
   const attachFileInputRef = useRef<HTMLInputElement>(null);
   const composerRef = useRef<HTMLTextAreaElement>(null);
   const working = busy || attaching;
-  const errorText = (error: unknown) =>
-    error instanceof Error && error.message ? error.message : t("Sorry, Copilot couldn’t process that just now. Please try again.");
+  const errorText = (error: unknown) => t(describeCopilotError(error));
+  // Idempotency key of a conversation create still awaiting success: a retry after a lost response reuses it (#33 AC-4).
+  const pendingConversationKeyRef = useRef<string | null>(null);
 
   useEffect(() => {
     const el = messagesRef.current;
@@ -351,15 +354,36 @@ export function GeminiPanel({ ctx }: { ctx: GeminiCtx }) {
   const ensureConversation = async () => {
     const existing = state.geminiConversationIds[key];
     if (existing) return existing;
-    const conversation = await createCopilotConversation();
+    pendingConversationKeyRef.current ??= `copilot-conv-${safeRandomUUID()}`;
+    const conversation = await createCopilotConversation(pendingConversationKeyRef.current);
+    pendingConversationKeyRef.current = null;
     mutate((draft) => {
       draft.geminiConversationIds = { ...draft.geminiConversationIds, [key]: conversation.id };
     });
     return conversation.id;
   };
 
+  /**
+   * Swaps the "thinking" dots (and a half-streamed reply) for a failure card with Retry / Start over (#33).
+   * Typed input goes back into an empty composer so nothing has to be retyped.
+   */
+  const failRequest = (error: unknown, retry?: GeminiRequestRetry, dropStreamed = false) => {
+    console.error("Copilot request failed:", error);
+    mutate((draft) => {
+      let list = (draft.geminiChats[key] ?? []).filter((m) => m.role !== "thinking");
+      if (dropStreamed) list = list.slice(0, -1);
+      draft.geminiChats = { ...draft.geminiChats, [key]: [...list, { role: "ai", kind: "request-failed", text: errorText(error), retry }] };
+    });
+    if (retry && "text" in retry) setInput((current) => (current.trim() ? current : retry.text));
+  };
+
   /** Runs one backend step behind the "thinking" dots; `autoFill` finishes an incomplete extraction in a second auto-complete turn. */
-  const runStep = async (step: (conversationId: string) => Promise<CopilotConversationDto>, autoFill = false, origin?: GeminiOrigin) => {
+  const runStep = async (
+    step: (conversationId: string) => Promise<CopilotConversationDto>,
+    autoFill = false,
+    origin?: GeminiOrigin,
+    retry?: GeminiRequestRetry,
+  ) => {
     setBusy(true);
     push({ role: "thinking" });
     try {
@@ -372,7 +396,7 @@ export function GeminiPanel({ ctx }: { ctx: GeminiCtx }) {
       resolveThinking(resultToMsg(result, origin));
       return true;
     } catch (error) {
-      resolveThinking({ role: "ai", text: errorText(error) });
+      failRequest(error, retry);
       return false;
     } finally {
       setBusy(false);
@@ -401,12 +425,8 @@ export function GeminiPanel({ ctx }: { ctx: GeminiCtx }) {
         const list = (draft.geminiChats[key] ?? []).filter((m) => m.role !== "thinking");
         draft.geminiChats = { ...draft.geminiChats, [key]: [...(streaming ? list.slice(0, -1) : list), finalReply] };
       });
-    } catch {
-      mutate((draft) => {
-        const list = (draft.geminiChats[key] ?? []).filter((m) => m.role !== "thinking");
-        const errorReply: GeminiMsg = { role: "ai", text: t("Sorry, Copilot couldn’t process that just now. Please try again.") };
-        draft.geminiChats = { ...draft.geminiChats, [key]: [...(streaming ? list.slice(0, -1) : list), errorReply] };
-      });
+    } catch (error) {
+      failRequest(error, { action: "chat", text }, streaming);
     } finally {
       setBusy(false);
     }
@@ -421,7 +441,8 @@ export function GeminiPanel({ ctx }: { ctx: GeminiCtx }) {
       "我的回答：",
       answers,
     ].join("\n");
-    if (await runStep((conversationId) => autoCompleteCopilotConversation(conversationId, brief), false, { path: "questions", detail: answers })) {
+    const retry: GeminiRequestRetry = { action: "questions", text: answers };
+    if (await runStep((conversationId) => autoCompleteCopilotConversation(conversationId, brief), false, { path: "questions", detail: answers }, retry)) {
       setPath("home");
     }
   };
@@ -435,7 +456,7 @@ export function GeminiPanel({ ctx }: { ctx: GeminiCtx }) {
       resolveThinking({ role: "ai", kind: "variants", title: result.title, variants: result.variants, selected: 0, origin: { path: "title", detail: title } });
       setPath("home");
     } catch (error) {
-      resolveThinking({ role: "ai", text: errorText(error) });
+      failRequest(error, { action: "title", text: title });
     } finally {
       setBusy(false);
     }
@@ -443,14 +464,16 @@ export function GeminiPanel({ ctx }: { ctx: GeminiCtx }) {
 
   const runImport = async (text: string) => {
     if (/^https?:\/\/\S+$/i.test(text)) {
-      if (await runStep((conversationId) => importCopilotSource(conversationId, { url: text }), true, { path: "link", detail: text })) setPath("home");
+      if (await runStep((conversationId) => importCopilotSource(conversationId, { url: text }), true, { path: "link", detail: text }, { action: "link", text }))
+        setPath("home");
       return;
     }
     if (text.length < 20) {
       push({ role: "ai", text: t("That doesn’t look like a link or a JD. Paste a job posting URL (starting with http:// or https://) or the full JD text.") });
       return;
     }
-    if (await runStep((conversationId) => importCopilotSource(conversationId, { text }), true, { path: "link", detail: text })) setPath("home");
+    if (await runStep((conversationId) => importCopilotSource(conversationId, { text }), true, { path: "link", detail: text }, { action: "link", text }))
+      setPath("home");
   };
 
   /** A note typed while a draft is open rewrites it (every version, for variants); changes get highlighted. */
@@ -484,7 +507,7 @@ export function GeminiPanel({ ctx }: { ctx: GeminiCtx }) {
       setRefining(false);
       setWsOpen(true);
     } catch (error) {
-      resolveThinking({ role: "ai", text: errorText(error) });
+      failRequest(error, { action: "refine", text: note, index: target.index });
     } finally {
       setBusy(false);
     }
@@ -581,19 +604,52 @@ export function GeminiPanel({ ctx }: { ctx: GeminiCtx }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [voiceSendQueued, voiceStatus]);
 
-  const startNewConversation = async () => {
+  /**
+   * Back to the five "Create a Job" entries right away (#33 AC-1). Purely local: the next conversation
+   * is created lazily when the first message is sent, so this works even while the backend is down.
+   */
+  const startNewConversation = () => {
     if (working) return;
     setHistoryOpen(false);
-    try {
-      const conversation = await createCopilotConversation();
-      mutate((draft) => {
-        draft.geminiConversationIds = { ...draft.geminiConversationIds, [key]: conversation.id };
-        draft.geminiChats = { ...draft.geminiChats, [key]: [] };
-        draft.geminiCreatePaths = { ...draft.geminiCreatePaths, [key]: "home" };
-      });
-      setInput("");
-    } catch {
-      say(t("Sorry, Copilot couldn’t process that just now. Please try again."), { type: "error" });
+    pendingConversationKeyRef.current = null;
+    mutate((draft) => {
+      const ids = { ...draft.geminiConversationIds };
+      delete ids[key];
+      draft.geminiConversationIds = ids;
+      draft.geminiChats = { ...draft.geminiChats, [key]: [] };
+      draft.geminiCreatePaths = { ...draft.geminiCreatePaths, [key]: "home" };
+    });
+    setInput("");
+    setRefining(false);
+  };
+
+  /** "Retry" on a failure card: re-send the original input through the same path, once (#33 AC-2/AC-4). */
+  const retryRequest = (index: number) => {
+    const msg = msgs[index];
+    if (working || !msg || msg.role !== "ai" || msg.kind !== "request-failed" || msg.done || !msg.retry) return;
+    const retry = msg.retry;
+    updateMsg(index, { done: true });
+    if ("text" in retry) setInput((current) => (current.trim() === retry.text.trim() ? "" : current));
+    switch (retry.action) {
+      case "chat":
+        push({ role: "thinking" });
+        return void sendCreate(retry.text);
+      case "questions":
+        return void runQuickStart(retry.text);
+      case "title":
+        return void runTitleVariants(retry.text);
+      case "link":
+        return void runImport(retry.text);
+      case "refine": {
+        const target = msgs[retry.index];
+        if (target && target.role === "ai" && (target.kind === "variants" || ("draft" in target && target.draft))) {
+          return void refineDraft(retry.text, { index: retry.index, msg: target as ActiveDraftMsg });
+        }
+        push({ role: "thinking" });
+        return void sendCreate(retry.text);
+      }
+      case "upload":
+        return attachFileInputRef.current?.click();
     }
   };
 
@@ -636,7 +692,12 @@ export function GeminiPanel({ ctx }: { ctx: GeminiCtx }) {
     push({ role: "user", text: `[${t("Uploaded file")}] ${file.name}` });
     setAttaching(true);
     try {
-      if (await runStep((conversationId) => uploadCopilotAttachment(conversationId, file), fromUploadPath, { path: "upload", detail: file.name })) {
+      if (
+        await runStep((conversationId) => uploadCopilotAttachment(conversationId, file), fromUploadPath, { path: "upload", detail: file.name }, {
+          action: "upload",
+          fileName: file.name,
+        })
+      ) {
         setPath("home");
       }
     } finally {
@@ -842,7 +903,7 @@ export function GeminiPanel({ ctx }: { ctx: GeminiCtx }) {
         <div style={{ flex: 1 }} />
         {!historyOpen && (
           <>
-            <button className="icon-btn" type="button" disabled={working} onClick={() => void startNewConversation()} title={t("New conversation")} aria-label={t("New conversation")}>
+            <button className="icon-btn" type="button" disabled={working} onClick={startNewConversation} title={t("New conversation")} aria-label={t("New conversation")}>
               <Icon name="edit_square" />
             </button>
             <button className="icon-btn" type="button" disabled={working} onClick={() => void openHistory()} title={t("Conversation history")} aria-label={t("Conversation history")}>
@@ -903,6 +964,8 @@ export function GeminiPanel({ ctx }: { ctx: GeminiCtx }) {
                 onPickVariant={(variantIndex) => void pickVariant(i, variantIndex)}
                 onSubmitForm={(fields, seniority) => void submitForm(i, fields, seniority)}
                 onRetryCreate={() => void retryCreate(i)}
+                onRetryRequest={() => retryRequest(i)}
+                onStartOver={startNewConversation}
               />
             ))
           )}
@@ -1609,6 +1672,8 @@ function GeminiMessage({
   onPickVariant,
   onSubmitForm,
   onRetryCreate,
+  onRetryRequest,
+  onStartOver,
 }: {
   msg: GeminiMsg;
   busy: boolean;
@@ -1621,6 +1686,8 @@ function GeminiMessage({
   onPickVariant: (variantIndex: number) => void;
   onSubmitForm: (fields: CopilotJdFields, seniority: string) => void;
   onRetryCreate: () => void;
+  onRetryRequest: () => void;
+  onStartOver: () => void;
 }) {
   const { t } = useStore();
   if (msg.role === "user") return <div className="gm-bubble user">{msg.text}</div>;
@@ -1649,6 +1716,26 @@ function GeminiMessage({
             <Button variant="primary" size="sm" disabled={busy} onClick={onRetryCreate}>
               <Icon name="refresh" />
               {busy ? t("Creating…") : t("Retry")}
+            </Button>
+          </div>
+        )}
+      </div>
+    );
+  if (msg.kind === "request-failed")
+    return (
+      <div className="gm-bubble ai gm-create-failed" role="alert">
+        <div>{msg.text}</div>
+        {!msg.done && (
+          <div className="gm-actions">
+            {msg.retry && (
+              <Button variant="primary" size="sm" disabled={busy} onClick={onRetryRequest}>
+                <Icon name="refresh" />
+                {msg.retry.action === "upload" ? t("Choose the file again") : t("Retry")}
+              </Button>
+            )}
+            <Button variant="secondary" size="sm" disabled={busy} onClick={onStartOver}>
+              <Icon name="restart_alt" />
+              {t("Start over")}
             </Button>
           </div>
         )}
