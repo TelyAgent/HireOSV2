@@ -8,6 +8,19 @@ import { ATTEMPTS, CASES, CORE_CANDIDATES, EVALUATIONS, QUESTIONS, RESULTS, type
 import { finalizeCaseEvaluation } from "../data/writtenApi";
 import { computeOverall } from "../utils/score";
 
+/** A score differing from the AI's needs a reason -- the same condition that shows the reason box. */
+function needsReason(c: Criterion): boolean {
+  return c.human != null && c.human !== c.ai && !(c.overrideReason ?? "").trim();
+}
+
+/** The first criterion that blocks finalizing, if any: unscored, or changed from the AI score without a reason. */
+function firstBlocker(criteria: Criterion[]): { index: number; kind: "score" | "reason" } | null {
+  const unscored = criteria.findIndex((c) => c.human == null);
+  if (unscored >= 0) return { index: unscored, kind: "score" };
+  const reason = criteria.findIndex(needsReason);
+  return reason >= 0 ? { index: reason, kind: "reason" } : null;
+}
+
 function isValidScore(text: string, max: number): boolean {
   if (!/^\d+$/.test(text.trim())) return false;
   const n = Number(text);
@@ -43,6 +56,8 @@ export function EvaluationReviewContent({
   const seedEvaluation = att ? EVALUATIONS[`eval_${att.invitationId ?? att.caseId}`] : undefined;
   const [evaluation, setEvaluation] = useState<Evaluation | undefined>(seedEvaluation);
   const [confirmOpen, setConfirmOpen] = useState(false);
+  // Turned on by a blocked finalize: missing scores and reasons are then outlined in red.
+  const [showErrors, setShowErrors] = useState(false);
 
   if (!att) return <EmptyState title="Attempt not found." />;
 
@@ -104,13 +119,24 @@ export function EvaluationReviewContent({
     say(t("AI re-run complete — AI scores refreshed."), { type: "success" });
   }
 
+  /** Checked before the confirm dialog opens: points at the first criterion that still needs input. */
+  function checkReady(): boolean {
+    const blocker = firstBlocker(ev.criteria);
+    if (!blocker) return true;
+    setShowErrors(true);
+    say(t(blocker.kind === "score" ? "Set a human score for every criterion before finalizing." : "Add an override reason for every changed score."), { type: "danger" });
+    // Wait for the error styling to render, then bring the field into view.
+    window.setTimeout(() => {
+      const row = document.getElementById(`crit-${ev.id}-${blocker.index}`);
+      row?.scrollIntoView({ behavior: "smooth", block: "center" });
+      row?.querySelector<HTMLElement>(blocker.kind === "score" ? "input" : "textarea")?.focus({ preventScroll: true });
+    }, 0);
+    return false;
+  }
+
   function commitFinalize() {
-    if (ev.criteria.some((c) => c.human == null)) {
-      say(t("Set a human score for every criterion before finalizing."), { type: "danger" });
-      return;
-    }
-    if (ev.criteria.some((c) => c.overridden && !c.overrideReason)) {
-      say(t("Add an override reason for every changed score."), { type: "danger" });
+    if (!checkReady()) {
+      setConfirmOpen(false);
       return;
     }
     const overall = computeOverall(ev.criteria, "human")!;
@@ -150,7 +176,7 @@ export function EvaluationReviewContent({
       commitFinalize();
       return;
     }
-    setConfirmOpen(true);
+    if (checkReady()) setConfirmOpen(true);
   }
 
   return (
@@ -189,7 +215,7 @@ export function EvaluationReviewContent({
           </div>
         )}
         {evaluation.criteria.map((c, i) => (
-          <CriterionRow key={c.name} c={c} locked={isFinalized} onChange={(patch) => setCriterion(i, patch)} />
+          <CriterionRow key={c.name} id={`crit-${ev.id}-${i}`} c={c} locked={isFinalized} showErrors={showErrors} onChange={(patch) => setCriterion(i, patch)} />
         ))}
       </div>
 
@@ -212,6 +238,7 @@ export function EvaluationReviewContent({
         onOk={commitFinalize}
         title={t("Confirm finalize")}
         okText={t("Confirm finalize")}
+        cancelText={t("Cancel")}
       >
         <div className="tiny" style={{ marginBottom: 8 }}>{cand.name} · {q.code}</div>
         <div>{t("Overall (human)")}: <b>{overallHuman == null ? t("Unknown") : overallHuman}</b></div>
@@ -226,7 +253,7 @@ export function EvaluationReviewPage() {
   return <EvaluationReviewContent attemptId={id} />;
 }
 
-function CriterionRow({ c, locked, onChange }: { c: Criterion; locked: boolean; onChange: (patch: Partial<Criterion>) => void }) {
+function CriterionRow({ id, c, locked, showErrors, onChange }: { id: string; c: Criterion; locked: boolean; showErrors: boolean; onChange: (patch: Partial<Criterion>) => void }) {
   const { t } = useStore();
   const [humanText, setHumanText] = useState(c.human == null ? "" : String(c.human));
   // The input keeps its own text (so a half-typed value isn't reformatted), but a change made from
@@ -249,7 +276,7 @@ function CriterionRow({ c, locked, onChange }: { c: Criterion; locked: boolean; 
   }
 
   return (
-    <div className="crit-row flex-col" style={{ display: "flex", flexDirection: "column", alignItems: "stretch" }}>
+    <div id={id} className="crit-row flex-col" style={{ display: "flex", flexDirection: "column", alignItems: "stretch" }}>
       <div className="flex items-center justify-between wrap gap-2" style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 8 }}>
         <div><b>{c.name}</b> <span className="tiny">{t("max")} {c.max}</span></div>
         <div className="flex gap-2 items-center" style={{ display: "flex", gap: 8, alignItems: "center" }}>
@@ -259,7 +286,7 @@ function CriterionRow({ c, locked, onChange }: { c: Criterion; locked: boolean; 
             {t("Human score")}
             <input
               className="input"
-              style={{ width: 72, height: 32, borderColor: outOfRange ? "var(--danger)" : !locked && c.human == null ? "var(--accent)" : undefined }}
+              style={{ width: 72, height: 32, borderColor: outOfRange || (showErrors && c.human == null) ? "var(--danger)" : !locked && c.human == null ? "var(--accent)" : undefined }}
               aria-invalid={outOfRange}
               type="number"
               min={0}
@@ -295,14 +322,27 @@ function CriterionRow({ c, locked, onChange }: { c: Criterion; locked: boolean; 
         </div>
       </details>
       {c.human != null && c.human !== c.ai && (
-        <textarea
-          className="input"
-          rows={2}
-          style={{ marginTop: 8 }}
-          placeholder={t("Override reason (required — old AI value stays visible in history)")}
-          value={c.overrideReason || ""}
-          onChange={(e) => onChange({ overrideReason: e.target.value })}
-        />
+        <div className="field" style={{ marginTop: 8 }}>
+          {/* Says why it's asked: the human score differs from the AI's suggestion. */}
+          <label className="tiny">
+            {t("Reason for changing the AI score")} ({t("AI suggests")} {c.ai} → {t("Human score")} {c.human}){!locked && <span style={{ color: "var(--danger)" }}> *</span>}
+          </label>
+          <textarea
+            className="input"
+            rows={2}
+            disabled={locked}
+            style={{ borderColor: showErrors && needsReason(c) ? "var(--danger)" : undefined }}
+            aria-invalid={showErrors && needsReason(c)}
+            placeholder={t("Override reason (required — old AI value stays visible in history)")}
+            value={c.overrideReason || ""}
+            onChange={(e) => onChange({ overrideReason: e.target.value })}
+          />
+          {showErrors && needsReason(c) && (
+            <div className="tiny" style={{ color: "var(--danger)", marginTop: 4 }}>
+              {t("Required: you changed the AI score, so say why — or click \"Use AI score\" to keep it.")}
+            </div>
+          )}
+        </div>
       )}
     </div>
   );
