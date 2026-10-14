@@ -79,12 +79,12 @@ export function EvaluationReviewContent({
 
   function acceptAll() {
     updateEvaluation((ev) => ({ ...ev, criteria: ev.criteria.map((c) => ({ ...c, human: c.ai, overridden: false })) }));
-    say("All AI scores accepted.", { type: "success" });
+    say(t("All AI scores filled in — adjust any of them under \"Human score\" on each criterion."), { type: "success" });
   }
 
   function reRunAi() {
     if (ev.status === "final") {
-      say("Already finalized — AI re-run is disabled.");
+      say(t("Already finalized — AI re-run is disabled."));
       return;
     }
     updateEvaluation((ev) => ({
@@ -94,16 +94,16 @@ export function EvaluationReviewContent({
         return { ...c, ai: Math.max(0, Math.min(c.max, c.ai + delta)) };
       }),
     }));
-    say("AI re-run complete — AI scores refreshed.", { type: "success" });
+    say(t("AI re-run complete — AI scores refreshed."), { type: "success" });
   }
 
   function commitFinalize() {
     if (ev.criteria.some((c) => c.human == null)) {
-      say("Set a human score for every criterion before finalizing.", { type: "danger" });
+      say(t("Set a human score for every criterion before finalizing."), { type: "danger" });
       return;
     }
     if (ev.criteria.some((c) => c.overridden && !c.overrideReason)) {
-      say("Add an override reason for every changed score.", { type: "danger" });
+      say(t("Add an override reason for every changed score."), { type: "danger" });
       return;
     }
     const overall = computeOverall(ev.criteria, "human")!;
@@ -128,7 +128,7 @@ export function EvaluationReviewContent({
     };
     onFinalized?.();
     setConfirmOpen(false);
-    say(`Evaluation finalized. Overall: ${overall}`, { type: "success" });
+    say(`${t("Evaluation finalized. Overall:")} ${overall}`, { type: "success" });
     if (onViewFinalResult) onViewFinalResult();
     else navigate(`/results/${att.caseId}/release`);
   }
@@ -176,8 +176,13 @@ export function EvaluationReviewContent({
 
       <div className="card card-pad" style={{ marginBottom: 16 }}>
         <h4 style={{ marginBottom: 8 }}>{t("Criteria")}</h4>
+        {!isFinalized && (
+          <div className="banner info tiny" style={{ marginBottom: 8 }}>
+            {t("AI scores are suggestions only. Enter the final score for each criterion under \"Human score\" on the right — or use \"Accept all AI scores\" to fill them in, then adjust any of them. Every criterion needs a human score before finalizing.")}
+          </div>
+        )}
         {evaluation.criteria.map((c, i) => (
-          <CriterionRow key={c.name} c={c} onChange={(patch) => setCriterion(i, patch)} />
+          <CriterionRow key={c.name} c={c} locked={isFinalized} onChange={(patch) => setCriterion(i, patch)} />
         ))}
       </div>
 
@@ -214,7 +219,7 @@ export function EvaluationReviewPage() {
   return <EvaluationReviewContent attemptId={id} />;
 }
 
-function CriterionRow({ c, onChange }: { c: Criterion; onChange: (patch: Partial<Criterion>) => void }) {
+function CriterionRow({ c, locked, onChange }: { c: Criterion; locked: boolean; onChange: (patch: Partial<Criterion>) => void }) {
   const { t } = useStore();
   const [humanText, setHumanText] = useState(c.human == null ? "" : String(c.human));
   // The input keeps its own text (so a half-typed value isn't reformatted), but a change made from
@@ -237,8 +242,28 @@ function CriterionRow({ c, onChange }: { c: Criterion; onChange: (patch: Partial
       <div className="flex items-center justify-between wrap gap-2" style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 8 }}>
         <div><b>{c.name}</b> <span className="tiny">{t("max")} {c.max}</span></div>
         <div className="flex gap-2 items-center" style={{ display: "flex", gap: 8, alignItems: "center" }}>
-          <span className="chip">AI {c.ai}</span>
-          <input className="input" style={{ width: 80, height: 32 }} type="number" min={0} max={c.max} value={humanText} placeholder={t("Human")} onChange={(e) => onHumanInput(e.target.value)} />
+          <span className="chip">{t("AI suggests")} {c.ai}</span>
+          {/* The human score is the one that counts -- labelled and outlined so it reads as the place to score. */}
+          <label style={{ display: "flex", alignItems: "center", gap: 6, fontWeight: 600 }}>
+            {t("Human score")}
+            <input
+              className="input"
+              style={{ width: 72, height: 32, borderColor: !locked && c.human == null ? "var(--accent)" : undefined }}
+              type="number"
+              min={0}
+              max={c.max}
+              value={humanText}
+              disabled={locked}
+              placeholder={t("Score")}
+              onChange={(e) => onHumanInput(e.target.value)}
+            />
+            <span className="tiny" style={{ fontWeight: 400 }}>/ {c.max}</span>
+          </label>
+          {!locked && c.human !== c.ai && (
+            <Button size="sm" variant="ghost" onClick={() => { setHumanText(String(c.ai)); onChange({ human: c.ai, overridden: false }); }}>
+              {t("Use AI score")}
+            </Button>
+          )}
           <span className={`badge ${c.confidence === "High" ? "success" : "info"}`}>{t("Confidence:")} {t(c.confidence)}</span>
           <span className="badge neutral">{t("Coverage:")} {t(c.coverage)}</span>
         </div>
