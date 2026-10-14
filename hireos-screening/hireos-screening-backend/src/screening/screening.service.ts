@@ -6,6 +6,7 @@ import type { Identity } from '../auth/workspace.guard';
 import { AiScreeningEvaluatorService } from './ai-screening-evaluator.service';
 import { AiCallError } from '../shared/ai-json-client';
 import { serializeDecision } from '../decisions/decisions.service';
+import { AI_EVALUATOR, LOCAL_EVALUATOR, canReuseEvaluation, evaluationInputHash, evaluationMetadata } from './evaluation-identity';
 
 type DimensionInput = { id: string; name: string; weight: number; rubric: string };
 type RequirementInput = {
@@ -58,9 +59,16 @@ export class ScreeningService {
       where: { workspaceId: identity.workspaceId, applicationId, status: 'withdrawn' },
       orderBy: { withdrawnAt: 'desc' },
     });
+    // Every snapshot, newest first (#19): earlier results stay readable after a refresh.
+    const history = await this.db.screeningEvaluation.findMany({
+      where: { workspaceId: identity.workspaceId, applicationId },
+      orderBy: { version: 'desc' },
+      select: { id: true, version: true, overallScore: true, coverage: true, completedAt: true, createdAt: true, modelVersion: true, evaluationMode: true, aiStatus: true, freshness: true },
+    });
     return {
       ...this.serializeDetail(application, evaluation, decision),
       withdrawnDecisions: withdrawnDecisions.map(serializeDecision),
+      history: history.map(serializeSnapshotSummary),
       screeningInProgress: this.inFlight.has(applicationId),
     };
   }
@@ -267,9 +275,34 @@ export class ScreeningService {
     const requirements = asRequirements(input.criteria?.requirements);
     const hardRequirements = requirements.filter((requirement) => requirement.hard);
     const resumeText = input.material?.text || '';
+    const aiConfigured = this.aiEvaluator.isConfigured();
+    const useAi = aiConfigured && !!resumeText;
+    const modelVersion = useAi ? this.aiEvaluator.modelName() : null;
+    const inputHash = evaluationInputHash({
+      evaluator: useAi ? AI_EVALUATOR : LOCAL_EVALUATOR,
+      modelVersion,
+      jobTitle: input.job?.title || '',
+      dimensions,
+      hardRequirements,
+      profileVersion: input.profile?.version ?? null,
+      criteriaVersion: input.criteria?.version ?? null,
+      materialId: input.material?.id ?? null,
+      resumeText,
+    });
+
+    // #19: identical inputs (same resume, profile, rubric, model and prompt) give the identical result --
+    // reuse the latest snapshot instead of asking the model again and getting a slightly different score.
+    const latest = await this.db.screeningEvaluation.findFirst({
+      where: { workspaceId: identity.workspaceId, applicationId: application.id },
+      orderBy: { version: 'desc' },
+      include: { dimensionScores: true },
+    });
+    if (canReuseEvaluation(latest, inputHash)) {
+      return { ...serializeEvaluation(latest), reused: true, snapshotCount: await this.snapshotCount(identity.workspaceId, application.id) };
+    }
 
     let evaluationResult: Awaited<ReturnType<ScreeningService['evaluateWithAi']>> | ReturnType<ScreeningService['evaluateLocally']>;
-    if (this.aiEvaluator.isConfigured() && resumeText) {
+    if (useAi) {
       try {
         evaluationResult = await this.evaluateWithAi(input.job?.title || '', dimensions, hardRequirements, resumeText);
       } catch (error) {
@@ -283,6 +316,7 @@ export class ScreeningService {
       evaluationResult = this.evaluateLocally(dimensions, hardRequirements, input.profile, buildCorpus(input.profile, resumeText));
     }
     const { dimensionResults, eligibilityResults, overall, coverage, evaluatorVersion } = evaluationResult;
+    const metadata = evaluationMetadata(useAi, evaluationResult.confidence, modelVersion);
 
     const eligibilityStatus = aggregateEligibility(eligibilityResults);
     const missingInformation = dimensionResults.filter((dimension) => dimension.status !== 'evaluated').map((dimension) => dimension.name);
@@ -298,6 +332,9 @@ export class ScreeningService {
       materialId: input.material?.id ?? null,
       materialReadStatus: input.material?.readStatus ?? null,
       evaluator: evaluatorVersion,
+      modelVersion,
+      inputHash,
+      ...(useAi ? {} : { aiSkippedReason: aiConfigured ? 'no_resume_text' : 'ai_not_configured' }),
     };
 
     const evaluation = await this.db.$transaction(async (tx) => {
@@ -320,19 +357,19 @@ export class ScreeningService {
           sessionId: session.id,
           version,
           status: 'completed',
-          evaluationMode: 'manual',
-          aiStatus: 'not_requested',
+          evaluationMode: metadata.evaluationMode,
+          aiStatus: metadata.aiStatus,
           inputManifest: json(inputManifest),
           eligibilityStatus,
           eligibilityResults: json(eligibilityResults),
           overallScore: overall,
           coverage,
-          confidence: overall == null ? null : 0.68,
+          confidence: metadata.confidence,
           evaluationStatus: overall == null ? 'insufficient_evidence' : 'evaluated',
           strengths: json(strengths),
           missingInformation: json(missingInformation),
           recommendation: Prisma.JsonNull,
-          modelVersion: null,
+          modelVersion: metadata.modelVersion,
           completedAt: new Date(),
         },
       });
@@ -476,7 +513,11 @@ export class ScreeningService {
       });
       return { ...created, dimensionScores: scores, evidenceItems: allEvidenceItems, verificationItems, concerns, humanAssessments: [] };
     });
-    return serializeEvaluation(evaluation);
+    return { ...serializeEvaluation(evaluation), reused: false, snapshotCount: await this.snapshotCount(identity.workspaceId, application.id) };
+  }
+
+  private snapshotCount(workspaceId: string, applicationId: string) {
+    return this.db.screeningEvaluation.count({ where: { workspaceId, applicationId } });
   }
 
   private singleFlight<T>(applicationId: string, start: () => Promise<T>): Promise<T> {
@@ -574,6 +615,7 @@ export class ScreeningService {
     eligibilityResults: NormalizedRequirementResult[];
     overall: number | null;
     coverage: number;
+    confidence: number | null;
     evaluatorVersion: string;
   }> {
     let ai: Awaited<ReturnType<AiScreeningEvaluatorService['evaluate']>>;
@@ -586,7 +628,8 @@ export class ScreeningService {
       });
     } catch (error) {
       const detail = error instanceof AiCallError ? error.message : 'AI_REQUEST_FAILED';
-      throw new ServiceUnavailableException({ code: 'AI_EVALUATION_FAILED', message: detail });
+      // aiStatus lets the client say "the AI call failed, retry" rather than a generic error (#19 AC-5).
+      throw new ServiceUnavailableException({ code: 'AI_EVALUATION_FAILED', aiStatus: 'failed', message: detail });
     }
     const byId = new Map(ai.dimensionScores.map((d) => [d.dimensionId, d]));
     const dimensionResults: NormalizedDimensionResult[] = dimensions.map((dimension) => {
@@ -617,7 +660,7 @@ export class ScreeningService {
         evidenceQuote: found?.evidenceQuote || null,
       };
     });
-    return { dimensionResults, eligibilityResults, overall, coverage: ai.coverage, evaluatorVersion: 'ai-screening-evaluator-v1' };
+    return { dimensionResults, eligibilityResults, overall, coverage: ai.coverage, confidence: ai.confidence, evaluatorVersion: AI_EVALUATOR };
   }
 
   private evaluateLocally(
@@ -630,6 +673,7 @@ export class ScreeningService {
     eligibilityResults: NormalizedRequirementResult[];
     overall: number | null;
     coverage: number;
+    confidence: number | null;
     evaluatorVersion: string;
   } {
     const dimensionResults: NormalizedDimensionResult[] = dimensions.map((dimension) => ({
@@ -646,7 +690,8 @@ export class ScreeningService {
       ...evaluateRequirement(requirement, profile, corpus),
       evidenceQuote: null,
     }));
-    return { dimensionResults, eligibilityResults, overall, coverage, evaluatorVersion: 'local-rule-evaluator-v1' };
+    // The local rules have no calibrated confidence of their own; recording a constant would be made up.
+    return { dimensionResults, eligibilityResults, overall, coverage, confidence: null, evaluatorVersion: LOCAL_EVALUATOR };
   }
 }
 
@@ -761,6 +806,20 @@ function serializeApplication(application: any) {
     linkedAt: application.linkedAt.toISOString(),
     linkedBy: application.linkedBy,
     linkReason: application.linkReason,
+  };
+}
+
+function serializeSnapshotSummary(evaluation: any) {
+  return {
+    id: evaluation.id,
+    version: evaluation.version,
+    overall: evaluation.overallScore,
+    coverage: evaluation.coverage || 0,
+    completedAt: (evaluation.completedAt || evaluation.createdAt).toISOString(),
+    modelVersion: evaluation.modelVersion,
+    evaluationMode: evaluation.evaluationMode,
+    aiStatus: evaluation.aiStatus,
+    freshness: evaluation.freshness,
   };
 }
 

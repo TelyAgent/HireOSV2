@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { useStore } from "../store/StoreContext";
 import { downloadDelivery, getDelivery, retryDelivery, sendDelivery } from "../data/api/deliveries";
-import { getApplication, getCandidate, getEvaluation, getJob } from "../data/db";
+import { getApplication, getCandidate, getJob } from "../data/db";
 import type { Delivery, DeliveryHistoryKey } from "../data/fixtures/deliveries";
 import { fmtDateTime, pct } from "../lib/format";
 import { Button, EmptyState, PageHeader, scoreDisplay } from "../components/ui/Primitives";
@@ -24,6 +24,21 @@ const DELIVERY_HISTORY_LABEL: Record<DeliveryHistoryKey, string> = {
   received: "Received",
   received_imported: "Received / Imported",
 };
+
+const ACCESS_LIMITATION_LABEL: Record<string, string> = {
+  contact_details_excluded: "Candidate contact details are excluded",
+  internal_ranking_excluded: "Internal ranking and comparison notes are excluded",
+  restricted_evidence_redacted: "Restricted evidence is redacted",
+};
+const REVIEW_STATUS_LABEL: Record<string, string> = {
+  human_reviewed: "Reviewed — sent on a decision recorded by a person",
+  not_reviewed: "Not reviewed",
+};
+
+function NotAvailable() {
+  const { t } = useStore();
+  return <span className="muted">{t("Not available")}</span>;
+}
 
 function cap(s: string): string {
   return s ? s.charAt(0).toUpperCase() + s.slice(1) : s;
@@ -128,7 +143,7 @@ export function DeliveryDetailPage() {
   // The delivery carries its own labels; the candidate / job caches may not be filled when arriving from the list.
   const cand = (app && getCandidate(app.candidateId)) || { displayName: delivery.candidateLabel || "—" };
   const job = (app && getJob(app.jobId)) || { title: delivery.jobLabel || "—" };
-  const ev = app ? getEvaluation(app.id) : null;
+  const snapshot = delivery.evaluationSnapshot ?? null;
 
   return (
     <>
@@ -152,27 +167,53 @@ export function DeliveryDetailPage() {
           <div className="eyebrow" style={{ marginBottom: 10 }}>
             {t("Package preview")}
           </div>
-          <p style={{ fontSize: "var(--fs-sm)" }}>
-            <strong>{t("Requested action:")}</strong> {t(DELIVERY_KIND_LABEL[delivery.kind] || delivery.kind)}
-          </p>
-          <p style={{ fontSize: "var(--fs-sm)" }}>
-            <strong>{t("Target:", "Target: (delivery)")}</strong> {delivery.targetLabel}
-          </p>
-          {ev && (
-            <p style={{ fontSize: "var(--fs-sm)" }}>
-              <strong>{t("Evaluation snapshot:")}</strong> {t("Overall")} {scoreDisplay(ev.overall) == null ? t("Insufficient evidence") : scoreDisplay(ev.overall)}, {t("coverage")} {pct(ev.coverage)},{" "}
-              {t("eligibility")} {t(ELIG_LABEL[ev.eligibilityStatus])}
-            </p>
-          )}
-          <p style={{ fontSize: "var(--fs-sm)" }}>
-            <strong>{t("Access limitations:")}</strong>{" "}
-            {t("Contact details and internal ranking are excluded from candidate-facing content; restricted evidence is redacted for recipients without HR/HM access.")}
-          </p>
-          {delivery.reviewStatus && (
-            <p style={{ fontSize: "var(--fs-sm)" }}>
-              <strong>{t("Review status:")}</strong> {t(cap(delivery.reviewStatus.replace(/_/g, " ")))}
-            </p>
-          )}
+          {/* The five promised items (#22): each one always shows, with an explicit placeholder when empty. */}
+          <dl className="package-preview">
+            <dt>{t("Requested action:")}</dt>
+            <dd>{delivery.requestedAction ? t(DELIVERY_KIND_LABEL[delivery.requestedAction] || delivery.requestedAction) : <NotAvailable />}</dd>
+            <dt>{t("Evaluation snapshot:")}</dt>
+            <dd>
+              {snapshot ? (
+                <>
+                  <div>
+                    {t("Overall")} {scoreDisplay(snapshot.overall) == null ? t("Insufficient evidence") : scoreDisplay(snapshot.overall)} · {t("coverage")} {pct(snapshot.coverage)} · {t("eligibility")}{" "}
+                    {snapshot.eligibilityStatus ? t(ELIG_LABEL[snapshot.eligibilityStatus] || snapshot.eligibilityStatus) : "—"}
+                  </div>
+                  <div className="tiny">
+                    {snapshot.version != null ? `v${snapshot.version} · ` : ""}
+                    {t("generated")} {fmtDateTime(snapshot.generatedAt, state.lang)} · {t("frozen when this package was created")}
+                  </div>
+                  {snapshot.dimensionScores.length > 0 && (
+                    <ul className="tiny package-dims">
+                      {snapshot.dimensionScores.map((d) => (
+                        <li key={d.dimensionId || d.name}>
+                          {d.name}: {d.status === "evaluated" && d.score != null ? Math.round(d.score) : t("Not evaluated")}
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </>
+              ) : (
+                <NotAvailable />
+              )}
+            </dd>
+            <dt>{t("Target:", "Target: (delivery)")}</dt>
+            <dd>{delivery.targetLabel || <NotAvailable />}</dd>
+            <dt>{t("Access limitations:")}</dt>
+            <dd>
+              {delivery.accessLimitations?.length ? (
+                <ul className="package-dims">
+                  {delivery.accessLimitations.map((key) => (
+                    <li key={key}>{t(ACCESS_LIMITATION_LABEL[key])}</li>
+                  ))}
+                </ul>
+              ) : (
+                <NotAvailable />
+              )}
+            </dd>
+            <dt>{t("Review status:")}</dt>
+            <dd>{delivery.reviewStatus ? t(REVIEW_STATUS_LABEL[delivery.reviewStatus] || cap(delivery.reviewStatus.replace(/_/g, " "))) : <NotAvailable />}</dd>
+          </dl>
           <hr className="divider" />
           <div className="tiny" style={{ fontWeight: 600, marginBottom: 6 }}>
             {t("Manifest")}

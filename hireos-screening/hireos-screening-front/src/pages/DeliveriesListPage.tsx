@@ -52,7 +52,6 @@ export function DeliveriesListPage() {
       <PageHeader
         title={t("Packages & Delivery")}
         subtitle={t("Every prepared, sent, delivered and received package — including reports that were never routed anywhere.")}
-        back="/jobs"
       />
       <div className="card">
         <table className="data-table">

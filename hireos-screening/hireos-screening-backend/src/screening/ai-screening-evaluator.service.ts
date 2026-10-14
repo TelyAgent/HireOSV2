@@ -55,6 +55,11 @@ export class AiScreeningEvaluatorService {
     return isAiConfigured(this.config);
   }
 
+  /** The configured model, recorded as the evaluation's `modelVersion` (#19). */
+  modelName(): string {
+    return this.config.get<string>('HIREOS_AI_MODEL', '').trim();
+  }
+
   async evaluate(input: {
     jobTitle: string;
     dimensions: EvalDimensionInput[];

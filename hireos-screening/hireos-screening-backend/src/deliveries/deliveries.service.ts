@@ -3,6 +3,7 @@ import { ConflictException, Injectable, NotFoundException } from '@nestjs/common
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../persistence/prisma.service';
 import type { Identity } from '../auth/workspace.guard';
+import { packageContents } from './package-contents';
 
 @Injectable()
 export class DeliveriesService {
@@ -22,7 +23,15 @@ export class DeliveriesService {
 
   async get(identity: Identity, id: string) {
     const pkg = await this.findPackage(identity.workspaceId, id);
-    return serializePackage(pkg);
+    const evaluationId = (pkg.payload as any)?.evaluation?.id;
+    const evaluationRow = evaluationId
+      ? await this.db.screeningEvaluation.findFirst({
+        where: { id: evaluationId, workspaceId: identity.workspaceId },
+        select: { version: true, completedAt: true, createdAt: true },
+      })
+      : null;
+    // The preview's five items (#22), frozen at package creation.
+    return { ...serializePackage(pkg), ...packageContents(pkg, evaluationRow) };
   }
 
   async send(identity: Identity, id: string) {

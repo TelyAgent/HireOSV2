@@ -35,6 +35,10 @@ import { useBoundedPolling } from "../lib/usePolling";
 import { StillProcessingNotice } from "../components/ui/StillProcessing";
 import { PageSkeleton } from "../components/ui/PageSkeleton";
 import { useFieldValidation } from "../lib/useFieldValidation";
+import { concernTitle } from "../lib/concerns";
+import { ApiError } from "../data/api/shared";
+import { listEvaluations, type EvaluationSnapshot, type ScreeningRunResult } from "../data/api/screening";
+import type { Evaluation } from "../data/fixtures/evaluations";
 
 const RESTRICTED_VIEWERS = ["emma", "daniel"];
 
@@ -43,10 +47,6 @@ function cap(s: string): string {
 }
 /** Concern titles and verification questions are generated server-side in English around the
  * requirement text (which is already in the job's language) -- translate the fixed wrapper. */
-function concernTitle(title: string, t: (s: string) => string) {
-  const m = /^(.*) is not confirmed$/s.exec(title);
-  return m ? t("{label} is not confirmed").replace("{label}", m[1]) : title;
-}
 function verificationQuestion(question: string, t: (s: string) => string) {
   const m = /^Please confirm: (.*)$/s.exec(question);
   return m ? t("Please confirm: {label}").replace("{label}", m[1]) : question;
@@ -125,7 +125,7 @@ function ConcernRow({ concern, onResolve }: { concern: Concern; onResolve: (id: 
   const [acceptRiskOpen, setAcceptRiskOpen] = useState(false);
   const restricted = concern.restricted && !RESTRICTED_VIEWERS.includes(state.currentUser);
   return (
-    <div className="card-pad" style={{ borderBottom: "1px solid var(--border)" }}>
+    <div className="card-pad" id={`concern-${concern.id}`} style={{ borderBottom: "1px solid var(--border)" }}>
       <div className="flex items-center justify-between flex-wrap gap-8">
         <div>
           <div style={{ fontWeight: 500, fontSize: "var(--fs-sm)" }}>
@@ -215,6 +215,116 @@ function VerificationRow({
   );
 }
 
+/** How a score was produced (#19): the model (and which one), or the local rules — never implied. */
+function EvaluatedBy({ evaluation }: { evaluation: Pick<Evaluation, "evaluationMode" | "modelVersion"> }) {
+  const { t } = useStore();
+  if (evaluation.evaluationMode === "ai")
+    return (
+      <Badge tone="info">
+        {t("AI")} · {evaluation.modelVersion || t("model not recorded")}
+      </Badge>
+    );
+  if (evaluation.evaluationMode === "rules") return <Badge tone="warning">{t("Rule-based (no AI)")}</Badge>;
+  return <Badge tone="outline">{t("Not recorded")}</Badge>;
+}
+
+/** Every snapshot, newest first; any of them can be opened as it was generated (#19 AC-1/AC-2). */
+function SnapshotHistory({ applicationId, history, currentId }: { applicationId: string; history: EvaluationSnapshot[]; currentId: string }) {
+  const { t, state } = useStore();
+  const [openId, setOpenId] = useState<string | null>(null);
+  const [snapshots, setSnapshots] = useState<Evaluation[] | null>(null);
+  const [loadFailed, setLoadFailed] = useState(false);
+  const open = async (id: string) => {
+    setOpenId(id);
+    if (snapshots) return;
+    setLoadFailed(false);
+    try {
+      setSnapshots(await listEvaluations(applicationId));
+    } catch {
+      setLoadFailed(true);
+    }
+  };
+  const selected = snapshots?.find((e) => e.id === openId);
+  return (
+    <>
+      <div className="section-title" style={{ marginTop: 28 }}>
+        {t("Snapshot history")} <span className="cnt">{history.length}</span>
+      </div>
+      <div className="card">
+        <table className="data-table">
+          <thead>
+            <tr>
+              <th>{t("Version")}</th>
+              <th>{t("Generated")}</th>
+              <th>{t("Overall")}</th>
+              <th>{t("Coverage")}</th>
+              <th>{t("Scored by")}</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody>
+            {history.map((h) => (
+              <tr key={h.id}>
+                <td>
+                  v{h.version} {h.id === currentId && <Badge tone="success">{t("Current")}</Badge>}
+                </td>
+                <td>{fmtDateTime(h.completedAt, state.lang)}</td>
+                <td>{scoreDisplay(h.overall) ?? t("Insufficient evidence")}</td>
+                <td>{pct(h.coverage)}</td>
+                <td>
+                  <EvaluatedBy evaluation={h} />
+                </td>
+                <td style={{ textAlign: "right" }}>
+                  <Button size="sm" variant="secondary" onClick={() => void open(h.id)}>
+                    {t("View")}
+                  </Button>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      {openId && (
+        <Modal open onClose={() => setOpenId(null)} title={`${t("Snapshot")} v${history.find((h) => h.id === openId)?.version ?? ""}`} wide>
+          {loadFailed ? (
+            <p className="tiny">{t("This snapshot could not be loaded — check your connection and try again.")}</p>
+          ) : !selected ? (
+            <PageSkeleton rows={3} />
+          ) : (
+            <>
+              <p className="tiny" style={{ marginBottom: 12 }}>
+                {fmtDateTime(selected.completedAt, state.lang)} · <EvaluatedBy evaluation={selected} /> · {t("Overall")}{" "}
+                {scoreDisplay(selected.overall) ?? t("Insufficient evidence")} · {t("Coverage")} {pct(selected.coverage)}
+                {selected.confidence != null && ` · ${t("Confidence")} ${pct(selected.confidence)}`}
+              </p>
+              <table className="data-table">
+                <thead>
+                  <tr>
+                    <th>{t("Dimension")}</th>
+                    <th>{t("Weight")}</th>
+                    <th>{t("Score")}</th>
+                    <th>{t("Reason")}</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {selected.dimensionScores.map((d) => (
+                    <tr key={d.id}>
+                      <td>{d.name}</td>
+                      <td>{pct(d.weight)}</td>
+                      <td>{d.status === "evaluated" && d.score != null ? Math.round(d.score) : t("Not evaluated")}</td>
+                      <td className="tiny">{d.reason}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </>
+          )}
+        </Modal>
+      )}
+    </>
+  );
+}
+
 function OverrideModal({ detail, onClose, onSaved }: { detail: ApplicationDetail; onClose: () => void; onSaved: () => void }) {
   const { t, state, say } = useStore();
   const dims = detail.evaluation?.dimensionScores || [];
@@ -293,6 +403,8 @@ export function ScreeningDetailPage() {
   const [running, setRunning] = useState(false);
   const [evidenceDim, setEvidenceDim] = useState<DimensionScore | null>(null);
   const [overrideOpen, setOverrideOpen] = useState(false);
+  /** Last run/refresh failure, shown with a Retry until the next attempt (#19 AC-5). */
+  const [runFailure, setRunFailure] = useState<{ action: "run" | "refresh"; message: string } | null>(null);
 
   const load = useCallback(() => {
     getApplicationDetail(id)
@@ -306,6 +418,15 @@ export function ScreeningDetailPage() {
 
   // Confirming a link starts screening in the background, so the page can open before
   // that run finishes -- keep polling until the result lands.
+  // Arriving from the decision page's concern list (#27 AC-1): bring that concern into view once loaded.
+  useEffect(() => {
+    if (!detail?.evaluation || !window.location.hash.startsWith("#concern-")) return;
+    const el = document.getElementById(window.location.hash.slice(1));
+    if (!el) return;
+    el.scrollIntoView({ block: "center" });
+    el.classList.add("concern-flash");
+  }, [detail]);
+
   const inProgress = !!detail && !detail.evaluation && !!detail.screeningInProgress;
   const screeningPoll = useBoundedPolling(inProgress, load, 3000);
 
@@ -318,30 +439,53 @@ export function ScreeningDetailPage() {
   const decision = db.decisions[application.id];
   const humanAssessments = db.humanAssessments[application.id] || [];
 
+  /** Verifiable outcome (#19 AC-3): the snapshot count comes from the server, the same list the history shows. */
+  const sayRunResult = (result: ScreeningRunResult) => {
+    const n = String(result.snapshotCount ?? "");
+    if (result.reused) say(t("Inputs unchanged — kept the previous evaluation ({n} snapshots in history)").replace("{n}", n), { type: "success" });
+    else say(t("New snapshot created ({n} snapshots in history) — earlier results are kept").replace("{n}", n), { type: "success" });
+  };
+  const failureMessage = (err: unknown) => {
+    if (err instanceof ApiError && err.code === "AI_EVALUATION_FAILED") return t("The AI evaluation call failed — nothing was saved. Retry in a moment.");
+    if (err instanceof ApiError && err.code === "CRITERIA_NOT_CONFIRMED") return t("Confirm the job criteria before running screening.");
+    if (err instanceof ApiError && err.code === "PROFILE_NOT_READY") return t("The resume hasn’t been parsed yet — wait for parsing to finish, then retry.");
+    return t("Screening failed — please try again");
+  };
   const handleRunScreening = async () => {
     setRunning(true);
+    setRunFailure(null);
     say(t("Running AI-assisted screening…"));
     try {
-      await runScreening(application.id);
-      say(t("Screening complete"), { type: "success" });
-    } catch {
-      say(t("Screening failed — please try again"), { type: "error" });
+      sayRunResult(await runScreening(application.id));
+    } catch (err) {
+      setRunFailure({ action: "run", message: failureMessage(err) });
     } finally {
       setRunning(false);
       load();
     }
   };
   const handleRefresh = async () => {
+    setRunning(true);
+    setRunFailure(null);
     say(t("Refreshing evaluation with latest inputs…"));
     try {
-      await refreshEvaluation(application.id);
-      say(t("Evaluation refreshed — new snapshot created, prior result kept in history"), { type: "success" });
-    } catch {
-      say(t("Screening failed — please try again"), { type: "error" });
+      sayRunResult(await refreshEvaluation(application.id));
+    } catch (err) {
+      setRunFailure({ action: "refresh", message: failureMessage(err) });
     } finally {
+      setRunning(false);
       load();
     }
   };
+  const failureBanner = runFailure && (
+    <div className="error-inline" role="alert" style={{ marginBottom: 16 }}>
+      <Icon name="error_outline" />
+      <span>{runFailure.message}</span>
+      <Button size="sm" variant="secondary" icon="refresh" disabled={running} onClick={() => void (runFailure.action === "run" ? handleRunScreening() : handleRefresh())}>
+        {t("Retry")}
+      </Button>
+    </div>
+  );
   const handleResolveConcern = async (concernId: string, outcome: ConcernStatus) => {
     await resolveConcern(application.id, concernId, outcome as "dismissed" | "confirmed" | "accepted_risk");
     if (outcome === "accepted_risk") {
@@ -371,6 +515,7 @@ export function ScreeningDetailPage() {
           back={`/jobs/${job.id}/screening`}
         />
         {screeningPoll.overdue && <StillProcessingNotice style={{ marginBottom: 16 }} onRetry={screeningPoll.retry} />}
+        {failureBanner}
         <div className="card">
           <EmptyState
             icon={inProgress || running ? "hourglass_top" : "fact_check"}
@@ -410,7 +555,7 @@ export function ScreeningDetailPage() {
         actions={
           <>
             {evaluation.freshness === "stale" && (
-              <Button variant="secondary" icon="refresh" onClick={handleRefresh}>
+              <Button variant="secondary" icon="refresh" onClick={handleRefresh} disabled={running}>
                 {t("Refresh & re-evaluate")}
               </Button>
             )}
@@ -424,6 +569,7 @@ export function ScreeningDetailPage() {
         }
       />
 
+      {failureBanner}
       {evaluation.freshness === "stale" && (
         <div className="error-inline" style={{ marginBottom: 16, borderColor: "var(--warning-border)", background: "var(--warning-bg)", color: "var(--warning-text)" }}>
           <Icon name="history" />
@@ -459,6 +605,10 @@ export function ScreeningDetailPage() {
             ) : (
               <RecommendationBadge outcome={inferRecommendation(evaluation)} />
             )}
+          </div>
+          <div>
+            <div className="tiny">{t("Scored by")}</div>
+            <EvaluatedBy evaluation={evaluation} />
           </div>
           <div>
             <div className="tiny">{t("Human status")}</div>
@@ -580,6 +730,13 @@ export function ScreeningDetailPage() {
           {humanAssessments.length > 0 && <p className="tiny">{t("This is stored separately — the AI score above is unchanged.")}</p>}
         </div>
       </div>
+
+      {evaluation.evaluationMode === "rules" && (
+        <p className="tiny" style={{ marginTop: 12, color: "var(--warning-text)" }}>
+          {t("This result was scored by local rules, not AI (AI isn’t configured or the resume has no readable text). Treat it as a rough guide only.")}
+        </p>
+      )}
+      {detail.history && detail.history.length > 0 && <SnapshotHistory applicationId={application.id} history={detail.history} currentId={evaluation.id} />}
 
       {evidenceDim && <EvidenceDrawer dimension={evidenceDim} onClose={() => setEvidenceDim(null)} />}
       {overrideOpen && <OverrideModal detail={detail} onClose={() => setOverrideOpen(false)} onSaved={load} />}

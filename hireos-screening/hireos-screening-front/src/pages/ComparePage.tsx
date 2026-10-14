@@ -470,6 +470,22 @@ export function ComparePage() {
         </div>
       </div>
 
+      {/* Never show a stale snapshot silently (#27 AC-7). */}
+      {snap.id === cmp.snapshots[cmp.snapshots.length - 1].id && (cmp.changedSinceSnapshot?.length ?? 0) > 0 && (
+        <div className="error-inline" role="status" style={{ marginBottom: 16, borderColor: "var(--warning-border)", background: "var(--warning-bg)", color: "var(--warning-text)" }}>
+          <Icon name="update" />
+          <span>
+            {t("Data updated since this snapshot: {names} changed (concerns, verification, decision or score). Refresh to compare the latest.").replace(
+              "{names}",
+              (cmp.changedSinceSnapshot ?? []).map((appId) => members.find((m) => m.app.id === appId)?.cand.displayName ?? appId).join(", "),
+            )}
+          </span>
+          <Button size="sm" variant="secondary" icon="refresh" onClick={handleRefresh}>
+            {t("Refresh comparison")}
+          </Button>
+        </div>
+      )}
+
       {mode === "round_changes" ? <RoundChanges cmp={cmp} /> : <KeyDifferences job={job} members={members} />}
 
       <div className="card" style={{ overflowX: "auto", marginTop: 18 }}>
