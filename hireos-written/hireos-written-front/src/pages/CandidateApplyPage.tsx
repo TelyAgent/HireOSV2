@@ -18,6 +18,16 @@ export function CandidateApplyPage() {
   const [answers, setAnswers] = useState<Record<string, string>>({});
   const [submitting, setSubmitting] = useState(false);
   const [justSubmitted, setJustSubmitted] = useState(false);
+  // The backend refuses answers after the deadline (DEADLINE_PASSED); the page closes the form too.
+  const [deadlinePassed, setDeadlinePassed] = useState(false);
+  const deadline = state.status === "ready" ? state.data.deadline : null;
+  useEffect(() => {
+    if (!deadline) return;
+    const check = () => setDeadlinePassed(Date.now() > new Date(deadline).getTime());
+    check();
+    const timer = window.setInterval(check, 30_000);
+    return () => window.clearInterval(timer);
+  }, [deadline]);
 
   useEffect(() => {
     let cancelled = false;
@@ -30,7 +40,7 @@ export function CandidateApplyPage() {
   }, [token]);
 
   async function handleSubmit() {
-    if (state.status !== "ready") return;
+    if (state.status !== "ready" || deadlinePassed) return;
     const missing = state.data.questions.some((q) => !(answers[q.questionId] ?? "").trim());
     if (missing) return;
     setSubmitting(true);
@@ -40,8 +50,9 @@ export function CandidateApplyPage() {
         state.data.questions.map((q) => ({ questionId: q.questionId, answerText: answers[q.questionId] ?? "" })),
       );
       setJustSubmitted(true);
-    } catch {
-      setState({ status: "error" });
+    } catch (error) {
+      if ((error as { code?: string }).code === "DEADLINE_PASSED") setDeadlinePassed(true);
+      else setState({ status: "error" });
     } finally {
       setSubmitting(false);
     }
@@ -68,6 +79,11 @@ export function CandidateApplyPage() {
         {state.status === "ready" && !state.data.submission && !justSubmitted && (
           <>
             {state.data.letter && <DeadlineBanner letter={state.data.letter} deadline={state.data.deadline} />}
+            {deadlinePassed && (
+              <div className="banner danger" style={{ marginBottom: 16 }}>
+                {t("The submission deadline has passed, so answers can no longer be submitted. If you have questions, please reply to the invitation email.")}
+              </div>
+            )}
             {state.data.letter && <InvitationLetterCard letter={state.data.letter} />}
             <div className="card card-pad" style={{ marginBottom: 16 }}>
               <h2 style={{ marginBottom: 4 }}>{state.data.jobTitle}</h2>
@@ -94,6 +110,7 @@ export function CandidateApplyPage() {
                   <textarea
                     className="input"
                     rows={8}
+                    disabled={deadlinePassed}
                     value={answers[q.questionId] ?? ""}
                     onChange={(e) => setAnswers((prev) => ({ ...prev, [q.questionId]: e.target.value }))}
                   />
@@ -101,7 +118,7 @@ export function CandidateApplyPage() {
               </div>
             ))}
 
-            <Button variant="primary" onClick={handleSubmit} disabled={submitting}>
+            <Button variant="primary" onClick={handleSubmit} disabled={submitting || deadlinePassed}>
               {submitting ? t("Submitting…") : t("Submit")}
             </Button>
           </>

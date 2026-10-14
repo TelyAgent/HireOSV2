@@ -29,6 +29,7 @@ test('email carries the letter and the link, without the "system generated" foot
   assert.match(email.text, /招聘专员\n「全栈工程师」招聘团队$/);
   assert.doesNotMatch(email.text, /系统自动发送/);
   assert.match(email.text, /截止时间：2026-10-15 11:31（北京时间）/);
+  assert.match(email.text, /逾期将无法提交/);
   assert.match(email.html, /截止时间<\/div>.*2026-10-15 11:31（北京时间）/);
   assert.match(email.subject, /请于 10-15 11:31 前提交/);
   assert.match(email.html, /&lt;b&gt;x&lt;\/b&gt;，您好/);

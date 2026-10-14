@@ -31,3 +31,13 @@ export function assertDraftSendable(state: { roundsSent: number; draftRoundOpen:
     throw new BadRequestException({ code: 'DRAFT_ROUND_EMPTY', message: 'Add at least one question to this round before sending.' });
   }
 }
+
+/** Answers may arrive this long after the deadline and still count: covers a submit clicked just before it. */
+export const DEADLINE_GRACE_MS = 60_000;
+
+/** A round's answers are accepted only until its deadline (plus a short grace for the request in flight). */
+export function assertBeforeDeadline(deadline: Date | null, now: Date = new Date()): void {
+  if (deadline && now.getTime() > deadline.getTime() + DEADLINE_GRACE_MS) {
+    throw new ConflictException({ code: 'DEADLINE_PASSED', deadline: deadline.toISOString(), message: 'The submission deadline has passed.' });
+  }
+}

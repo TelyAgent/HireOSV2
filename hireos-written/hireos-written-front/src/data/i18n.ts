@@ -455,6 +455,7 @@ export const ZH: Record<string, string> = {
   "Change in Settings": "在设置中更改",
   "No corporate mailbox is set up, so no email will be sent — you'll get a link to send yourself.": "尚未配置企业邮箱，不会自动发送邮件；发送后会给你一个链接，需自行发给候选人。",
   "Set one up in Settings": "去设置中配置",
+  "The submission deadline has passed, so answers can no longer be submitted. If you have questions, please reply to the invitation email.": "已超过提交截止时间，无法再提交作答。如有疑问，请回复邀请邮件联系我们。",
 };
 
 export function translate(lang: "en" | "zh", source: string): string {

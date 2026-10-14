@@ -57,7 +57,7 @@ function escapeHtml(value: string): string {
 export function invitationEmail(input: InvitationLetterInput, link: string): { subject: string; text: string; html: string } {
   const letter = invitationLetter(input);
   const linkLine = '请点击以下链接查看题目并提交作答：';
-  const deadlineLine = letter.deadlineText ? `截止时间：${letter.deadlineText}（${letter.timingText}），请务必在截止前提交。` : null;
+  const deadlineLine = letter.deadlineText ? `截止时间：${letter.deadlineText}（${letter.timingText}），逾期将无法提交。` : null;
   const text = [
     letter.greeting,
     '',
@@ -79,7 +79,7 @@ export function invitationEmail(input: InvitationLetterInput, link: string): { s
     ? `<div style="margin:16px 0;padding:12px 16px;border-left:4px solid #d97706;background:#fff7ed;border-radius:4px">`
       + `<div style="font-size:13px;color:#92400e">截止时间</div>`
       + `<div style="font-size:18px;font-weight:bold;color:#b45309;margin:2px 0">${escapeHtml(letter.deadlineText)}</div>`
-      + `<div style="font-size:13px;color:#92400e">${escapeHtml(letter.timingText)}，请务必在截止前提交。</div></div>`
+      + `<div style="font-size:13px;color:#92400e">${escapeHtml(letter.timingText)}，逾期将无法提交。</div></div>`
     : '';
   const html = [
     p(letter.greeting),

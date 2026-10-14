@@ -402,7 +402,10 @@ export async function submitPublicInvitation(token: string, answers: { questionI
     headers: { "content-type": "application/json" },
     body: JSON.stringify({ answers }),
   });
-  if (!response.ok) throw new Error(`Request failed (${response.status})`);
+  if (!response.ok) {
+    const body = (await response.json().catch(() => null)) as { code?: string } | null;
+    throw Object.assign(new Error(`Request failed (${response.status})`), { code: body?.code });
+  }
 }
 
 export interface RealPlanItem {

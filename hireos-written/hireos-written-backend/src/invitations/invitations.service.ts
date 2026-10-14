@@ -10,7 +10,7 @@ import type { CreateInvitationDto, QuestionSnapshotDto } from './create-invitati
 import type { SubmitAnswersDto } from './submit-answers.dto';
 import type { FinalizeEvaluationDto, ReleaseResultDto } from './case-result.dto';
 import { invitationEmail, invitationLetter } from './invitation-letter';
-import { assertCaseOpen, assertDraftSendable, nextRoundNumber } from './rounds';
+import { assertBeforeDeadline, assertCaseOpen, assertDraftSendable, nextRoundNumber } from './rounds';
 
 function generateToken(): string {
   return randomBytes(24).toString('base64url');
@@ -195,6 +195,7 @@ export class InvitationsService {
     const invitation = await this.db.invitation.findUnique({ where: { token }, include: { submission: true } });
     if (!invitation) throw new NotFoundException({ code: 'INVITATION_NOT_FOUND' });
     if (invitation.submission) throw new ConflictException({ code: 'ALREADY_SUBMITTED' });
+    assertBeforeDeadline(invitation.deadline);
 
     const [submission] = await this.db.$transaction([
       this.db.submission.create({
