@@ -323,7 +323,7 @@ export const ZH: Record<string, string> = {
   "View evidence": "查看依据",
   "Override reason (required — old AI value stays visible in history)": "修改理由（必填 —— 历史记录中仍会保留原 AI 分数）",
   "Accept all AI scores": "采纳全部 AI 评分", "Re-run AI (demo)": "重新运行 AI（演示）",
-  "Finalize evaluation": "定稿评估",
+  "Finalize evaluation": "定稿评估", "View final result": "查看最终结果",
 
   "No finalized result for this case yet.": "该案例尚无已定稿的结果。",
   "Release": "结果发布", "Internal reference": "内部参考", "overridden": "已修改",

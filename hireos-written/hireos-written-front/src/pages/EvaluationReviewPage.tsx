@@ -171,8 +171,13 @@ export function EvaluationReviewContent({
       </div>
 
       <div className="flex gap-2 wrap" style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-        <Button onClick={acceptAll}>{t("Accept all AI scores")}</Button>
-        <Button variant="ghost" disabled={evaluation.status === "final"} onClick={reRunAi}>{t("Re-run AI (demo)")}</Button>
+        {/* Once finalized the scoring is locked and the flow has moved on — no more AI actions. */}
+        {!isFinalized && (
+          <>
+            <Button onClick={acceptAll}>{t("Accept all AI scores")}</Button>
+            <Button variant="ghost" onClick={reRunAi}>{t("Re-run AI (demo)")}</Button>
+          </>
+        )}
         {!hideFinalize && (
           <Button variant="primary" onClick={onFinalizeClick}>{t(isFinalized ? "View final result" : "Finalize evaluation")}</Button>
         )}
