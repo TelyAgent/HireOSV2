@@ -20,17 +20,18 @@ export interface InvitationLetter {
   signature: string[];
 }
 
-/** Deadlines are entered and stored as wall-clock UTC (see SendToCandidateDrawer), so print the UTC parts. */
+/** "YYYY-MM-DD HH:mm" in Beijing time (UTC+8, no DST) -- the letter states the time zone explicitly. */
 export function formatDeadline(deadline: Date): string {
+  const d = new Date(deadline.getTime() + 8 * 3600_000);
   const pad = (n: number) => String(n).padStart(2, '0');
-  return `${deadline.getUTCFullYear()}-${pad(deadline.getUTCMonth() + 1)}-${pad(deadline.getUTCDate())} ${pad(deadline.getUTCHours())}:${pad(deadline.getUTCMinutes())}`;
+  return `${d.getUTCFullYear()}-${pad(d.getUTCMonth() + 1)}-${pad(d.getUTCDate())} ${pad(d.getUTCHours())}:${pad(d.getUTCMinutes())}`;
 }
 
 export function invitationLetter(input: InvitationLetterInput): InvitationLetter {
   const timing = input.mode === 'timed' && input.durationMin
     ? `本次笔试限时 ${input.durationMin} 分钟，打开题目后开始计时`
     : '本次笔试不限作答时长';
-  const deadline = input.deadline ? `，请在 ${formatDeadline(input.deadline)} 前提交` : '';
+  const deadline = input.deadline ? `，请在 ${formatDeadline(input.deadline)}（北京时间）前提交` : '';
   return {
     greeting: `${input.candidateName}，您好：`,
     paragraphs: [

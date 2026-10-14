@@ -16,17 +16,25 @@ export function InvitationLetterCard({ letter }: { letter: InvitationLetter }) {
   );
 }
 
+/** Same as the backend's formatDeadline(): "YYYY-MM-DD HH:mm" in Beijing time (UTC+8, no DST). */
+function formatBeijingTime(date: Date): string {
+  const d = new Date(date.getTime() + 8 * 3600_000);
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${d.getUTCFullYear()}-${pad(d.getUTCMonth() + 1)}-${pad(d.getUTCDate())} ${pad(d.getUTCHours())}:${pad(d.getUTCMinutes())}`;
+}
+
 /**
  * Preview-only copy of hireos-written-backend's invitationLetter() (src/invitations/invitation-letter.ts),
  * so HR sees the letter before sending. The candidate page always renders the backend's version.
  */
 export function previewInvitationLetter(input: {
-  candidateName: string; jobTitle: string; senderName: string | null; mode: string; durationMin: number | null; deadline: string;
+  candidateName: string; jobTitle: string; senderName: string | null; mode: string; durationMin: number | null; /** ISO instant, or "" when not set yet. */
+  deadline: string;
 }): InvitationLetter {
   const timing = input.mode === "timed" && input.durationMin
     ? `本次笔试限时 ${input.durationMin} 分钟，打开题目后开始计时`
     : "本次笔试不限作答时长";
-  const deadline = input.deadline ? `，请在 ${input.deadline.replace("T", " ")} 前提交` : "";
+  const deadline = input.deadline ? `，请在 ${formatBeijingTime(new Date(input.deadline))}（北京时间）前提交` : "";
   return {
     greeting: `${input.candidateName}，您好：`,
     paragraphs: [

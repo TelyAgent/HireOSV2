@@ -10,6 +10,13 @@ import { CASES, CORE_APPLICATIONS, CORE_JOBS, CORE_CANDIDATES, INVITATIONS, QUES
 
 type Step = "form" | "preview" | "sent";
 
+/** ISO instant -> the local "YYYY-MM-DDTHH:mm" a datetime-local input expects. */
+function toLocalInput(iso: string): string {
+  const d = new Date(iso);
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+
 /**
  * Ported from the prototype's openSendToCandidateDrawer(caseId, round, onSent) — a lightweight,
  * single-round "send this round's questions to this candidate" flow, distinct from the batch
@@ -70,7 +77,7 @@ export function SendToCandidateDrawer({
     setStep("form");
     setMode("timed");
     setDurationMin(90);
-    setDeadline(round.deadlineAt ? round.deadlineAt.slice(0, 16) : "");
+    setDeadline(round.deadlineAt ? toLocalInput(round.deadlineAt) : "");
     setRecipientEmail(cand.email ?? "");
     setSentLink(null);
     setEmailSent(false);
@@ -91,7 +98,8 @@ export function SendToCandidateDrawer({
 
   async function confirmSend() {
     setSending(true);
-    const deadlineIso = new Date(`${deadline}:00Z`).toISOString();
+    // The datetime-local value is the HR's local wall-clock time; store the real instant.
+    const deadlineIso = new Date(deadline).toISOString();
     let token: string | undefined;
     try {
       const created = await createInvitation(caseId, {
@@ -241,14 +249,14 @@ export function SendToCandidateDrawer({
               senderName: sender?.name ?? null,
               mode,
               durationMin: mode === "timed" ? durationMin : null,
-              deadline,
+              deadline: deadline ? new Date(deadline).toISOString() : "",
             })}
           />
           <div className="card card-pad" style={{ marginBottom: 16 }}>
             <div className="tiny" style={{ color: "var(--text-tertiary)", marginBottom: 4 }}>{t("Target role")}</div>
             <div style={{ fontWeight: 600, marginBottom: 12 }}>{job?.title ?? "—"}</div>
             <div className="tiny" style={{ color: "var(--text-tertiary)", marginBottom: 4 }}>
-              {mode === "timed" ? `${t("Timed")} · ${durationMin} ${t("min timed")}` : t("Deadline only")} · {t("deadline")} {new Date(`${deadline}:00Z`).toLocaleString()}
+              {mode === "timed" ? `${t("Timed")} · ${durationMin} ${t("min timed")}` : t("Deadline only")} · {t("deadline")} {new Date(deadline).toLocaleString()}
             </div>
           </div>
           {items.map((pi) => {

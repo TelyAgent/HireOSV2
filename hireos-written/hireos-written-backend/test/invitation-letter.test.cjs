@@ -10,7 +10,7 @@ test('greets the candidate by name and signs off as the sending HR mailbox', () 
   assert.equal(letter.greeting, '陈昊天，您好：');
   assert.match(letter.paragraphs[0], /全栈工程师/);
   assert.match(letter.paragraphs[1], /限时 90 分钟/);
-  assert.match(letter.paragraphs[1], /2026-10-15 03:31 前提交/);
+  assert.match(letter.paragraphs[1], /2026-10-15 11:31（北京时间）前提交/);
   assert.deepEqual(letter.signature, ['招聘专员', '「全栈工程师」招聘团队']);
 });
 
