@@ -41,7 +41,8 @@ export function SendToCandidateDrawer({
   const [mode, setMode] = useState<"timed" | "deadline_only">("timed");
   const [durationMin, setDurationMin] = useState(90);
   const [deadline, setDeadline] = useState("");
-  const [disclosure, setDisclosure] = useState<"score_and_summary" | "summary_only">("score_and_summary");
+  // Result disclosure is no longer chosen per send: results aren't shown to candidates, the backend still records the default.
+  const disclosure = "score_and_summary" as const;
   const [recipientEmail, setRecipientEmail] = useState("");
   const [sending, setSending] = useState(false);
   const [sentLink, setSentLink] = useState<string | null>(null);
@@ -54,7 +55,6 @@ export function SendToCandidateDrawer({
     setMode("timed");
     setDurationMin(90);
     setDeadline(round.deadlineAt ? round.deadlineAt.slice(0, 16) : "");
-    setDisclosure("score_and_summary");
     setRecipientEmail(cand.email ?? "");
     setSentLink(null);
     setEmailSent(false);
@@ -182,15 +182,6 @@ export function SendToCandidateDrawer({
           <div className="field" style={{ marginBottom: 16 }}>
             <label>{t("Deadline")}</label>
             <input className="input" type="datetime-local" value={deadline} onChange={(e) => setDeadline(e.target.value)} />
-          </div>
-
-          <div className="field" style={{ marginBottom: 16 }}>
-            <label>{t("Result disclosure")}</label>
-            {([["score_and_summary", t("Score + summary")], ["summary_only", t("Summary only (no numeric score)")]] as const).map(([val, label]) => (
-              <label key={val} className="checkbox-row" style={{ marginBottom: 6, cursor: "pointer", display: "flex" }}>
-                <input type="radio" name="sendDisc" checked={disclosure === val} onChange={() => setDisclosure(val)} /> {label}
-              </label>
-            ))}
           </div>
 
           <div className="field" style={{ marginBottom: 16 }}>

@@ -20,7 +20,7 @@ function candidateEmail(caseId: string) {
   return c ? CORE_CANDIDATES[c.candidateId]?.email ?? "—" : "—";
 }
 
-const STEP_LABELS = ["Recipients", "Tests & materials", "Timing & submission", "Result disclosure", "Review & send"];
+const STEP_LABELS = ["Recipients", "Tests & materials", "Timing & submission", "Review & send"];
 
 export function InvitationComposerPage() {
   const { t, say } = useStore();
@@ -36,7 +36,6 @@ export function InvitationComposerPage() {
   const [mode, setMode] = useState<"timed" | "deadline_only">("timed");
   const [durationMin, setDurationMin] = useState(90);
   const [deadline] = useState("2026-09-25T23:59:00Z");
-  const [disclosure, setDisclosure] = useState<"score_and_summary" | "summary_only">("score_and_summary");
   const [delivery, setDelivery] = useState<DeliveryRow[] | null>(null);
 
   const allItems = useMemo(() => recipients.flatMap((r) => planItemsForCase(r.caseId)), [recipients]);
@@ -54,7 +53,7 @@ export function InvitationComposerPage() {
       say(t("Add at least one recipient."), { type: "danger" });
       return;
     }
-    setStep((s) => Math.min(s + 1, 4));
+    setStep((s) => Math.min(s + 1, 3));
   }
   function back() {
     setStep((s) => Math.max(s - 1, 0));
@@ -185,19 +184,6 @@ export function InvitationComposerPage() {
 
         {step === 3 && (
           <div>
-            <h3 style={{ marginBottom: 12 }}>{t("Result disclosure")}</h3>
-            {(["score_and_summary", "summary_only"] as const).map((val) => (
-              <label key={val} className="checkbox-row" style={{ marginBottom: 8, cursor: "pointer", display: "flex" }}>
-                <input type="radio" name="disc" checked={disclosure === val} onChange={() => setDisclosure(val)} />
-                {val === "score_and_summary" ? t("Score + summary") : t("Summary only (no numeric score)")}
-              </label>
-            ))}
-            <div className="tiny" style={{ marginTop: 8 }}>{t("Never includes internal ranking, reviewer notes, or the internal answer key.")}</div>
-          </div>
-        )}
-
-        {step === 4 && (
-          <div>
             <h3 style={{ marginBottom: 12 }}>{t("Review & send")}</h3>
             <div className="banner info" style={{ marginBottom: 12 }}>
               {t("Preview shown per recipient: template, question package version, estimated workload, timezone")} ({TZ}) {t("and Reply-To.")}
@@ -206,7 +192,7 @@ export function InvitationComposerPage() {
               <Card key={r.caseId} style={{ marginBottom: 8 }}>
                 <b>{r.name}</b> · {r.email}
                 <div className="tiny">
-                  {mode === "timed" ? `${durationMin} ${t("min timed")}` : t("Deadline only")} · {t("Deadline")} {fmtDateShort(deadline)} · {t("Disclosure:")} {disclosure === "score_and_summary" ? t("Score + summary") : t("Summary only")}
+                  {mode === "timed" ? `${durationMin} ${t("min timed")}` : t("Deadline only")} · {t("Deadline")} {fmtDateShort(deadline)}
                 </div>
                 <div className="tiny">{t("From / Reply-To:")} hr@sendinglabs.com {t("(simulated)")}</div>
               </Card>
@@ -218,7 +204,7 @@ export function InvitationComposerPage() {
 
       <div style={{ display: "flex", gap: 8, marginTop: 16, maxWidth: 720 }}>
         {step > 0 && <Button onClick={back}>{t("Back")}</Button>}
-        {step < 4 && <Button variant="primary" onClick={next}>{t("Continue")}</Button>}
+        {step < 3 && <Button variant="primary" onClick={next}>{t("Continue")}</Button>}
         <Button variant="ghost" onClick={saveExit}>{t("Save draft & exit")}</Button>
       </div>
     </div>
