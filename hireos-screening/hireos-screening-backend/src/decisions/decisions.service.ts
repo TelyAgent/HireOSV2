@@ -177,6 +177,80 @@ export class DecisionsService {
     return this.serializeDecisionResult(decision, pkg);
   }
 
+  /**
+   * Withdraws the active decision so a new one can be made (issue #23). Only possible while its
+   * handoff hasn't reached Interview / Written yet: once that event is dispatched the candidate and
+   * task already exist downstream and have to be handled there. The withdrawn decision is kept
+   * (status `withdrawn` + who / when / why) as history; the screening task reopens.
+   */
+  async withdraw(identity: Identity, applicationId: string, decisionId: string, raw: { reason?: string }) {
+    const reason = (raw.reason || '').trim();
+    if (!reason) throw new BadRequestException({ code: 'WITHDRAW_REASON_REQUIRED', message: 'Explain why the decision is being withdrawn.' });
+    if (reason.length > 2000) throw new BadRequestException({ code: 'WITHDRAW_REASON_TOO_LONG' });
+
+    const decision = await this.db.screeningDecision.findFirst({ where: { id: decisionId, applicationId, workspaceId: identity.workspaceId } });
+    if (!decision) throw new NotFoundException({ code: 'NOT_FOUND' });
+    if (decision.status !== 'approved') throw new ConflictException({ code: 'DECISION_NOT_ACTIVE', message: 'This decision is no longer in effect.' });
+
+    // The handoff for this decision was written in the same transaction as the decision itself.
+    const handoffs = await this.db.screeningOutboxEvent.findMany({
+      where: {
+        workspaceId: identity.workspaceId,
+        aggregateId: applicationId,
+        eventType: { in: ['candidate.advanced_to_interview', 'candidate.assessment_requested'] },
+        createdAt: { gte: decision.createdAt },
+      },
+    });
+    const sent = handoffs.find((event) => event.status === 'dispatched');
+    if (sent) {
+      throw new ConflictException({
+        code: 'HANDOFF_ALREADY_SENT',
+        target: sent.eventType === 'candidate.assessment_requested' ? 'written' : 'interview',
+        message: 'This decision has already been handed off and can only be handled in the receiving subsystem.',
+      });
+    }
+
+    const application = await this.db.application.findFirst({ where: { id: applicationId, workspaceId: identity.workspaceId } });
+    if (!application) throw new NotFoundException({ code: 'NOT_FOUND' });
+    const hasEvaluation = await this.db.screeningEvaluation.count({ where: { workspaceId: identity.workspaceId, applicationId } });
+    const now = new Date();
+
+    const withdrawn = await this.db.$transaction(async (tx) => {
+      // Conditional: a concurrent withdraw (or a second click) can't apply twice.
+      const updated = await tx.screeningDecision.updateMany({
+        where: { id: decision.id, status: 'approved' },
+        data: { status: 'withdrawn', withdrawnAt: now, withdrawnBy: identity.actorId, withdrawReason: reason },
+      });
+      if (updated.count !== 1) throw new ConflictException({ code: 'DECISION_NOT_ACTIVE', message: 'This decision is no longer in effect.' });
+      // Only undelivered handoffs are cancelled; the dispatcher only picks up `pending` ones.
+      const cancelled = await tx.screeningOutboxEvent.updateMany({
+        where: { id: { in: handoffs.map((event) => event.id) }, status: { in: ['pending', 'failed'] } },
+        data: { status: 'cancelled', lastError: 'Decision withdrawn before handoff' },
+      });
+      if (cancelled.count !== handoffs.length) {
+        throw new ConflictException({ code: 'HANDOFF_IN_PROGRESS', message: 'The handoff is being sent right now — try again in a moment.' });
+      }
+      await tx.handoffPackage.updateMany({ where: { workspaceId: identity.workspaceId, decisionId: decision.id }, data: { status: 'cancelled' } });
+      await tx.application.update({ where: { id: applicationId }, data: { screeningStatus: hasEvaluation ? 'review_pending' : 'not_started' } });
+      await tx.humanTask.updateMany({
+        where: { workspaceId: identity.workspaceId, applicationId, completionRef: decision.id, taskType: { in: ['screening_review', 'screening_evaluation_issue'] } },
+        data: { status: 'open', completedAt: null, completionRef: null },
+      });
+      await tx.auditRecord.create({
+        data: {
+          workspaceId: identity.workspaceId,
+          actorId: identity.actorId,
+          action: 'screening_decision_withdrawn',
+          objectType: 'ScreeningDecision',
+          objectId: decision.id,
+          payload: json({ applicationId, reason, outcome: decision.outcome, nextStepTarget: decision.nextStepTarget, cancelledHandoffs: cancelled.count }),
+        },
+      });
+      return tx.screeningDecision.findUniqueOrThrow({ where: { id: decision.id } });
+    });
+    return { decision: serializeDecision(withdrawn) };
+  }
+
   async createReviewOnlyPackage(identity: Identity, applicationId: string) {
     const application = await this.db.application.findFirst({
       where: { id: applicationId, workspaceId: identity.workspaceId },
@@ -305,7 +379,11 @@ export function serializeDecision(decision: any) {
     decidedAt: decision.createdAt.toISOString(),
     status: decision.status,
     overrideAi: decision.overrideAi,
+    nextStepTarget: decision.nextStepTarget,
     exceptionRef: decision.exceptionRef || undefined,
+    withdrawnAt: decision.withdrawnAt ? decision.withdrawnAt.toISOString() : undefined,
+    withdrawnBy: decision.withdrawnBy || undefined,
+    withdrawReason: decision.withdrawReason || undefined,
   };
 }
 

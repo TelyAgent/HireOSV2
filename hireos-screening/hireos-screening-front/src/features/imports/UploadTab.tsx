@@ -16,6 +16,8 @@ import { Icon } from "../../components/ui/Icons";
 import { Badge, Button } from "../../components/ui/Primitives";
 import { describeItem, formatFileSize } from "./importOutcome";
 import { MAX_CONCURRENT_BATCHES, MAX_RESUME_BYTES, chunkForUpload, runWithConcurrency } from "./folderFiles";
+import { STILL_PROCESSING_AFTER_MS } from "../../lib/usePolling";
+import { StillProcessingNotice } from "../../components/ui/StillProcessing";
 
 interface Run {
   id: string;
@@ -23,12 +25,11 @@ interface Run {
   batch?: ImportBatch;
   /** Set when the upload request itself failed, so no batch was ever created. */
   error?: string;
+  /** Still unsettled after the polling window — shown instead of polling stopping silently (#23). */
+  overdue?: boolean;
 }
 
 const POLL_INTERVAL_MS = 700;
-const POLL_TIMEOUT_MS = 30_000;
-/** Job-scoped imports also wait for profile parse + AI match, which can take minutes. */
-const JOB_MATCH_POLL_TIMEOUT_MS = 5 * 60_000;
 const JOB_MATCH_POLL_INTERVAL_MS = 2_000;
 
 /** A job-scoped batch isn't settled until every created candidate has a match outcome. */
@@ -44,11 +45,10 @@ function isUnsettled(batch: ImportBatch) {
  * Phase 1) and return while it's still in flight. Poll until the batch leaves
  * "processing" -- and, for imports from a job, until each resume has been parsed and
  * matched against it -- so the UI reflects what actually happened. */
-async function pollUntilSettled(batch: ImportBatch, onUpdate: (batch: ImportBatch) => void): Promise<void> {
+async function pollUntilSettled(batch: ImportBatch, onUpdate: (batch: ImportBatch) => void): Promise<ImportBatch> {
   const startedAt = Date.now();
-  const timeout = batch.targetJobId ? JOB_MATCH_POLL_TIMEOUT_MS : POLL_TIMEOUT_MS;
   let current = batch;
-  while (isUnsettled(current) && Date.now() - startedAt < timeout) {
+  while (isUnsettled(current) && Date.now() - startedAt < STILL_PROCESSING_AFTER_MS) {
     if (current.status !== "processing") {
       await delay(JOB_MATCH_POLL_INTERVAL_MS - POLL_INTERVAL_MS);
     }
@@ -56,6 +56,7 @@ async function pollUntilSettled(batch: ImportBatch, onUpdate: (batch: ImportBatc
     current = await getImportBatch(batch.id);
     onUpdate(current);
   }
+  return current;
 }
 
 const MATCH_RESULT: Record<JobMatchResult, { tone: "success" | "neutral" | "outline" | "warning" | "danger"; label: string }> = {
@@ -168,12 +169,14 @@ function BatchCard({
   retryingId,
   onCancel,
   cancelling,
+  onResume,
 }: {
   run: Run;
   onRetryItem: (itemId: string) => void;
   retryingId: string | null;
   onCancel: (batchId: string) => void;
   cancelling: boolean;
+  onResume: () => void;
 }) {
   const { t } = useStore();
   if (run.error) {
@@ -228,6 +231,7 @@ function BatchCard({
   );
   return (
     <div className="card card-pad" style={{ marginTop: 14 }}>
+      {run.overdue && <StillProcessingNotice style={{ marginBottom: 12 }} onRetry={onResume} />}
       <div className="flex items-center justify-between" style={{ marginBottom: 10 }}>
         <div className="section-title" style={{ margin: 0 }}>
           {t("Batch")} {batch.id} — {doneCount}/{batch.items.length} {t("processed")}
@@ -266,9 +270,18 @@ export function useImportRuns({ jobId, onChanged }: { jobId?: string; onChanged?
 
   const finishRun = async (id: string, batch: ImportBatch) => {
     applyBatchUpdate(id, batch);
+    setRuns((prev) => prev.map((r) => (r.id === id ? { ...r, overdue: false } : r)));
     if (isUnsettled(batch)) {
-      await pollUntilSettled(batch, (updated) => applyBatchUpdate(id, updated));
+      const last = await pollUntilSettled(batch, (updated) => applyBatchUpdate(id, updated));
+      if (isUnsettled(last)) setRuns((prev) => prev.map((r) => (r.id === id ? { ...r, overdue: true } : r)));
     }
+  };
+
+  /** "Retry" on the still-processing notice: poll the same batch for another window. */
+  const resumeRun = async (id: string) => {
+    const run = runs.find((r) => r.id === id);
+    if (!run?.batch) return;
+    await finishRun(id, await getImportBatch(run.batch.id));
   };
 
   const startRun = async (files: File[]) => {
@@ -320,6 +333,7 @@ export function useImportRuns({ jobId, onChanged }: { jobId?: string; onChanged?
       retryingId={retryingId}
       onCancel={(batchId) => handleCancel(run.id, batchId)}
       cancelling={cancellingId === run.batch?.id}
+      onResume={() => void resumeRun(run.id)}
     />
   ));
 
