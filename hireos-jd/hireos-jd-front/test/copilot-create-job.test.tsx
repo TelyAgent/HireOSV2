@@ -4,7 +4,8 @@ import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/re
 import { App as AntApp } from 'antd';
 import { MemoryRouter, Route, Routes, useParams } from 'react-router-dom';
 
-vi.mock('../src/features/copilot/copilotApi', () => ({
+vi.mock('../src/features/copilot/copilotApi', async (importOriginal) => ({
+  CopilotRequestError: (await importOriginal<typeof import('../src/features/copilot/copilotApi')>()).CopilotRequestError,
   createCopilotConversation: vi.fn(),
   setCopilotFields: vi.fn(),
   confirmCopilotDraft: vi.fn(),

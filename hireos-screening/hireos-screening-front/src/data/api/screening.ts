@@ -16,6 +16,8 @@ export interface ApplicationDetail {
   decision: (typeof db.decisions)[string] | null;
   /** Earlier decisions that were withdrawn (issue #23), newest first. */
   withdrawnDecisions?: (typeof db.decisions)[string][];
+  /** Every evaluation snapshot, newest first (#19). */
+  history?: EvaluationSnapshot[];
   /** A screening run for this application is still in progress on the server. */
   screeningInProgress?: boolean;
 }
@@ -58,16 +60,37 @@ export async function listApplicationsForJob(jobId: string): Promise<Application
   return apiFetch<ApplicationWithNames[]>(`/applications?jobId=${encodeURIComponent(jobId)}`);
 }
 
-export async function runScreening(applicationId: string): Promise<Evaluation> {
-  const evaluation = await apiFetch<Evaluation>(`/applications/${applicationId}/screen`, { method: "POST" });
+/** One row of the snapshot history (#19). */
+export interface EvaluationSnapshot {
+  id: string;
+  version: number;
+  overall: number | null;
+  coverage: number;
+  completedAt: string;
+  modelVersion: string | null;
+  evaluationMode: Evaluation["evaluationMode"];
+  aiStatus: Evaluation["aiStatus"];
+  freshness: Evaluation["freshness"];
+}
+
+/** A run's result: `reused` when the inputs were unchanged and the previous snapshot stands (#19). */
+export type ScreeningRunResult = Evaluation & { reused?: boolean; snapshotCount?: number };
+
+/** Full snapshots (dimension scores included), newest first. */
+export async function listEvaluations(applicationId: string): Promise<Evaluation[]> {
+  return apiFetch<Evaluation[]>(`/applications/${applicationId}/evaluations`);
+}
+
+export async function runScreening(applicationId: string): Promise<ScreeningRunResult> {
+  const evaluation = await apiFetch<ScreeningRunResult>(`/applications/${applicationId}/screen`, { method: "POST" });
   db.evaluations[applicationId] = evaluation;
   return evaluation;
 }
 
-export async function refreshEvaluation(applicationId: string): Promise<Evaluation> {
+export async function refreshEvaluation(applicationId: string): Promise<ScreeningRunResult> {
   const current = await apiFetch<ApplicationDetail>(`/applications/${applicationId}/screening`);
   if (!current.evaluation) throw new Error("No evaluation exists to refresh");
-  const evaluation = await apiFetch<Evaluation>(`/evaluations/${current.evaluation.id}/refresh`, { method: "POST" });
+  const evaluation = await apiFetch<ScreeningRunResult>(`/evaluations/${current.evaluation.id}/refresh`, { method: "POST" });
   db.evaluations[applicationId] = evaluation;
   return evaluation;
 }
