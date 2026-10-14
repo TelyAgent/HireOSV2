@@ -184,14 +184,17 @@ export async function uploadCopilotAttachment(conversationId: string, file: File
 
 /**
  * Persists the collected fields as a real Job + JobDraft on the backend (which in turn creates the
- * Job on the Core Record service). This is a background write for now: the UI still navigates using
- * its local fixture job, since the rest of the app (JobWorkspacePage, etc.) doesn't read real backend
- * data yet. Call sites should treat failures as non-fatal — log, don't block the fixture flow on it.
+ * Job on the Core Record service). The job only exists once this resolves — callers must surface a
+ * failure, never invent a local job (#34).
+ *
+ * The idempotency key is fixed per conversation, so a double click or a retry after a partial failure
+ * reuses the same Core job instead of creating a second one; once confirmed, the backend returns the
+ * same jobId for the conversation.
  */
 export function confirmCopilotDraft(conversationId: string): Promise<{ conversationId: string; jobId: string }> {
   return request(`${BASE}/${conversationId}/confirm-draft`, {
     method: "POST",
-    idempotencyKey: idempotencyKey("copilot-confirm"),
+    idempotencyKey: `copilot-confirm-${conversationId}`,
   });
 }
 

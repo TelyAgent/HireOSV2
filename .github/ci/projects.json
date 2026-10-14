@@ -19,7 +19,7 @@
       "name": "jd-front",
       "dir": "hireos-jd/hireos-jd-front",
       "prisma": false,
-      "checks": ["build", "lint", "typecheck"],
+      "checks": ["build", "lint", "typecheck", "test"],
       "known_failing": []
     },
     {

@@ -6,7 +6,7 @@ import { Button } from "../../components/ui/Primitives";
 import { useStore } from "../../store/StoreContext";
 import { mkBlock } from "../../data/fixtures/documents";
 import { docKey, normalizeBlocks } from "../workspace/docHelpers";
-import { money, nowISO, uid } from "../../lib/format";
+import { money, nowISO } from "../../lib/format";
 import {
   autoCompleteCopilotConversation,
   confirmCopilotDraft,
@@ -30,7 +30,7 @@ import { VoiceInputButton, type VoiceInputHandle, type VoiceInputStatus } from "
 import { mergeVoiceTranscript } from "../../lib/voice-stream";
 import { fmtRelative } from "../../lib/format";
 import type { Audience, Requirement } from "../../data/types";
-import type { ConversationActionOption, GeminiCreatePath, GeminiDraft, GeminiMsg, GeminiOrigin, GeminiVariant } from "../../store/types";
+import type { ConversationActionOption, GeminiCreatePath, GeminiCreateRetry, GeminiDraft, GeminiMsg, GeminiOrigin, GeminiVariant } from "../../store/types";
 
 /** Converts a fetched conversation's raw messages back into the panel's bubble shapes. There's no
  * per-message phase snapshot server-side, so a conversation that's currently ready to confirm gets its
@@ -650,20 +650,15 @@ export function GeminiPanel({ ctx }: { ctx: GeminiCtx }) {
     await runStep((conversationId) => autoCompleteCopilotConversation(conversationId));
   };
 
-  const createJobFromDraft = async (d: GeminiDraft, seniority?: string) => {
-    // Confirms the draft as a real Job on the Core Record service and uses its real id, so the job
-    // this navigates to is the same one the Job Library page (which now reads real backend data) will
-    // show. Only falls back to a local-only fixture id if the backend call itself fails.
-    const conversationId = state.geminiConversationIds[key];
-    let newId: string;
-    try {
-      if (!conversationId) throw new Error("No conversation to confirm.");
-      newId = (await confirmCopilotDraft(conversationId)).jobId;
-      if (seniority) await updateJobFields(newId, { seniority }).catch((error) => console.warn("Failed to save the job level:", error));
-    } catch (error) {
-      console.warn("Copilot confirm-draft failed, falling back to a local-only job:", error);
-      newId = uid("job-gen");
-    }
+  /**
+   * Confirms the draft as a real Job on the Core Record service and opens it. Throws when the backend
+   * call fails — there is no local-only fallback any more (#34): a job the user is told about must
+   * survive a refresh. The conversation id is passed in by the caller, because a conversation created
+   * earlier in the same click isn't in this render's `state` yet.
+   */
+  const createJobFromDraft = async (conversationId: string, d: GeminiDraft, seniority?: string) => {
+    const newId = (await confirmCopilotDraft(conversationId)).jobId;
+    if (seniority) await updateJobFields(newId, { seniority }).catch((error) => console.warn("Failed to save the job level:", error));
     mutate((draft) => {
       draft.jobs[newId] = {
         id: newId,
@@ -753,20 +748,37 @@ export function GeminiPanel({ ctx }: { ctx: GeminiCtx }) {
       text: t("The JD is created. You can"),
       options: [{ id: `view-jd:${newId}`, label: t("View the created JD"), href: `/jobs/${newId}/document` }],
     });
+    // AC-4: go straight to the new job's editor.
+    closeModal();
+    navigate(`/jobs/${newId}/document`);
+    return newId;
+  };
+
+  /** Nothing was saved: say why, keep the input where it was, and offer a retry of the same create (#34). */
+  const reportCreateFailure = (error: unknown, retry: GeminiCreateRetry) => {
+    console.error("Creating the job failed:", error);
+    const reason = errorText(error);
+    say(t("The job was not created — %s").replace("%s", reason), { type: "error" });
+    push({ role: "ai", kind: "create-failed", text: t("The job was not created — %s").replace("%s", reason), retry });
   };
 
   /** Saves user-picked/authored fields on the conversation, then creates the job from them. */
-  const createFromFields = async (fields: CopilotJdFields, label: string, seniority?: string) => {
+  const createFromFields = async (retry: Extract<GeminiCreateRetry, { source: "fields" }>, echo = true) => {
     if (working) return false;
     setBusy(true);
     try {
       const conversationId = await ensureConversation();
-      const result = await setCopilotFields(conversationId, fields, label);
-      push({ role: "user", text: label });
-      await createJobFromDraft(jdFieldsToGeminiDraft(result.fields), seniority);
+      const result = await setCopilotFields(conversationId, retry.fields as CopilotJdFields, retry.label);
+      if (echo) push({ role: "user", text: retry.label });
+      await createJobFromDraft(conversationId, jdFieldsToGeminiDraft(result.fields), retry.seniority);
+      if (retry.variant) updateMsg(retry.variant.index, { picked: retry.variant.variantIndex });
+      if (retry.formIndex !== undefined) {
+        updateMsg(retry.formIndex, { done: true });
+        setPath("home");
+      }
       return true;
     } catch (error) {
-      say(errorText(error), { type: "error" });
+      reportCreateFailure(error, retry);
       return false;
     } finally {
       setBusy(false);
@@ -777,8 +789,12 @@ export function GeminiPanel({ ctx }: { ctx: GeminiCtx }) {
     if (working) return;
     setBusy(true);
     try {
-      await createJobFromDraft(d);
+      const conversationId = state.geminiConversationIds[key];
+      if (!conversationId) throw new Error(t("This conversation has expired — start a new one."));
+      await createJobFromDraft(conversationId, d);
       updateMsg(index, { created: true });
+    } catch (error) {
+      reportCreateFailure(error, { source: "draft", draftIndex: index, draft: d });
     } finally {
       setBusy(false);
     }
@@ -789,14 +805,26 @@ export function GeminiPanel({ ctx }: { ctx: GeminiCtx }) {
     if (!msg || msg.role !== "ai" || msg.kind !== "variants") return;
     const v = msg.variants[variantIndex];
     const label = `${t("Create job with version %s").replace("%s", String.fromCharCode(65 + variantIndex))} · ${t(v.label)}`;
-    if (await createFromFields(v.fields, label)) updateMsg(index, { picked: variantIndex });
+    await createFromFields({ source: "fields", fields: v.fields as Record<string, unknown>, label, variant: { index, variantIndex } });
   };
 
   const submitForm = async (index: number, fields: CopilotJdFields, seniority: string) => {
-    if (await createFromFields(fields, `${t("Create Manually")}: ${fields.title}`, seniority || undefined)) {
-      updateMsg(index, { done: true });
-      setPath("home");
-    }
+    await createFromFields({
+      source: "fields",
+      fields: fields as Record<string, unknown>,
+      label: `${t("Create Manually")}: ${fields.title}`,
+      seniority: seniority || undefined,
+      formIndex: index,
+    });
+  };
+
+  /** "Retry" on a failure card: run the same create again (same conversation, same idempotency key). */
+  const retryCreate = async (index: number) => {
+    const msg = msgs[index];
+    if (working || !msg || msg.role !== "ai" || msg.kind !== "create-failed" || msg.done) return;
+    updateMsg(index, { done: true });
+    if (msg.retry.source === "draft") await createFromDraftCard(msg.retry.draftIndex, msg.retry.draft);
+    else await createFromFields(msg.retry, false);
   };
 
   const handleSelectOption = (option: ConversationActionOption) => {
@@ -874,6 +902,7 @@ export function GeminiPanel({ ctx }: { ctx: GeminiCtx }) {
                 onChooseFile={() => attachFileInputRef.current?.click()}
                 onPickVariant={(variantIndex) => void pickVariant(i, variantIndex)}
                 onSubmitForm={(fields, seniority) => void submitForm(i, fields, seniority)}
+                onRetryCreate={() => void retryCreate(i)}
               />
             ))
           )}
@@ -1579,6 +1608,7 @@ function GeminiMessage({
   onChooseFile,
   onPickVariant,
   onSubmitForm,
+  onRetryCreate,
 }: {
   msg: GeminiMsg;
   busy: boolean;
@@ -1590,6 +1620,7 @@ function GeminiMessage({
   onChooseFile: () => void;
   onPickVariant: (variantIndex: number) => void;
   onSubmitForm: (fields: CopilotJdFields, seniority: string) => void;
+  onRetryCreate: () => void;
 }) {
   const { t } = useStore();
   if (msg.role === "user") return <div className="gm-bubble user">{msg.text}</div>;
@@ -1606,6 +1637,23 @@ function GeminiMessage({
   if (msg.kind === "variants")
     return <VariantPicker msg={msg} busy={busy} wsVisible={wsVisible} onSelect={onSelectVariant} onPick={onPickVariant} onRefine={onRefine} />;
   if (msg.kind === "form") return <ManualJobForm msg={msg} busy={busy} onSubmit={onSubmitForm} />;
+  if (msg.kind === "create-failed")
+    return (
+      <div className="gm-bubble ai gm-create-failed" role="alert">
+        <div>{msg.text}</div>
+        <div className="tiny" style={{ marginTop: 4 }}>
+          {t("Nothing was saved and your input is kept.")}
+        </div>
+        {!msg.done && (
+          <div className="gm-actions">
+            <Button variant="primary" size="sm" disabled={busy} onClick={onRetryCreate}>
+              <Icon name="refresh" />
+              {busy ? t("Creating…") : t("Retry")}
+            </Button>
+          </div>
+        )}
+      </div>
+    );
   if (msg.kind === "upload")
     return (
       <div className="gm-bubble ai">

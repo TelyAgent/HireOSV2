@@ -97,6 +97,8 @@ export type GeminiMsg =
   /** Inline prompt card for a path: the upload button or the manual form. `done` once used. */
   | { role: "ai"; kind: "upload"; text: string; done?: boolean }
   | { role: "ai"; kind: "form"; text: string; done?: boolean }
+  /** Creating the job failed (#34): nothing was saved, the reason is shown and `retry` re-runs the same create. `done` once retried. */
+  | { role: "ai"; kind: "create-failed"; text: string; retry: GeminiCreateRetry; done?: boolean }
   /** "Start with a job title" result: three styles to pick from. `picked` once a job was created from one. */
   | {
       role: "ai";
@@ -109,6 +111,13 @@ export type GeminiMsg =
       superseded?: boolean;
       picked?: number;
     };
+
+/** What a "create job" attempt needs to be re-run from a failure card (kept serializable — chats are persisted). */
+export type GeminiCreateRetry =
+  | { source: "fields"; fields: CopilotJdFieldsLike; label: string; seniority?: string; formIndex?: number; variant?: { index: number; variantIndex: number } }
+  | { source: "draft"; draftIndex: number; draft: GeminiDraft };
+/** Structural stand-in for `CopilotJdFields` (store types don't import feature modules). */
+export type CopilotJdFieldsLike = Record<string, unknown>;
 
 export interface AppState {
   // appearance / chrome
