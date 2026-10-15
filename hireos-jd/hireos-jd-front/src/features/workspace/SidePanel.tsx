@@ -70,8 +70,9 @@ function CopilotTab({ jobId }: { jobId: string }) {
     ? selectDraft(state, jobId).blocks.find((b) => b.id === state.wsFocusBlockId)
     : undefined;
 
-  // Completeness standard V5: Confidential blocks are never sent to Copilot.
-  const targetId = sel ? sel.blockId : focused?.id;
+  // Completeness standard V5: text selected in a Confidential block is never sent to Copilot. A Confidential
+  // block the cursor merely sits in doesn't block a question — it's just left out of what is sent.
+  const targetId = sel ? sel.blockId : undefined;
   const target = targetId ? selectDraft(state, jobId).blocks.find((b) => b.id === targetId) : undefined;
   const restrictedBlocked = !!target && blockLevel(target) === "confidential";
 

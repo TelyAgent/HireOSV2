@@ -21,7 +21,7 @@ import { docKey } from '../src/features/workspace/docHelpers';
 
 const api = vi.mocked(docsApi);
 
-function Seeded({ select }: { select?: { blockId: string; text: string } }) {
+function Seeded({ select, focus }: { select?: { blockId: string; text: string }; focus?: string }) {
   const { mutate } = useStore();
   const [ready, setReady] = useState(false);
   useEffect(() => {
@@ -40,17 +40,18 @@ function Seeded({ select }: { select?: { blockId: string; text: string } }) {
       };
       d.wsSideTab = 'copilot';
       d.wsSelection = select ? { ...select, scopeLabel: 'Selected text' } : null;
+      d.wsFocusBlockId = focus ?? null;
     });
     setReady(true);
-  }, [mutate, select]);
+  }, [mutate, select, focus]);
   return ready ? <SidePanel jobId="j1" /> : null;
 }
-const renderPanel = (select?: { blockId: string; text: string }) =>
+const renderPanel = (select?: { blockId: string; text: string }, focus?: string) =>
   render(
     <AntApp>
       <StoreProvider>
         <MemoryRouter>
-          <Seeded select={select} />
+          <Seeded select={select} focus={focus} />
         </MemoryRouter>
       </StoreProvider>
     </AntApp>,
@@ -123,5 +124,18 @@ describe('job-page Copilot', () => {
     await type('今天天气怎么样？');
     expect(await screen.findByText(/超出了职位工作区的范围/)).toBeInTheDocument();
     expect(screen.queryByText(/select some text/)).toBeNull();
+  });
+
+  it('#106: with the cursor in a Confidential block and nothing selected, a question still goes out — without that block', async () => {
+    api.askDocumentCopilot.mockResolvedValue({ kind: 'answer', intent: 'answer', text: 'Yes, once Level is set.', sources: [], contextScope: 'document' });
+    renderPanel(undefined, 'b3');
+    const box = await screen.findByPlaceholderText('Ask Copilot to rewrite, explain, or draft something…');
+    expect(box).not.toBeDisabled();
+    await type('What does this JD require?');
+    expect(await screen.findByText('Yes, once Level is set.')).toBeInTheDocument();
+    const body = api.askDocumentCopilot.mock.calls[0][2];
+    expect(body.selection).toBeUndefined();
+    expect(JSON.stringify(body)).not.toContain('Internal ceiling');
+    expect(body.context.readiness).toMatch(/AI Analyze has not been run/);
   });
 });

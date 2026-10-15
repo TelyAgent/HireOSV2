@@ -1,15 +1,20 @@
 // #106 AC-2 — the Copilot's "can I publish?" context uses exactly the Publish button's rule.
 import { describe, expect, it } from 'vitest';
-import { describePublishGate, publishGate } from '../src/features/workspace/publishGate';
+import { describeAiAnalysis, describePublishGate, publishGate } from '../src/features/workspace/publishGate';
 import type { AppState } from '../src/store/types';
 import type { Evaluation } from '../src/features/workspace/completeness';
 import { mkBlock } from '../src/data/fixtures/documents';
 import { docKey } from '../src/features/workspace/docHelpers';
 
-const blocks = [mkBlock('b1', 'h2', 'Data Analyst', { level: 'public' }), mkBlock('b2', 'p', 'Owns reporting.', { level: 'public' })];
-const state = (versions?: { versionNo: number; blocks: typeof blocks }[]) =>
+const blocks = [
+  mkBlock('b1', 'h2', 'Data Analyst', { level: 'public' }),
+  mkBlock('b2', 'p', 'Owns reporting.', { level: 'public' }),
+  mkBlock('b3', 'p', 'Hiring preference: under 42 years old', { level: 'confidential' }),
+];
+const state = (versions?: { versionNo: number; blocks: typeof blocks }[], aiRun?: unknown) =>
   ({
     wsVersions: versions ? { j1: { jdCode: 'JD-1', versions } } : {},
+    wsAiAnalysis: aiRun ? { j1: aiRun } : {},
     drafts: { [docKey('j1')]: { id: 'doc-j1', jobId: 'j1', audience: 'internal', language: 'en', revision: 1, saveState: 'saved', blocks } },
     jobs: {},
   }) as unknown as AppState;
@@ -42,4 +47,40 @@ describe('publishGate', () => {
     expect(gate.kind).toBe('ready');
     expect(describePublishGate(gate, true)).toMatch(/Publish button is available\. The document has unsaved changes\. Submitting for approval is not available/);
   });
+
+  it('a flag on a Confidential block is named by rule only — its quoted text never reaches the Copilot', () => {
+    const flag = { rule: 'R2', severity: 'warning' as const, blockId: 'b3', message: '“under 42 years old” implies an age.', evidence: 'under 42 years old' };
+    const text = describePublishGate(publishGate(state([]), 'j1', ev({ flags: [flag], weakCount: 1 })), false);
+    expect(text).toContain('R2 (in a Confidential block)');
+    expect(text).not.toContain('42');
+  });
+});
+
+describe('describeAiAnalysis', () => {
+  const run = (revision: number) => ({
+    at: 1,
+    revision,
+    result: {
+      verdict: 'blocked',
+      summary: 'Requirements contradict the level.',
+      items: [
+        { id: 'X7', status: 'weak', severity: 'blocker', evidence: '10 years', reason: 'Junior with 10 years', suggestion: '', blockId: 'b2' },
+        { id: 'S1', status: 'weak', severity: 'suggestion', evidence: '', reason: 'optional', suggestion: '', blockId: null },
+      ],
+    },
+  });
+
+  it('gives the current verdict and blocking findings for the same revision', () => {
+    const text = describeAiAnalysis(state([], run(1)), 'j1');
+    expect(text).toMatch(/Current AI Analyze result: blocked\. Requirements contradict the level\./);
+    expect(text).toMatch(/X7 \(blocker\): Junior with 10 years — “10 years”/);
+    expect(text).not.toContain('S1');
+  });
+
+  it('says an older result is outdated instead of repeating it, and says when none ran', () => {
+    expect(describeAiAnalysis(state([], run(0)), 'j1')).toMatch(/outdated/);
+    expect(describeAiAnalysis(state([], run(0)), 'j1')).not.toContain('blocked');
+    expect(describeAiAnalysis(state([]), 'j1')).toMatch(/has not been run/);
+  });
+
 });

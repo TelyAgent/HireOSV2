@@ -39,7 +39,7 @@ import {
 } from "./documentsApi";
 import { nowISO, uid } from "../../lib/format";
 import { SalaryModal } from "./SalaryModal";
-import { describePublishGate, publishGate } from "./publishGate";
+import { describeAiAnalysis, describePublishGate, publishGate } from "./publishGate";
 import {
   REQ_ITEMS,
   detectLanguage,
@@ -270,7 +270,7 @@ export function useDocActions(jobId: string) {
       if (!job) return undefined;
       const loaded = state.wsVersions[jobId];
       const ev = evaluateJob(job, selectDraft(state, jobId), "en", loaded ? loaded.jdCode || null : undefined);
-      return describePublishGate(publishGate(state, jobId, ev), selectDraft(state, jobId).saveState !== "saved");
+      return `${describePublishGate(publishGate(state, jobId, ev), selectDraft(state, jobId).saveState !== "saved")} ${describeAiAnalysis(state, jobId)}`;
     };
 
     /** Turns a rewrite result into a suggestion the user can accept or reject — the only path that proposes edits. */
@@ -335,8 +335,13 @@ export function useDocActions(jobId: string) {
      * nothing selected, market questions are researched, and only an explicit edit becomes a proposal.
      */
     const ask = async (message: string, blockId: string | null, selText: string, implicit = false) => {
-      const sel = selectionOf(blockId, selText);
-      if (sel && blockLevel(sel.block) === "confidential") return void pushThreadMsg("text", t(CONFIDENTIAL_BLOCK));
+      let sel = selectionOf(blockId, selText);
+      if (sel && blockLevel(sel.block) === "confidential") {
+        // Text the user selected in a Confidential block is never sent; the block the cursor merely sits in
+        // is just left out, and the question is answered from the rest of the JD (V5).
+        if (!implicit) return void pushThreadMsg("text", t(CONFIDENTIAL_BLOCK));
+        sel = null;
+      }
       if (state.wsCopilotBusy) return;
 
       const body: AskRequest = {
