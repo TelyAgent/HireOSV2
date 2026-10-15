@@ -28,7 +28,7 @@ export async function extractTextFromFile(buffer: Buffer, mimeType: string, file
           message: '这个 PDF 里没有可读取的文字（可能是扫描件或图片），请上传 DOCX/TXT 文件，或直接粘贴 JD 文案。',
         });
       }
-      return truncate(result.text);
+      return truncate(radicalsToIdeographs(result.text));
     } finally {
       await parser.destroy();
     }
@@ -47,6 +47,15 @@ export async function extractTextFromFile(buffer: Buffer, mimeType: string, file
     code: 'ATTACHMENT_TYPE_UNSUPPORTED',
     message: '仅支持上传 PDF、DOCX 或 TXT 文件。',
   });
+}
+
+/**
+ * Some PDF fonts map common characters to Kangxi / CJK radical code points (⼯ U+2F2F for 工, ⼤ for 大): they
+ * look the same but are different characters to the model and to search (#80). NFKC maps each back to its
+ * ideograph; it is applied only to those blocks so full-width punctuation such as （ and ： is kept.
+ */
+function radicalsToIdeographs(text: string): string {
+  return text.replace(/[\u2E80-\u2EFF\u2F00-\u2FDF]/g, (ch) => ch.normalize('NFKC'));
 }
 
 function truncate(text: string): string {

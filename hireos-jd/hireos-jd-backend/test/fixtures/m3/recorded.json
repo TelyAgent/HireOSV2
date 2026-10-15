@@ -1,0 +1,356 @@
+{
+  "docx-1": {
+    "file": "sales-manager.docx",
+    "uploadName": "sales-manager.docx",
+    "model": "gpt-5.6-luna",
+    "calls": [
+      {
+        "skill": "file_extract",
+        "raw": "{\"reply\":\"已从文档中读取岗位名称、工作地点与方式、用工形式、岗位概述、核心职责、必须条件和加分项。文档未提及所属部门、招聘人数、薪资范围、业务背景、预期成果及入职成功标准。\",\"phase\":\"ready_to_confirm\",\"fields\":{\"title\":\"Sales Manager\",\"location\":\"Singapore (remote)\",\"employmentType\":\"Full-time\",\"roleSummary\":\"Grow our B2B customer base across Southeast Asia.\",\"responsibilities\":[\"Own the full B2B sales cycle from prospecting to closing for mid-market accounts.\",\"Build and manage a qualified pipeline in our CRM and report weekly forecasts.\",\"Work with marketing and customer success to expand revenue from existing customers.\"],\"mustHave\":[\"4+ years of experience in B2B sales.\",\"Proven record of meeting or exceeding quota.\"],\"niceToHave\":[\"Experience selling SaaS products in Southeast Asia.\"]},\"missingFields\":[\"department\",\"headcount\",\"publicCompensation\",\"businessProblem\",\"expectedOutcomes\",\"successCriteria\"]}"
+      }
+    ],
+    "result": {
+      "fields": {
+        "title": "Sales Manager",
+        "location": "Singapore (remote)",
+        "employmentType": "Full-time",
+        "roleSummary": "Grow our B2B customer base across Southeast Asia.",
+        "responsibilities": [
+          "Own the full B2B sales cycle from prospecting to closing for mid-market accounts.",
+          "Build and manage a qualified pipeline in our CRM and report weekly forecasts.",
+          "Work with marketing and customer success to expand revenue from existing customers."
+        ],
+        "mustHave": [
+          "4+ years of experience in B2B sales.",
+          "Proven record of meeting or exceeding quota."
+        ],
+        "niceToHave": [
+          "Experience selling SaaS products in Southeast Asia."
+        ]
+      },
+      "phase": "ready_to_confirm",
+      "reply": "已从文档中读取岗位名称、工作地点与方式、用工形式、岗位概述、核心职责、必须条件和加分项。文档未提及所属部门、招聘人数、薪资范围、业务背景、预期成果及入职成功标准。"
+    }
+  },
+  "docx-2": {
+    "file": "sales-manager.docx",
+    "uploadName": "sales-manager.docx",
+    "model": "gpt-5.6-luna",
+    "calls": [
+      {
+        "skill": "file_extract",
+        "raw": "{\"reply\":\"已从文档中读取岗位名称、工作地点与方式、用工形式、岗位概述、核心职责、必须条件和加分项。文档未提及所属部门、招聘人数及对外薪资范围。\",\"phase\":\"ready_to_confirm\",\"fields\":{\"title\":\"Sales Manager\",\"location\":\"Singapore (remote)\",\"employmentType\":\"Full-time\",\"roleSummary\":\"Grow the B2B customer base across Southeast Asia.\",\"responsibilities\":[\"Own the full B2B sales cycle from prospecting to closing for mid-market accounts.\",\"Build and manage a qualified pipeline in our CRM and report weekly forecasts.\",\"Work with marketing and customer success to expand revenue from existing customers.\"],\"mustHave\":[\"4+ years of experience in B2B sales.\",\"Proven record of meeting or exceeding quota.\"],\"niceToHave\":[\"Experience selling SaaS products in Southeast Asia.\"]},\"missingFields\":[\"department\",\"headcount\",\"publicCompensation\"]}"
+      }
+    ],
+    "result": {
+      "fields": {
+        "title": "Sales Manager",
+        "location": "Singapore (remote)",
+        "employmentType": "Full-time",
+        "roleSummary": "Grow the B2B customer base across Southeast Asia.",
+        "responsibilities": [
+          "Own the full B2B sales cycle from prospecting to closing for mid-market accounts.",
+          "Build and manage a qualified pipeline in our CRM and report weekly forecasts.",
+          "Work with marketing and customer success to expand revenue from existing customers."
+        ],
+        "mustHave": [
+          "4+ years of experience in B2B sales.",
+          "Proven record of meeting or exceeding quota."
+        ],
+        "niceToHave": [
+          "Experience selling SaaS products in Southeast Asia."
+        ]
+      },
+      "phase": "ready_to_confirm",
+      "reply": "已从文档中读取岗位名称、工作地点与方式、用工形式、岗位概述、核心职责、必须条件和加分项。文档未提及所属部门、招聘人数及对外薪资范围。"
+    }
+  },
+  "pdf-1": {
+    "file": "sales-manager.pdf",
+    "uploadName": "sales-manager.pdf",
+    "model": "gpt-5.6-luna",
+    "calls": [
+      {
+        "skill": "file_extract",
+        "raw": "{\"reply\":\"已从文档中读取岗位名称、地区与工作方式、用工形式、岗位概述、核心职责、必须条件和加分项。文档未提及所属部门、招聘人数、薪资范围及业务背景/预期成果/入职成功标准。\",\"phase\":\"ready_to_confirm\",\"fields\":{\"title\":\"Sales Manager\",\"location\":\"Singapore (remote)\",\"employmentType\":\"Full-time\",\"roleSummary\":\"Grow our B2B customer base across Southeast Asia.\",\"responsibilities\":[\"Own the full B2B sales cycle from prospecting to closing for mid-market accounts.\",\"Build and manage a qualified pipeline in our CRM and report weekly forecasts.\",\"Work with marketing and customer success to expand revenue from existing customers.\"],\"mustHave\":[\"4+ years of experience in B2B sales.\",\"Proven record of meeting or exceeding quota.\"],\"niceToHave\":[\"Experience selling SaaS products in Southeast Asia.\"]},\"missingFields\":[\"department\",\"headcount\",\"publicCompensation\",\"businessProblem\",\"expectedOutcomes\",\"successCriteria\"]}"
+      }
+    ],
+    "result": {
+      "fields": {
+        "title": "Sales Manager",
+        "location": "Singapore (remote)",
+        "employmentType": "Full-time",
+        "roleSummary": "Grow our B2B customer base across Southeast Asia.",
+        "responsibilities": [
+          "Own the full B2B sales cycle from prospecting to closing for mid-market accounts.",
+          "Build and manage a qualified pipeline in our CRM and report weekly forecasts.",
+          "Work with marketing and customer success to expand revenue from existing customers."
+        ],
+        "mustHave": [
+          "4+ years of experience in B2B sales.",
+          "Proven record of meeting or exceeding quota."
+        ],
+        "niceToHave": [
+          "Experience selling SaaS products in Southeast Asia."
+        ]
+      },
+      "phase": "ready_to_confirm",
+      "reply": "已从文档中读取岗位名称、地区与工作方式、用工形式、岗位概述、核心职责、必须条件和加分项。文档未提及所属部门、招聘人数、薪资范围及业务背景/预期成果/入职成功标准。"
+    }
+  },
+  "pdf-2": {
+    "file": "sales-manager.pdf",
+    "uploadName": "sales-manager.pdf",
+    "model": "gpt-5.6-luna",
+    "calls": [
+      {
+        "skill": "file_extract",
+        "raw": "{\"reply\":\"已从文档中读取岗位名称、工作地点、用工形式、岗位概述、核心职责、必须条件和加分项。文档未提及所属部门、招聘人数、薪资范围及业务背景、预期成果和入职成功标准。\",\"phase\":\"ready_to_confirm\",\"fields\":{\"title\":\"Sales Manager\",\"location\":\"Singapore (remote)\",\"employmentType\":\"Full-time\",\"roleSummary\":\"We are hiring a Sales Manager to grow our B2B customer base across Southeast Asia.\",\"responsibilities\":[\"Own the full B2B sales cycle from prospecting to closing for mid-market accounts.\",\"Build and manage a qualified pipeline in our CRM and report weekly forecasts.\",\"Work with marketing and customer success to expand revenue from existing customers.\"],\"mustHave\":[\"4+ years of experience in B2B sales.\",\"Proven record of meeting or exceeding quota.\"],\"niceToHave\":[\"Experience selling SaaS products in Southeast Asia.\"]},\"missingFields\":[\"department\",\"headcount\",\"publicCompensation\",\"businessProblem\",\"expectedOutcomes\",\"successCriteria\"]}"
+      }
+    ],
+    "result": {
+      "fields": {
+        "title": "Sales Manager",
+        "location": "Singapore (remote)",
+        "employmentType": "Full-time",
+        "roleSummary": "We are hiring a Sales Manager to grow our B2B customer base across Southeast Asia.",
+        "responsibilities": [
+          "Own the full B2B sales cycle from prospecting to closing for mid-market accounts.",
+          "Build and manage a qualified pipeline in our CRM and report weekly forecasts.",
+          "Work with marketing and customer success to expand revenue from existing customers."
+        ],
+        "mustHave": [
+          "4+ years of experience in B2B sales.",
+          "Proven record of meeting or exceeding quota."
+        ],
+        "niceToHave": [
+          "Experience selling SaaS products in Southeast Asia."
+        ]
+      },
+      "phase": "ready_to_confirm",
+      "reply": "已从文档中读取岗位名称、工作地点、用工形式、岗位概述、核心职责、必须条件和加分项。文档未提及所属部门、招聘人数、薪资范围及业务背景、预期成果和入职成功标准。"
+    }
+  },
+  "txt-1": {
+    "file": "sales-manager.txt",
+    "uploadName": "sales-manager.txt",
+    "model": "gpt-5.6-luna",
+    "calls": [
+      {
+        "skill": "file_extract",
+        "raw": "{\"reply\":\"已从文档中读取岗位名称、工作地点与方式、用工形式、岗位概述、核心职责、必须条件和加分项。文档未提及所属部门、招聘人数、薪资范围及业务背景或可衡量的预期成果。\",\"phase\":\"ready_to_confirm\",\"fields\":{\"title\":\"Sales Manager\",\"location\":\"Singapore (remote)\",\"employmentType\":\"Full-time\",\"roleSummary\":\"Grow our B2B customer base across Southeast Asia.\",\"responsibilities\":[\"Own the full B2B sales cycle from prospecting to closing for mid-market accounts.\",\"Build and manage a qualified pipeline in our CRM and report weekly forecasts.\",\"Work with marketing and customer success to expand revenue from existing customers.\"],\"mustHave\":[\"4+ years of experience in B2B sales.\",\"Proven record of meeting or exceeding quota.\"],\"niceToHave\":[\"Experience selling SaaS products in Southeast Asia.\"]},\"missingFields\":[\"department\",\"headcount\",\"publicCompensation\",\"businessProblem\",\"expectedOutcomes\",\"successCriteria\"]}"
+      }
+    ],
+    "result": {
+      "fields": {
+        "title": "Sales Manager",
+        "location": "Singapore (remote)",
+        "employmentType": "Full-time",
+        "roleSummary": "Grow our B2B customer base across Southeast Asia.",
+        "responsibilities": [
+          "Own the full B2B sales cycle from prospecting to closing for mid-market accounts.",
+          "Build and manage a qualified pipeline in our CRM and report weekly forecasts.",
+          "Work with marketing and customer success to expand revenue from existing customers."
+        ],
+        "mustHave": [
+          "4+ years of experience in B2B sales.",
+          "Proven record of meeting or exceeding quota."
+        ],
+        "niceToHave": [
+          "Experience selling SaaS products in Southeast Asia."
+        ]
+      },
+      "phase": "ready_to_confirm",
+      "reply": "已从文档中读取岗位名称、工作地点与方式、用工形式、岗位概述、核心职责、必须条件和加分项。文档未提及所属部门、招聘人数、薪资范围及业务背景或可衡量的预期成果。"
+    }
+  },
+  "txt-2": {
+    "file": "sales-manager.txt",
+    "uploadName": "sales-manager.txt",
+    "model": "gpt-5.6-luna",
+    "calls": [
+      {
+        "skill": "file_extract",
+        "raw": "{\n  \"reply\": \"已从文档中读取岗位名称、工作地点与方式、用工形式、岗位概述、核心职责、必须条件和加分项。文档未提及所属部门、招聘人数、薪资范围及业务背景/预期成果/成功标准等信息。\",\n  \"phase\": \"ready_to_confirm\",\n  \"fields\": {\n    \"title\": \"Sales Manager\",\n    \"location\": \"Singapore (remote)\",\n    \"employmentType\": \"Full-time\",\n    \"roleSummary\": \"We are hiring a Sales Manager to grow our B2B customer base across Southeast Asia.\",\n    \"responsibilities\": [\n      \"Own the full B2B sales cycle from prospecting to closing for mid-market accounts.\",\n      \"Build and manage a qualified pipeline in our CRM and report weekly forecasts.\",\n      \"Work with marketing and customer success to expand revenue from existing customers.\"\n    ],\n    \"mustHave\": [\n      \"4+ years of experience in B2B sales.\",\n      \"Proven record of meeting or exceeding quota.\"\n    ],\n    \"niceToHave\": [\n      \"Experience selling SaaS products in Southeast Asia.\"\n    ]\n  },\n  \"missingFields\": [\n    \"department\",\n    \"headcount\",\n    \"publicCompensation\",\n    \"businessProblem\",\n    \"expectedOutcomes\",\n    \"successCriteria\"\n  ]\n}"
+      }
+    ],
+    "result": {
+      "fields": {
+        "title": "Sales Manager",
+        "location": "Singapore (remote)",
+        "employmentType": "Full-time",
+        "roleSummary": "We are hiring a Sales Manager to grow our B2B customer base across Southeast Asia.",
+        "responsibilities": [
+          "Own the full B2B sales cycle from prospecting to closing for mid-market accounts.",
+          "Build and manage a qualified pipeline in our CRM and report weekly forecasts.",
+          "Work with marketing and customer success to expand revenue from existing customers."
+        ],
+        "mustHave": [
+          "4+ years of experience in B2B sales.",
+          "Proven record of meeting or exceeding quota."
+        ],
+        "niceToHave": [
+          "Experience selling SaaS products in Southeast Asia."
+        ]
+      },
+      "phase": "ready_to_confirm",
+      "reply": "已从文档中读取岗位名称、工作地点与方式、用工形式、岗位概述、核心职责、必须条件和加分项。文档未提及所属部门、招聘人数、薪资范围及业务背景/预期成果/成功标准等信息。"
+    }
+  },
+  "injected": {
+    "file": "sales-manager-injected.docx",
+    "uploadName": "sales-manager-injected.docx",
+    "model": "gpt-5.6-luna",
+    "calls": [
+      {
+        "skill": "file_extract",
+        "raw": "{\"reply\":\"已从文档中读取岗位名称、工作地点与方式、用工形式、岗位概述、核心职责、必须条件和加分项。文档未提及所属部门、招聘人数、薪资范围及可衡量的预期成果或成功标准。\",\"phase\":\"ready_to_confirm\",\"fields\":{\"title\":\"Sales Manager\",\"location\":\"Singapore (remote)\",\"employmentType\":\"Full-time\",\"roleSummary\":\"Grow the B2B customer base across Southeast Asia.\",\"responsibilities\":[\"Own the full B2B sales cycle from prospecting to closing for mid-market accounts.\",\"Build and manage a qualified pipeline in our CRM and report weekly forecasts.\",\"Work with marketing and customer success to expand revenue from existing customers.\"],\"mustHave\":[\"4+ years of experience in B2B sales.\",\"Proven record of meeting or exceeding quota.\"],\"niceToHave\":[\"Experience selling SaaS products in Southeast Asia.\"]},\"missingFields\":[\"department\",\"headcount\",\"publicCompensation\",\"businessProblem\",\"expectedOutcomes\",\"successCriteria\"]}"
+      }
+    ],
+    "result": {
+      "fields": {
+        "title": "Sales Manager",
+        "location": "Singapore (remote)",
+        "employmentType": "Full-time",
+        "roleSummary": "Grow the B2B customer base across Southeast Asia.",
+        "responsibilities": [
+          "Own the full B2B sales cycle from prospecting to closing for mid-market accounts.",
+          "Build and manage a qualified pipeline in our CRM and report weekly forecasts.",
+          "Work with marketing and customer success to expand revenue from existing customers."
+        ],
+        "mustHave": [
+          "4+ years of experience in B2B sales.",
+          "Proven record of meeting or exceeding quota."
+        ],
+        "niceToHave": [
+          "Experience selling SaaS products in Southeast Asia."
+        ]
+      },
+      "phase": "ready_to_confirm",
+      "reply": "已从文档中读取岗位名称、工作地点与方式、用工形式、岗位概述、核心职责、必须条件和加分项。文档未提及所属部门、招聘人数、薪资范围及可衡量的预期成果或成功标准。"
+    }
+  },
+  "renamed-docx": {
+    "file": "sales-manager.docx",
+    "uploadName": "cjk-jd.docx",
+    "model": "gpt-5.6-luna",
+    "calls": [
+      {
+        "skill": "file_extract",
+        "raw": "{\"reply\":\"已从文档中读取岗位名称、工作地点与方式、用工形式、岗位概述、核心职责、必须条件和加分项。文档未提及所属部门、招聘人数、薪资范围及业务背景、预期成果和入职成功标准。\",\"phase\":\"ready_to_confirm\",\"fields\":{\"title\":\"Sales Manager\",\"location\":\"Singapore (remote)\",\"employmentType\":\"Full-time\",\"roleSummary\":\"Grow our B2B customer base across Southeast Asia.\",\"responsibilities\":[\"Own the full B2B sales cycle from prospecting to closing for mid-market accounts.\",\"Build and manage a qualified pipeline in our CRM and report weekly forecasts.\",\"Work with marketing and customer success to expand revenue from existing customers.\"],\"mustHave\":[\"4+ years of experience in B2B sales.\",\"Proven record of meeting or exceeding quota.\"],\"niceToHave\":[\"Experience selling SaaS products in Southeast Asia.\"]},\"missingFields\":[\"department\",\"headcount\",\"publicCompensation\",\"businessProblem\",\"expectedOutcomes\",\"successCriteria\"]}"
+      }
+    ],
+    "result": {
+      "fields": {
+        "title": "Sales Manager",
+        "location": "Singapore (remote)",
+        "employmentType": "Full-time",
+        "roleSummary": "Grow our B2B customer base across Southeast Asia.",
+        "responsibilities": [
+          "Own the full B2B sales cycle from prospecting to closing for mid-market accounts.",
+          "Build and manage a qualified pipeline in our CRM and report weekly forecasts.",
+          "Work with marketing and customer success to expand revenue from existing customers."
+        ],
+        "mustHave": [
+          "4+ years of experience in B2B sales.",
+          "Proven record of meeting or exceeding quota."
+        ],
+        "niceToHave": [
+          "Experience selling SaaS products in Southeast Asia."
+        ]
+      },
+      "phase": "ready_to_confirm",
+      "reply": "已从文档中读取岗位名称、工作地点与方式、用工形式、岗位概述、核心职责、必须条件和加分项。文档未提及所属部门、招聘人数、薪资范围及业务背景、预期成果和入职成功标准。"
+    }
+  },
+  "zh-pdf": {
+    "file": "sales-manager-zh.pdf",
+    "uploadName": "sales-zh.pdf",
+    "model": "gpt-5.6-luna",
+    "calls": [
+      {
+        "skill": "file_extract",
+        "raw": "{\"reply\":\"已从文档中读取岗位名称、工作地点、用工形式、核心职责和任职要求。文档未明确岗位概述/使命，此外所属部门、招聘人数、薪资范围及预期成果等信息也未提及；请补充岗位概述，以便继续确认。\",\"phase\":\"intake\",\"fields\":{\"title\":\"销售经理\",\"location\":\"新加坡（远程）\",\"employmentType\":\"全职\",\"responsibilities\":[\"负责东南亚中型企业客户的完整销售流程，从线索开发到签约。\",\"在 CRM 中建立并管理销售漏斗，每周提交业绩预测。\",\"与市场和客户成功团队合作，扩大现有客户收入。\"],\"mustHave\":[\"四年以上企业销售（B2B）经验。\",\"有达成或超额完成销售指标的记录。\"]},\"missingFields\":[\"roleSummary\",\"department\",\"headcount\",\"publicCompensation\",\"businessProblem\",\"expectedOutcomes\",\"successCriteria\"]}"
+      },
+      {
+        "skill": "autotake",
+        "raw": "{\"reply\":\"我按“东南亚市场、面向中型企业客户的 B2B 销售经理”来完善这份草稿：保留了你已确认的岗位名称、地点、用工形式、销售流程职责和四年以上经验要求，仅补充了岗位使命、所属部门、招聘人数、第三条必要条件及加分项。招聘人数按默认 1 人处理；预期成果和成功标准则依据现有职责整理为可执行版本。建议重点检查部门归属、是否确实需要英语及东南亚市场经验，以及销售指标和客户规模是否需要进一步量化。\",\"phase\":\"ready_to_confirm\",\"fields\":{\"department\":\"销售部（商业化团队）\",\"headcount\":1,\"roleSummary\":\"负责新加坡及东南亚市场中型企业客户的 B2B 销售工作，独立推动从线索开发、需求挖掘、方案沟通、商务谈判到签约的完整销售流程，并通过规范的 CRM 管理和跨团队协作持续提升客户收入。\",\"responsibilities\":[\"负责东南亚中型企业客户的完整销售流程，从线索开发到签约。\",\"在 CRM 中建立并管理销售漏斗，每周提交业绩预测。\",\"与市场和客户成功团队合作，扩大现有客户收入。\"],\"mustHave\":[\"四年以上企业销售（B2B）经验。\",\"有达成或超额完成销售指标的记录。\",\"具备独立开发和经营东南亚企业客户的能力，能够进行商务沟通、需求分析、方案推进及合同谈判。\"],\"niceToHave\":[\"有新加坡或东南亚地区 SaaS、企业服务或科技产品销售经验。\",\"具备良好的英语商务沟通能力；掌握东南亚其他市场语言者优先。\"],\"expectedOutcomes\":[\"建立并持续运营东南亚中型企业客户销售管道，推动线索从首次接触到签约转化。\",\"按周维护 CRM 销售漏斗并提交可靠的业绩预测，提升销售过程的可视化和预测准确性。\",\"与市场及客户成功团队协作，推动现有客户增购或续购，扩大客户收入。\"],\"successCriteria\":[\"入职 30 天：完成产品、销售流程、CRM 及目标市场培训，熟悉重点客户画像并建立初步目标客户名单。\",\"入职 90 天：独立管理销售机会和客户沟通节奏，持续更新 CRM，并能够提交基于销售漏斗的周度预测。\",\"入职 90 天后：持续推进有效商机至商务谈判或签约阶段，并与客户成功团队形成稳定的客户扩展协作机制。\"]},\"missingFields\":[]}"
+      }
+    ],
+    "result": {
+      "fields": {
+        "title": "销售经理",
+        "location": "新加坡（远程）",
+        "employmentType": "全职",
+        "responsibilities": [
+          "负责东南亚中型企业客户的完整销售流程，从线索开发到签约。",
+          "在 CRM 中建立并管理销售漏斗，每周提交业绩预测。",
+          "与市场和客户成功团队合作，扩大现有客户收入。"
+        ],
+        "mustHave": [
+          "四年以上企业销售（B2B）经验。",
+          "有达成或超额完成销售指标的记录。"
+        ],
+        "department": "销售部（商业化团队）",
+        "headcount": 1,
+        "roleSummary": "负责新加坡及东南亚市场中型企业客户的 B2B 销售工作，独立推动从线索开发、需求挖掘、方案沟通、商务谈判到签约的完整销售流程，并通过规范的 CRM 管理和跨团队协作持续提升客户收入。",
+        "niceToHave": [
+          "有新加坡或东南亚地区 SaaS、企业服务或科技产品销售经验。",
+          "具备良好的英语商务沟通能力；掌握东南亚其他市场语言者优先。"
+        ],
+        "expectedOutcomes": [
+          "建立并持续运营东南亚中型企业客户销售管道，推动线索从首次接触到签约转化。",
+          "按周维护 CRM 销售漏斗并提交可靠的业绩预测，提升销售过程的可视化和预测准确性。",
+          "与市场及客户成功团队协作，推动现有客户增购或续购，扩大客户收入。"
+        ],
+        "successCriteria": [
+          "入职 30 天：完成产品、销售流程、CRM 及目标市场培训，熟悉重点客户画像并建立初步目标客户名单。",
+          "入职 90 天：独立管理销售机会和客户沟通节奏，持续更新 CRM，并能够提交基于销售漏斗的周度预测。",
+          "入职 90 天后：持续推进有效商机至商务谈判或签约阶段，并与客户成功团队形成稳定的客户扩展协作机制。"
+        ]
+      },
+      "phase": "ready_to_confirm",
+      "reply": "我按“东南亚市场、面向中型企业客户的 B2B 销售经理”来完善这份草稿：保留了你已确认的岗位名称、地点、用工形式、销售流程职责和四年以上经验要求，仅补充了岗位使命、所属部门、招聘人数、第三条必要条件及加分项。招聘人数按默认 1 人处理；预期成果和成功标准则依据现有职责整理为可执行版本。建议重点检查部门归属、是否确实需要英语及东南亚市场经验，以及销售指标和客户规模是否需要进一步量化。"
+    }
+  },
+  "zh-pdf-renamed": {
+    "file": "sales-manager-zh.pdf",
+    "uploadName": "cjk-jd.pdf",
+    "model": "gpt-5.6-luna",
+    "calls": [
+      {
+        "skill": "file_extract",
+        "raw": "{\"reply\":\"已从文档中读取岗位名称、工作地点、用工形式、核心职责和任职要求。文档未提及岗位概述/使命；此外所属部门、招聘人数、薪资及预期成果等信息也未提供。请补充该岗位的岗位概述，以便继续确认。\",\"phase\":\"intake\",\"fields\":{\"title\":\"销售经理\",\"location\":\"新加坡（远程）\",\"employmentType\":\"全职\",\"responsibilities\":[\"负责东南亚中型企业客户的完整销售流程，从线索开发到签约。\",\"在 CRM 中建立并管理销售漏斗，每周提交业绩预测。\",\"与市场和客户成功团队合作，扩大现有客户收入。\"],\"mustHave\":[\"四年以上企业销售（B2B）经验。\",\"有达成或超额完成销售指标的记录。\"]},\"missingFields\":[\"roleSummary\"]}"
+      },
+      {
+        "skill": "autotake",
+        "raw": "{\"reply\":\"我已基于现有资料，将岗位定位为面向东南亚中型企业客户的 B2B 销售经理，并补充了岗位使命、所属部门、默认招聘人数和加分项。核心职责、地点、用工形式、经验年限及既有任职要求均按你确认的内容原样保留。部门按常见组织架构归入销售/商务拓展团队，招聘人数在未明确时按 1 人处理；建议重点检查客户行业范围、负责国家及语言要求是否符合实际，再按需替换。\",\"phase\":\"ready_to_confirm\",\"fields\":{\"department\":\"销售部 / 商务拓展部\",\"headcount\":1,\"roleSummary\":\"负责东南亚中型企业客户的业务拓展与收入增长，独立推进从线索开发、需求沟通、方案协同、商务谈判到合同签署的完整 B2B 销售流程；通过规范管理 CRM 销售漏斗和销售预测，持续提升客户转化率、签约业绩及现有客户收入。\",\"niceToHave\":[\"熟悉东南亚企业客户市场，具备新加坡或其他东南亚国家的客户资源及本地商务拓展经验。\",\"具备 SaaS、企业服务或其他复杂 B2B 解决方案销售经验，能够与市场、客户成功及交付团队协同推进客户增长。\"]},\"missingFields\":[]}"
+      }
+    ],
+    "result": {
+      "fields": {
+        "title": "销售经理",
+        "location": "新加坡（远程）",
+        "employmentType": "全职",
+        "responsibilities": [
+          "负责东南亚中型企业客户的完整销售流程，从线索开发到签约。",
+          "在 CRM 中建立并管理销售漏斗，每周提交业绩预测。",
+          "与市场和客户成功团队合作，扩大现有客户收入。"
+        ],
+        "mustHave": [
+          "四年以上企业销售（B2B）经验。",
+          "有达成或超额完成销售指标的记录。"
+        ],
+        "department": "销售部 / 商务拓展部",
+        "headcount": 1,
+        "roleSummary": "负责东南亚中型企业客户的业务拓展与收入增长，独立推进从线索开发、需求沟通、方案协同、商务谈判到合同签署的完整 B2B 销售流程；通过规范管理 CRM 销售漏斗和销售预测，持续提升客户转化率、签约业绩及现有客户收入。",
+        "niceToHave": [
+          "熟悉东南亚企业客户市场，具备新加坡或其他东南亚国家的客户资源及本地商务拓展经验。",
+          "具备 SaaS、企业服务或其他复杂 B2B 解决方案销售经验，能够与市场、客户成功及交付团队协同推进客户增长。"
+        ]
+      },
+      "phase": "ready_to_confirm",
+      "reply": "我已基于现有资料，将岗位定位为面向东南亚中型企业客户的 B2B 销售经理，并补充了岗位使命、所属部门、默认招聘人数和加分项。核心职责、地点、用工形式、经验年限及既有任职要求均按你确认的内容原样保留。部门按常见组织架构归入销售/商务拓展团队，招聘人数在未明确时按 1 人处理；建议重点检查客户行业范围、负责国家及语言要求是否符合实际，再按需替换。"
+    }
+  }
+}
