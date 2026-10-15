@@ -114,4 +114,19 @@ describe('Quick Start', () => {
     expect(await screen.findByText(/What’s the job title\?/)).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /Create job from this draft/ })).toBeNull();
   });
+
+  it('#65 review: reopening a Quick Start from History resumes it — the next answer still goes through Quick Start', async () => {
+    api.listCopilotConversations.mockResolvedValue([conv({ id: 'conv-9', fields: { title: 'Growth' }, updatedAt: new Date().toISOString() })] as never);
+    api.getCopilotConversation.mockResolvedValue(
+      conv({ id: 'conv-9', quickStartOpen: true, messages: [{ id: 'm1', role: 'assistant', text: 'Please answer: What hard skills must the candidate have?', sequence: 2, createdAt: '' }] }),
+    );
+    api.quickStartCopilotConversation.mockResolvedValue(reply('Thanks'));
+    renderPanel();
+    fireEvent.click(await screen.findByRole('button', { name: 'Conversation history' }));
+    fireEvent.click(await screen.findByText('Growth'));
+    await screen.findByText(/What hard skills must the candidate have\?/);
+    send('Performance marketing, SQL');
+    await waitFor(() => expect(api.quickStartCopilotConversation).toHaveBeenCalledWith('conv-9', 'Performance marketing, SQL'));
+    expect(api.streamCopilotMessage).not.toHaveBeenCalled();
+  });
 });

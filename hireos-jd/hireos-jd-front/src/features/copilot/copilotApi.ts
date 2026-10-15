@@ -77,6 +77,8 @@ export interface CopilotConversationDto {
   createdAt: string;
   updatedAt: string;
   messages: CopilotMessageDto[];
+  /** Returned when opening a conversation: a Quick Start is still collecting answers there (#65). */
+  quickStartOpen?: boolean;
 }
 
 async function request<T>(path: string, init: RequestInit & { idempotencyKey: string }): Promise<T> {

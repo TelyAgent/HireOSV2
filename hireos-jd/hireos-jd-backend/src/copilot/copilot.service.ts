@@ -108,7 +108,11 @@ export class CopilotService {
   async getConversation(identity: Identity, id: string) {
     const conversation = await this.loadConversation(identity, id);
     const messages = await this.db.copilotMessage.findMany({ where: { conversationId: id }, orderBy: { sequence: 'asc' } });
-    return serializeConversation(conversation, messages);
+    // A Quick Start still collecting answers: a reopened conversation resumes it instead of plain chat (#65).
+    const quickStartOpen =
+      conversation.phase === 'intake' &&
+      (await this.pendingQuickStartAnswers(identity, id, `copilot.quick-start:${id}`)).length > 0;
+    return { ...serializeConversation(conversation, messages), quickStartOpen };
   }
 
   async sendMessage(identity: Identity, id: string, raw: unknown, meta: RequestMeta) {
@@ -166,22 +170,24 @@ export class CopilotService {
 
   /**
    * `pending`: confirmations still owed on a complete draft (e.g. TITLE_UNCONFIRMED); they don't change the
-   * phase. `phase`: forces the phase — a Quick Start follow-up question keeps the conversation collecting
-   * even when an earlier draft is complete.
+   * phase. Left out, the conversation keeps the ones it already has — only the user confirming the title
+   * (`setFields`) clears it, never an AI turn such as auto-complete (#66). `phase`: forces the phase — a
+   * Quick Start follow-up question keeps the conversation collecting even when an earlier draft is complete.
    */
   private async commitTurn(
     identity: Identity,
     id: string,
     prep: Extract<TurnPrep, { cached: null }>,
     parsed: LlmTurnResult,
-    pending: string[] = [],
+    pending?: string[],
     forcePhase?: 'intake',
   ): Promise<SerializedConversation> {
     const { operation, key, hash, userMessage, capabilityCode, currentFields } = prep;
     const mergedFields: JdFields = { ...currentFields, ...parsed.fields };
     const computed = computeMissingFields(mergedFields);
     const phase = forcePhase ?? (computed.length === 0 ? 'ready_to_confirm' : 'intake');
-    const missingFields = [...computed, ...pending];
+    const kept = pending ?? pendingConfirmations(await this.loadConversation(identity, id));
+    const missingFields = [...computed, ...kept];
 
     try {
       return await this.db.$transaction(async (tx) => {

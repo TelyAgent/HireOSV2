@@ -772,7 +772,8 @@ export function GeminiPanel({ ctx }: { ctx: GeminiCtx }) {
       mutate((draft) => {
         draft.geminiConversationIds = { ...draft.geminiConversationIds, [key]: conversation.id };
         draft.geminiChats = { ...draft.geminiChats, [key]: conversationToGeminiMsgs(conversation) };
-        draft.geminiCreatePaths = { ...draft.geminiCreatePaths, [key]: "home" };
+        // A Quick Start still collecting answers resumes, so the next answer goes through its three-question check.
+        draft.geminiCreatePaths = { ...draft.geminiCreatePaths, [key]: conversation.quickStartOpen ? "questions" : "home" };
       });
       setHistoryOpen(false);
       setInput("");

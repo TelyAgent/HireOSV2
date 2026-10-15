@@ -158,3 +158,19 @@ test('#65 review: a follow-up on a conversation with a complete draft keeps "int
   assert.deepEqual(res.missingFields.filter((f) => f === TITLE_UNCONFIRMED), [TITLE_UNCONFIRMED]);
   await assert.rejects(svc.confirmDraft(identity, 'c1', meta()), (e) => e.getResponse().code === 'CONVERSATION_NOT_READY');
 });
+
+test('#66 review: auto-complete on a draft with an AI-suggested title keeps it unconfirmed — only the user clears it', async () => {
+  const { svc, db } = service({ answered: [true, true, true], title: 'Vietnam Growth Manager', titleFromUser: false });
+  await svc.quickStart(identity, 'c1', { answers: 'No one owns growth\nBuild a growth process\nSQL' }, meta());
+  assert.deepEqual(db.conv.missingFields, [TITLE_UNCONFIRMED]);
+  await svc.autoComplete(identity, 'c1', {}, meta());
+  assert.deepEqual(db.conv.missingFields, [TITLE_UNCONFIRMED]);
+  await assert.rejects(svc.confirmDraft(identity, 'c1', meta()), (e) => e.getResponse().code === 'TITLE_UNCONFIRMED');
+});
+
+test('#65 review: opening a conversation tells whether a Quick Start is still collecting answers', async () => {
+  const { svc } = service({ answered: [true, true, false], title: 'X', titleFromUser: false });
+  assert.equal((await svc.getConversation(identity, 'c1')).quickStartOpen, false);
+  await svc.quickStart(identity, 'c1', { answers: 'No one owns growth\nBuild a growth process' }, meta());
+  assert.equal((await svc.getConversation(identity, 'c1')).quickStartOpen, true);
+});
