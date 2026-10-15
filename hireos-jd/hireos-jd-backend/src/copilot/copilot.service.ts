@@ -164,18 +164,23 @@ export class CopilotService {
     };
   }
 
-  /** `pending`: confirmations still owed on a complete draft (e.g. TITLE_UNCONFIRMED); they don't change the phase. */
+  /**
+   * `pending`: confirmations still owed on a complete draft (e.g. TITLE_UNCONFIRMED); they don't change the
+   * phase. `phase`: forces the phase — a Quick Start follow-up question keeps the conversation collecting
+   * even when an earlier draft is complete.
+   */
   private async commitTurn(
     identity: Identity,
     id: string,
     prep: Extract<TurnPrep, { cached: null }>,
     parsed: LlmTurnResult,
     pending: string[] = [],
+    forcePhase?: 'intake',
   ): Promise<SerializedConversation> {
     const { operation, key, hash, userMessage, capabilityCode, currentFields } = prep;
     const mergedFields: JdFields = { ...currentFields, ...parsed.fields };
     const computed = computeMissingFields(mergedFields);
-    const phase = computed.length === 0 ? 'ready_to_confirm' : 'intake';
+    const phase = forcePhase ?? (computed.length === 0 ? 'ready_to_confirm' : 'intake');
     const missingFields = [...computed, ...pending];
 
     try {
@@ -672,9 +677,11 @@ export class CopilotService {
       return existing.responseBody;
     }
 
-    const assessment = tooThinToAssess(input.answers)
+    // The answers so far live in the conversation, not the browser: a closed panel or a reload loses nothing.
+    const answers = [...(await this.pendingQuickStartAnswers(identity, id, operation)), input.answers].join('\n');
+    const assessment = tooThinToAssess(answers)
       ? { answered: [false, false, false] as [boolean, boolean, boolean], title: null, titleFromUser: false }
-      : await this.assessQuickStart(identity, id, input.answers);
+      : await this.assessQuickStart(identity, id, answers);
     const currentFields = asRecord(conversation.fields) as JdFields;
     const prep = (capabilityCode: string, turns: ChatTurn[]): Extract<TurnPrep, { cached: null }> => ({
       cached: null,
@@ -687,10 +694,18 @@ export class CopilotService {
       currentFields,
     });
 
-    const ask = followUp(assessment, input.answers);
+    const ask = followUp(assessment, answers);
     if (ask) {
-      // Nothing to draft yet: keep collecting, no fields written, no draft shown.
-      return this.commitTurn(identity, id, prep('jd_quick_start_follow_up', []), { reply: ask, phase: 'intake', fields: {}, missingFields: [] });
+      // Nothing to draft yet: keep collecting — no fields written, the phase stays "intake" even if an earlier
+      // draft was complete, and a pending title confirmation is kept.
+      return this.commitTurn(
+        identity,
+        id,
+        prep('jd_quick_start_follow_up', []),
+        { reply: ask, phase: 'intake', fields: {}, missingFields: [] },
+        pendingConfirmations(conversation),
+        'intake',
+      );
     }
 
     const brief = [
@@ -698,7 +713,7 @@ export class CopilotService {
       '1. 遇到了什么困难想招人；2. 希望候选人解决什么问题；3. 候选人必须具备哪些硬技能。',
       '',
       '我的回答：',
-      input.answers,
+      answers,
       '',
       assessment.titleFromUser ? `职位名称（用户给出）：${assessment.title}` : `职位名称（AI 根据回答建议，待用户确认）：${assessment.title}`,
     ].join('\n');
@@ -706,6 +721,25 @@ export class CopilotService {
     const parsed = await this.runAutoCompleteTurn(identity, id, turns);
     const result: LlmTurnResult = { ...parsed, fields: { ...parsed.fields, title: assessment.title! } };
     return this.commitTurn(identity, id, prep('jd_autotake_turn', turns), result, assessment.titleFromUser ? [] : [TITLE_UNCONFIRMED]);
+  }
+
+  /**
+   * The answers already sent in this Quick Start: the user messages of the trailing quick-start turns that
+   * only asked a follow-up (the run since the last draft), oldest first.
+   */
+  private async pendingQuickStartAnswers(identity: Identity, id: string, operation: string): Promise<string[]> {
+    const runs = await this.db.idempotencyKey.findMany({ where: { workspaceId: identity.workspaceId, operation }, orderBy: { createdAt: 'asc' } });
+    const keys: string[] = [];
+    for (let i = runs.length - 1; i >= 0; i--) {
+      if (asRecord(runs[i].responseBody).phase !== 'intake') break;
+      keys.push(runs[i].key);
+    }
+    if (!keys.length) return [];
+    const messages = await this.db.copilotMessage.findMany({
+      where: { conversationId: id, role: 'user', idempotencyKey: { in: keys } },
+      orderBy: { sequence: 'asc' },
+    });
+    return messages.map((m) => m.text ?? '').filter(Boolean);
   }
 
   private async assessQuickStart(identity: Identity, id: string, answers: string) {

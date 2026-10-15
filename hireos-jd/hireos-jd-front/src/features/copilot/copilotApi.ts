@@ -229,8 +229,9 @@ export function autoCompleteCopilotConversation(conversationId: string, text?: s
 }
 
 /**
- * Quick Start (#65 #66): everything answered so far. The backend drafts only once all three questions have a
- * real answer and a job title can be suggested; otherwise it replies asking for what's missing.
+ * Quick Start (#65 #66): one more message of answers; the backend adds it to the ones already sent in this
+ * conversation. It drafts only once all three questions have a real answer and a job title can be suggested;
+ * otherwise it replies asking for what's missing.
  */
 export function quickStartCopilotConversation(conversationId: string, answers: string): Promise<CopilotConversationDto> {
   return request(`${BASE}/${conversationId}/quick-start`, {

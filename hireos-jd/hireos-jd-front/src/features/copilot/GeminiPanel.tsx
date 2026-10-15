@@ -494,24 +494,17 @@ export function GeminiPanel({ ctx }: { ctx: GeminiCtx }) {
   };
 
   /** Quick Start: the three answers go to auto-complete in one turn, which writes the whole JD. */
-  /** Quick Start answers sent so far in this conversation; a follow-up answer adds to them (#65). */
-  const quickStartAnswers = useRef("");
+  /** Quick Start (#65): the backend keeps the answers so far; each message adds to them. */
   const runQuickStart = async (text: string) => {
-    const answers = quickStartAnswers.current ? `${quickStartAnswers.current}\n${text}` : text;
     const retry: GeminiRequestRetry = { action: "questions", text };
     setBusy(true);
     push({ role: "thinking" });
     try {
       const conversationId = await ensureConversation();
-      const result = await quickStartCopilotConversation(conversationId, answers);
-      resolveThinking(resultToMsg(result, { path: "questions", detail: answers }));
+      const result = await quickStartCopilotConversation(conversationId, text);
+      resolveThinking(resultToMsg(result, { path: "questions", detail: text }));
       // Still collecting: stay on Quick Start so the next message answers what was asked.
-      if (result.phase === "ready_to_confirm") {
-        quickStartAnswers.current = "";
-        setPath("home");
-      } else {
-        quickStartAnswers.current = answers;
-      }
+      if (result.phase === "ready_to_confirm") setPath("home");
     } catch (error) {
       failRequest(error, retry);
     } finally {
@@ -658,7 +651,6 @@ export function GeminiPanel({ ctx }: { ctx: GeminiCtx }) {
     if (p.key === "upload") attachFileInputRef.current?.click();
     setPath(p.key);
     setComposerHint("");
-    quickStartAnswers.current = "";
     push({ role: "user", text: t(p.title) });
     if (p.key === "questions") {
       push({
@@ -719,7 +711,6 @@ export function GeminiPanel({ ctx }: { ctx: GeminiCtx }) {
     if (working) return;
     setHistoryOpen(false);
     pendingConversationKeyRef.current = null;
-    quickStartAnswers.current = "";
     mutate((draft) => {
       const ids = { ...draft.geminiConversationIds };
       delete ids[key];
@@ -785,7 +776,6 @@ export function GeminiPanel({ ctx }: { ctx: GeminiCtx }) {
       });
       setHistoryOpen(false);
       setInput("");
-      quickStartAnswers.current = "";
     } catch (error) {
       setHistoryError(errorText(error));
     }

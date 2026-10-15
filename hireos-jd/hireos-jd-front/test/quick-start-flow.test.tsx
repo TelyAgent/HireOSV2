@@ -61,7 +61,7 @@ beforeEach(() => {
 afterEach(cleanup);
 
 describe('Quick Start', () => {
-  it('#65 AC-1: a follow-up question shows no draft; the next answer is sent together with the earlier ones', async () => {
+  it('#65 AC-1: a follow-up question shows no draft; the next answer is sent on its own (the backend keeps the earlier ones)', async () => {
     api.quickStartCopilotConversation
       .mockResolvedValueOnce(reply('One more thing before I write the JD — please answer:\n1. What hard skills must the candidate have?'))
       .mockResolvedValueOnce(conv({ phase: 'ready_to_confirm', fields: FIELDS, missingFields: ['title_unconfirmed'] }));
@@ -74,9 +74,10 @@ describe('Quick Start', () => {
 
     send('Performance marketing, SQL');
     await screen.findByRole('button', { name: /Create job from this draft/ });
-    expect(api.quickStartCopilotConversation.mock.calls[1][1]).toBe(
-      'We have nobody owning growth in Vietnam\nBuild a repeatable local growth process\nPerformance marketing, SQL',
-    );
+    expect(api.quickStartCopilotConversation.mock.calls.map((c) => c[1])).toEqual([
+      'We have nobody owning growth in Vietnam\nBuild a repeatable local growth process',
+      'Performance marketing, SQL',
+    ]);
   });
 
   it('#66 AC-1/AC-2: an AI-suggested title is highlighted and Create stays disabled until it is confirmed or edited', async () => {
