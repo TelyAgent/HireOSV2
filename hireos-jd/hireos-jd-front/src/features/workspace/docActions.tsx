@@ -139,7 +139,40 @@ export function useDocActions(jobId: string) {
     };
 
     /** AI draft for a missing (or suggested) section: replaces its empty blocks / creates the section. */
-    const aiDraft = async (item: ReqItem, undo = true) => {
+    /** Opens the before / after review of one AI change; nothing is written unless the user keeps it (#94). */
+    const showPreview = (label: string, before: string[], after: string[], toConfirm: string[], apply: () => void, done: string) =>
+      openModal(
+        <AiChangePreview
+          label={label}
+          before={before}
+          after={after}
+          toConfirm={toConfirm}
+          onKeep={() => {
+            apply();
+            // The rule check recomputes on its own; a past AI Analyze is run again on the kept text (M6).
+            mutate((draft) => {
+              // Also when the first analysis is still running: its result would describe the old text.
+              if (draft.wsAiAnalysis[jobId] || draft.wsAiBusy[`${jobId}:analyze`]) draft.wsReanalyze = { jobId, n: (draft.wsReanalyze?.n ?? 0) + 1 };
+            });
+            say(`${t(done)} “${t(label)}” — ${t("you can undo it.")}`, { type: "success" });
+          }}
+        />,
+      );
+
+    /** What the AI wanted to add without a source goes to the Copilot thread for a person to decide (#95). */
+    const noteToConfirm = (label: string, toConfirm: string[]) => {
+      if (!toConfirm.length) return;
+      pushThreadMsg(
+        "text",
+        [`${t("Not written into the JD — no source in this job's data. Confirm before adding")} (${t(label)}):`, ...toConfirm.map((x) => `- ${x}`)].join("\n"),
+      );
+    };
+
+    /**
+     * `preview`: show the result for the user to keep or reject before anything changes (#94); the batch
+     * passes false and writes directly (its blocks stay marked as AI drafts to review).
+     */
+    const aiDraft = async (item: ReqItem, undo = true, preview = false) => {
       if (!item.heading || item.noAi || state.wsAiBusy[`${jobId}:${item.id}`]) return false;
       const blocks = selectDraft(state, jobId).blocks;
       setBusy(item.id, true);
@@ -155,20 +188,24 @@ export function useDocActions(jobId: string) {
         });
         const kind = item.list ? "ul" : "p";
         const level = item.level ?? "internal";
-        const fresh = res.items.map((text) => ({ ...mkBlock(uid("nb"), kind, kind === "ul" ? [text] : text, { level }), aiDraft: true }));
-        applyAi(
-          item.label,
-          (doc) => {
-            const { sec } = findSection(groupSections(doc.blocks), item, doc.blocks);
-            if (!sec) return insertSectionOrdered(doc, item, fresh);
-            const empty = new Set(sec.blocks.filter((b) => !isFilled(blockPlainText(b).trim())).map((b) => b.id));
-            doc.blocks = doc.blocks.filter((b) => !empty.has(b.id));
-            const last = sec.blocks.filter((b) => !empty.has(b.id)).pop() ?? sec.head;
-            const at = last ? doc.blocks.findIndex((b) => b.id === last.id) + 1 : 0;
-            doc.blocks.splice(at, 0, ...fresh);
-          },
-          undo,
-        );
+        const fresh = res.items.map((text) => ({ ...mkBlock(uid("nb"), kind, kind === "ul" ? [text] : text, { level }), aiDraft: !preview }));
+        const apply = () =>
+          applyAi(
+            item.label,
+            (doc) => {
+              const { sec } = findSection(groupSections(doc.blocks), item, doc.blocks);
+              if (!sec) return insertSectionOrdered(doc, item, fresh);
+              const empty = new Set(sec.blocks.filter((b) => !isFilled(blockPlainText(b).trim())).map((b) => b.id));
+              doc.blocks = doc.blocks.filter((b) => !empty.has(b.id));
+              const last = sec.blocks.filter((b) => !empty.has(b.id)).pop() ?? sec.head;
+              const at = last ? doc.blocks.findIndex((b) => b.id === last.id) + 1 : 0;
+              doc.blocks.splice(at, 0, ...fresh);
+            },
+            undo,
+          );
+        if (preview) return void showPreview(item.label, [], res.items, res.toConfirm ?? [], apply, "Copilot drafted");
+        apply();
+        noteToConfirm(item.label, res.toConfirm ?? []);
         return true;
       } catch (error) {
         say(error instanceof Error ? error.message : t("Copilot couldn’t complete this. Please try again."), { type: "error" });
@@ -179,13 +216,13 @@ export function useDocActions(jobId: string) {
     };
 
     /** AI fix for a section that fails a "Needs revision" rule: rewrites its content in place. */
-    const aiFix = async (row: ReqRow, undo = true) => {
+    const aiFix = async (row: ReqRow, undo = true, preview = false) => {
       const item = row.item;
       if (!item.heading || item.noAi || state.wsAiBusy[`${jobId}:${item.id}`]) return false;
       const blocks = selectDraft(state, jobId).blocks;
       const { sec } = findSection(groupSections(blocks), item, blocks);
       const current = filledBlocks(sec, item);
-      if (!current.length) return aiDraft(item, undo);
+      if (!current.length) return aiDraft(item, undo, preview);
       setBusy(item.id, true);
       try {
         const res = await aiSection(jobId, DOC_AUDIENCE, {
@@ -202,17 +239,23 @@ export function useDocActions(jobId: string) {
         const ids = new Set(current.map((b) => b.id));
         const level = blockLevel(current[0]);
         const kind = item.list ? "ul" : "p";
-        const fresh = res.items.map((text) => ({ ...mkBlock(uid("nb"), kind, kind === "ul" ? [text] : text, { level }), aiDraft: true }));
-        applyAi(
-          item.label,
-          (doc) => {
-            const at = doc.blocks.findIndex((b) => ids.has(b.id));
-            if (at < 0) return;
-            doc.blocks = doc.blocks.filter((b) => !ids.has(b.id));
-            doc.blocks.splice(at, 0, ...fresh);
-          },
-          undo,
-        );
+        const fresh = res.items.map((text) => ({ ...mkBlock(uid("nb"), kind, kind === "ul" ? [text] : text, { level }), aiDraft: !preview }));
+        const apply = () =>
+          applyAi(
+            item.label,
+            (doc) => {
+              const at = doc.blocks.findIndex((b) => ids.has(b.id));
+              if (at < 0) return;
+              doc.blocks = doc.blocks.filter((b) => !ids.has(b.id));
+              doc.blocks.splice(at, 0, ...fresh);
+            },
+            undo,
+          );
+        if (preview) {
+          return void showPreview(item.label, current.map((b) => blockPlainText(b)), res.items, res.toConfirm ?? [], apply, "Copilot revised");
+        }
+        apply();
+        noteToConfirm(item.label, res.toConfirm ?? []);
         return true;
       } catch (error) {
         say(error instanceof Error ? error.message : t("Copilot couldn’t complete this. Please try again."), { type: "error" });
@@ -526,6 +569,11 @@ export function useDocActions(jobId: string) {
 
       /* ---------------- completeness ---------------- */
 
+      /** Runs the AI review again on the current text, without switching tabs. */
+      reanalyze() {
+        void runAiAnalysis();
+      },
+
       /** Analyze: refreshes the rule check, opens the Analysis tab and runs the AI review. */
       analyze() {
         set({ wsAnalyzedAt: { ...state.wsAnalyzedAt, [jobId]: Date.now() }, wsSideTab: "analysis" });
@@ -533,11 +581,11 @@ export function useDocActions(jobId: string) {
       },
 
       aiDraft(item: ReqItem) {
-        void aiDraft(item).then((ok) => ok && say(`${t("Copilot drafted")} “${t(item.label)}” — ${t("review and edit.")}`, { type: "success" }));
+        void aiDraft(item, true, true);
       },
 
       aiFix(row: ReqRow) {
-        void aiFix(row).then((ok) => ok && say(`${t("Copilot revised")} “${t(row.item.label)}” — ${t("review the change.")}`, { type: "success" }));
+        void aiFix(row, true, true);
       },
 
       /** Drafts every missing content item and fixes every weak one, as one undoable change. */
@@ -844,6 +892,94 @@ function applySuggestionToBlock(block: DocBlock, s: Suggestion): boolean {
 /* ---------------------------------------------------------------
    Modals used by the actions above
    --------------------------------------------------------------- */
+/** Items in `a` that aren't in `b` (order kept). */
+/**
+ * Line diff in the order the result will have (#94 review): an LCS walk over before / after, so a removed
+ * line shows where it was and every added or unchanged line sits where it will be written.
+ */
+export function lineDiff(before: string[], after: string[]): { kind: "same" | "removed" | "added"; text: string }[] {
+  const n = before.length;
+  const m = after.length;
+  const lcs = Array.from({ length: n + 1 }, () => new Array<number>(m + 1).fill(0));
+  for (let i = n - 1; i >= 0; i--) {
+    for (let j = m - 1; j >= 0; j--) lcs[i][j] = before[i] === after[j] ? lcs[i + 1][j + 1] + 1 : Math.max(lcs[i + 1][j], lcs[i][j + 1]);
+  }
+  const out: { kind: "same" | "removed" | "added"; text: string }[] = [];
+  let i = 0;
+  let j = 0;
+  while (i < n && j < m) {
+    if (before[i] === after[j]) {
+      out.push({ kind: "same", text: after[j] });
+      i++;
+      j++;
+    } else if (lcs[i + 1][j] >= lcs[i][j + 1]) out.push({ kind: "removed", text: before[i++] });
+    else out.push({ kind: "added", text: after[j++] });
+  }
+  while (i < n) out.push({ kind: "removed", text: before[i++] });
+  while (j < m) out.push({ kind: "added", text: after[j++] });
+  return out;
+}
+
+/**
+ * Before / after of one AI change (#94): removed lines, added lines and unchanged ones, plus anything the AI
+ * wanted to add without a source (#95). The document only changes on "Keep".
+ */
+export function AiChangePreview({
+  label,
+  before,
+  after,
+  toConfirm,
+  onKeep,
+}: {
+  label: string;
+  before: string[];
+  after: string[];
+  toConfirm: string[];
+  onKeep: () => void;
+}) {
+  const { t, closeModal } = useStore();
+  const lines = lineDiff(before, after);
+  return (
+    <>
+      <ModalHeader title={`${t("Review AI change")} · ${t(label)}`} />
+      <ModalBody>
+        <div className="ai-diff">
+          {lines.map((line, i) => (
+            <div key={i} className={`ai-diff-line${line.kind === "same" ? "" : ` is-${line.kind}`}`}>
+              <span className="ai-diff-sign">{line.kind === "removed" ? "−" : line.kind === "added" ? "+" : " "}</span>
+              {line.text}
+            </div>
+          ))}
+        </div>
+        {toConfirm.length > 0 && (
+          <div className="ai-diff-confirm">
+            <div className="tiny">{t("Not included — no source in this job's data. Add them yourself only if they're right:")}</div>
+            <ul>
+              {toConfirm.map((x, i) => (
+                <li key={i}>{x}</li>
+              ))}
+            </ul>
+          </div>
+        )}
+      </ModalBody>
+      <ModalFooter>
+        <Button variant="secondary" onClick={closeModal}>
+          {t("Reject")}
+        </Button>
+        <Button
+          variant="primary"
+          onClick={() => {
+            onKeep();
+            closeModal();
+          }}
+        >
+          {t("Keep")}
+        </Button>
+      </ModalFooter>
+    </>
+  );
+}
+
 function RefineModal({ jobId, suggestionId }: { jobId: string; suggestionId: string }) {
   const { state, t, closeModal } = useStore();
   const actions = useDocActions(jobId);

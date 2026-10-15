@@ -942,3 +942,11 @@ a:focus-visible, button:focus-visible, [tabindex]:focus-visible, input:focus-vis
 .gm-ai-tag{ font-size:var(--fs-xs); font-weight:600; color:var(--warning-text); white-space:nowrap; }
 .gm-title-confirm-row{ display:flex; gap:8px; margin-top:8px; }
 .gm-title-confirm-row input{ flex:1; min-width:0; padding:6px 8px; border:1px solid var(--border-strong); border-radius:6px; background:var(--surface); color:var(--text); font:inherit; font-size:var(--fs-sm); }
+.ai-diff{ display:flex; flex-direction:column; gap:4px; font-size:var(--fs-sm); }
+.ai-diff-line{ padding:4px 8px; border-radius:6px; white-space:pre-wrap; }
+.ai-diff-line.is-removed{ background:var(--danger-bg); color:var(--danger-text); text-decoration:line-through; }
+.ai-diff-line.is-added{ background:var(--success-bg, var(--warning-bg)); }
+.ai-diff-sign{ display:inline-block; width:14px; font-weight:600; }
+.ai-diff-confirm{ margin-top:12px; padding:8px 10px; border:1px dashed var(--border-strong); border-radius:6px; }
+.ai-diff-confirm ul{ margin:6px 0 0; padding-left:18px; font-size:var(--fs-sm); }
+.ck-aiall-scope{ margin:-4px 0 10px; color:var(--text-tertiary); }

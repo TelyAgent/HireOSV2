@@ -48,6 +48,7 @@ export const initialState: AppState = {
   wsCopilotBusy: false,
   wsFocusBlockId: null,
   wsSaveRequest: 0,
+  wsReanalyze: null,
   wsAnalyzedAt: {},
   wsFocusRequest: null,
   wsAiAnalysis: {},

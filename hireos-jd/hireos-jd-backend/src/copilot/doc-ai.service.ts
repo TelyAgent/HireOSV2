@@ -6,6 +6,7 @@ import type { Identity } from '../auth/workspace.guard';
 import { PrismaService } from '../persistence/prisma.service';
 import { json } from '../records';
 import { LlmProvider } from './llm-provider';
+import { separateUnsourced } from './unsourced-facts';
 
 /**
  * Completeness-standard AI for the job document (JD Completeness Standard v0.1, kept next to the
@@ -52,6 +53,8 @@ const sectionInputSchema = z.object({
 const sectionOutputSchema = z.object({
   items: z.array(z.string()).min(1).max(12),
   explain: z.string().default(''),
+  /** Additions the model thinks are worth making but has no source for: shown for a person to confirm (#95). */
+  toConfirm: z.array(z.string()).max(12).catch([]).default([]),
 });
 
 const analyzeInputSchema = z.object({
@@ -125,6 +128,7 @@ export class DocAiService {
       '',
       '## 规则',
       '- 只基于给出的职位信息和文档内容写作，不要编造公司名称、薪资数字、具体产品名等文档里没有的事实；信息不足时写通用但具体、可验证的内容。',
+      '- 不要加入职位信息和文档里都没有的技能、工具、证书、职级、岗位称谓、经验年限或薪资（例如原文只提 SQL 时不要补“熟练使用电子表格软件”，不要把职位改称为别的名称）。确实值得补充的，写进 toConfirm，由人工确认，不要写进 items。',
       '- 不要出现年龄、性别、婚育、民族、宗教、国籍等限制条件。',
       '- 不要输出 HTML 或 markdown 标记。',
       languageRule(input.context.language),
@@ -136,6 +140,7 @@ export class DocAiService {
       '只输出一个 JSON 对象（不要包含其他文字或代码块标记）：',
       '- items: string[] — 新的章节内容',
       '- explain: string — 一句话说明你写了什么 / 改了什么（用中文）',
+      '- toConfirm: string[] — 你认为值得补充、但原文没有依据、需要人工确认的内容（没有就给空数组）',
     ].join('\n');
     const user = [
       '## 职位信息',
@@ -158,9 +163,21 @@ export class DocAiService {
     ].join('\n');
 
     const output = await this.run(identity, jobId, 'jd_doc_section', system, user, sectionOutputSchema);
-    const items = output.items.map((x) => x.trim()).filter(Boolean);
-    if (!items.length) throw new ServiceUnavailableException({ code: 'LLM_INVALID_OUTPUT', message: 'Copilot 没有生成内容，请重试。' });
-    return { items: input.list ? items : [items.join('\n')], explain: output.explain.trim() };
+    const written = output.items.map((x) => x.trim()).filter(Boolean);
+    if (!written.length) throw new ServiceUnavailableException({ code: 'LLM_INVALID_OUTPUT', message: 'Copilot 没有生成内容，请重试。' });
+    // Years of experience or pay the job's own data doesn't contain never go into the text (#95 AC-3).
+    const source = [jobLines(input.context), documentText(input.blocks), ...input.current].join('\n');
+    const separated = separateUnsourced(input.list ? written : [written.join('\n')], input.list, source);
+    const items = separated.items.map((x) => x.trim()).filter(Boolean);
+    const toConfirm = separated.toConfirm;
+    if (!items.length) {
+      throw new ServiceUnavailableException({ code: 'LLM_INVALID_OUTPUT', message: 'Copilot 只给出了原文没有依据的内容，没有可以直接写入的部分，请补充职位信息后重试。' });
+    }
+    return {
+      items,
+      explain: output.explain.trim(),
+      toConfirm: [...toConfirm, ...output.toConfirm.map((x) => x.trim()).filter(Boolean)].slice(0, 12),
+    };
   }
 
   async analyze(identity: Identity, jobId: string, raw: unknown) {

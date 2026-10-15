@@ -18,6 +18,18 @@ import type { CopilotMsg, SideTab } from "../../store/types";
 export function SidePanel({ jobId }: { jobId: string }) {
   const { state, t } = useStore();
   const actions = useDocActions(jobId);
+  // After an AI change is kept, re-run AI Analyze on the new text (#94 AC-2). A request that arrives while an
+  // analysis is still running waits for it to finish, then runs on the latest text — it is never dropped.
+  const reanalyze = state.wsReanalyze;
+  const analyzing = !!state.wsAiBusy[`${jobId}:analyze`];
+  // Requests from before this panel mounted were already handled; don't re-run them on remount.
+  const handledReanalyze = useRef(reanalyze?.jobId === jobId ? reanalyze.n : 0);
+  useEffect(() => {
+    if (reanalyze?.jobId !== jobId || reanalyze.n <= handledReanalyze.current || analyzing) return;
+    handledReanalyze.current = reanalyze.n;
+    actions.reanalyze();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [reanalyze?.n, analyzing]);
   const ev = useCompleteness(jobId);
   const issues = ev ? issueCount(ev) : 0;
   const tabs: { key: SideTab; label: string; count?: number; tone?: string }[] = [
