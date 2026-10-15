@@ -26,6 +26,7 @@ import {
 import {
   aiAnalyze,
   aiSection,
+  askDocumentCopilot,
   createSuggestion,
   rewriteDocumentSelection,
   updateSuggestion,
@@ -33,12 +34,16 @@ import {
   type AiFinding,
   type NewSuggestion,
   type RewriteRequest,
+  type RewriteResult,
 } from "./documentsApi";
 import { nowISO, uid } from "../../lib/format";
 import { SalaryModal } from "./SalaryModal";
+import { fitAskRequest } from "./askBudget";
+import { describeAiAnalysis, describePublishGate, publishGate, statusContext } from "./publishGate";
 import {
   REQ_ITEMS,
   detectLanguage,
+  evaluateJob,
   filledBlocks,
   findSection,
   isFilled,
@@ -49,6 +54,7 @@ import {
 } from "./completeness";
 import type { BlockKind, BlockLevel, DocBlock, DocumentDraft, Suggestion } from "../../data/types";
 import type { SideTab } from "../../store/types";
+
 
 export function useDocActions(jobId: string) {
   const { state, t, set, mutate, say, openModal, closeModal } = useStore();
@@ -232,6 +238,71 @@ export function useDocActions(jobId: string) {
       }
     };
 
+    const NEEDS_TARGET = "I don’t have anything to work on yet — select some text, or click into the paragraph or list you want changed, then ask again.";
+    const CONFIDENTIAL_BLOCK = "This block is Confidential — Copilot can’t read or rewrite it. Change its visibility first if that’s intended.";
+
+    /** The selected text (or clicked block) as Copilot sees it; null when there is none. */
+    const selectionOf = (blockId: string | null, selText: string) => {
+      const block = blockId ? selectDraft(state, jobId).blocks.find((b) => b.id === blockId) : undefined;
+      if (!block || !selText.trim()) return null;
+      const items = Array.isArray(block.text) ? block.text.map(stripHtml) : null;
+      const selected = selText.trim();
+      const scope: RewriteRequest["scope"] = items && !items.some((x) => x.includes(selected)) ? "items" : "fragment";
+      const target: RewriteRequest["target"] = items ? { kind: block.kind, items } : { kind: block.kind, text: stripHtml(block.text as string) };
+      return { block, items, selected, scope, target };
+    };
+
+    /** Job title, department and the whole JD minus Confidential blocks (completeness standard V5). */
+    const docContext = (): RewriteRequest["context"] => {
+      const job = state.jobs[jobId];
+      return {
+        jobTitle: job?.title,
+        department: job?.department,
+        documentText: selectDraft(state, jobId)
+          .blocks.filter((b) => blockLevel(b) !== "confidential")
+          .map((b) => (b.kind === "ul" ? `- ${blockPlainText(b)}` : blockPlainText(b)))
+          .join("\n"),
+      };
+    };
+
+    /** The page's own Publish gate in words — the same rule as the button — so "can I submit?" is answered from it (#106 AC-2). */
+    const readiness = (): string | undefined => {
+      const job = state.jobs[jobId];
+      if (!job) return undefined;
+      const loaded = state.wsVersions[jobId];
+      const ev = evaluateJob(job, selectDraft(state, jobId), "en", loaded ? loaded.jdCode || null : undefined);
+      return statusContext(
+        describePublishGate(publishGate(state, jobId, ev), selectDraft(state, jobId).saveState !== "saved"),
+        describeAiAnalysis(state, jobId),
+      );
+    };
+
+    /** Turns a rewrite result into a suggestion the user can accept or reject — the only path that proposes edits. */
+    const proposeEdit = async (
+      sel: NonNullable<ReturnType<typeof selectionOf>>,
+      result: RewriteResult,
+      instruction: string,
+      supersedes?: string,
+    ) => {
+      const suggestion = await addSuggestion({
+        anchorBlock: sel.block.id,
+        author: "ai",
+        initiatedBy: state.currentUserId,
+        instruction,
+        oldText: sel.scope === "items" ? sel.items!.join("\n") : sel.selected,
+        newText: result.text,
+        newItems: result.items,
+        reason: result.reason,
+        supersedes: supersedes ?? null,
+      });
+      mutate((draft) => {
+        draft.wsCopilotThread = [...draft.wsCopilotThread, { kind: "suggestion", suggestion, explain: result.explain }];
+        draft.wsSelection = null;
+        draft.wsSideTab = "copilot";
+      });
+    };
+
+    /** Quick actions and "refine": always an edit of the selection. */
     const generate = async (
       blockId: string | null,
       selText: string,
@@ -239,62 +310,78 @@ export function useDocActions(jobId: string) {
       instruction?: string,
       supersedes?: string,
     ) => {
-      const doc = selectDraft(state, jobId);
-      const block = blockId ? doc.blocks.find((b) => b.id === blockId) : undefined;
-      if (!block || !selText.trim()) {
-        pushThreadMsg(
-          "text",
-          t("I don’t have anything to work on yet — select some text, or click into the paragraph or list you want changed, then ask again."),
-        );
-        return;
-      }
+      const sel = selectionOf(blockId, selText);
+      if (!sel) return void pushThreadMsg("text", t(NEEDS_TARGET));
       // Completeness standard V5: confidential content is never sent to AI.
-      if (blockLevel(block) === "confidential") {
-        pushThreadMsg("text", t("This block is Confidential — Copilot can’t read or rewrite it. Change its visibility first if that’s intended."));
-        return;
-      }
+      if (blockLevel(sel.block) === "confidential") return void pushThreadMsg("text", t(CONFIDENTIAL_BLOCK));
       if (state.wsCopilotBusy) return;
 
-      const items = Array.isArray(block.text) ? block.text.map(stripHtml) : null;
-      const selected = selText.trim();
-      const scope: RewriteRequest["scope"] = items && !items.some((x) => x.includes(selected)) ? "items" : "fragment";
-      const job = state.jobs[jobId];
+      // Same budget as a typed message: the selection is sent whole or not at all, the document fills the rest.
+      const fit = fitAskRequest({
+        message: instruction ?? "",
+        selection: { text: sel.selected, target: sel.target, scope: sel.scope },
+        context: docContext(),
+      });
+      if ("tooLarge" in fit) return void pushThreadMsg("text", t("The selected text is too long for Copilot — select a shorter part and ask again."));
 
       set({ wsCopilotBusy: true, wsSideTab: "copilot" });
       try {
         const result = await rewriteDocumentSelection(jobId, DOC_AUDIENCE, {
-          selectedText: selected,
+          selectedText: sel.selected,
           instruction,
           action,
-          target: items ? { kind: block.kind, items } : { kind: block.kind, text: stripHtml(block.text as string) },
-          scope,
-          context: {
-            jobTitle: job?.title,
-            department: job?.department,
-            documentText: doc.blocks
-              .filter((b) => blockLevel(b) !== "confidential")
-              .map((b) => (b.kind === "ul" ? `- ${blockPlainText(b)}` : blockPlainText(b)))
-              .join("\n"),
-          },
+          target: sel.target,
+          scope: sel.scope,
+          context: fit.body.context,
         });
-        const suggestion = await addSuggestion({
-          anchorBlock: block.id,
-          author: "ai",
-          initiatedBy: state.currentUserId,
-          instruction: instruction || action,
-          oldText: scope === "items" ? items!.join("\n") : selected,
-          newText: result.text,
-          newItems: result.items,
-          reason: result.reason,
-          supersedes: supersedes ?? null,
-        });
-        mutate((draft) => {
-          draft.wsCopilotThread = [...draft.wsCopilotThread, { kind: "suggestion", suggestion, explain: result.explain }];
-          draft.wsSelection = null;
-          draft.wsSideTab = "copilot";
-        });
+        await proposeEdit(sel, result, instruction || action, supersedes);
       } catch (error) {
         pushThreadMsg("text", error instanceof Error ? error.message : t("Copilot couldn’t generate a suggestion. Please try again."));
+      } finally {
+        set({ wsCopilotBusy: false });
+      }
+    };
+
+    /**
+     * A typed message (#106 #107): questions about the JD are answered from the whole document even with
+     * nothing selected, market questions are researched, and only an explicit edit becomes a proposal.
+     */
+    const ask = async (message: string, blockId: string | null, selText: string, implicit = false) => {
+      let sel = selectionOf(blockId, selText);
+      if (sel && blockLevel(sel.block) === "confidential") {
+        // Text the user selected in a Confidential block is never sent; the block the cursor merely sits in
+        // is just left out, and the question is answered from the rest of the JD (V5).
+        if (!implicit) return void pushThreadMsg("text", t(CONFIDENTIAL_BLOCK));
+        sel = null;
+      }
+      if (state.wsCopilotBusy) return;
+
+      // Sized on the whole request; a JD too long to fit is sent in part and the answer says so (#106 review).
+      const fit = fitAskRequest({
+        message,
+        selection: sel ? { text: sel.selected, target: sel.target, scope: sel.scope, implicit } : undefined,
+        context: { ...docContext(), readiness: readiness() },
+      });
+      // A selection is never cut — an accepted edit replaces exactly what the model saw.
+      if ("tooLarge" in fit) return void pushThreadMsg("text", t("The selected text is too long for Copilot — select a shorter part and ask again."));
+      const { body, truncated } = fit;
+      set({ wsCopilotBusy: true, wsSideTab: "copilot" });
+      try {
+        const result = await askDocumentCopilot(jobId, DOC_AUDIENCE, body);
+        if (result.kind === "needs_target") return void pushThreadMsg("text", t(NEEDS_TARGET));
+        if (result.kind === "no_change") {
+          return void pushThreadMsg("text", `${t("No change needed — nothing was proposed.")} ${result.explain}`.trim());
+        }
+        if (result.kind === "edit") return void (await proposeEdit(sel!, result, message));
+        mutate((draft) => {
+          draft.wsCopilotThread = [
+            ...draft.wsCopilotThread,
+            { kind: "text", text: result.text, basis: truncated ? "partial" : result.contextScope, sources: result.sources },
+          ];
+          draft.wsSelection = null;
+        });
+      } catch (error) {
+        pushThreadMsg("text", error instanceof Error ? error.message : t("Copilot couldn’t answer that. Please try again."));
       } finally {
         set({ wsCopilotBusy: false });
       }
@@ -323,13 +410,13 @@ export function useDocActions(jobId: string) {
         if (!instruction.trim()) return;
         pushThreadMsg("user", instruction);
         const sel = state.wsSelection;
-        if (sel) return void generate(sel.blockId, sel.text, "custom", instruction);
-        // No selection: work on the whole block the cursor is in.
+        if (sel) return void ask(instruction, sel.blockId, sel.text);
+        // No selection: an edit works on the block the cursor is in; a question uses the whole JD.
         const focused = state.wsFocusBlockId
           ? selectDraft(state, jobId).blocks.find((b) => b.id === state.wsFocusBlockId)
           : undefined;
         const text = focused ? (Array.isArray(focused.text) ? focused.text.map(stripHtml).join("\n") : stripHtml(focused.text)) : "";
-        void generate(focused?.id ?? null, text, "custom", instruction);
+        void ask(instruction, focused?.id ?? null, text, true);
       },
 
       /* ---------------- block structure ---------------- */

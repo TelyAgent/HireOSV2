@@ -1,5 +1,6 @@
 import { Logger, ValidationPipe } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
+import type { NestExpressApplication } from '@nestjs/platform-express';
 import { ConfigService } from '@nestjs/config';
 import type { Server } from 'node:http';
 import { AppModule } from './app.module';
@@ -7,7 +8,10 @@ import { ZodExceptionFilter } from './http/zod-exception.filter';
 import { attachVoiceGateway, VOICE_WS_PATH } from './voice/voice-gateway';
 
 async function bootstrap() {
-  const app = await NestFactory.create(AppModule);
+  const app = await NestFactory.create<NestExpressApplication>(AppModule);
+  // Copilot requests carry the whole (non-confidential) JD so answers cover all of it (#106); the 100 KB
+  // default is too small for a long Chinese JD.
+  app.useBodyParser('json', { limit: '2mb' });
   const config = app.get(ConfigService);
   const corsOrigin = config.get<string>('CORS_ORIGIN');
   app.setGlobalPrefix('api');

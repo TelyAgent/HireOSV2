@@ -1140,6 +1140,13 @@ export const ZH: Record<string, string> = {
   "Your sign-in has expired. Refresh the page and sign in again, then retry.": "登录已过期，请刷新页面重新登录后再试。",
   "You don’t have permission to do this. Ask an admin for access.": "你没有执行此操作的权限，请联系管理员开通。",
   "Copilot is getting too many requests right now. Wait a moment, then retry.": "Copilot 当前请求过多，请稍等片刻再重试。",
+  "Based on the selected text and the whole JD (Confidential excluded)": "依据：选中的文字和整份 JD（不含保密内容）",
+  "Based on the whole JD (Confidential excluded)": "依据：整份 JD（不含保密内容）",
+  "Based on the first part of the JD only — it’s too long to send in full. Select the part you’re asking about for a precise answer.":
+    "依据：仅 JD 的前半部分（JD 过长，无法全部发送）。如需准确回答，请选中你要问的那部分。",
+  "The selected text is too long for Copilot — select a shorter part and ask again.": "选中的内容太长，Copilot 无法处理，请选短一些再问。",
+  "No change needed — nothing was proposed.": "无需改动，没有生成修改建议。",
+  "Copilot couldn’t answer that. Please try again.": "Copilot 暂时无法回答，请重试。",
   "Copilot is temporarily unavailable. Your input is kept — retry in a moment.": "Copilot 暂时不可用，你的输入已保留，请稍后重试。",
   "Couldn’t reach Copilot. Check your connection, then retry.": "无法连接到 Copilot，请检查网络后重试。",
   "Sorry, Copilot couldn’t process that just now. Your input is kept — please retry.": "抱歉，Copilot 暂时无法处理这条请求，你的输入已保留，请重试。",

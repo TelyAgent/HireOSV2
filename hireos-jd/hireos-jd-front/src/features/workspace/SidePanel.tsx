@@ -70,8 +70,9 @@ function CopilotTab({ jobId }: { jobId: string }) {
     ? selectDraft(state, jobId).blocks.find((b) => b.id === state.wsFocusBlockId)
     : undefined;
 
-  // Completeness standard V5: Confidential blocks are never sent to Copilot.
-  const targetId = sel ? sel.blockId : focused?.id;
+  // Completeness standard V5: text selected in a Confidential block is never sent to Copilot. A Confidential
+  // block the cursor merely sits in doesn't block a question — it's just left out of what is sent.
+  const targetId = sel ? sel.blockId : undefined;
   const target = targetId ? selectDraft(state, jobId).blocks.find((b) => b.id === targetId) : undefined;
   const restrictedBlocked = !!target && blockLevel(target) === "confidential";
 
@@ -218,7 +219,31 @@ function CopilotMessage({ msg, jobId }: { msg: CopilotMsg; jobId: string }) {
           <Icon name="auto_awesome" size={15} />
           Copilot
         </div>
-        <div className="bubble">{msg.text}</div>
+        <div className="bubble">
+          {msg.text}
+          {msg.sources && msg.sources.length > 0 && (
+            <ul className="copilot-sources">
+              {msg.sources.map((s) => (
+                <li key={s.url}>
+                  <a href={s.url} target="_blank" rel="noreferrer">
+                    {s.title || s.url}
+                  </a>
+                </li>
+              ))}
+            </ul>
+          )}
+          {msg.basis && (
+            <div className="copilot-basis">
+              {t(
+                msg.basis === "partial"
+                  ? "Based on the first part of the JD only — it’s too long to send in full. Select the part you’re asking about for a precise answer."
+                  : msg.basis === "selection"
+                    ? "Based on the selected text and the whole JD (Confidential excluded)"
+                    : "Based on the whole JD (Confidential excluded)",
+              )}
+            </div>
+          )}
+        </div>
       </div>
     );
   }
