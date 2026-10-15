@@ -22,7 +22,7 @@ export type RenderResult = { html: string } | { blocked: 'private_address' };
 const RENDER_TIMEOUT_MS = 20_000;
 const MAX_RENDER_REQUESTS = 200;
 const MAX_RESPONSE_BYTES = 10 * 1024 * 1024;
-const MAX_TOTAL_BYTES = 24 * 1024 * 1024;
+export const MAX_TOTAL_BYTES = 24 * 1024 * 1024;
 const MAX_CONCURRENT_RENDERS = 2;
 const MAX_REDIRECTS = 5;
 // Not needed to read a page's text, and the bulk of its bytes.
@@ -162,9 +162,8 @@ async function handleRoute(
       response = null;
     }
     if (!response) return await route.abort('blockedbyclient');
-    const content = await readCapped(response, Math.min(MAX_RESPONSE_BYTES, MAX_TOTAL_BYTES - state.bytes));
+    const content = await readWithinBudget(response, MAX_RESPONSE_BYTES, state);
     if (content === null) return await route.abort('blockedbyclient');
-    state.bytes += content.byteLength;
     await route.fulfill({ status: response.status, headers: responseHeaders(response), body: content });
   } catch {
     await route.abort('failed').catch(() => undefined);
@@ -193,8 +192,12 @@ function responseHeaders(response: Response): Record<string, string> {
   return headers;
 }
 
-/** Returns null when the response is larger than `limit`. */
-async function readCapped(response: Response, limit: number): Promise<Buffer | null> {
+/**
+ * Reads a response body, returning null once it exceeds `limit` or the render's shared byte budget is spent.
+ * Requests run in parallel, so the budget is charged chunk by chunk as bytes arrive, not after a body is complete:
+ * otherwise each of many concurrent responses could pass a check against the same remaining amount (#64 review).
+ */
+export async function readWithinBudget(response: Response, limit: number, budget: { bytes: number }): Promise<Buffer | null> {
   if (!response.body) return Buffer.alloc(0);
   const reader = response.body.getReader();
   const chunks: Uint8Array[] = [];
@@ -203,7 +206,9 @@ async function readCapped(response: Response, limit: number): Promise<Buffer | n
     const { value, done } = await reader.read();
     if (done) break;
     size += value.byteLength;
-    if (size > limit) {
+    // Bytes already read stay charged even when the response is then dropped: they were received.
+    budget.bytes += value.byteLength;
+    if (size > limit || budget.bytes > MAX_TOTAL_BYTES) {
       await reader.cancel().catch(() => undefined);
       return null;
     }

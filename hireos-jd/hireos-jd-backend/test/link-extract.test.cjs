@@ -148,3 +148,26 @@ test('#64: a static page with its posting in the HTML is read without starting a
   assert.match(text, /Sales Manager/);
   assert.match(text, /Singapore/);
 });
+
+test('#64 review: parallel responses share one byte budget, so together they never exceed it', async () => {
+  const { readWithinBudget, MAX_TOTAL_BYTES } = require('../dist/copilot/link-render');
+  const MB = 1024 * 1024;
+  // 8 MiB each, sent in 1 MiB chunks that interleave across the four responses.
+  const streamed = () => {
+    let sent = 0;
+    return new Response(new ReadableStream({
+      async pull(controller) {
+        await new Promise((resolve) => setImmediate(resolve));
+        if (sent >= 8) return controller.close();
+        sent++;
+        controller.enqueue(new Uint8Array(MB));
+      },
+    }));
+  };
+  const budget = { bytes: 0 };
+  const bodies = await Promise.all([1, 2, 3, 4].map(() => readWithinBudget(streamed(), 10 * MB, budget)));
+  const delivered = bodies.filter(Boolean).reduce((sum, body) => sum + body.byteLength, 0);
+  assert.ok(delivered <= MAX_TOTAL_BYTES, `delivered ${delivered / MB} MiB`);
+  assert.ok(bodies.some((body) => body === null), 'responses past the budget are dropped');
+  assert.equal((await readWithinBudget(new Response(new Uint8Array(11 * MB)), 10 * MB, { bytes: 0 })), null, 'one response over its own limit is dropped');
+});
