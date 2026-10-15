@@ -153,3 +153,17 @@ test('#106 review: a long JD is accepted in full; a cut one tells the model it s
   assert.match(input, /仅前一部分/);
   assert.match(input, /不能说 JD 里“没有”/);
 });
+
+test('#107 review: "do not change X, but shorten Y" is still an edit; plain "do not modify" stays an answer', async () => {
+  for (const message of ['不要修改薪资，请把选中的职责精简一下', 'Do not change the salary; rewrite the selected responsibilities more concisely.']) {
+    const llm = fakeLlm({ intent: 'edit', rewrite: { items: ['Owns reporting.'], explain: '精简', reason: '' } });
+    const { svc } = service(llm);
+    const res = await ask(svc, { message, selection: selection('Owns weekly and monthly reporting for the whole team.') });
+    assert.equal(res.kind, 'edit', message);
+    assert.ok(llm.calls.some((c) => c.system?.includes('意图分类器')), 'the classifier decides');
+  }
+  const llm = fakeLlm({ intent: 'edit' });
+  const { svc } = service(llm);
+  const res = await ask(svc, { message: '这句是什么意思？不要修改文档', selection: selection('Can write SQL queries.') });
+  assert.equal(res.kind, 'answer');
+});

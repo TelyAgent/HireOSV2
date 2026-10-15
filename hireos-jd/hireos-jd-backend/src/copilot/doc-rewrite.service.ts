@@ -65,8 +65,12 @@ const askInputSchema = z.object({
 
 export type DocIntent = 'answer' | 'research' | 'edit' | 'action' | 'off_topic';
 
-/** "只回答，不修改" and the like: never a proposal, whatever the classifier thinks (#107 AC-1). */
-const ANSWER_ONLY = /只回答|只解释|不(要|用)?修改|别改|不要改|不改动|不用改|just answer|only answer|answer only|explain only|don'?t (change|edit|modify)|do not (change|edit|modify)/i;
+/** "只回答" and the like: an explicit answer-only request, never a proposal (#107 AC-1). */
+const ANSWER_ONLY = /只回答|只解释|仅回答|仅解释|just answer|only answer|answer only|explain only|just explain|only explain/i;
+/** "不修改" / "don't change": answer-only only when nothing else in the message asks for an edit. */
+const NO_EDIT = /不(要|用)?修改|别改|不要改|不改动|不用改|don'?t (change|edit|modify)|do not (change|edit|modify)/i;
+/** Words that ask for an edit — "不要修改薪资，请把职责精简一下" is still an edit of the responsibilities. */
+const EDIT_VERB = /精简|改写|重写|润色|缩短|扩写|翻译|改成|改为|修改为|调整|补充|删除|删掉|加上|写上|rewrite|shorten|simplify|condense|rephrase|reword|translate|expand|make (it|them|this)|turn (it|this) into/i;
 
 const DOC_INTENT_PROMPT = [
   '你是 JD 编辑页 Copilot 的意图分类器。用户在看一份职位 JD，可能选中了一段文字，然后说了一句话。判断这句话属于哪一类：',
@@ -216,7 +220,9 @@ export class DocRewriteService {
   }
 
   private async classify(jobId: string, message: string, selected?: string): Promise<DocIntent> {
-    if (ANSWER_ONLY.test(message)) return /薪|工资|待遇|行情|市场|salary|pay|market/i.test(message) ? 'research' : 'answer';
+    if (ANSWER_ONLY.test(message) || (NO_EDIT.test(message) && !EDIT_VERB.test(message))) {
+      return /薪|工资|待遇|行情|市场|salary|pay|market/i.test(message) ? 'research' : 'answer';
+    }
     try {
       const raw = await this.llm.completeJson(DOC_INTENT_PROMPT, [
         { role: 'user', content: `${selected ? `选中的文字：${selected}\n\n` : ''}用户这句话：${message}` },
