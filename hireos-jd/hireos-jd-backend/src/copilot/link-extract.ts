@@ -1,7 +1,7 @@
 import { BadRequestException, Logger } from '@nestjs/common';
 import { lookup } from 'node:dns/promises';
 import { BlockList, isIP } from 'node:net';
-import { renderPage } from './link-render';
+import { renderPage, type Renderer } from './link-render';
 
 const MAX_EXTRACTED_CHARS = 12_000;
 const MAX_BODY_BYTES = 2 * 1024 * 1024;
@@ -39,9 +39,19 @@ export type LinkNetwork = {
 
 export type LinkExtractOptions = {
   network?: LinkNetwork;
-  /** Chromium used to render script-loaded pages; defaults to JD_LINK_BROWSER_PATH. Unset disables rendering. */
-  browserPath?: string | null;
+  /**
+   * Browser used to render script-loaded pages. Defaults to the `jd-renderer` service (JD_LINK_RENDERER_URL),
+   * else a local Chromium (JD_LINK_BROWSER_PATH, for development). `null`, or neither set, disables rendering.
+   */
+  renderer?: Renderer | null;
 };
+
+function configuredRenderer(): Renderer | null {
+  const url = process.env.JD_LINK_RENDERER_URL?.trim();
+  if (url) return { kind: 'remote', url };
+  const executablePath = process.env.JD_LINK_BROWSER_PATH?.trim();
+  return executablePath ? { kind: 'local', executablePath } : null;
+}
 
 const defaultNetwork: LinkNetwork = {
   lookup: (host) => lookup(host, { all: true }),
@@ -121,11 +131,11 @@ async function preferRendered(staticText: string, url: URL, network: LinkNetwork
 }
 
 async function renderedText(url: URL, network: LinkNetwork, options: LinkExtractOptions): Promise<string> {
-  const browserPath = options.browserPath === undefined ? process.env.JD_LINK_BROWSER_PATH?.trim() : options.browserPath;
-  if (!browserPath) throw linkError(SCRIPT_PAGE_MESSAGE);
+  const renderer = options.renderer === undefined ? configuredRenderer() : options.renderer;
+  if (!renderer) throw linkError(SCRIPT_PAGE_MESSAGE);
   // One page load makes dozens of requests to a handful of hosts; resolve each host once.
   const checked = new Map<string, Promise<void>>();
-  const result = await renderPage(url, browserPath, {
+  const result = await renderPage(url, renderer, {
     assertPublic: (target) => {
       const key = `${target.protocol}//${target.hostname}`;
       if (!checked.has(key)) checked.set(key, assertPublicUrl(target, network));

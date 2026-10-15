@@ -9,7 +9,14 @@ import type { Browser, Page, Route } from 'playwright-core';
  * intercepted and either refused or fetched by Node, after the same public-address check as the plain fetch.
  * Node follows redirects itself and checks every hop: the browser does not route the follow-up request of a
  * fulfilled 3xx, which would otherwise hit the dead proxy.
+ *
+ * In deployment the browser runs in its own container (hireos-jd/jd-renderer): no secrets, no database, on an
+ * internal network without internet access. This service connects to it remotely; interception still happens
+ * here, so the renderer never needs network access. Local development may launch a Chromium binary directly.
  */
+
+/** The `jd-renderer` service's Playwright endpoint, or a local Chromium binary. */
+export type Renderer = { kind: 'remote'; url: string } | { kind: 'local'; executablePath: string };
 
 export type RenderNetwork = {
   /** Throws when the URL may not be fetched (non-http(s), private address, ...). */
@@ -20,6 +27,8 @@ export type RenderNetwork = {
 export type RenderResult = { html: string } | { blocked: 'private_address' };
 
 const RENDER_TIMEOUT_MS = 20_000;
+/** Upper bound on a whole render, launch to teardown, whatever the page does. */
+const HARD_STOP_MS = RENDER_TIMEOUT_MS + 5_000;
 const MAX_RENDER_REQUESTS = 200;
 const MAX_RESPONSE_BYTES = 10 * 1024 * 1024;
 export const MAX_TOTAL_BYTES = 24 * 1024 * 1024;
@@ -45,18 +54,45 @@ async function withRenderSlot<T>(run: () => Promise<T>): Promise<T> {
   }
 }
 
-export async function renderPage(url: URL, browserPath: string, network: RenderNetwork): Promise<RenderResult> {
-  return withRenderSlot(async () => {
-    const { chromium } = await import('playwright-core');
-    const browser = await chromium.launch({
-      executablePath: browserPath,
+// Anything the route handler doesn't fulfill (it fulfills or aborts every http(s) request) has nowhere to go.
+const DEAD_PROXY = { server: '127.0.0.1:9', bypass: '<-loopback>' };
+
+async function openBrowser(renderer: Renderer): Promise<Browser> {
+  const { chromium } = await import('playwright-core');
+  if (renderer.kind === 'remote') {
+    // The renderer starts a fresh browser per connection; closing this connection ends that browser.
+    return chromium.connect(renderer.url, {
       timeout: RENDER_TIMEOUT_MS,
-      // Anything the route handler doesn't fulfill (it fulfills or aborts every http(s) request) has nowhere to go.
-      args: ['--proxy-server=127.0.0.1:9', '--proxy-bypass-list=<-loopback>', '--disable-dev-shm-usage'],
+      headers: { 'x-playwright-launch-options': JSON.stringify({ proxy: DEAD_PROXY }) },
+    });
+  }
+  return chromium.launch({
+    executablePath: renderer.executablePath,
+    timeout: RENDER_TIMEOUT_MS,
+    proxy: DEAD_PROXY,
+    args: ['--disable-dev-shm-usage'],
+    // The page is untrusted: a local browser gets none of the service's environment (database URL, API keys).
+    env: { PATH: process.env.PATH ?? '/usr/bin:/bin', HOME: '/tmp', TMPDIR: '/tmp' },
+  });
+}
+
+export async function renderPage(url: URL, renderer: Renderer, network: RenderNetwork, hardStopMs = HARD_STOP_MS): Promise<RenderResult> {
+  return withRenderSlot(async () => {
+    const browser = await openBrowser(renderer);
+    // A page can hang its renderer (e.g. a busy loop), and then calls like page.content() never return. The hard
+    // stop closes the browser — which fails whatever is still pending — and gives up on the render either way,
+    // so a render slot is always released (#64 review).
+    let hardStop: NodeJS.Timeout | undefined;
+    const stopped = new Promise<never>((_, reject) => {
+      hardStop = setTimeout(() => {
+        void browser.close().catch(() => undefined);
+        reject(new Error(`render exceeded ${hardStopMs}ms`));
+      }, hardStopMs);
     });
     try {
-      return await render(browser, url, network);
+      return await Promise.race([render(browser, url, network), stopped]);
     } finally {
+      clearTimeout(hardStop);
       await browser.close().catch(() => undefined);
     }
   });

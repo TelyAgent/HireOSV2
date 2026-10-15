@@ -17,12 +17,13 @@ The service listens on `http://127.0.0.1:3005/api`.
 ### Reading job links rendered by scripts
 
 "Paste a Link or Text" first reads the page's HTML. When that HTML has no posting (the page loads it with
-scripts), the service renders the page in Chromium if `JD_LINK_BROWSER_PATH` points to a Chromium binary;
-otherwise it tells the user to paste the JD text. The Docker image installs Chromium and sets the variable.
-Locally, any Chromium works, e.g. one installed by `npx playwright install chromium`.
+scripts), the service renders the page in a browser, if one is configured:
+- `JD_LINK_RENDERER_URL`: the isolated `jd-renderer` container (`hireos-jd/jd-renderer`), as in docker-compose;
+- `JD_LINK_BROWSER_PATH`: a local Chromium, for development (e.g. one installed by `npx playwright install chromium`).
 
-The browser never connects out by itself: every request it makes goes through the same public-address check
-as the HTML fetch, and requests count, size and time are capped (`src/copilot/link-render.ts`).
+With neither set, the user is told to paste the JD text. The browser never connects out by itself: every
+request it makes goes through the same public-address check as the HTML fetch. Request count, size and time
+are capped, and a hung page is stopped (`src/copilot/link-render.ts`).
 
 ## Current Phase
 

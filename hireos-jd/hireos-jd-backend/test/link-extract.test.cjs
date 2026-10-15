@@ -64,6 +64,8 @@ function fixtureNetwork() {
           return html('<!doctype html><html><body><div id="app"></div><script>document.title = "x";</script></body></html>');
         case 'jobs.example.test/to-intranet':
           return new Response('', { status: 301, headers: { location: 'http://intranet.example.test/admin' } });
+        case 'jobs.example.test/hang':
+          return html('<html><body><div id="app"></div><script>setTimeout(() => { for (;;) {} }, 50);</script></body></html>');
         case 'jobs.example.test/short-static':
           return html('<html><body><h1>运营专员</h1><p>地点：杭州</p><ul><li>负责社群日常运营与活动策划</li><li>两年以上运营经验</li></ul></body></html>');
         case 'jobs.example.test/static':
@@ -94,6 +96,7 @@ function findBrowser() {
 
 const browserPath = findBrowser();
 const needsBrowser = browserPath ? {} : { skip: 'no Chromium found (set JD_LINK_BROWSER_PATH)' };
+const renderer = browserPath && { kind: 'local', executablePath: browserPath };
 
 async function rejectsWith(promise, pattern) {
   await assert.rejects(promise, (error) => {
@@ -105,7 +108,7 @@ async function rejectsWith(promise, pattern) {
 
 test('#64 AC-5: a page whose initial HTML has no posting is rendered, and the posting the script loads is read', needsBrowser, async () => {
   const { network, requested } = fixtureNetwork();
-  const text = await extractTextFromLink('https://jobs.example.test/position/42', { network, browserPath });
+  const text = await extractTextFromLink('https://jobs.example.test/position/42', { network, renderer });
 
   assert.match(text, /AI应用算法工程师/);
   assert.match(text, /北京 \/ 广州 \/ 杭州 \/ 上海/);
@@ -116,7 +119,7 @@ test('#64 AC-5: a page whose initial HTML has no posting is rendered, and the po
 
 test('#64 AC-5: inside the rendered page, internal hosts stay unreachable, directly or via a public redirect', needsBrowser, async () => {
   const { network, requested } = fixtureNetwork();
-  const text = await extractTextFromLink('https://jobs.example.test/position/42', { network, browserPath });
+  const text = await extractTextFromLink('https://jobs.example.test/position/42', { network, renderer });
 
   assert.doesNotMatch(text, /SECRET-INTERNAL-DATA/);
   assert.deepEqual(requested.filter((r) => r.url.includes('intranet.example.test')), []);
@@ -125,28 +128,28 @@ test('#64 AC-5: inside the rendered page, internal hosts stay unreachable, direc
 
 test('#64 AC-3: a rendered page that still has no posting is refused with the reason and the paste path', needsBrowser, async () => {
   const { network } = fixtureNetwork();
-  await rejectsWith(extractTextFromLink('https://jobs.example.test/empty-shell', { network, browserPath }), /没有找到职位内容.*粘贴/);
+  await rejectsWith(extractTextFromLink('https://jobs.example.test/empty-shell', { network, renderer }), /没有找到职位内容.*粘贴/);
 });
 
 test('#64 AC-3: without a browser configured, a script-rendered page says so and points to pasting the JD', async () => {
   const { network } = fixtureNetwork();
-  await rejectsWith(extractTextFromLink('https://jobs.example.test/position/42', { network, browserPath: null }), /网页脚本加载.*粘贴/);
+  await rejectsWith(extractTextFromLink('https://jobs.example.test/position/42', { network, renderer: null }), /网页脚本加载.*粘贴/);
 });
 
 test('#64 AC-5: internal addresses, non-http schemes and redirects into the intranet are still refused', async () => {
   const { network, requested } = fixtureNetwork();
-  await rejectsWith(extractTextFromLink('http://127.0.0.1:3005/health', { network, browserPath }), /内网地址/);
-  await rejectsWith(extractTextFromLink('http://[::ffff:10.0.0.1]/', { network, browserPath }), /内网地址/);
-  await rejectsWith(extractTextFromLink('http://intranet.example.test/admin', { network, browserPath }), /内网地址/);
-  await rejectsWith(extractTextFromLink('ftp://jobs.example.test/file', { network, browserPath }), /http 或 https/);
-  await rejectsWith(extractTextFromLink('https://jobs.example.test/to-intranet', { network, browserPath }), /内网地址/);
+  await rejectsWith(extractTextFromLink('http://127.0.0.1:3005/health', { network, renderer }), /内网地址/);
+  await rejectsWith(extractTextFromLink('http://[::ffff:10.0.0.1]/', { network, renderer }), /内网地址/);
+  await rejectsWith(extractTextFromLink('http://intranet.example.test/admin', { network, renderer }), /内网地址/);
+  await rejectsWith(extractTextFromLink('ftp://jobs.example.test/file', { network, renderer }), /http 或 https/);
+  await rejectsWith(extractTextFromLink('https://jobs.example.test/to-intranet', { network, renderer }), /内网地址/);
   assert.deepEqual(requested.filter((r) => r.url.includes('intranet.example.test')), []);
 });
 
 test('#64: a static page with its posting in the HTML is read without starting a browser', async () => {
   const { network } = fixtureNetwork();
-  // browserPath points nowhere: rendering would fail, so success proves it wasn't needed.
-  const text = await extractTextFromLink('https://jobs.example.test/static', { network, browserPath: '/nonexistent/chromium' });
+  // The renderer points nowhere: rendering would fail, so success proves it wasn't needed.
+  const text = await extractTextFromLink('https://jobs.example.test/static', { network, renderer: { kind: 'local', executablePath: '/nonexistent/chromium' } });
   assert.match(text, /Sales Manager/);
   assert.match(text, /Singapore/);
 });
@@ -176,10 +179,59 @@ test('#64 review: parallel responses share one byte budget, so together they nev
 
 test('#64 review: a short static posting is still read when rendering is unavailable or fails', async () => {
   const { network } = fixtureNetwork();
-  for (const browser of [null, '/nonexistent/chromium']) {
-    const text = await extractTextFromLink('https://jobs.example.test/short-static', { network, browserPath: browser });
+  for (const unavailable of [null, { kind: 'local', executablePath: '/nonexistent/chromium' }, { kind: 'remote', url: 'ws://127.0.0.1:9/' }]) {
+    const text = await extractTextFromLink('https://jobs.example.test/short-static', { network, renderer: unavailable });
     assert.match(text, /运营专员/);
     assert.match(text, /杭州/);
     assert.ok(text.length < 200, 'short enough to have tried rendering');
+  }
+});
+
+test('#64 review: a page that hangs its renderer is stopped, and the render slots are freed', needsBrowser, async () => {
+  const { renderPage } = require('../dist/copilot/link-render');
+  const { network } = fixtureNetwork();
+  const renderNetwork = { assertPublic: async () => {}, fetch: network.fetch };
+  const startedAt = Date.now();
+  // Three hung renders against two slots: the third only starts once a slot is freed.
+  const hung = await Promise.allSettled([1, 2, 3].map(() => renderPage(new URL('https://jobs.example.test/hang'), renderer, renderNetwork, 3000)));
+  assert.deepEqual(hung.map((r) => r.status), ['rejected', 'rejected', 'rejected']);
+  assert.ok(Date.now() - startedAt < 12_000, `stopped in ${Date.now() - startedAt}ms`);
+
+  const text = await extractTextFromLink('https://jobs.example.test/position/42', { network, renderer });
+  assert.match(text, /AI应用算法工程师/, 'later renders still run');
+});
+
+test('#64 review: the browser does not inherit the service environment', () => {
+  const source = require('node:fs').readFileSync(require.resolve('../dist/copilot/link-render'), 'utf8');
+  assert.match(source, /env: \{ PATH: process\.env\.PATH/);
+});
+
+/** A `playwright run-server` like the jd-renderer container, when this machine has Playwright's own Chromium. */
+async function startRenderServer() {
+  const { chromium } = require('playwright-core');
+  if (!fs.existsSync(chromium.executablePath())) return null;
+  const { spawn } = require('node:child_process');
+  const port = 39000 + Math.floor(Math.random() * 500);
+  const child = spawn(process.execPath, [require('node:path').join(require('node:path').dirname(require.resolve('playwright-core/package.json')), 'cli.js'), 'run-server', '--port', String(port), '--host', '127.0.0.1'], { stdio: ['ignore', 'pipe', 'inherit'] });
+  await new Promise((resolve, reject) => {
+    child.stdout.on('data', (chunk) => String(chunk).includes('Listening') && resolve());
+    child.on('exit', reject);
+  });
+  // run-server keeps running on SIGTERM; stop it for good so the test process can exit.
+  const stop = () => new Promise((resolve) => { child.stdout.destroy(); child.once('exit', resolve); child.kill('SIGKILL'); });
+  return { url: `ws://127.0.0.1:${port}/`, stop };
+}
+
+test('#64 review: the remote renderer (jd-renderer) reads the posting, with interception still done here', { timeout: 60_000 }, async (t) => {
+  const server = await startRenderServer();
+  if (!server) return t.skip('Playwright Chromium not installed (npx playwright-core install chromium)');
+  try {
+    const { network, requested } = fixtureNetwork();
+    const text = await extractTextFromLink('https://jobs.example.test/position/42', { network, renderer: { kind: 'remote', url: server.url } });
+    assert.match(text, /AI应用算法工程师/);
+    assert.doesNotMatch(text, /SECRET-INTERNAL-DATA/);
+    assert.deepEqual(requested.filter((r) => r.url.includes('intranet.example.test')), []);
+  } finally {
+    await server.stop();
   }
 });

@@ -37,6 +37,9 @@ services:
   jd-backend:
     logging: *local-logging
 
+  jd-renderer:
+    logging: *local-logging
+
   written-backend:
     logging: *local-logging
 
