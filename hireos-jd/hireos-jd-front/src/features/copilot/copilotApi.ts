@@ -265,15 +265,19 @@ export function generateCopilotTitleVariants(
   });
 }
 
-/** Applies one refinement note to every title variant, keeping each style. Nothing is saved. */
+/**
+ * Applies one refinement note to every title variant, keeping each style. Nothing is saved. `primary` is the
+ * version the user is looking at: it is refined first and its job facts are shared by all three (#71).
+ */
 export function refineCopilotVariants(
   conversationId: string,
   note: string,
   variants: CopilotTitleVariant[],
+  primary = 0,
 ): Promise<{ variants: CopilotTitleVariant[]; answer?: CopilotWebAnswer }> {
   return request(`${BASE}/${conversationId}/refine-variants`, {
     method: "POST",
-    body: JSON.stringify({ note, variants: variants.map(({ key, label, description, fields }) => ({ key, label, description, fields })) }),
+    body: JSON.stringify({ note, primary, variants: variants.map(({ key, label, description, fields }) => ({ key, label, description, fields })) }),
     idempotencyKey: idempotencyKey("copilot-refine-variants"),
   });
 }

@@ -542,7 +542,7 @@ export function GeminiPanel({ ctx }: { ctx: GeminiCtx }) {
       const salaryAsked = SALARY_NOTE.test(note);
       let summary: string;
       if (msg.kind === "variants") {
-        const result = await refineCopilotVariants(conversationId, note, msg.variants);
+        const result = await refineCopilotVariants(conversationId, note, msg.variants, msg.selected ?? 0);
         if (result.answer) return void resolveThinking({ role: "ai", text: formatWebAnswer(result.answer, t("Sources:")) });
         const changes = result.variants.map((v, i) => ({ letter: String.fromCharCode(65 + i), fields: changedFields(v.fields, msg.variants[i]?.fields) }));
         if (changes.every((c) => !c.fields.length)) {
