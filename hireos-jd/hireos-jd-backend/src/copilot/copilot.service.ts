@@ -638,9 +638,13 @@ export class CopilotService {
         recordChanges(asFieldMeta(conversation.fieldMeta), asRecord(conversation.fields), input.fields, () => 'user'),
         ['title'],
       );
-      const updated = await tx.copilotConversation.update({
-        where: { id },
-        data: { fields: json(input.fields), missingFields: json([]), fieldMeta: json(fieldMeta), phase: 'ready_to_confirm', stateRevision: { increment: 1 } },
+      // Conditional on the draft this save was computed from: a confirmation or another save in between is not
+      // overwritten with stale marks or a reused revision (#68 review).
+      const updated = await updateIfUnchanged(tx, id, conversation.stateRevision, {
+        fields: json(input.fields),
+        missingFields: json([]),
+        fieldMeta: json(fieldMeta),
+        phase: 'ready_to_confirm',
       });
       const latest = await tx.copilotMessage.findFirst({ where: { conversationId: id }, orderBy: { sequence: 'desc' } });
       const sequence = (latest?.sequence ?? 0) + 1;

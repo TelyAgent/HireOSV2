@@ -199,3 +199,19 @@ test('#68 review: a user edit made while a turn waits for the model is not overw
   assert.equal(db.conv.fields.location, 'London');
   assert.deepEqual(db.conv.fieldMeta.location, { source: 'user', revision: 1, status: 'confirmed' });
 });
+
+test('#68 review: a save computed from an older draft doesn\'t undo a confirmation or reuse a revision', async () => {
+  const { svc, db } = service({ titleFromUser: false });
+  await svc.quickStart(identity, 'c1', { answers: ANSWERS }, meta());
+  const stale = { ...db.conv }; // what a slow save read before the confirmation landed
+  await svc.confirmFields(identity, 'c1', { fields: ['mustHave'], revisions: { mustHave: 1 } });
+
+  const load = db.copilotConversation.findFirst;
+  db.copilotConversation.findFirst = async () => { db.copilotConversation.findFirst = load; return { ...stale }; };
+  await assert.rejects(
+    svc.setFields(identity, 'c1', { fields: { ...stale.fields, roleSummary: 'Owns growth and the team.' }, label: 'Edit summary' }, meta()),
+    (e) => e.response?.code === 'DRAFT_CHANGED',
+  );
+  assert.equal(db.conv.fieldMeta.mustHave.status, 'confirmed', 'the confirmation stands');
+  assert.equal(db.conv.fields.roleSummary, DRAFT.roleSummary);
+});
