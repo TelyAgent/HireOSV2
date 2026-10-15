@@ -126,7 +126,7 @@ async function render(browser: Browser, url: URL, network: RenderNetwork, timeou
     // The posting arrives from scripts, possibly after a pause with the network idle (a timer, a lazy request),
     // so idle network is no sign it has loaded. Stop once the text is long enough and has stopped changing,
     // else at the deadline (#64 review).
-    await waitForStableText(page, deadline).catch(() => undefined);
+    await waitForStableText(page, deadline, () => documentStatus >= 400).catch(() => undefined);
     if (state.documentBlocked) return { blocked: 'private_address' };
     if (documentStatus >= 400) return { status: documentStatus };
     return { html: await page.content() };
@@ -139,11 +139,13 @@ const STABLE_TEXT_CHARS = 200;
 const STABLE_POLL_MS = 500;
 const STABLE_POLLS = 3;
 
-async function waitForStableText(page: Page, deadline: number): Promise<void> {
+/** Until the text is long enough and settled, `done()` (e.g. the page landed on an error status), or the deadline. */
+async function waitForStableText(page: Page, deadline: number, done: () => boolean): Promise<void> {
   let last = -1;
   let same = 0;
   while (Date.now() + STABLE_POLL_MS < deadline) {
     await page.waitForTimeout(STABLE_POLL_MS);
+    if (done()) return;
     // Visible-content text only: inline scripts and styles count toward textContent but are no posting (#64 review).
     const length = await page
       .evaluate(() => {

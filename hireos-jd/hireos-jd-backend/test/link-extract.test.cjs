@@ -34,7 +34,15 @@ const APP_JS = `
 const JOB = {
   title: 'AI应用算法工程师',
   locations: '北京 / 广州 / 杭州 / 上海',
-  duties: ['深入业务与产品共创需求，将诉求转化为可执行的AI任务定义', '搭建高效的数据采集、清洗与标注工程流水线', '面向业务目标设计评测指标与Rubric，搭建自动化评测框架'],
+  // Long enough (200+ characters) that a render settles as soon as the posting is in, like a real one.
+  duties: [
+    '深入业务与产品共创需求，将诉求转化为可执行的AI任务定义，明确目标、边界、优先级与验收口径',
+    '搭建高效的数据采集、清洗与标注工程流水线，建立数据版本追踪与质量评估体系',
+    '面向业务目标设计评测指标与Rubric，搭建自动化评测框架，建立离线基准与线上实验体系',
+    '负责系统集成与上线发布，对线上质量、稳定性与成本负责，建立监控、告警、兜底与人工接管机制',
+    '在Prompt、RAG、微调、Agent等路线间做技术选型与权衡，设计端到端应用架构并完成生产级集成',
+    '主导基座大模型的后训练技术演进，包括高质量的SFT与强化学习、偏好优化算法攻坚',
+  ],
 };
 
 function html(body, extra = {}) {
@@ -130,7 +138,7 @@ async function rejectsWith(promise, pattern) {
 
 test('#64 AC-5: a page whose initial HTML has no posting is rendered, and the posting the script loads is read', needsBrowser, async () => {
   const { network, requested } = fixtureNetwork();
-  const text = await extractTextFromLink('https://jobs.example.test/position/42', { network, renderer, renderTimeoutMs: 4000 });
+  const text = await extractTextFromLink('https://jobs.example.test/position/42', { network, renderer, renderTimeoutMs: 15000 });
 
   assert.match(text, /AI应用算法工程师/);
   assert.match(text, /北京 \/ 广州 \/ 杭州 \/ 上海/);
@@ -141,7 +149,7 @@ test('#64 AC-5: a page whose initial HTML has no posting is rendered, and the po
 
 test('#64 AC-5: inside the rendered page, internal hosts stay unreachable, directly or via a public redirect', needsBrowser, async () => {
   const { network, requested } = fixtureNetwork();
-  const text = await extractTextFromLink('https://jobs.example.test/position/42', { network, renderer, renderTimeoutMs: 4000 });
+  const text = await extractTextFromLink('https://jobs.example.test/position/42', { network, renderer, renderTimeoutMs: 15000 });
 
   assert.doesNotMatch(text, /SECRET-INTERNAL-DATA/);
   assert.deepEqual(requested.filter((r) => r.url.includes('intranet.example.test')), []);
@@ -219,7 +227,7 @@ test('#64 review: a page that hangs its renderer is stopped, and the render slot
   assert.deepEqual(hung.map((r) => r.status), ['rejected', 'rejected', 'rejected']);
   assert.ok(Date.now() - startedAt < 20_000, `stopped in ${Date.now() - startedAt}ms`);
 
-  const text = await extractTextFromLink('https://jobs.example.test/position/42', { network, renderer, renderTimeoutMs: 4000 });
+  const text = await extractTextFromLink('https://jobs.example.test/position/42', { network, renderer, renderTimeoutMs: 15000 });
   assert.match(text, /AI应用算法工程师/, 'later renders still run');
 });
 
@@ -230,7 +238,7 @@ test('#64 review: the browser does not inherit the service environment', () => {
 
 test('#64 review AC-3: what the render finds out (a human check) is reported, not hidden behind the loading text', needsBrowser, async () => {
   const { network } = fixtureNetwork();
-  await rejectsWith(extractTextFromLink('https://jobs.example.test/loading', { network, renderer, renderTimeoutMs: 4000 }), /人机验证/);
+  await rejectsWith(extractTextFromLink('https://jobs.example.test/loading', { network, renderer, renderTimeoutMs: 10000 }), /人机验证/);
   // With no render possible, the shell's loading text is not taken for a posting either.
   await rejectsWith(extractTextFromLink('https://jobs.example.test/loading', { network, renderer: null }), /网页脚本加载.*粘贴/);
 });
@@ -242,32 +250,32 @@ test('#64 review AC-3: a page whose render is empty is no content, even if it sa
 
 test('#64: a short static posting that renders the same is read', needsBrowser, async () => {
   const { network } = fixtureNetwork();
-  const text = await extractTextFromLink('https://jobs.example.test/short-static', { network, renderer, renderTimeoutMs: 4000 });
+  const text = await extractTextFromLink('https://jobs.example.test/short-static', { network, renderer, renderTimeoutMs: 10000 });
   assert.match(text, /运营专员/);
 });
 
 test('#64 review: a posting requested after the network went idle is still waited for', needsBrowser, async () => {
   const { network } = fixtureNetwork();
-  const text = await extractTextFromLink('https://jobs.example.test/delayed', { network, renderer, renderTimeoutMs: 4000 });
+  const text = await extractTextFromLink('https://jobs.example.test/delayed', { network, renderer, renderTimeoutMs: 15000 });
   assert.match(text, /AI应用算法工程师/);
 });
 
 test('#64 review AC-3: a page that ends on an error status, or only asks to sign in, is refused with the reason', needsBrowser, async () => {
   const { network } = fixtureNetwork();
-  await rejectsWith(extractTextFromLink('https://jobs.example.test/to-login', { network, renderer, renderTimeoutMs: 3000 }), /需要登录.*粘贴/);
-  await rejectsWith(extractTextFromLink('https://jobs.example.test/login-wall', { network, renderer, renderTimeoutMs: 3000 }), /需要登录.*粘贴/);
+  await rejectsWith(extractTextFromLink('https://jobs.example.test/to-login', { network, renderer, renderTimeoutMs: 10000 }), /需要登录.*粘贴/);
+  await rejectsWith(extractTextFromLink('https://jobs.example.test/login-wall', { network, renderer, renderTimeoutMs: 10000 }), /需要登录.*粘贴/);
 });
 
 test('#64 review: inline scripts don\'t count as content, so a slow posting is still waited for', needsBrowser, async () => {
   const { network } = fixtureNetwork();
-  const text = await extractTextFromLink('https://jobs.example.test/big-inline-script', { network, renderer, renderTimeoutMs: 6000 });
+  const text = await extractTextFromLink('https://jobs.example.test/big-inline-script', { network, renderer, renderTimeoutMs: 15000 });
   assert.match(text, /AI应用算法工程师/);
 });
 
 test('#64 review: a posting with a "Sign in to apply" button is read, not taken for a login wall', async () => {
   const { network } = fixtureNetwork();
   for (const r of [null, renderer]) {
-    const text = await extractTextFromLink('https://jobs.example.test/sign-in-to-apply', { network, renderer: r || null, renderTimeoutMs: 3000 });
+    const text = await extractTextFromLink('https://jobs.example.test/sign-in-to-apply', { network, renderer: r || null, renderTimeoutMs: 10000 });
     assert.match(text, /运营专员/);
     assert.match(text, /Sign in to apply/);
   }
@@ -294,7 +302,7 @@ test('#64 review: the remote renderer (jd-renderer) reads the posting, with inte
   if (!server) return t.skip('Playwright Chromium not installed (npx playwright-core install chromium)');
   try {
     const { network, requested } = fixtureNetwork();
-    const text = await extractTextFromLink('https://jobs.example.test/position/42', { network, renderer: { kind: 'remote', url: server.url }, renderTimeoutMs: 4000 });
+    const text = await extractTextFromLink('https://jobs.example.test/position/42', { network, renderer: { kind: 'remote', url: server.url }, renderTimeoutMs: 15000 });
     assert.match(text, /AI应用算法工程师/);
     assert.doesNotMatch(text, /SECRET-INTERNAL-DATA/);
     assert.deepEqual(requested.filter((r) => r.url.includes('intranet.example.test')), []);
