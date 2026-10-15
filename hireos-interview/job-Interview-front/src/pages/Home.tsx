@@ -1,5 +1,5 @@
 import { useStore } from "../store/StoreContext";
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { api, type ApiError, type JobSummary, type TaskSummary } from '../features/project-intake/api';
 import { errorText, intakeText } from '../features/project-intake/i18n';
 import { Pill } from "../utils/status";
@@ -43,6 +43,12 @@ export function HomePage() {
       .finally(() => { if (active) setLoading(false); });
     return () => { active = false; };
   }, [reload]);
+  // Re-fetch after the "New interview project" modal closes so a just-created job shows up.
+  const createModalWasOpen = useRef(false);
+  useEffect(() => {
+    if (createModalWasOpen.current && !state.showCreateModal) setReload((n) => n + 1);
+    createModalWasOpen.current = state.showCreateModal;
+  }, [state.showCreateModal]);
   // Jobs/Résumés/Tasks handed off from the Resume Screening subsystem, fetched from the
   // real API (see src/data/domain.ts for the shape). A task is a unique (Job, Candidate)
   // pair; a JD with no matched résumé yet is a Job with zero tasks, not a task itself.

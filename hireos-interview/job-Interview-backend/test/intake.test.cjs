@@ -87,6 +87,14 @@ test('intake persistence, validation, parsing and recovery', async (t) => {
       const read = await (await fetch(`${base}/jobs/${job.id}`)).json();
       assert.equal(read.id, job.id); assert.equal(read.jdText, jdText); assert.equal(read.tasks.length, 0);
     });
+    await t.test('a job can be created from JD text alone; title comes from the first line', async () => {
+      const response = await send('/jobs', { jdText: '\n  Platform Engineer  \nRemote\n\nOwn the platform.' });
+      assert.equal(response.status, 201); const created = await response.json();
+      assert.equal(created.title, 'Platform Engineer'); assert.equal(created.coreJobId, null);
+      assert.match(created.jdText, /Own the platform/); assert.equal(created.tasks.length, 0);
+      assert.equal((await send('/jobs', { jdText: '   ' })).status, 400);
+      assert.equal((await send('/jobs', { jdText: 'x', title: 'extra' })).status, 400);
+    });
     await t.test('workspace isolation and production fail-closed guard', async () => {
       await assert.rejects(app.get(JobsService).get('different-workspace', job.id), (e) => e.getStatus() === 404);
       const guard = new WorkspaceGuard(new ConfigService({ NODE_ENV: 'production', DEV_AUTH_ENABLED: 'true' }));

@@ -8,10 +8,13 @@ export const taskStatusSchema = z.enum([
   'evidence_requested', 'awaiting_confirmation', 'package_published', 'on_hold', 'not_proceeding',
 ]);
 
-// The "pick an existing job" entry point (JobsService.attach) — Interview has no JD
-// authoring of its own, so this is the only way a Job comes to exist locally besides
-// a Screening hand-off.
+// The "pick an existing job" entry point (JobsService.attach) — syncs a Core Record job
+// locally. A Job can also be created from JD text (createJobSchema) or a Screening hand-off.
 export const attachJobSchema = z.object({ coreJobId: z.string().trim().min(1).max(200) }).strict();
+
+// The "start from a JD" entry point (JobsService.create): a Job authored locally from
+// pasted or uploaded JD text, with no Core Record counterpart (coreJobId stays null).
+export const createJobSchema = z.object({ jdText: z.string().trim().min(1).max(150000) }).strict();
 
 // Links one more résumé to an existing Job (the "link candidate" action).
 export const createTaskSchema = z.object({ materialId: z.string().uuid() }).strict();

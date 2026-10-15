@@ -1,16 +1,16 @@
 import { useStore } from "../store/StoreContext";
-import { CloseSvg, ArrowRightSvg, FileSvg, SearchSvg } from "./ui/Icons";
+import { CloseSvg, ArrowRightSvg, FileSvg } from "./ui/Icons";
 import { Modal } from "antd";
-import { useAttachJob } from "../features/project-intake/useAttachJob";
+import { useCreateProject } from "../features/project-intake/useCreateProject";
 import { errorText, intakeText } from "../features/project-intake/i18n";
 
 export function CreateProjectModal() {
   const { state, set, t } = useStore();
-  const form = useAttachJob();
+  const form = useCreateProject();
   const it = intakeText(state.lang);
   const open = state.showCreateModal;
 
-  const close_ = () => { if (!form.busy) { set({ showCreateModal: false }); form.back(); } };
+  const close_ = () => { if (!form.creating) { set({ showCreateModal: false }); form.reset(); } };
 
   if (!open) return null;
 
@@ -29,264 +29,141 @@ export function CreateProjectModal() {
     >
       <div style={{ display: "flex", alignItems: "flex-start", gap: 10 }}>
         <div style={{ flex: 1 }}>
-          <div
-            style={{
-              fontFamily: "'IBM Plex Mono', monospace",
-              fontSize: 10.5,
-              letterSpacing: ".08em",
-              color: "var(--ink-3)",
-            }}
-          >
+          <div style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: 10.5, letterSpacing: ".08em", color: "var(--ink-3)" }}>
             {t.newInterviewProject}
           </div>
-          <div style={{ marginTop: 6, fontSize: 22, fontWeight: 700 }}>
-            {t.pickJobTitle}
-          </div>
-          <div style={{ marginTop: 6, fontSize: 13, color: "var(--ink-2)" }}>
-            {t.pickJobSubtitle}
-          </div>
+          <div style={{ marginTop: 6, fontSize: 22, fontWeight: 700 }}>{t.startWithJd}</div>
+          <div style={{ marginTop: 6, fontSize: 13, color: "var(--ink-2)" }}>{t.jdSubtitle}</div>
         </div>
         <button
           aria-label={t.closeProjectDialog}
           onClick={close_}
-          style={{
-            flex: "none",
-            width: 28,
-            height: 28,
-            border: 0,
-            background: "transparent",
-            color: "var(--ink-3)",
-            cursor: "pointer",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-          }}
+          style={{ flex: "none", width: 28, height: 28, border: 0, background: "transparent", color: "var(--ink-3)", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}
         >
           <CloseSvg />
         </button>
       </div>
 
-      {!form.job && (
-        <div style={{ marginTop: 20 }}>
-          <div
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: 10,
-              padding: "10px 14px",
-              border: "1px solid var(--line-strong)",
-              borderRadius: 11,
-              background: "var(--surface)",
+      <div style={{ marginTop: 20 }}>
+        <label htmlFor="jdTextInput" style={{ display: "block", fontSize: 13, fontWeight: 600 }}>{t.jobDescription}</label>
+        <div style={{ marginTop: 3, fontSize: 11, fontWeight: 700, color: "var(--bad)", letterSpacing: ".02em" }}>{t.required}</div>
+        <textarea
+          id="jdTextInput"
+          value={form.jdText}
+          onChange={(e) => form.setJdText(e.target.value)}
+          placeholder={t.jdPlaceholder}
+          style={{
+            marginTop: 8, width: "100%", height: 150, border: "1px solid var(--line-strong)", borderRadius: 11,
+            padding: "12px 14px", fontSize: 13, color: "var(--ink-2)", background: "var(--surface)", lineHeight: 1.55,
+            resize: "none", boxSizing: "border-box", outline: "none", fontFamily: "inherit",
+          }}
+        />
+        <label
+          htmlFor="jdFileInput"
+          style={{
+            marginTop: 14, width: "100%", display: "flex", alignItems: "center", gap: 12, padding: "14px 16px",
+            border: "1px dashed var(--line-strong)", borderRadius: 12, background: "var(--surface-2)",
+            cursor: form.jdFileBusy ? "progress" : "pointer", textAlign: "left", boxSizing: "border-box",
+          }}
+        >
+          <input
+            id="jdFileInput"
+            type="file"
+            accept=".pdf,.docx,.txt"
+            disabled={form.jdFileBusy}
+            onChange={(e) => {
+              const f = e.target.files?.[0];
+              if (f) void form.pickJdFile(f);
+              e.target.value = "";
             }}
-          >
-            <SearchSvg />
-            <input
-              autoFocus
-              aria-label={t.searchJobsPlaceholder}
-              value={form.query}
-              onChange={(e) => void form.search(e.target.value)}
-              placeholder={t.searchJobsPlaceholder}
-              style={{
-                flex: 1,
-                border: 0,
-                outline: "none",
-                fontSize: 13.5,
-                background: "transparent",
-                color: "var(--ink)",
-              }}
-            />
+            style={{ display: "none" }}
+          />
+          <span style={{ color: "var(--brand)", display: "flex" }}><FileSvg /></span>
+          <div style={{ minWidth: 0 }}>
+            <div style={{ fontSize: 13.5, fontWeight: 700, color: "var(--brand)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+              {form.jdFileName || t.chooseJdFile}
+            </div>
+            <div style={{ fontSize: 11.5, color: "var(--ink-3)" }}>{form.jdFileBusy ? it.uploading : t.chooseJdFileSub}</div>
           </div>
+        </label>
 
-          <div style={{ marginTop: 10, display: "flex", flexDirection: "column", gap: 6, maxHeight: 280, overflowY: "auto" }}>
-            {form.searching && <div style={{ padding: "10px 2px", fontSize: 12.5, color: "var(--ink-3)" }}>{it.loading}</div>}
-            {!form.searching && form.results.length === 0 && (
-              <div style={{ padding: "10px 2px", fontSize: 12.5, color: "var(--ink-3)" }}>{t.noJobsFound}</div>
-            )}
-            {form.results.map((job) => (
-              <button
-                key={job.id}
-                disabled={form.attaching}
-                onClick={() => void form.pick(job.id)}
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "space-between",
-                  gap: 10,
-                  padding: "12px 14px",
-                  border: "1px solid var(--line)",
-                  borderRadius: 11,
-                  background: "var(--surface)",
-                  cursor: "pointer",
-                  textAlign: "left",
-                }}
+        <div style={{ marginTop: 16, display: "flex", alignItems: "center", gap: 10 }}>
+          <div style={{ flex: 1 }}>
+            <div style={{ fontSize: 13.5, fontWeight: 600 }}>{t.candidateMaterials}</div>
+            <div style={{ fontSize: 11.5, color: "var(--ink-3)" }}>{t.candidateMaterialsSub}</div>
+          </div>
+          <label htmlFor="materialsFileInput" style={{ flex: "none", display: "flex", alignItems: "center", gap: 5, color: "var(--brand)", fontSize: 13, fontWeight: 600, cursor: "pointer" }}>
+            <input
+              id="materialsFileInput"
+              type="file"
+              multiple
+              accept=".pdf,.docx,.txt"
+              onChange={(e) => {
+                const files = Array.from(e.target.files || []);
+                if (files.length) form.addMaterials(files);
+                e.target.value = "";
+              }}
+              style={{ display: "none" }}
+            />
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round">
+              <path d="M12 5v14M5 12h14"></path>
+            </svg>
+            {t.addMaterials}
+          </label>
+        </div>
+
+        {form.materials.length > 0 && (
+          <div style={{ marginTop: 9, display: "flex", flexDirection: "column", gap: 6 }}>
+            {form.materials.map((m) => (
+              <div
+                key={m.key}
+                style={{ display: "flex", alignItems: "center", gap: 8, padding: "7px 10px", border: "1px solid var(--line)", borderRadius: 9, background: "var(--surface-2)", fontSize: 12 }}
               >
-                <div>
-                  <div style={{ fontSize: 13.5, fontWeight: 700 }}>{job.title}</div>
-                  <div style={{ marginTop: 2, fontSize: 11.5, color: "var(--ink-3)" }}>
-                    {[job.team, job.location, job.seniority]
-                      .filter(Boolean)
-                      .map((v) => (state.lang === "zh" && v === "Unassigned" ? "未分配" : state.lang === "zh" && v === "Unspecified" ? "未指定" : v))
-                      .join(" · ") || job.status}
-                  </div>
-                </div>
-                <ArrowRightSvg />
-              </button>
+                <FileSvg size={16} />
+                <span style={{ flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                  {m.name}
+                  <small style={{ display: "block", whiteSpace: "normal", color: m.error ? "var(--bad)" : "var(--ink-3)" }}>
+                    {m.uploading ? it.uploading : m.error ? errorText(m.error, state.lang) : it.available}
+                  </small>
+                </span>
+                {m.error && !m.material && (
+                  <button onClick={() => void form.retryMaterial(m)} style={{ border: 0, background: "transparent", color: "var(--brand)", cursor: "pointer", fontSize: 12, fontWeight: 600 }}>
+                    {it.retry}
+                  </button>
+                )}
+                <button
+                  aria-label={it.remove}
+                  onClick={() => form.removeMaterial(m.key)}
+                  style={{ border: 0, background: "transparent", color: "var(--ink-3)", cursor: "pointer", fontSize: 12 }}
+                >
+                  ✕
+                </button>
+              </div>
             ))}
           </div>
-        </div>
-      )}
+        )}
+      </div>
 
-      {form.job && (
-        <div style={{ marginTop: 18 }}>
-          <div
-            style={{
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "space-between",
-              padding: "12px 14px",
-              border: "1px solid var(--line-strong)",
-              borderRadius: 11,
-              background: "var(--surface-2)",
-            }}
-          >
-            <div>
-              <div style={{ fontSize: 13.5, fontWeight: 700 }}>{form.job.title}</div>
-              <div style={{ marginTop: 2, fontSize: 11.5, color: "var(--ink-3)" }}>
-                {[form.job.department, form.job.location, form.job.level].filter(Boolean).join(" · ")}
-              </div>
-            </div>
-            <button
-              onClick={form.back}
-              style={{ border: 0, background: "transparent", color: "var(--brand)", fontSize: 12.5, fontWeight: 600, cursor: "pointer" }}
-            >
-              {t.changeJob}
-            </button>
-          </div>
-
-          <div style={{ marginTop: 16, display: "flex", alignItems: "center", gap: 10 }}>
-            <div style={{ flex: 1 }}>
-              <div style={{ fontSize: 13.5, fontWeight: 600 }}>{t.resumesTitle}</div>
-              <div style={{ fontSize: 11.5, color: "var(--ink-3)" }}>{t.resumesSub}</div>
-            </div>
-            <label
-              htmlFor="resumesFileInput"
-              style={{
-                flex: "none",
-                display: "flex",
-                alignItems: "center",
-                gap: 5,
-                color: "var(--brand)",
-                fontSize: 13,
-                fontWeight: 600,
-                cursor: "pointer",
-              }}
-            >
-              <input
-                id="resumesFileInput"
-                type="file"
-                multiple
-                accept=".pdf,.docx,.txt"
-                onChange={(e) => {
-                  const files = Array.from(e.target.files || []);
-                  if (!files.length) return;
-                  form.addResumes(files);
-                  e.target.value = "";
-                }}
-                style={{ display: "none" }}
-              />
-              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round">
-                <path d="M12 5v14M5 12h14"></path>
-              </svg>
-              {t.addResumes}
-            </label>
-          </div>
-
-          {form.resumes.length > 0 && (
-            <div style={{ marginTop: 9, display: "flex", flexDirection: "column", gap: 6 }}>
-              {form.resumes.map((m) => (
-                <div
-                  key={m.key}
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    gap: 8,
-                    padding: "7px 10px",
-                    border: "1px solid var(--line)",
-                    borderRadius: 9,
-                    background: "var(--surface-2)",
-                    fontSize: 12,
-                  }}
-                >
-                  <FileSvg />
-                  <span style={{ flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                    {m.name}
-                    <small style={{ display: 'block', whiteSpace: 'normal' }}>
-                      {m.uploading ? it.uploading : (m.error || m.material?.errorCode) ? errorText(m.error || m.material!.errorCode!, state.lang) : it.available}
-                    </small>
-                  </span>
-                  {m.error && <button onClick={() => void form.uploadResume(m)}>{it.retry}</button>}
-                  <button
-                    aria-label={it.remove}
-                    onClick={() => form.setResumes((rows) => rows.filter((x) => x.key !== m.key))}
-                    style={{ border: 0, background: "transparent", color: "var(--ink-3)", cursor: "pointer", fontSize: 12 }}
-                  >
-                    ✕
-                  </button>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-      )}
-
-      {form.error && <div role="alert" style={{ marginTop: 12, color: 'var(--bad)' }}>{form.error}</div>}
-      <div
-        style={{
-          marginTop: 22,
-          paddingTop: 16,
-          borderTop: "1px solid var(--line)",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "flex-end",
-          gap: 16,
-        }}
-      >
+      {form.error && <div role="alert" style={{ marginTop: 12, fontSize: 12.5, color: "var(--bad)" }}>{form.error}</div>}
+      <div style={{ marginTop: 22, paddingTop: 16, borderTop: "1px solid var(--line)", display: "flex", alignItems: "center", justifyContent: "flex-end", gap: 16 }}>
         <button
           onClick={close_}
-          style={{
-            border: 0,
-            background: "transparent",
-            color: "var(--brand)",
-            fontSize: 13.5,
-            fontWeight: 600,
-            cursor: "pointer",
-          }}
+          style={{ border: 0, background: "transparent", color: "var(--brand)", fontSize: 13.5, fontWeight: 600, cursor: "pointer" }}
         >
           {t.cancel}
         </button>
-        {form.job && (
-          <button
-            onClick={form.finish}
-            disabled={form.busy}
-            style={{
-              height: 40,
-              padding: "0 18px",
-              border: "1px solid var(--brand)",
-              borderRadius: 10,
-              background: "var(--brand)",
-              color: "var(--brand-ink)",
-              fontSize: 13.5,
-              fontWeight: 700,
-              cursor: "pointer",
-              display: "flex",
-              alignItems: "center",
-              gap: 8,
-            }}
-          >
-            {t.doneButton}
-            <ArrowRightSvg />
-          </button>
-        )}
+        <button
+          onClick={() => void form.create()}
+          disabled={form.busy}
+          style={{
+            height: 40, padding: "0 18px", border: "1px solid var(--brand)", borderRadius: 10, background: "var(--brand)",
+            color: "var(--brand-ink)", fontSize: 13.5, fontWeight: 700, display: "flex", alignItems: "center", gap: 8,
+            cursor: form.busy ? "not-allowed" : "pointer", opacity: form.busy ? 0.6 : 1,
+          }}
+        >
+          {form.creating ? it.submitting : t.createProject}
+          <ArrowRightSvg />
+        </button>
       </div>
     </Modal>
   );

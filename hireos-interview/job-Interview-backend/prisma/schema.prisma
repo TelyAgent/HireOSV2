@@ -33,8 +33,8 @@ model Job {
   id             String   @id @default(uuid())
   workspaceId    String
   createdBy      String
-  // Core Record's Job id. Always set for any Job reachable from current code paths;
-  // nullable only because a handful of pre-migration rows predate this field.
+  // Core Record's Job id. Set for attached / handed-off jobs; null for jobs created
+  // locally from JD text (POST /jobs) and a handful of pre-migration rows.
   coreJobId      String?  @unique
   title          String
   department     String?

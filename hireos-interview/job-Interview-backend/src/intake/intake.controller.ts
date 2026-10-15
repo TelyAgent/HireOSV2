@@ -25,8 +25,10 @@ export class IntakeController {
   @Get('materials/:id')
   material(@Req() req: { identity: Identity }, @Param('id') id: string) { return this.materials.get(req.identity.workspaceId, id); }
 
-  // Interview has no JD authoring of its own -- these two replace the old JD-upload
-  // flow: search Core Record's job directory, then attach the one the recruiter picked.
+  // Two ways a recruiter brings a job in: create one from JD text, or search Core
+  // Record's job directory and attach the one they picked.
+  @Post('jobs')
+  createJob(@Req() req: { identity: Identity }, @Body() body: unknown) { return this.jobs.create(req.identity, body); }
   @Get('external-jobs')
   searchExternalJobs(@Req() req: { identity: Identity }, @Query('q') q?: string) { return this.jobs.search(req.identity, q); }
   @Post('jobs/attach')

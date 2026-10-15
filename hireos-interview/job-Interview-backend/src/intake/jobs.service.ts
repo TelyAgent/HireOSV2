@@ -2,7 +2,7 @@ import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../persistence/prisma.service';
 import { CoreRecordClient, mapRecruitingStatus } from '../core-record/core-record.client';
 import { JdContentFacade, formatJdText } from '../core-record/jd-content.facade';
-import { attachJobSchema, validate } from './contracts';
+import { attachJobSchema, createJobSchema, validate } from './contracts';
 import type { Identity } from './workspace.guard';
 
 @Injectable()
@@ -51,6 +51,20 @@ export class JobsService {
         recruitingStatus,
         jdText,
       },
+    });
+    return this.get(identity.workspaceId, job.id);
+  }
+
+  /**
+   * The "start from a JD" entry point: creates a local Job from pasted or uploaded JD
+   * text. The title is the JD's first non-empty line; department/location/level stay
+   * empty and coreJobId stays null since no Core Record job backs it.
+   */
+  async create(identity: Identity, raw: unknown) {
+    const { jdText } = validate(createJobSchema, raw);
+    const title = (jdText.split('\n').map((line) => line.trim()).find(Boolean) || jdText).slice(0, 200);
+    const job = await this.db.job.create({
+      data: { workspaceId: identity.workspaceId, createdBy: identity.actorId, title, jdText },
     });
     return this.get(identity.workspaceId, job.id);
   }
