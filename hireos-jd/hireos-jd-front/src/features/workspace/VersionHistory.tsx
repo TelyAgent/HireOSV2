@@ -21,7 +21,7 @@ import { getPerson } from "../../data/fixtures/people";
 import { fmtDate, fmtRelative } from "../../lib/format";
 import { coreJobToLocalJob } from "../jobs/jobsMapping";
 import { BLOCK_LEVELS, BLOCK_LEVEL_KEYS, blockLevel, blockPlainText, editDocCopy, groupSections, selectDraft } from "./docHelpers";
-import { diffBlocks, publishVersion, type BlockDiff, type JdVersion } from "./versions";
+import { baselineOf, diffBlocks, docMetaOf, publishVersion, type BlockDiff, type JdVersion } from "./versions";
 import { useDocumentSaver } from "./useDocumentSaver";
 import type { BlockLevel } from "../../data/types";
 
@@ -241,7 +241,8 @@ export function VersionHistoryDrawer({ jobId }: { jobId: string }) {
           mutate((d) => {
             editDocCopy(d, jobId, (doc) => {
               doc.blocks = v.blocks.map((b) => ({ ...b, text: Array.isArray(b.text) ? [...b.text] : b.text }));
-              if (v.meta) doc.meta = v.meta;
+              const meta = docMetaOf(v);
+              if (meta) doc.meta = meta;
               doc.revision++;
               doc.saveState = "dirty";
             });
@@ -261,12 +262,19 @@ export function VersionHistoryDrawer({ jobId }: { jobId: string }) {
         <DrawerHeader title={`${v.code} · ${v.title}`} />
         <DrawerBody>
           <div className="card card-pad ver-meta">
-            <div>
-              <span>{t("Published")}</span>
-              <strong>
-                {fmtDate(v.publishedAt)} · {personName(v.publishedBy)}
-              </strong>
-            </div>
+            {baselineOf(v) ? (
+              <div>
+                <span>{t("Migration baseline")}</span>
+                <strong>{t("Migrated %s · original approval and publish time unknown").replace("%s", fmtDate(v.publishedAt))}</strong>
+              </div>
+            ) : (
+              <div>
+                <span>{t("Published")}</span>
+                <strong>
+                  {fmtDate(v.publishedAt)} · {personName(v.publishedBy)}
+                </strong>
+              </div>
+            )}
             {v.note && (
               <div>
                 <span>{t("Note")}</span>
@@ -366,9 +374,16 @@ export function VersionHistoryDrawer({ jobId }: { jobId: string }) {
               <div className="ver-item-top">
                 <strong>v{v.versionNo}</strong>
                 {v === latest && <span className="badge badge-success">{t("Latest")}</span>}
-                <span className="tiny">
-                  {fmtDate(v.publishedAt)} · {personName(v.publishedBy)}
-                </span>
+                {baselineOf(v) ? (
+                  <>
+                    <span className="badge badge-neutral">{t("Migration baseline")}</span>
+                    <span className="tiny">{t("Migrated %s · original approval and publish time unknown").replace("%s", fmtDate(v.publishedAt))}</span>
+                  </>
+                ) : (
+                  <span className="tiny">
+                    {fmtDate(v.publishedAt)} · {personName(v.publishedBy)}
+                  </span>
+                )}
                 <div style={{ flex: 1 }} />
                 <Button variant="text" size="sm" onClick={() => setView({ kind: "view", no: v.versionNo })}>
                   {t("View")}

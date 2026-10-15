@@ -10,13 +10,20 @@ import { authFetch } from "../../lib/session";
 
 const JOBS = `${API_BASE_URL}api/jobs`;
 
+/** Set on the v1 the #96 migration gave a job published before versions existed. */
+export interface VersionBaseline {
+  kind: "migration_baseline";
+  source: "saved_document" | "draft";
+  migratedAt: string;
+}
+
 export interface JdVersion {
   versionNo: number;
   /** e.g. JD-2026-0012@v3 */
   code: string;
   title: string;
   blocks: DocBlock[];
-  meta: DocMeta | null;
+  meta: (DocMeta & { baseline?: VersionBaseline }) | null;
   note: string;
   publishedBy: string;
   publishedAt: string;
@@ -24,6 +31,18 @@ export interface JdVersion {
 export interface JdVersions {
   jdCode: string;
   versions: JdVersion[];
+}
+
+/** The migration-baseline marker of a version, if it is one: its time is the migration's, not a real publish. */
+export function baselineOf(v: JdVersion): VersionBaseline | null {
+  return v.meta?.baseline?.kind === "migration_baseline" ? v.meta.baseline : null;
+}
+
+/** A version's document meta without the baseline marker, for restoring it into the draft. */
+export function docMetaOf(v: JdVersion): DocMeta | null {
+  if (!v.meta) return null;
+  const { values, shown } = v.meta;
+  return { values: values ?? {}, shown: shown ?? [] };
 }
 
 async function parseOrThrow<T>(response: Response): Promise<T> {

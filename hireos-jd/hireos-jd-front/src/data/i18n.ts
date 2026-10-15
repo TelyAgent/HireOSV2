@@ -353,6 +353,8 @@ export const ZH: Record<string, string> = {
   "Compare": "对比",
   "Every Publish creates a new version. History is kept so every change can be traced.": "每次发布都会生成一个新版本，历史版本会保留，便于追溯每次改动。",
   "Not published yet — the first Publish creates v1.": "尚未发布 — 首次发布将生成 v1。",
+  "Migration baseline": "迁移基线",
+  "Migrated %s · original approval and publish time unknown": "迁移于 %s · 原审批与发布时间未知",
   "Latest": "最新",
   "Draft": "草稿",
   "That text has changed since the review — run Analyze again.": "原文在检查之后已被修改 — 请重新分析。",

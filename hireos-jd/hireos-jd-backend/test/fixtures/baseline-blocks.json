@@ -1,0 +1,285 @@
+{
+  "title": "Growth Lead",
+  "jobId": "job-abc123",
+  "draft": {
+    "roleSummary": "Owns growth in Vietnam.",
+    "responsibilities": [
+      "Build a local growth process",
+      "Run experiments"
+    ],
+    "requirements": [
+      {
+        "label": "Performance marketing",
+        "priority": "must_have",
+        "group": "1.基础条件"
+      },
+      {
+        "label": "SQL",
+        "priority": "must_have",
+        "group": "1.基础条件"
+      },
+      {
+        "label": "Vietnamese",
+        "priority": "must_have"
+      },
+      {
+        "label": "B2C apps",
+        "priority": "preferred"
+      }
+    ],
+    "hiringContext": {
+      "businessProblem": "No one owns growth in Vietnam.",
+      "expectedOutcomes": [
+        "10k MAU"
+      ]
+    },
+    "successCriteria": [
+      {
+        "period": "90 days",
+        "statement": "Launch 3 campaigns"
+      }
+    ],
+    "internalCompensation": {
+      "min": 30000,
+      "max": 45000,
+      "currency": "USD",
+      "period": "year",
+      "basis": "gross"
+    },
+    "publicCompensation": {
+      "min": 25000,
+      "max": 40000,
+      "currency": "USD",
+      "period": "year",
+      "basis": "gross"
+    }
+  },
+  "blocks": [
+    {
+      "id": "b123-1",
+      "kind": "h2",
+      "text": "Growth Lead",
+      "requirementRefs": [],
+      "semanticRole": "presentation_only",
+      "comment": null,
+      "stale": false,
+      "level": "public"
+    },
+    {
+      "id": "b123-2",
+      "kind": "p",
+      "text": "Owns growth in Vietnam.",
+      "requirementRefs": [],
+      "semanticRole": "presentation_only",
+      "comment": null,
+      "stale": false,
+      "level": "public"
+    },
+    {
+      "id": "b123-3",
+      "kind": "h2",
+      "text": "Business problem",
+      "requirementRefs": [],
+      "semanticRole": "presentation_only",
+      "comment": null,
+      "stale": false,
+      "level": "internal"
+    },
+    {
+      "id": "b123-4",
+      "kind": "p",
+      "text": "No one owns growth in Vietnam.",
+      "requirementRefs": [],
+      "semanticRole": "presentation_only",
+      "comment": null,
+      "stale": false,
+      "level": "internal"
+    },
+    {
+      "id": "b123-5",
+      "kind": "h2",
+      "text": "Responsibilities",
+      "requirementRefs": [],
+      "semanticRole": "presentation_only",
+      "comment": null,
+      "stale": false,
+      "level": "public"
+    },
+    {
+      "id": "b123-6",
+      "kind": "ul",
+      "text": [
+        "Build a local growth process"
+      ],
+      "requirementRefs": [],
+      "semanticRole": "presentation_only",
+      "comment": null,
+      "stale": false,
+      "level": "public"
+    },
+    {
+      "id": "b123-7",
+      "kind": "ul",
+      "text": [
+        "Run experiments"
+      ],
+      "requirementRefs": [],
+      "semanticRole": "presentation_only",
+      "comment": null,
+      "stale": false,
+      "level": "public"
+    },
+    {
+      "id": "b123-8",
+      "kind": "h2",
+      "text": "Requirements",
+      "requirementRefs": [],
+      "semanticRole": "presentation_only",
+      "comment": null,
+      "stale": false,
+      "level": "public"
+    },
+    {
+      "id": "b123-9",
+      "kind": "h3",
+      "text": "1.基础条件",
+      "requirementRefs": [],
+      "semanticRole": "presentation_only",
+      "comment": null,
+      "stale": false,
+      "level": "public"
+    },
+    {
+      "id": "b123-10",
+      "kind": "ul",
+      "text": [
+        "Performance marketing"
+      ],
+      "requirementRefs": [],
+      "semanticRole": "presentation_only",
+      "comment": null,
+      "stale": false,
+      "level": "public"
+    },
+    {
+      "id": "b123-11",
+      "kind": "ul",
+      "text": [
+        "SQL"
+      ],
+      "requirementRefs": [],
+      "semanticRole": "presentation_only",
+      "comment": null,
+      "stale": false,
+      "level": "public"
+    },
+    {
+      "id": "b123-12",
+      "kind": "ul",
+      "text": [
+        "Vietnamese"
+      ],
+      "requirementRefs": [],
+      "semanticRole": "presentation_only",
+      "comment": null,
+      "stale": false,
+      "level": "public"
+    },
+    {
+      "id": "b123-13",
+      "kind": "h2",
+      "text": "Preferred",
+      "requirementRefs": [],
+      "semanticRole": "presentation_only",
+      "comment": null,
+      "stale": false,
+      "level": "public"
+    },
+    {
+      "id": "b123-14",
+      "kind": "ul",
+      "text": [
+        "B2C apps"
+      ],
+      "requirementRefs": [],
+      "semanticRole": "presentation_only",
+      "comment": null,
+      "stale": false,
+      "level": "public"
+    },
+    {
+      "id": "b123-15",
+      "kind": "h2",
+      "text": "Compensation",
+      "requirementRefs": [],
+      "semanticRole": "presentation_only",
+      "comment": null,
+      "stale": false,
+      "level": "public"
+    },
+    {
+      "id": "b123-16",
+      "kind": "p",
+      "text": "25K–40K / year · gross · USD",
+      "requirementRefs": [],
+      "semanticRole": "presentation_only",
+      "comment": null,
+      "stale": false,
+      "level": "public"
+    },
+    {
+      "id": "b123-17",
+      "kind": "p",
+      "text": "Internal ceiling: 30K–45K / year · gross · USD",
+      "requirementRefs": [],
+      "semanticRole": "presentation_only",
+      "comment": null,
+      "stale": false,
+      "level": "confidential"
+    },
+    {
+      "id": "b123-18",
+      "kind": "h2",
+      "text": "Expected outcomes",
+      "requirementRefs": [],
+      "semanticRole": "presentation_only",
+      "comment": null,
+      "stale": false,
+      "level": "internal"
+    },
+    {
+      "id": "b123-19",
+      "kind": "ul",
+      "text": [
+        "10k MAU"
+      ],
+      "requirementRefs": [],
+      "semanticRole": "presentation_only",
+      "comment": null,
+      "stale": false,
+      "level": "internal"
+    },
+    {
+      "id": "b123-20",
+      "kind": "h2",
+      "text": "Success in the first 90 days",
+      "requirementRefs": [],
+      "semanticRole": "presentation_only",
+      "comment": null,
+      "stale": false,
+      "level": "internal"
+    },
+    {
+      "id": "b123-21",
+      "kind": "ul",
+      "text": [
+        "Launch 3 campaigns"
+      ],
+      "requirementRefs": [],
+      "semanticRole": "presentation_only",
+      "comment": null,
+      "stale": false,
+      "level": "internal"
+    }
+  ]
+}
