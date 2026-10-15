@@ -164,9 +164,12 @@ export class DocAiService {
 
     const output = await this.run(identity, jobId, 'jd_doc_section', system, user, sectionOutputSchema);
     const written = output.items.map((x) => x.trim()).filter(Boolean);
+    if (!written.length) throw new ServiceUnavailableException({ code: 'LLM_INVALID_OUTPUT', message: 'Copilot 没有生成内容，请重试。' });
     // Years of experience or pay the job's own data doesn't contain never go into the text (#95 AC-3).
     const source = [jobLines(input.context), documentText(input.blocks), ...input.current].join('\n');
-    const { items, toConfirm } = separateUnsourced(input.list ? written : [written.join('\n')], input.list, source);
+    const separated = separateUnsourced(input.list ? written : [written.join('\n')], input.list, source);
+    const items = separated.items.map((x) => x.trim()).filter(Boolean);
+    const toConfirm = separated.toConfirm;
     if (!items.length) {
       throw new ServiceUnavailableException({ code: 'LLM_INVALID_OUTPUT', message: 'Copilot 只给出了原文没有依据的内容，没有可以直接写入的部分，请补充职位信息后重试。' });
     }

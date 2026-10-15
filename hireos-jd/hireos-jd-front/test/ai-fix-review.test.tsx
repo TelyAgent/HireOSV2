@@ -208,6 +208,22 @@ describe('#94 review', () => {
   });
 });
 
+describe('#94 review: first analysis', () => {
+  it('Keep during the very first analysis (no result yet) still re-analyzes the kept text afterwards', async () => {
+    let finishFirst!: () => void;
+    api.aiAnalyze.mockImplementationOnce(() => new Promise((resolve) => (finishFirst = () => resolve({ verdict: 'needs_work', summary: 'old', items: [] }))) as never);
+    api.aiSection.mockResolvedValue({ items: ['A clearer summary of the role.'], explain: '', toConfirm: [] });
+    renderPanel(false);
+    fireEvent.click(await screen.findByText('analyze-now'));
+    await waitFor(() => expect(api.aiAnalyze).toHaveBeenCalledTimes(1));
+    fireEvent.click(await aiFixFor('Role summary'));
+    fireEvent.click(await screen.findByRole('button', { name: 'Keep' }));
+    finishFirst();
+    await waitFor(() => expect(api.aiAnalyze).toHaveBeenCalledTimes(2));
+    expect(api.aiAnalyze.mock.calls[1][2].blocks.map((b) => b.text)).toContain('A clearer summary of the role.');
+  });
+});
+
 describe('lineDiff', () => {
   it('keeps the result order with removed lines where they were', async () => {
     const { lineDiff } = await import('../src/features/workspace/docActions');

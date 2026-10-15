@@ -151,7 +151,8 @@ export function useDocActions(jobId: string) {
             apply();
             // The rule check recomputes on its own; a past AI Analyze is run again on the kept text (M6).
             mutate((draft) => {
-              if (draft.wsAiAnalysis[jobId]) draft.wsReanalyze = { jobId, n: (draft.wsReanalyze?.n ?? 0) + 1 };
+              // Also when the first analysis is still running: its result would describe the old text.
+              if (draft.wsAiAnalysis[jobId] || draft.wsAiBusy[`${jobId}:analyze`]) draft.wsReanalyze = { jobId, n: (draft.wsReanalyze?.n ?? 0) + 1 };
             });
             say(`${t(done)} “${t(label)}” — ${t("you can undo it.")}`, { type: "success" });
           }}

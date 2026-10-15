@@ -57,3 +57,9 @@ test('#95 review: decimals, dotted names and words starting with K are left alon
   assert.deepEqual(sentencesOf('Uses Node.js. Has 2.5 years. 负责数据。会 SQL！'), ['Uses Node.js.', 'Has 2.5 years.', '负责数据。', '会 SQL！']);
   assert.deepEqual(separateUnsourced(['Ships weekly. Needs 2.5 years in analytics.'], false, 'Ships weekly'), { items: ['Ships weekly.'], toConfirm: ['Needs 2.5 years in analytics.'] });
 });
+
+test('#95 review: a blank model output is refused, never written over the existing text', async () => {
+  const svc = new DocAiService({ aiRun: { create: async () => ({}) } }, { completeJson: async () => JSON.stringify({ items: ['   '], explain: '' }) });
+  const body = { mode: 'fix', itemId: 'B1', label: 'Role summary', hint: 'h', issue: 'x', list: false, current: ['Owns weekly reporting.'], context: {}, blocks: [] };
+  await assert.rejects(svc.section(identity, 'job-1', body), (e) => e.getResponse().code === 'LLM_INVALID_OUTPUT');
+});
