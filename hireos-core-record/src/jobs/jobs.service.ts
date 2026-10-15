@@ -69,11 +69,14 @@ export class JobsService {
   // Backs a cross-subsystem "pick an existing job" picker (e.g. Interview attaching to
   // a job whose JD already lives in the JD subsystem) -- no subsystem maintains its own
   // copy of the job list, so this is the one place to browse the master directory.
-  async list(identity: Identity, query?: string) {
+  /** `status` narrows to one job status (e.g. 'open' = published) before the 100-row cap applies. */
+  async list(identity: Identity, query?: string, status?: string) {
+    const statusFilter = status?.trim() ? z.enum(['draft', 'open', 'paused', 'closed', 'archived']).parse(status.trim()) : undefined;
     const jobs = await this.db.job.findMany({
       where: {
         workspaceId: identity.workspaceId,
         ...(query?.trim() ? { title: { contains: query.trim(), mode: 'insensitive' } } : {}),
+        ...(statusFilter ? { status: statusFilter } : {}),
       },
       orderBy: { createdAt: 'desc' },
       take: 100,

@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { BadRequestException } from '@nestjs/common';
+import { invalidSchemaFromZod } from '../http/invalid-schema';
 
 export const kindSchema = z.enum(['resume', 'screening', 'assessment', 'other']);
 export const taskMaterialKindSchema = z.enum(['screening', 'assessment', 'other']);
@@ -8,13 +8,21 @@ export const taskStatusSchema = z.enum([
   'evidence_requested', 'awaiting_confirmation', 'package_published', 'on_hold', 'not_proceeding',
 ]);
 
-// The "pick an existing job" entry point (JobsService.attach) — syncs a Core Record job
-// locally. A Job can also be created from JD text (createJobSchema) or a Screening hand-off.
+// Syncs a Core Record job locally (JobsService.attach) — used by the new-task entry for
+// both "pick an existing job" and freshly created JDs, and by nothing else besides a
+// Screening hand-off.
 export const attachJobSchema = z.object({ coreJobId: z.string().trim().min(1).max(200) }).strict();
 
-// The "start from a JD" entry point (JobsService.create): a Job authored locally from
-// pasted or uploaded JD text, with no Core Record counterpart (coreJobId stays null).
-export const createJobSchema = z.object({ jdText: z.string().trim().min(1).max(150000) }).strict();
+// The new-task entry (QuickStartService): a job -- either new JD text (optionally with the
+// uploaded JD file it was read from) or an existing Core Record job -- plus at most one
+// résumé. One job + one résumé is one interview task.
+export const quickStartSchema = z.object({
+  jd: z.union([
+    z.object({ text: z.string().trim().min(1).max(150000), materialId: z.string().uuid().optional() }).strict(),
+    z.object({ coreJobId: z.string().trim().min(1).max(200) }).strict(),
+  ]),
+  resumeMaterialId: z.string().uuid().optional(),
+}).strict();
 
 // Links one more résumé to an existing Job (the "link candidate" action).
 export const createTaskSchema = z.object({ materialId: z.string().uuid() }).strict();
@@ -107,6 +115,6 @@ export const extractionSchema = z.object({
 
 export function validate<T>(schema: z.ZodType<T>, value: unknown): T {
   const parsed = schema.safeParse(value);
-  if (!parsed.success) throw new BadRequestException({ code: 'INVALID_INPUT', fieldErrors: parsed.error.flatten() });
+  if (!parsed.success) throw invalidSchemaFromZod(parsed.error);
   return parsed.data;
 }

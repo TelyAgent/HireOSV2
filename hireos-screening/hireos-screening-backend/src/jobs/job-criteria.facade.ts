@@ -54,6 +54,14 @@ export class JobCriteriaFacade {
     return mapProjection(body);
   }
 
+  /** Screening's "New job" entry: creates the job (a draft) in JD + Core Record, or finds the one with the same JD text. */
+  async createFromText(identity: Identity, text: string, idempotencyKey: string): Promise<{ coreJobId: string; title: string; jdText: string; duplicate: boolean }> {
+    const response = await this.request('/intake/jobs', identity, 'POST', { text }, idempotencyKey);
+    const body = await parseBody(response);
+    if (!response.ok) throw this.toException(response.status, body);
+    return body as { coreJobId: string; title: string; jdText: string; duplicate: boolean };
+  }
+
   async update(identity: Identity, jobId: string, input: RoleDraftInput): Promise<RemoteCriteriaProjection> {
     const response = await this.request(
       `/jobs/${jobId}/drafts/current`,

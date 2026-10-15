@@ -296,9 +296,15 @@ export type MailAccountInput = {
 };
 
 async function throwWithMessage(response: Response): Promise<never> {
-  const body = await response.json().catch(() => null) as { message?: string | string[] } | null;
-  const message = Array.isArray(body?.message) ? body.message.join("; ") : body?.message;
+  const body = await response.json().catch(() => null) as { code?: string; message?: string | string[]; details?: { fieldErrors?: Record<string, string[]> } } | null;
+  const message = body?.code === "INVALID_SCHEMA" ? invalidSchemaMessage(body.details) : Array.isArray(body?.message) ? body.message.join("; ") : body?.message;
   throw new Error(message || `Request failed (${response.status})`);
+}
+
+/** A 422 INVALID_SCHEMA (the platform's validation error) as readable "field: problem" text. */
+function invalidSchemaMessage(details?: { fieldErrors?: Record<string, string[]> }) {
+  const entries = Object.entries(details?.fieldErrors ?? {});
+  return entries.length ? entries.map(([field, errors]) => `${field}: ${errors.join(", ")}`).join("; ") : undefined;
 }
 
 export async function listMailAccounts(): Promise<MailAccount[]> {
@@ -493,4 +499,47 @@ export async function updatePlanItem(caseId: string, id: string, input: { custom
 export async function deletePlanItem(caseId: string, id: string): Promise<void> {
   const response = await authFetch(`${BASE}/cases/${encodeURIComponent(caseId)}/plan-items/${encodeURIComponent(id)}`, { method: "DELETE" });
   if (!response.ok) throw new Error(`Request failed (${response.status})`);
+}
+
+/* ---------------------------------------------------------------
+   New-task entry: JD (new text or an existing job) + one résumé -> a written-test case.
+   Errors surface as ApiCodeError(code) so the modal can explain them.
+   --------------------------------------------------------------- */
+export class ApiCodeError extends Error { constructor(public code: string) { super(code); } }
+
+async function codeFetch<T>(path: string, init?: RequestInit): Promise<T> {
+  let response: Response;
+  try { response = await authFetch(`${BASE}${path}`, init); } catch { throw new ApiCodeError("NETWORK_ERROR"); }
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({}));
+    throw new ApiCodeError(error.code || (response.status === 413 ? "FILE_TOO_LARGE" : "REQUEST_FAILED"));
+  }
+  return response.json() as Promise<T>;
+}
+
+/** A file stored in Core Record (`id` is its Core material id) plus its extracted text. */
+export interface UploadedMaterial { id: string; name: string; text: string; readStatus: string; errorCode: string | null }
+export interface ExternalJob { id: string; title: string; team?: string; location?: string; seniority?: string; status: string }
+export interface QuickStartResult { caseId: string; taskId: string; jobTitle: string; candidateName: string; duplicate: boolean }
+
+export async function uploadMaterial(file: File): Promise<UploadedMaterial> {
+  if (file.size > 10 * 1024 * 1024) throw new ApiCodeError("FILE_TOO_LARGE");
+  if (!/\.(pdf|docx|txt)$/i.test(file.name)) throw new ApiCodeError("UNSUPPORTED_FILE_TYPE");
+  const data = new FormData(); data.append("file", file);
+  return codeFetch<UploadedMaterial>("/materials", { method: "POST", body: data });
+}
+
+export async function searchExternalJobs(query: string): Promise<ExternalJob[]> {
+  return codeFetch<ExternalJob[]>(`/external-jobs${query.trim() ? `?q=${encodeURIComponent(query.trim())}` : ""}`);
+}
+
+export async function quickStart(
+  input: { jd: { text: string; materialId?: string } | { coreJobId: string }; resumeMaterialId: string },
+  idempotencyKey: string,
+): Promise<QuickStartResult> {
+  return codeFetch<QuickStartResult>("/quick-start", {
+    method: "POST",
+    headers: { "Content-Type": "application/json", "Idempotency-Key": idempotencyKey },
+    body: JSON.stringify(input),
+  });
 }

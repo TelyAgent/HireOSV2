@@ -95,6 +95,10 @@ model Job {
   employmentType     String
   seniority          String
   status             String                       @default("open")
+  // jd_published: synced from Core Record once HireOS JD published it. quick_start: created from
+  // Screening's own "New job" entry -- a JD draft in Core Record that Screening uses right away,
+  // since Screening can be used on its own without anyone publishing it in JD (see screeningStatus).
+  origin             String                       @default("jd_published")
   jdText             String?                      @db.Text
   criteriaStatus     String                       @default("draft")
   criteriaVersion    Int                          @default(0)

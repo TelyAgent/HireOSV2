@@ -36,7 +36,7 @@ export type Job = JobSummary & {
 export type TaskSummary = {
   id: string; jobId: string; status: string; reviewed: boolean; version: number;
   matchScore: number | null; matchRecommendation: string | null; createdAt: string;
-  job: { title: string }; candidate: CandidateRef;
+  job: { title: string }; candidate: CandidateRef & { possibleDuplicate?: boolean };
   rounds: { status: 'Planned' | 'completed' }[];
 };
 export type Task = {

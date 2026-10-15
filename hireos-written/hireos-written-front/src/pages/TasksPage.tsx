@@ -14,6 +14,8 @@ import {
   fmtDateShort, nowISO, type CoreCandidate, type CoreJob, type Task,
 } from "../data/fixtures";
 import { latestResultForCase } from "../data/realPlanItemsMerge";
+import { CreateWrittenTaskModal } from "../components/CreateWrittenTaskModal";
+import type { QuickStartResult } from "../data/writtenApi";
 
 function candidateOf(caseId: string): CoreCandidate | null {
   const c = CASES[caseId];
@@ -53,7 +55,8 @@ const FILTER_DEFS: { key: FilterKey; label: string }[] = [
 ];
 
 export function TasksPage() {
-  const { state, t, user, say } = useStore();
+  const { state, t, user, say, set } = useStore();
+  const [createOpen, setCreateOpen] = useState(false);
   const navigate = useNavigate();
   const uid = state.currentUser;
   const scoped = false; // no restricted-scope demo user selected by default
@@ -127,11 +130,32 @@ export function TasksPage() {
 
   const handleLinkCandidate = () => navigate("/assessments/prj_fin");
 
+  // New case from the "New written test" entry: pull it into the fixture dicts, then open its plan.
+  const handleCreated = async (result: QuickStartResult) => {
+    setCreateOpen(false);
+    try {
+      await loadRealWrittenTasksIntoFixtures();
+      set({ realTasksVersion: state.realTasksVersion + 1 });
+    } catch (error) {
+      console.warn("Failed to refresh real written tasks after creating one:", error);
+    }
+    const zh = state.lang === "zh";
+    const duplicateNote = result.duplicate
+      ? (zh ? `已存在相同岗位「${result.jobTitle}」，已关联到该岗位。` : `A job with the same JD already exists ("${result.jobTitle}") — linked to it.`)
+      : "";
+    say([duplicateNote, t("Written test task created.")].filter(Boolean).join(" "));
+    navigate(`/cases/${result.caseId}/plan`);
+  };
+
   const openTask = (tk: Task) => navigate(isWrittenTestTask(tk) ? `/cases/${tk.sourceRef}/plan` : tk.link);
 
   return (
     <div>
-      <h1 style={{ marginBottom: 4 }}>{t("My Tasks")}</h1>
+      <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 12 }}>
+        <h1 style={{ marginBottom: 4 }}>{t("My Tasks")}</h1>
+        <Button variant="primary" onClick={() => setCreateOpen(true)}>{t("+ New written test")}</Button>
+      </div>
+      <CreateWrittenTaskModal open={createOpen} onClose={() => setCreateOpen(false)} onCreated={(r) => void handleCreated(r)} />
       <div className="muted" style={{ marginBottom: 16 }}>
         {t("Signed in as")} {user.name} · {user.role} · Aurora Studio
       </div>
@@ -270,7 +294,7 @@ function WrittenTaskRow({
         </div>
       )}
       <div><StatusBadge status={status} /></div>
-      <div className="task-sub" style={{ fontSize: 14 }}>{clusterMode && round ? round.title : fmtDateShort(task.dueAt)}</div>
+      <div className="task-sub" style={{ fontSize: 14 }}>{clusterMode && round ? round.title : fmtDateShort(task.createdAt ?? "")}</div>
       {!clusterMode && <div className="task-sub" style={{ fontSize: 14 }}>{deadline}</div>}
       <div>
         {cand && (

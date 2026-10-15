@@ -3,6 +3,7 @@ import { NestFactory } from '@nestjs/core';
 import { ConfigService } from '@nestjs/config';
 import type { Server } from 'node:http';
 import { AppModule } from './app.module';
+import { ZodExceptionFilter } from './http/zod-exception.filter';
 import { attachVoiceGateway, VOICE_WS_PATH } from './voice/voice-gateway';
 
 async function bootstrap() {
@@ -15,6 +16,7 @@ async function bootstrap() {
     credentials: true,
   });
   app.useGlobalPipes(new ValidationPipe({ whitelist: true, transform: true, forbidNonWhitelisted: true }));
+  app.useGlobalFilters(new ZodExceptionFilter());
   app.enableShutdownHooks();
 
   attachVoiceGateway(app.getHttpServer() as Server, {

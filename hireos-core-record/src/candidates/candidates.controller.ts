@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Headers, Param, Patch, Post, Req, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Headers, Param, Patch, Post, Query, Req, UseGuards } from '@nestjs/common';
 import { WorkspaceGuard, type Identity } from '../auth/workspace.guard';
 import { CandidatesService } from './candidates.service';
 import type { RequestMeta } from '../records';
@@ -11,6 +11,18 @@ export class CandidatesController {
   @Post()
   create(@Req() req: { identity: Identity }, @Headers() headers: Record<string, string | undefined>, @Body() body: unknown) {
     return this.candidates.create(req.identity, body, meta(headers));
+  }
+
+  /** The candidate a résumé file belongs to -- reused if already linked, else created and linked. */
+  @Post('from-material')
+  resolveForMaterial(@Req() req: { identity: Identity }, @Headers() headers: Record<string, string | undefined>, @Body() body: unknown) {
+    return this.candidates.resolveForMaterial(req.identity, body, meta(headers));
+  }
+
+  /** Lookup by email (case-insensitive) — subsystems use it to flag a likely duplicate candidate. */
+  @Get()
+  findByEmail(@Req() req: { identity: Identity }, @Query('email') email?: string) {
+    return this.candidates.findByEmail(req.identity, email);
   }
 
   @Get(':id')

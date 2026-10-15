@@ -14,6 +14,7 @@ const { JobsService } = require('../dist/intake/jobs.service');
 const { WorkspaceGuard } = require('../dist/intake/workspace.guard');
 const { AiService } = require('../dist/intake/ai.service');
 const { CoreRecordClient } = require('../dist/core-record/core-record.client');
+const { JdContentFacade } = require('../dist/core-record/jd-content.facade');
 
 function pdfFixture(text) {
   const stream = text ? `BT /F1 12 Tf 50 750 Td (${text}) Tj ET` : '';
@@ -50,7 +51,7 @@ test('intake persistence, validation, parsing and recovery', async (t) => {
     const source = JSON.parse(request.messages[1].content);
     const segment = source.segments[0];
     const fact = { value: segment.text, segmentId: segment.id, quote: mode === 'bad-source' ? 'invented source' : segment.text };
-    const result = { title: fact, name: null, email: null, facts: [], missingFields: [], warnings: [] };
+    const result = { title: fact, name: null, email: mode === 'email' ? { value: 'ada@example.com', segmentId: segment.id, quote: segment.text } : null, facts: [], missingFields: [], warnings: [] };
     res.setHeader('Content-Type', 'application/json');
     res.end(JSON.stringify({ choices: [{ message: { content: mode === 'bad-json' ? '{' : JSON.stringify(result) } }], usage: { total_tokens: 10 } }));
   });
@@ -62,15 +63,43 @@ test('intake persistence, validation, parsing and recovery', async (t) => {
   const identity = { workspaceId, actorId: 'test-user' };
   // Core Record is a separate service; stand in for its upload endpoint (hash-deduped like
   // the real one) so this test doesn't depend on a running core-record instance.
+  // Candidates / Applications / Jobs are kept in memory, idempotent by key like the real service.
+  const coreJobs = new Map(); const coreCandidates = new Map(); const materialCandidates = new Map(); const listJobsStatuses = []; const coreApplications = new Map(); const emailMatches = [];
+  const once = (map, key, make) => { if (!map.has(key)) map.set(key, make()); return map.get(key); };
   const coreRecord = {
     async uploadMaterial(_identity, file) {
       const hash = createHash('sha256').update(file.buffer).digest('hex');
       return { id: `core-${hash.slice(0, 32)}`, name: file.originalname, mime: file.mimetype, size: file.buffer.length, hash, readStatus: 'available', securityStatus: 'clean' };
     },
+    async getJob(_identity, id) { if (!coreJobs.has(id)) throw Object.assign(new Error('NOT_FOUND'), { status: 404 }); return coreJobs.get(id); },
+    // Résumé file -> Core candidate, shared across subsystems (Core's /candidates/from-material).
+    async resolveCandidateForMaterial(_identity, body) {
+      if (materialCandidates.has(body.materialId)) return { ...coreCandidates.get(materialCandidates.get(body.materialId)), created: false };
+      const candidate = { id: randomUUID(), displayName: body.displayName, identityStatus: 'provisional', status: 'active' };
+      coreCandidates.set(candidate.id, candidate); materialCandidates.set(body.materialId, candidate.id);
+      return { ...candidate, created: true };
+    },
+    async createCandidate(_identity, body, key) { return once(coreCandidates, key, () => ({ id: randomUUID(), displayName: body.displayName, identityStatus: 'provisional', status: 'active' })); },
+    async createApplication(_identity, body, key) { return once(coreApplications, key, () => ({ id: randomUUID(), ...body, status: 'active' })); },
+    async findCandidatesByEmail() { return emailMatches; },
+    async listJobs(_identity, _q, status) { listJobsStatuses.push(status); return [...coreJobs.values()].filter((j) => !status || j.status === status); },
+  };
+  // JD subsystem stand-in: same JD text (whitespace-normalized) resolves to the same job.
+  const jdSources = new Map(); const jdCalls = [];
+  const jdContent = {
+    async get(_identity, coreJobId) { const text = [...jdSources].find(([, id]) => id === coreJobId)?.[0]; return text ? { responsibilities: [], requirements: [], sourceText: text } : null; },
+    async createFromText(_identity, body, key) {
+      jdCalls.push({ body, key });
+      const norm = body.text.replace(/\s+/g, ' ').trim();
+      if (jdSources.has(norm)) { const id = jdSources.get(norm); return { coreJobId: id, title: coreJobs.get(id).title, jdText: body.text, duplicate: true }; }
+      const job = { id: randomUUID(), title: body.text.trim().split('\n')[0], status: 'draft' };
+      coreJobs.set(job.id, job); jdSources.set(norm, job.id);
+      return { coreJobId: job.id, title: job.title, jdText: body.text, duplicate: false };
+    },
   };
   const module = await Test.createTestingModule({ imports: [AppModule] }).overrideGuard(WorkspaceGuard).useValue({
     canActivate(context) { context.switchToHttp().getRequest().identity = identity; return true; },
-  }).overrideProvider(CoreRecordClient).useValue(coreRecord).compile();
+  }).overrideProvider(CoreRecordClient).useValue(coreRecord).overrideProvider(JdContentFacade).useValue(jdContent).compile();
   const app = module.createNestApplication({ logger: false });
   app.setGlobalPrefix('api');
   await app.listen(0, '127.0.0.1');
@@ -86,14 +115,6 @@ test('intake persistence, validation, parsing and recovery', async (t) => {
       job = await db.job.create({ data: { workspaceId, createdBy: identity.actorId, coreJobId: randomUUID(), title: 'Backend Engineer', jdText: jdText } });
       const read = await (await fetch(`${base}/jobs/${job.id}`)).json();
       assert.equal(read.id, job.id); assert.equal(read.jdText, jdText); assert.equal(read.tasks.length, 0);
-    });
-    await t.test('a job can be created from JD text alone; title comes from the first line', async () => {
-      const response = await send('/jobs', { jdText: '\n  Platform Engineer  \nRemote\n\nOwn the platform.' });
-      assert.equal(response.status, 201); const created = await response.json();
-      assert.equal(created.title, 'Platform Engineer'); assert.equal(created.coreJobId, null);
-      assert.match(created.jdText, /Own the platform/); assert.equal(created.tasks.length, 0);
-      assert.equal((await send('/jobs', { jdText: '   ' })).status, 400);
-      assert.equal((await send('/jobs', { jdText: 'x', title: 'extra' })).status, 400);
     });
     await t.test('workspace isolation and production fail-closed guard', async () => {
       await assert.rejects(app.get(JobsService).get('different-workspace', job.id), (e) => e.getStatus() === 404);
@@ -128,8 +149,73 @@ test('intake persistence, validation, parsing and recovery', async (t) => {
       assert.equal(task.job.id, job.id);
       const again = await send(`/jobs/${job.id}/tasks`, { materialId: resumeMaterial.id });
       assert.equal((await again.json()).id, task.id, 'relinking the same résumé reuses the same task');
+      const linked = await db.interviewTask.findUnique({ where: { id: task.id }, include: { candidate: true } });
+      assert.equal(linked.origin, 'manual'); assert.ok(linked.coreApplicationId, 'a Core Record application is registered');
+      assert.ok(linked.candidate.coreCandidateId, 'the candidate is registered with Core Record');
+      assert.equal(coreApplications.size, 1, 'relinking does not register a second application');
       const refreshed = await (await fetch(`${base}/jobs/${job.id}`)).json();
       assert.equal(refreshed.tasks.length, 1);
+    });
+    let quickJob;
+    await t.test('quick start: new JD text + one résumé creates the job via JD and one task', async () => {
+      const upload = async (name, content) => { const form = new FormData(); form.append('file', new Blob([content]), name); return (await fetch(`${base}/materials`, { method: 'POST', body: form })).json(); };
+      const resume = await upload('Lin_Chen.txt', 'Lin Chen\n\nShipped payment systems.');
+      const response = await send('/quick-start', { jd: { text: 'Platform Engineer\nRemote\n\nOwn the platform.' }, resumeMaterialId: resume.id }, 'qs-key-1');
+      assert.equal(response.status, 201); const body = await response.json();
+      assert.equal(body.duplicate, false); quickJob = body.job;
+      assert.equal(quickJob.title, 'Platform Engineer'); assert.ok(quickJob.coreJobId);
+      assert.match(quickJob.jdText, /Own the platform/, 'local JD text comes from the JD source text');
+      assert.equal(jdCalls.at(-1).key, 'interview.quick-start:qs-key-1');
+      assert.equal(body.task.job.id, quickJob.id); assert.equal(body.task.candidate.name, 'Lin Chen');
+      const row = await db.interviewTask.findUnique({ where: { id: body.task.id } });
+      assert.equal(row.origin, 'quick_start'); assert.ok(row.coreApplicationId);
+      assert.equal([...coreApplications.values()].at(-1).origin, 'interview_quick_start');
+    });
+    await t.test('quick start: a résumé another subsystem already knows reuses that Core candidate', async () => {
+      const form = new FormData(); form.append('file', new Blob(['Wen Shared\n\nKnown to Written already.']), 'Wen_Shared.txt');
+      const resume = await (await fetch(`${base}/materials`, { method: 'POST', body: form })).json();
+      const local = await db.material.findUnique({ where: { id: resume.id } });
+      const writtenCandidate = { id: randomUUID(), displayName: 'Wen Shared', identityStatus: 'provisional', status: 'active' };
+      coreCandidates.set(writtenCandidate.id, writtenCandidate); materialCandidates.set(local.coreMaterialId, writtenCandidate.id);
+      coreJobs.get(quickJob.coreJobId).status = 'open'; // published in JD meanwhile, so it can be picked
+      const body = await (await send('/quick-start', { jd: { coreJobId: quickJob.coreJobId }, resumeMaterialId: resume.id })).json();
+      const row = await db.interviewTask.findUnique({ where: { id: body.task.id }, include: { candidate: true } });
+      assert.equal(row.candidate.coreCandidateId, writtenCandidate.id);
+      assert.equal([...coreApplications.values()].find((a) => a.id === row.coreApplicationId).candidateId, writtenCandidate.id);
+    });
+    await t.test('quick start: the same JD again is reported as a duplicate of the existing job', async () => {
+      const body = await (await send('/quick-start', { jd: { text: '  Platform Engineer\nRemote\n\n  Own the platform.  ' } })).json();
+      assert.equal(body.duplicate, true); assert.equal(body.job.id, quickJob.id); assert.equal(body.task, null);
+      assert.equal(await db.job.count({ where: { workspaceId, coreJobId: quickJob.coreJobId } }), 1);
+    });
+    await t.test('the job list picks up fields filled in Core Record later (e.g. by JD structuring)', async () => {
+      Object.assign(coreJobs.get(quickJob.coreJobId), { location: 'Remote (APAC)', team: 'Platform' });
+      const rows = await (await fetch(`${base}/jobs`)).json();
+      const row = rows.find((r) => r.id === quickJob.id);
+      assert.equal(row.location, 'Remote (APAC)'); assert.equal(row.department, 'Platform');
+    });
+    await t.test('quick start: an existing Core Record job can be picked instead of new JD text', async () => {
+      const coreJob = { id: randomUUID(), title: 'Data Engineer', status: 'open' }; coreJobs.set(coreJob.id, coreJob);
+      const callsBefore = jdCalls.length;
+      const body = await (await send('/quick-start', { jd: { coreJobId: coreJob.id } })).json();
+      assert.equal(body.job.coreJobId, coreJob.id); assert.equal(body.job.title, 'Data Engineer'); assert.equal(body.duplicate, false);
+      assert.equal(jdCalls.length, callsBefore, 'picking an existing job does not touch JD intake');
+    });
+    await t.test('choosing an existing job: only published jobs are offered or accepted', async () => {
+      const draft = { id: randomUUID(), title: 'Still a draft', status: 'draft' }; coreJobs.set(draft.id, draft);
+      const offered = await (await fetch(`${base}/external-jobs`)).json();
+      assert.equal(listJobsStatuses.at(-1), 'open', 'the picker asks Core Record for published jobs');
+      assert.ok(!offered.some((j) => j.id === draft.id));
+      const response = await send('/quick-start', { jd: { coreJobId: draft.id } });
+      assert.equal(response.status, 409); assert.equal((await response.json()).code, 'JOB_NOT_PUBLISHED');
+      assert.equal(await db.job.count({ where: { workspaceId, coreJobId: draft.id } }), 0);
+    });
+    await t.test('quick start: a bad résumé is rejected before anything is created upstream', async () => {
+      const callsBefore = jdCalls.length;
+      assert.equal((await send('/quick-start', { jd: { text: 'Ghost Role' }, resumeMaterialId: randomUUID() })).status, 404);
+      assert.equal((await send('/quick-start', { jd: { text: '   ' } })).status, 422);
+      assert.equal((await send('/quick-start', { jd: { text: 'x', coreJobId: 'y' } })).status, 422);
+      assert.equal(jdCalls.length, callsBefore);
     });
     let interviewer;
     await t.test('a task is created with two generic rounds automatically', async () => {
@@ -172,6 +258,18 @@ test('intake persistence, validation, parsing and recovery', async (t) => {
       assert.equal((await db.job.findUnique({ where: { id: job.id } })).title, 'Backend Engineer');
       const candidate = await db.candidate.findUnique({ where: { id: task.candidate.id } });
       assert.equal(candidate.name, 'Ada Example');
+    });
+    await t.test('a parsed email matching another Core candidate flags (never merges) the candidate', async () => {
+      const form = new FormData(); form.append('file', new Blob(['Ada Again\n\nada@example.com']), 'Ada_Again.txt');
+      const material = await (await fetch(`${base}/materials`, { method: 'POST', body: form })).json();
+      const linked = await (await send(`/jobs/${job.id}/tasks`, { materialId: material.id })).json();
+      emailMatches.push({ id: randomUUID(), displayName: 'Ada Example', email: 'ada@example.com' });
+      mode = 'email';
+      try { for (let i = 0; i < 4; i++) await worker.tick(); } finally { mode = 'ok'; emailMatches.length = 0; }
+      const candidate = await db.candidate.findUnique({ where: { id: linked.candidate.id } });
+      assert.equal(candidate.possibleDuplicate, true); assert.equal(candidate.name, 'Ada Again');
+      const list = await (await fetch(`${base}/tasks`)).json();
+      assert.equal(list.find((row) => row.id === linked.id).candidate.possibleDuplicate, true);
     });
     await t.test('invalid AI responses and missing configuration stay explicit', async () => {
       const ai = app.get(AiService); const source = { sourceId: 'test', segments: [{ id: 's1', text: 'Engineer' }] };

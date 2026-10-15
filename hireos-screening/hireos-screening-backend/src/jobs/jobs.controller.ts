@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Patch, Post, Req, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Headers, Param, Patch, Post, Req, UseGuards } from '@nestjs/common';
 import { WorkspaceGuard, type Identity } from '../auth/workspace.guard';
 import { JobsService } from './jobs.service';
 
@@ -10,6 +10,12 @@ export class JobsController {
   @Get()
   list(@Req() req: { identity: Identity }) {
     return this.jobs.list(req.identity);
+  }
+
+  /** "New job": pasted JD text -> a draft job in JD + Core Record that Screening uses right away. */
+  @Post('quick-start')
+  quickStart(@Req() req: { identity: Identity }, @Headers('idempotency-key') key: string | undefined, @Body() body: unknown) {
+    return this.jobs.quickStart(req.identity, body, key);
   }
 
   @Get(':id')

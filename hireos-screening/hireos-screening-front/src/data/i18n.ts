@@ -9,6 +9,19 @@
  * and a matching entry exists, else the source string unchanged.
  */
 export const ZH: Record<string, string> = {
+  // New job entry (NewJobModal)
+  "Start with a job description": "从职位描述开始",
+  "Paste the JD — AI reads it for the title, location and requirements; you confirm the rubric before screening starts.": "粘贴 JD 即可——AI 会读取职位名称、地点和岗位要求，确认评分标准后即可开始筛选。",
+  "AI is reading the JD…": "AI 正在提取岗位信息…",
+  "Job description": "职位描述",
+  "Required": "必填",
+  "Paste the job description here…": "在此粘贴职位描述…",
+  "Choose JD file": "选择 JD 文件",
+  "Reading file…": "正在读取文件…",
+  "PDF, DOCX, or TXT · up to 10 MB": "PDF、DOCX 或 TXT · 最大 10 MB",
+  "Creating…": "正在创建…",
+  "Create job": "创建职位",
+  "Job created. Review and confirm the rubric to start screening.": "职位已创建，请核对并确认评分标准后开始筛选。",
   "Not provided": "未提供",
   Unknown: "未知",
   Completed: "已完成",

@@ -102,6 +102,7 @@ export class ScreeningHandoffService {
         jobId: job.id,
         candidateId: candidate.id,
         resumeId,
+        origin: 'screening_handoff',
         matchScore: input.matchScore,
         matchRecommendation: input.matchRecommendation,
         screeningHandedOffAt: new Date(),

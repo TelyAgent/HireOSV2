@@ -2,6 +2,7 @@ import { ConflictException, Injectable, NotFoundException } from '@nestjs/common
 import { createHash } from 'node:crypto';
 import { z } from 'zod';
 import type { Identity } from '../auth/workspace.guard';
+import { isIntakeOwned } from '../intake/intake-ownership';
 import { CoreRecordClient } from '../core/core-record.client';
 import { PrismaService } from '../persistence/prisma.service';
 import { findIdempotent, json, storeIdempotency, type RequestMeta } from '../records';
@@ -32,8 +33,15 @@ export class DraftsService {
       orderBy: { revision: 'desc' },
     });
     if (!draft) throw new NotFoundException({ code: 'DRAFT_NOT_FOUND' });
-    const role = await this.core.getRoleVersion(identity, jobId, draft.coreRoleVersionId);
-    return serialize(draft, role);
+    const [role, source] = await Promise.all([
+      this.core.getRoleVersion(identity, jobId, draft.coreRoleVersionId),
+      this.db.jdSource.findFirst({ where: { workspaceId: identity.workspaceId, jobId }, orderBy: { createdAt: 'desc' } }),
+    ]);
+    // Raw JD text for jobs started from another subsystem's entry (see IntakeService). It stays
+    // the authoritative JD only while the current draft is still the one intake wrote; once a
+    // person edits or confirms it, theirs is.
+    const intakeOwned = source && isIntakeOwned(draft, source);
+    return { ...serialize(draft, role), sourceText: intakeOwned ? source.text : null };
   }
 
   async updateCurrent(identity: Identity, jobId: string, raw: unknown, meta: RequestMeta) {

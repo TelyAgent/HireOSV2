@@ -14,8 +14,8 @@ export class JobsController {
   }
 
   @Get()
-  list(@Req() req: { identity: Identity }, @Query('q') q?: string) {
-    return this.jobs.list(req.identity, q);
+  list(@Req() req: { identity: Identity }, @Query('q') q?: string, @Query('status') status?: string) {
+    return this.jobs.list(req.identity, q, status);
   }
 
   @Get(':id')

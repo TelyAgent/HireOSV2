@@ -51,7 +51,7 @@ function toCase(t: RealWrittenTask): Case {
 }
 
 function toTask(t: RealWrittenTask): Task {
-  return { id: t.id, title: t.title, type: t.type, assignee: t.assignee, status: t.status, dueAt: t.dueAt ?? "", link: `/cases/${t.caseId}/plan`, sourceRef: t.caseId };
+  return { id: t.id, title: t.title, type: t.type, assignee: t.assignee, status: t.status, dueAt: t.dueAt ?? "", createdAt: t.createdAt, link: `/cases/${t.caseId}/plan`, sourceRef: t.caseId };
 }
 
 export async function loadRealWrittenTasksIntoFixtures(): Promise<void> {

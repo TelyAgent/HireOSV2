@@ -1,4 +1,5 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
+import { CoreRecordClient } from '../core-record/core-record.client';
 import { PrismaService } from '../persistence/prisma.service';
 import type { Identity } from '../auth/workspace.guard';
 
@@ -33,9 +34,40 @@ export interface WrittenTaskDto {
 
 @Injectable()
 export class TasksService {
-  constructor(private readonly db: PrismaService) {}
+  private readonly logger = new Logger(TasksService.name);
+
+  constructor(private readonly db: PrismaService, private readonly coreRecord: CoreRecordClient) {}
+
+  /**
+   * Keeps local jobs' title / department / location / level in step with Core Record -- e.g. the
+   * edits made to the job in HireOS JD after the case was created here. One directory call per
+   * list load; Core Record being unreachable just leaves the local copies as they are.
+   */
+  private async syncJobsFromCore(identity: Identity) {
+    let coreJobs: Awaited<ReturnType<CoreRecordClient['listJobs']>>;
+    try {
+      coreJobs = await this.coreRecord.listJobs(identity);
+    } catch (error) {
+      this.logger.warn(`Skipping Core Record job sync: ${error instanceof Error ? error.message : String(error)}`);
+      return;
+    }
+    const byId = new Map(coreJobs.map((job) => [job.id, job]));
+    if (!byId.size) return;
+    const local = await this.db.job.findMany({
+      where: { workspaceId: identity.workspaceId, coreJobId: { in: [...byId.keys()] } },
+      select: { id: true, coreJobId: true, title: true, department: true, location: true, level: true },
+    });
+    for (const job of local) {
+      const core = byId.get(job.coreJobId)!;
+      const synced = { title: core.title, department: core.team ?? null, location: core.location ?? null, level: core.seniority ?? null };
+      if ((Object.keys(synced) as (keyof typeof synced)[]).some((key) => job[key] !== synced[key])) {
+        await this.db.job.update({ where: { id: job.id }, data: synced });
+      }
+    }
+  }
 
   async list(identity: Identity): Promise<WrittenTaskDto[]> {
+    await this.syncJobsFromCore(identity);
     const tasks = await this.db.task.findMany({
       where: { workspaceId: identity.workspaceId },
       include: { case: { include: { candidate: true, job: true } } },

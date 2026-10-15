@@ -63,7 +63,7 @@ export class SuggestionsService {
   }
 
   async create(identity: Identity, jobId: string, audience: string, raw: unknown) {
-    const input = parse(createSchema, raw);
+    const input = createSchema.parse(raw);
     const row = await this.db.jobDocumentSuggestion.create({
       data: {
         workspaceId: identity.workspaceId,
@@ -85,7 +85,7 @@ export class SuggestionsService {
   }
 
   async update(identity: Identity, jobId: string, audience: string, id: string, raw: unknown) {
-    const input = parse(updateSchema, raw);
+    const input = updateSchema.parse(raw);
     const current = await this.db.jobDocumentSuggestion.findFirst({
       where: { id, workspaceId: identity.workspaceId, jobId, audience: parseAudience(audience) },
     });
@@ -109,12 +109,6 @@ export class SuggestionsService {
     });
     return serialize(row);
   }
-}
-
-function parse<T>(schema: z.ZodType<T>, raw: unknown): T {
-  const result = schema.safeParse(raw);
-  if (!result.success) throw new BadRequestException({ code: 'INVALID_SUGGESTION', message: result.error.message });
-  return result.data;
 }
 
 function parseAudience(value: string) {

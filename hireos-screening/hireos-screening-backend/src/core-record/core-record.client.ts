@@ -81,6 +81,22 @@ export class CoreRecordClient {
     });
   }
 
+  /**
+   * The Core candidate a résumé file (Core material id) belongs to: the one already linked to it
+   * -- e.g. by Interview or Written seeing the same file first -- or a new one linked to it now.
+   */
+  async resolveCandidateForMaterial(
+    identity: Identity,
+    input: { materialId: string; displayName: string; source?: string },
+  ): Promise<(CoreCandidate & { created: boolean }) | null> {
+    if (this.mode === 'mock') return null;
+    return this.request<CoreCandidate & { created: boolean }>('/candidates/from-material', identity, {
+      method: 'POST',
+      idempotencyKey: randomUUID(),
+      body: input,
+    });
+  }
+
   /** Core Record's job directory — the jobs HireOS JD creates and publishes live here. */
   async listJobs(identity: Identity): Promise<CoreJob[]> {
     if (this.mode === 'mock') return [];

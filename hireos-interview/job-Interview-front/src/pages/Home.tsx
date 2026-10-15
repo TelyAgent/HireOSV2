@@ -66,6 +66,8 @@ export function HomePage() {
     createdAt: t.createdAt,
   }));
   const jobsById = new Map(jobs.map((j) => [j.id, j]));
+  // Phase-1 dedupe flag from the backend: the résumé's email matches another Core Record candidate.
+  const duplicateCandidateIds = new Set(savedTasks.filter((t) => t.candidate.possibleDuplicate).map((t) => t.candidate.id));
 
   const taskRows = tasks.map((task) => {
     const job = jobsById.get(task.jobId);
@@ -82,6 +84,7 @@ export function HomePage() {
       role: job?.title || it.notLinked,
       candidate: candidate?.name || it.notLinked,
       candidateLinked: !!candidate,
+      possibleDuplicate: duplicateCandidateIds.has(task.candidateId),
       status: task.status,
       statusLabel: state.lang === "zh" ? meta.zh : meta.en,
       tone: meta.tone,
@@ -583,6 +586,14 @@ export function HomePage() {
                       <div style={{ minWidth: 0 }}>
                         <div style={{ fontSize: 13.5, fontWeight: 600, color: "var(--ink)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
                           {p.candidate}
+                          {p.possibleDuplicate && (
+                            <span
+                              title={state.lang === "zh" ? "简历邮箱与另一位候选人相同，请人工核对" : "Résumé email matches another candidate — please check"}
+                              style={{ marginLeft: 6, padding: "1px 6px", borderRadius: 6, background: "var(--warn-soft)", color: "var(--warn)", fontSize: 10.5, fontWeight: 700 }}
+                            >
+                              {state.lang === "zh" ? "可能重复" : "Possible duplicate"}
+                            </span>
+                          )}
                         </div>
                         <div style={{ fontSize: 11.5, color: "var(--ink-3)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
                           {p.role}{p.candidateLinked ? ` · ${state.lang === "zh" ? "匹配度" : "Match"} ${p.matchScore}%` : ""}

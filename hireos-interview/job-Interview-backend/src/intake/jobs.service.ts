@@ -1,12 +1,14 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../persistence/prisma.service';
 import { CoreRecordClient, mapRecruitingStatus } from '../core-record/core-record.client';
 import { JdContentFacade, formatJdText } from '../core-record/jd-content.facade';
-import { attachJobSchema, createJobSchema, validate } from './contracts';
+import { attachJobSchema, validate } from './contracts';
 import type { Identity } from './workspace.guard';
 
 @Injectable()
 export class JobsService {
+  private readonly logger = new Logger(JobsService.name);
+
   constructor(
     private readonly db: PrismaService,
     private readonly coreRecord: CoreRecordClient,
@@ -55,33 +57,52 @@ export class JobsService {
     return this.get(identity.workspaceId, job.id);
   }
 
-  /**
-   * The "start from a JD" entry point: creates a local Job from pasted or uploaded JD
-   * text. The title is the JD's first non-empty line; department/location/level stay
-   * empty and coreJobId stays null since no Core Record job backs it.
-   */
-  async create(identity: Identity, raw: unknown) {
-    const { jdText } = validate(createJobSchema, raw);
-    const title = (jdText.split('\n').map((line) => line.trim()).find(Boolean) || jdText).slice(0, 200);
-    const job = await this.db.job.create({
-      data: { workspaceId: identity.workspaceId, createdBy: identity.actorId, title, jdText },
-    });
-    return this.get(identity.workspaceId, job.id);
-  }
-
-  /** Proxies Core Record's job directory for the "pick an existing job" picker --
-   * Interview keeps no copy of the master list, per Core Record owning it. */
+  /** Proxies Core Record's job directory for the "pick an existing job" picker -- published jobs
+   * only (a draft is still being written in JD). Interview keeps no copy of the master list. */
   search(identity: Identity, query?: string) {
-    return this.coreRecord.listJobs(identity, query);
+    return this.coreRecord.listJobs(identity, query, 'open');
   }
 
-  list(workspaceId: string) {
+  async list(identity: Identity) {
+    await this.syncFromCore(identity);
     return this.db.job.findMany({
-      where: { workspaceId },
+      where: { workspaceId: identity.workspaceId },
       orderBy: { createdAt: 'desc' },
       take: 200,
       select: { id: true, title: true, department: true, location: true, level: true, recruitingStatus: true, jdVersion: true, createdAt: true },
     });
+  }
+
+  /**
+   * Keeps local jobs' title / department / location / level / recruiting status in step with Core
+   * Record -- e.g. edits made to the job in HireOS JD after it was created here. One
+   * directory call per list load (the same pattern Screening's job sync uses); Core Record being
+   * unreachable just leaves the local copies as they are.
+   */
+  private async syncFromCore(identity: Identity) {
+    let coreJobs: Awaited<ReturnType<CoreRecordClient['listJobs']>>;
+    try {
+      coreJobs = await this.coreRecord.listJobs(identity);
+    } catch (error) {
+      this.logger.warn(`Skipping Core Record job sync: ${error instanceof Error ? error.message : String(error)}`);
+      return;
+    }
+    const byId = new Map(coreJobs.map((job) => [job.id, job]));
+    if (!byId.size) return;
+    const local = await this.db.job.findMany({
+      where: { workspaceId: identity.workspaceId, coreJobId: { in: [...byId.keys()] } },
+      select: { id: true, coreJobId: true, title: true, department: true, location: true, level: true, recruitingStatus: true },
+    });
+    for (const job of local) {
+      const core = byId.get(job.coreJobId!)!;
+      const synced = {
+        title: core.title, department: core.team ?? null, location: core.location ?? null,
+        level: core.seniority ?? null, recruitingStatus: mapRecruitingStatus(core.status),
+      };
+      if ((Object.keys(synced) as (keyof typeof synced)[]).some((key) => job[key] !== synced[key])) {
+        await this.db.job.update({ where: { id: job.id }, data: synced });
+      }
+    }
   }
 
   async get(workspaceId: string, id: string) {

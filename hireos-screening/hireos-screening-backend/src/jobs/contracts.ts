@@ -1,5 +1,5 @@
-import { BadRequestException } from '@nestjs/common';
 import { z } from 'zod';
+import { invalidSchemaFromZod } from '../http/invalid-schema';
 
 export const criteriaSchema = z.object({
   requirements: z.array(z.object({
@@ -21,7 +21,7 @@ export const criteriaSchema = z.object({
 export function validate<T>(schema: z.ZodType<T>, input: unknown): T {
   const parsed = schema.safeParse(input);
   if (!parsed.success) {
-    throw new BadRequestException({ code: 'INVALID_INPUT', fieldErrors: parsed.error.flatten() });
+    throw invalidSchemaFromZod(parsed.error);
   }
   return parsed.data;
 }

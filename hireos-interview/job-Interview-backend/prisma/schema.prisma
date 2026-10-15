@@ -33,8 +33,9 @@ model Job {
   id             String   @id @default(uuid())
   workspaceId    String
   createdBy      String
-  // Core Record's Job id. Set for attached / handed-off jobs; null for jobs created
-  // locally from JD text (POST /jobs) and a handful of pre-migration rows.
+  // Core Record's Job id. Always set for any Job reachable from current code paths (attach,
+  // the new-task entry via JD's intake, Screening hand-off); nullable only because a
+  // handful of pre-migration rows predate this field.
   coreJobId      String?  @unique
   title          String
   department     String?
@@ -60,9 +61,12 @@ model Job {
 model Candidate {
   id              String   @id @default(uuid())
   workspaceId     String
-  // Core Record's Candidate id, set only for candidates that arrived via a Screening
-  // hand-off. Null for candidates created locally from an uploaded résumé.
+  // Core Record's Candidate id. Set by a Screening hand-off, or registered when a task is
+  // created for this candidate (TasksService.linkCore); null only for legacy rows.
   coreCandidateId String?  @unique
+  // Phase-1 dedupe: set when the résumé's parsed email matches another Core Record
+  // candidate. Only a flag for a human to look at -- nothing is merged automatically.
+  possibleDuplicate Boolean @default(false)
   name            String
   email           String?
   phone           String?
@@ -104,6 +108,10 @@ model InterviewTask {
   matchScore           Int?      // 0-100, handed off from Resume Screening
   matchRecommendation  String?   // strong_match | match | weak_match
   screeningHandedOffAt DateTime?
+  // Core Record Application this task belongs to -- the (job, candidate) pair every
+  // subsystem shares. Null for legacy rows and jobs without a coreJobId.
+  coreApplicationId    String?
+  origin               String    @default("manual") // manual | quick_start | screening_handoff
   // Decision & Next Steps. `decisionConclusion` is the AI-drafted narrative materialized
   // from a `decision_summary` ParseJob (grounded in the task's real card scores — see
   // rubric/decision-contracts.ts); `decision` is the human's final call, never the AI's.

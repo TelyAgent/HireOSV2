@@ -7,6 +7,7 @@ import { RoundsService } from './rounds.service';
 import { advanceTaskStatus } from './task-status';
 import { taskStages } from './task-stages';
 import { mergeTranscriptLines } from '../rubric/summary-contracts';
+import { CoreRecordClient } from '../core-record/core-record.client';
 import type { Identity } from './workspace.guard';
 
 // A card "meets the bar" at this human score or above — the single threshold Review and
@@ -15,10 +16,16 @@ const DEBRIEF_BAR = 3;
 
 @Injectable()
 export class TasksService {
-  constructor(private readonly db: PrismaService, private readonly candidates: CandidatesService, private readonly rounds: RoundsService) {}
+  constructor(
+    private readonly db: PrismaService,
+    private readonly candidates: CandidatesService,
+    private readonly rounds: RoundsService,
+    private readonly coreRecord: CoreRecordClient,
+  ) {}
 
-  /** Links one more résumé to an existing Job — the "link candidate" action. */
-  async create(identity: Identity, jobId: string, raw: unknown) {
+  /** Links one more résumé to an existing Job — the "link candidate" action, and the
+   * résumé half of the new-task entry (QuickStartService, origin 'quick_start'). */
+  async create(identity: Identity, jobId: string, raw: unknown, origin: 'manual' | 'quick_start' = 'manual') {
     const input = validate(createTaskSchema, raw);
     const job = await this.db.job.findFirst({ where: { id: jobId, workspaceId: identity.workspaceId } });
     if (!job) throw new NotFoundException({ code: 'NOT_FOUND' });
@@ -29,11 +36,12 @@ export class TasksService {
       const taskId = await this.db.$transaction(async (tx) => {
         const { candidateId, resumeId } = await this.candidates.findOrCreateFromResume(tx, identity.workspaceId, material);
         const task = await tx.interviewTask.create({ data: {
-          workspaceId: identity.workspaceId, createdBy: identity.actorId, jobId, candidateId, resumeId,
+          workspaceId: identity.workspaceId, createdBy: identity.actorId, jobId, candidateId, resumeId, origin,
         } });
         await this.rounds.createDefaultRounds(tx, identity.workspaceId, task.id);
         return task.id;
       });
+      await this.linkCore(identity, taskId);
       return this.get(identity.workspaceId, taskId);
     } catch (error) {
       // A Postgres transaction aborts entirely on the first error, so recovering the
@@ -42,9 +50,48 @@ export class TasksService {
       if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
         const resume = await this.db.resume.findUniqueOrThrow({ where: { materialId: material.id } });
         const existing = await this.db.interviewTask.findUniqueOrThrow({ where: { jobId_candidateId: { jobId, candidateId: resume.candidateId } } });
+        await this.linkCore(identity, existing.id);
         return this.get(identity.workspaceId, existing.id);
       }
       throw error;
+    }
+  }
+
+  /**
+   * Registers the task's candidate and (job, candidate) Application with Core Record, so
+   * every subsystem shares the same ids. Runs after the local transaction (it's HTTP) and is
+   * idempotent: ids already stored are reused, and Core's own idempotency keys make a retry
+   * after a partial failure safe -- a failed call surfaces to the caller, whose retry of the
+   * same résumé lands back here through the existing-task path above.
+   */
+  private async linkCore(identity: Identity, taskId: string) {
+    const task = await this.db.interviewTask.findUniqueOrThrow({ where: { id: taskId }, include: { job: true, candidate: true, resume: { include: { material: true } } } });
+    if (!task.job.coreJobId) return;
+    let coreCandidateId = task.candidate.coreCandidateId;
+    if (!coreCandidateId) {
+      // The same résumé file seen by another subsystem (Written, Screening) resolves to the
+      // candidate it already has; only a task without a Core-stored résumé gets a fresh one.
+      const coreMaterialId = task.resume?.material.coreMaterialId;
+      const core = coreMaterialId
+        ? await this.coreRecord.resolveCandidateForMaterial(identity, { materialId: coreMaterialId, displayName: task.candidate.name, source: 'interview' })
+        : await this.coreRecord.createCandidate(identity, { displayName: task.candidate.name, source: 'interview' }, `interview:candidate:${task.candidate.id}`);
+      coreCandidateId = core.id;
+      try {
+        await this.db.candidate.update({ where: { id: task.candidate.id }, data: { coreCandidateId } });
+      } catch (error) {
+        // Another local candidate already carries this Core id (e.g. a Screening hand-off that
+        // arrived without its résumé). Still link the application to the shared candidate;
+        // leave the local rows as they are rather than merging them silently.
+        if (!(error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002')) throw error;
+      }
+    }
+    if (!task.coreApplicationId) {
+      const application = await this.coreRecord.createApplication(identity, {
+        candidateId: coreCandidateId, jobId: task.job.coreJobId,
+        origin: task.origin === 'quick_start' ? 'interview_quick_start' : 'interview_manual',
+        linkReason: 'Résumé linked to the job in Interview',
+      }, `interview:application:${task.id}`);
+      await this.db.interviewTask.update({ where: { id: task.id }, data: { coreApplicationId: application.id } });
     }
   }
 
@@ -55,7 +102,7 @@ export class TasksService {
         id: true, jobId: true, status: true, reviewed: true, version: true,
         matchScore: true, matchRecommendation: true, createdAt: true,
         job: { select: { title: true } },
-        candidate: { select: { id: true, name: true, email: true } },
+        candidate: { select: { id: true, name: true, email: true, possibleDuplicate: true } },
         rounds: { select: { status: true } },
       } });
   }

@@ -7,13 +7,17 @@ export type JdContent = {
   roleSummary?: string;
   responsibilities: string[];
   requirements: Array<{ id?: string; label?: string } & Record<string, unknown>>;
+  // Raw JD text when the job was started from a subsystem entry (JD's IntakeService).
+  sourceText?: string;
 };
 
+export type JdIntakeResult = { coreJobId: string; title: string; jdText: string; duplicate: boolean };
+
 /**
- * Read-only proxy to the JD subsystem's confirmed role content (see
- * hireos-jd-backend's DraftsController — GET /jobs/:jobId/drafts/current), the same
- * endpoint hireos-screening-backend's JobCriteriaFacade already reads. Interview never
- * writes here: it has no JD-authoring capability of its own (see Job's schema comment).
+ * Interview's window onto the JD subsystem: reads a job's role content (GET
+ * /jobs/:jobId/drafts/current, the same endpoint hireos-screening-backend's
+ * JobCriteriaFacade reads) and, for the new-task entry, hands raw JD text to JD's
+ * POST /intake/jobs so the job is created there (and in Core Record), never locally.
  */
 @Injectable()
 export class JdContentFacade {
@@ -55,18 +59,55 @@ export class JdContentFacade {
       const error = body as { code?: string; message?: string };
       throw new ServiceUnavailableException({ code: error.code || 'JD_BACKEND_ERROR', message: error.message || `JD backend returned HTTP ${response.status}.` });
     }
-    const value = body as { roleSummary?: unknown; responsibilities?: unknown; requirements?: unknown };
+    const value = body as { roleSummary?: unknown; responsibilities?: unknown; requirements?: unknown; sourceText?: unknown };
     return {
       roleSummary: typeof value.roleSummary === 'string' ? value.roleSummary : undefined,
       responsibilities: Array.isArray(value.responsibilities) ? value.responsibilities.map(String) : [],
       requirements: Array.isArray(value.requirements) ? (value.requirements as JdContent['requirements']) : [],
+      sourceText: typeof value.sourceText === 'string' ? value.sourceText : undefined,
     };
+  }
+
+  /** Creates (or, for the same JD text, finds) the job in JD + Core Record. */
+  async createFromText(identity: Identity, body: { text: string; coreMaterialId?: string }, idempotencyKey: string): Promise<JdIntakeResult> {
+    let response: Response;
+    try {
+      response = await globalThis.fetch(`${this.baseUrl}/intake/jobs`, {
+        method: 'POST',
+        body: JSON.stringify(body),
+        headers: {
+          'content-type': 'application/json',
+          'idempotency-key': idempotencyKey,
+          'x-request-id': randomUUID(),
+          'x-correlation-id': `${this.serviceName}:${randomUUID()}`,
+          'x-source-service': this.serviceName,
+          'x-workspace-id': identity.workspaceId,
+          'x-actor-id': identity.actorId,
+          ...(process.env.SERVICE_TOKEN ? { 'x-hireos-service-token': process.env.SERVICE_TOKEN } : {}),
+        },
+      });
+    } catch (error) {
+      throw new ServiceUnavailableException({
+        code: 'JD_BACKEND_UNAVAILABLE',
+        message: error instanceof Error ? error.message : 'JD backend is unavailable.',
+      });
+    }
+    const result = await parseBody(response);
+    if (!response.ok) {
+      const error = result as { code?: string; message?: string };
+      throw new ServiceUnavailableException({ code: error.code || 'JD_BACKEND_ERROR', message: error.message || `JD backend returned HTTP ${response.status}.` });
+    }
+    return result as JdIntakeResult;
   }
 }
 
 /** Flattens the structured JD draft into the plain text RubricService/splitText expect --
  * Interview only ever consumes JD content as prose, never edits its structure. */
 export function formatJdText(content: JdContent, fallbackTitle: string): string {
+  // JD only returns sourceText while the job's draft is still the one its intake wrote from the
+  // AI's reading of the text, untouched by a person -- the pasted text is then the fullest version
+  // of the JD. Once someone edits it in JD, sourceText is gone and their structured content is used.
+  if (content.sourceText?.trim()) return content.sourceText.trim();
   const parts: string[] = [];
   if (content.roleSummary) parts.push(content.roleSummary.trim());
   if (content.responsibilities.length) {

@@ -30,8 +30,11 @@ export async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> 
   });
   const body = await parseResponse(response) as { code?: string; message?: string } | T;
   if (!response.ok) {
-    const errorBody = (body && typeof body === "object" ? body : {}) as { code?: string; message?: string } & Record<string, unknown>;
-    throw new ApiError(errorBody.code || `HTTP_${response.status}`, errorBody.message || `Request failed (${response.status})`, errorBody);
+    const errorBody = (body && typeof body === "object" ? body : {}) as { code?: string; message?: string; details?: { fieldErrors?: Record<string, string[]> } } & Record<string, unknown>;
+    // 422 INVALID_SCHEMA (the platform's validation error): show the field problems, not the generic line.
+    const fieldErrors = errorBody.code === "INVALID_SCHEMA" ? Object.entries(errorBody.details?.fieldErrors ?? {}) : [];
+    const message = fieldErrors.length ? fieldErrors.map(([field, errors]) => `${field}: ${errors.join(", ")}`).join("; ") : errorBody.message;
+    throw new ApiError(errorBody.code || `HTTP_${response.status}`, message || `Request failed (${response.status})`, errorBody);
   }
   return body as T;
 }

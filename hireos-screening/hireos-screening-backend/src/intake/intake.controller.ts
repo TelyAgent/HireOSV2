@@ -31,6 +31,13 @@ export class IntakeController {
     return this.materials.saveUpload(req.identity, file);
   }
 
+  // "New job" entry: read a JD file's text into the paste box (the file itself isn't kept).
+  @Post('jobs/jd-file')
+  @UseInterceptors(FileInterceptor('file', { limits: { fileSize: 10 * 1024 * 1024, files: 1 } }))
+  jdFile(@UploadedFile() file?: MulterFile) {
+    return this.materials.extractJdText(file);
+  }
+
   @Get('materials/:id')
   material(@Req() req: { identity: Identity }, @Param('id') id: string) {
     return this.materials.get(req.identity.workspaceId, id);

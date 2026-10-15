@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { BadRequestException } from '@nestjs/common';
+import { invalidSchemaFromZod } from '../http/invalid-schema';
 
 // This module owns Interview Brief question generation end to end. It reads a
 // *confirmed* RubricVersion and its CapabilityCard rows from the rubric module (the only
@@ -51,6 +51,6 @@ export function collectQuestionRefs(parsed: z.infer<typeof questionGenerationSch
 
 export function validate<T>(schema: z.ZodType<T>, value: unknown): T {
   const parsed = schema.safeParse(value);
-  if (!parsed.success) throw new BadRequestException({ code: 'INVALID_INPUT', fieldErrors: parsed.error.flatten() });
+  if (!parsed.success) throw invalidSchemaFromZod(parsed.error);
   return parsed.data;
 }

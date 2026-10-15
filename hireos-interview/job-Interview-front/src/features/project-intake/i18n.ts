@@ -1,5 +1,5 @@
 const en = {
-  uploading: 'Uploading and reading…', submitting: 'Creating…', retry: 'Retry', remove: 'Remove',
+  uploading: 'Uploading and reading…', submitting: 'Creating…', readingJd: 'AI is reading the JD…', retry: 'Retry', remove: 'Remove',
   saved: 'Project saved.',
   loading: 'Loading…', empty: 'No projects yet.', noMatches: 'No matching projects.',
   draft: 'Draft', notLinked: 'Candidate not linked', notPlanned: 'Not planned yet',
@@ -16,7 +16,7 @@ const en = {
   cancel: 'Cancel', multipleResumes: 'Multiple resumes: confirm the candidate before linking.',
 };
 const zh: typeof en = {
-  uploading: '正在上传并读取…', submitting: '正在创建…', retry: '重试', remove: '移除',
+  uploading: '正在上传并读取…', submitting: '正在创建…', readingJd: 'AI 正在提取岗位信息…', retry: '重试', remove: '移除',
   saved: '项目已保存。',
   loading: '加载中…', empty: '暂无项目。', noMatches: '没有匹配的项目。',
   draft: '草稿', notLinked: '未关联候选人', notPlanned: '尚未规划',
@@ -36,6 +36,14 @@ const errors: Record<string, [string, string]> = {
   NETWORK_ERROR: ['Unable to reach the server. Your input is retained.', '无法连接服务器，输入已保留。'],
   REQUEST_FAILED: ['Request failed. Please retry.', '请求失败，请重试。'],
   JD_REQUIRED: ['Provide a job description.', '请提供岗位描述。'],
+  JOB_NOT_PUBLISHED: ['This job is not published yet. Publish it in JD Management or paste its JD.', '该岗位尚未发布，请先在职位管理中发布，或粘贴 JD 新建。'],
+  JD_NOT_RECOGNIZED: ['AI found no job title or job content in this text. Check the JD and try again.', 'AI 没有从这段文字中识别到职位名称和岗位内容，请检查 JD 后重试。'],
+  LLM_INVALID_OUTPUT: ['AI returned an unreadable result. Nothing was created — please retry.', 'AI 返回结果无法解析，未创建任何内容，请重试。'],
+  JOB_REQUIRED: ['Choose a job first.', '请先选择一个岗位。'],
+  MATERIAL_NOT_AVAILABLE: ['The résumé could not be read. Replace it and try again.', '简历无法读取，请更换文件后重试。'],
+  JD_BACKEND_UNAVAILABLE: ['The JD service is unavailable, so the job could not be created. Please retry later.', 'JD 服务暂不可用，岗位未能创建，请稍后重试。'],
+  CORE_RECORD_UNAVAILABLE: ['The shared records service is unavailable. Please retry later.', '主档服务暂不可用，请稍后重试。'],
+  JOB_NOT_OPEN: ['This job is closed or archived, so candidates can no longer be linked.', '该岗位已关闭或归档，不能再关联候选人。'],
   FILE_TOO_LARGE: ['The file exceeds 10 MB.', '文件超过 10 MB。'],
   EMPTY_FILE: ['The file is empty.', '文件为空。'],
   UNSUPPORTED_FILE_TYPE: ['Choose a PDF, DOCX or TXT file.', '请选择有效的 PDF、DOCX 或 TXT 文件。'],
@@ -75,7 +83,7 @@ const errors: Record<string, [string, string]> = {
   IDEMPOTENCY_CONFLICT: ['This request conflicts with an earlier submission.', '此请求与先前提交冲突。'],
   NOT_FOUND: ['Project or material not found.', '项目或材料不存在。'],
   AUTH_REQUIRED: ['Authentication is required.', '需要有效身份才能访问。'],
-  INVALID_INPUT: ['Please check the form fields.', '请检查表单字段。'],
+  INVALID_SCHEMA: ['Please check the form fields.', '请检查表单字段。'],
 };
 export const intakeText = (lang: 'en' | 'zh') => lang === 'zh' ? zh : en;
 export const errorText = (code: string, lang: 'en' | 'zh') => (errors[code] || errors.REQUEST_FAILED)[lang === 'zh' ? 1 : 0];

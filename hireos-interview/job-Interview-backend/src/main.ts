@@ -5,6 +5,7 @@ import { AppModule } from './app.module';
 import { NestExpressApplication } from '@nestjs/platform-express';
 import type { Request, Response } from 'express';
 import { RtmsService, type ZoomWebhookBody } from './meetings/rtms.service';
+import { invalidSchemaFromClassValidator } from './http/invalid-schema';
 
 const RTMS_WEBHOOK_PATH = '/api/meetings/webhooks/zoom';
 const zoomWebhookLogger = new Logger('ZoomWebhook');
@@ -81,6 +82,7 @@ async function bootstrap() {
       whitelist: true,
       transform: true,
       forbidNonWhitelisted: true,
+      exceptionFactory: (errors) => invalidSchemaFromClassValidator(errors),
     }),
   );
 

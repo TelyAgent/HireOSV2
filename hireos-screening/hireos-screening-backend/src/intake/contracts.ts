@@ -1,5 +1,5 @@
-import { BadRequestException } from '@nestjs/common';
 import { z } from 'zod';
+import { invalidSchemaFromZod } from '../http/invalid-schema';
 
 export const importChannelSchema = z.enum(['manual_upload', 'email', 'folder', 'api']);
 
@@ -15,10 +15,7 @@ export const pasteCandidateSchema = z.object({
 export function validate<T>(schema: z.ZodType<T>, value: unknown): T {
   const parsed = schema.safeParse(value);
   if (!parsed.success) {
-    throw new BadRequestException({
-      code: 'INVALID_INPUT',
-      fieldErrors: parsed.error.flatten(),
-    });
+    throw invalidSchemaFromZod(parsed.error);
   }
   return parsed.data;
 }

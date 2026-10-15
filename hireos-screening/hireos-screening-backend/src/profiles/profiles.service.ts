@@ -7,6 +7,7 @@ import type { Identity } from '../auth/workspace.guard';
 import { ProfileParserService } from './profile-parser.service';
 import { AiProfileParserService } from './ai-profile-parser.service';
 import { DiscoveryService } from '../discovery/discovery.service';
+import { invalidSchemaFromZod } from '../http/invalid-schema';
 
 // A parse is one AI call (HIREOS_AI_TIMEOUT_SECONDS, 60s by default) plus a few writes, so
 // the lease comfortably outlasts it. A job still "running" past its lease means the
@@ -91,7 +92,7 @@ export class ProfilesService implements OnModuleInit, OnModuleDestroy {
     }).strict().refine((v) => (v.compensationMin == null) === (v.compensationMax == null), { message: 'min and max go together' })
       .refine((v) => v.compensationMin == null || v.compensationMax! >= v.compensationMin, { message: 'max below min' })
       .safeParse(raw);
-    if (!input.success) throw new BadRequestException({ code: 'INVALID_INPUT' });
+    if (!input.success) throw invalidSchemaFromZod(input.error);
     const candidate = await this.db.candidate.findFirst({
       where: { id: candidateId, workspaceId: identity.workspaceId },
       include: { profiles: { orderBy: { version: 'desc' }, take: 1 } },

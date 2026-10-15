@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../persistence/prisma.service';
 import type { Identity } from '../auth/workspace.guard';
 import type { ScreeningHandoffDto } from './screening-handoff.dto';
+import { upsertCaseWithTask } from './case-intake';
 
 @Injectable()
 export class ScreeningHandoffService {
@@ -35,26 +36,13 @@ export class ScreeningHandoffService {
         update: { title: dto.jobTitle, department: dto.jobDepartment, location: dto.jobLocation, level: dto.jobLevel, jdText: dto.jdText },
       });
 
-      const kase = await tx.case.upsert({
-        where: { workspaceId_candidateId_jobId: { workspaceId: identity.workspaceId, candidateId: candidate.id, jobId: job.id } },
-        create: {
-          workspaceId: identity.workspaceId, candidateId: candidate.id, jobId: job.id, status: 'linked',
-          coreMaterialId: dto.coreMaterialId, resumeText: dto.resumeText, matchScore: dto.matchScore, matchRecommendation: dto.matchRecommendation,
-        },
+      const { caseId, taskId } = await upsertCaseWithTask(tx, {
+        workspaceId: identity.workspaceId, candidateId: candidate.id, jobId: job.id, candidateName: dto.candidateName,
+        create: { coreMaterialId: dto.coreMaterialId, resumeText: dto.resumeText, matchScore: dto.matchScore, matchRecommendation: dto.matchRecommendation },
         update: { coreMaterialId: dto.coreMaterialId, resumeText: dto.resumeText, matchScore: dto.matchScore, matchRecommendation: dto.matchRecommendation },
       });
 
-      const task = await tx.task.upsert({
-        where: { caseId: kase.id },
-        create: {
-          workspaceId: identity.workspaceId, caseId: kase.id,
-          title: `${dto.candidateName} — plan ready, test not yet sent`,
-          type: 'invite_pending', status: 'open',
-        },
-        update: {},
-      });
-
-      return { candidateId: candidate.id, jobId: job.id, caseId: kase.id, taskId: task.id };
+      return { candidateId: candidate.id, jobId: job.id, caseId, taskId };
     });
   }
 }

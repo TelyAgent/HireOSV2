@@ -40,7 +40,7 @@ test('persistent meeting notes: authorization, sessions, revisions and recovery'
     assert.equal((await (await send('/meeting-record-tasks')).json()).length, 1);
     assert.equal((await (await send('/meeting-record-tasks', 'GET', undefined, { 'test-actor': 'other' })).json()).length, 0);
     const path = `/tasks/${task.id}/interview-sessions`;
-    assert.equal((await send(path, 'POST', { round: 0 })).status, 400);
+    assert.equal((await send(path, 'POST', { round: 0 })).status, 422);
     assert.equal((await send(path, 'POST', { round: 1 }, { 'x-hireos-record': '' })).status, 403);
     const sessions = await Promise.all([send(path, 'POST', { round: 1 }), send(path, 'POST', { round: 1 })]);
     const [first, same] = await Promise.all(sessions.map(r => r.json()));
@@ -59,7 +59,7 @@ test('persistent meeting notes: authorization, sessions, revisions and recovery'
     assert.equal((await retry.json()).version, 1, 'lost response retry is idempotent');
     const concurrent = await Promise.all(['draft A', 'draft B'].map(content => send(notePath, 'PUT', { version: 1, content })));
     assert.deepEqual(concurrent.map(r => r.status).sort(), [200, 409]);
-    assert.equal((await send(notePath, 'PUT', { version: 2, content: 'x'.repeat(50001) })).status, 400);
+    assert.equal((await send(notePath, 'PUT', { version: 2, content: 'x'.repeat(50001) })).status, 422);
     const second = await (await send(path, 'POST', { round: 2 })).json();
     assert.notEqual(second.session.id, first.session.id); assert.equal(second.note.content, '');
     const current = await (await send(recordPath)).json();

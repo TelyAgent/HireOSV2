@@ -66,6 +66,10 @@ model Case {
   interviewTaskId     String?
   coreMaterialId      String?
   resumeText          String?
+  // Core Record Application this case belongs to -- the (job, candidate) pair every subsystem
+  // shares. Set by the new-task entry; null for screening hand-offs (Screening owns that link).
+  coreApplicationId   String?
+  origin              String   @default("screening_handoff") // screening_handoff | quick_start
   matchScore          Int?
   matchRecommendation String?
   // A supplemental round was opened ("Add supplemental test") and hasn't been sent yet -- keeps an

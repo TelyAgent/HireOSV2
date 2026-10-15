@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Patch, Post, Query, Req, UploadedFile, UseGuards, UseInterceptors } from '@nestjs/common';
+import { Body, Controller, Get, Headers, Param, Patch, Post, Query, Req, UploadedFile, UseGuards, UseInterceptors } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { MaterialsService } from './materials.service';
 import { JobsService } from './jobs.service';
@@ -6,6 +6,7 @@ import { TasksService } from './tasks.service';
 import { RoundsService } from './rounds.service';
 import { ParsingService } from './parsing.service';
 import { ScreeningHandoffService } from './screening-handoff.service';
+import { QuickStartService } from './quick-start.service';
 import { WorkspaceGuard, type Identity } from './workspace.guard';
 
 @Controller()
@@ -18,6 +19,7 @@ export class IntakeController {
     private readonly rounds: RoundsService,
     private readonly parsing: ParsingService,
     private readonly screeningHandoff: ScreeningHandoffService,
+    private readonly quickStartService: QuickStartService,
   ) {}
   @Post('materials')
   @UseInterceptors(FileInterceptor('file', { limits: { fileSize: 10 * 1024 * 1024, files: 1, fields: 0 } }))
@@ -25,17 +27,18 @@ export class IntakeController {
   @Get('materials/:id')
   material(@Req() req: { identity: Identity }, @Param('id') id: string) { return this.materials.get(req.identity.workspaceId, id); }
 
-  // Two ways a recruiter brings a job in: create one from JD text, or search Core
-  // Record's job directory and attach the one they picked.
-  @Post('jobs')
-  createJob(@Req() req: { identity: Identity }, @Body() body: unknown) { return this.jobs.create(req.identity, body); }
+  // The new-task entry: new JD text (created in JD + Core Record) or an existing Core
+  // Record job, plus an optional résumé -> local job, and a task when a résumé is given.
+  @Post('quick-start')
+  quickStart(@Req() req: { identity: Identity }, @Headers('idempotency-key') key: string | undefined, @Body() body: unknown) { return this.quickStartService.start(req.identity, body, key); }
+  // Job picker for "choose an existing job": search Core Record's job directory.
   @Get('external-jobs')
   searchExternalJobs(@Req() req: { identity: Identity }, @Query('q') q?: string) { return this.jobs.search(req.identity, q); }
   @Post('jobs/attach')
   attachJob(@Req() req: { identity: Identity }, @Body() body: unknown) { return this.jobs.attach(req.identity, body); }
 
   @Get('jobs')
-  listJobs(@Req() req: { identity: Identity }) { return this.jobs.list(req.identity.workspaceId); }
+  listJobs(@Req() req: { identity: Identity }) { return this.jobs.list(req.identity); }
   @Get('jobs/:id')
   job(@Req() req: { identity: Identity }, @Param('id') id: string) { return this.jobs.get(req.identity.workspaceId, id); }
 

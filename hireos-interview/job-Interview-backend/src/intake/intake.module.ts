@@ -13,13 +13,14 @@ import { ScreeningHandoffService } from './screening-handoff.service';
 import { WorkspaceGuard } from './workspace.guard';
 import { CoreRecordClient } from '../core-record/core-record.client';
 import { JdContentFacade } from '../core-record/jd-content.facade';
+import { QuickStartService } from './quick-start.service';
 
 @Module({
   imports: [MeetingsModule],
   controllers: [IntakeController],
   providers: [
     PrismaService, AiService, MaterialsService, CandidatesService, JobsService, TasksService,
-    RoundsService, ParsingService, ScreeningHandoffService, WorkspaceGuard, CoreRecordClient, JdContentFacade,
+    RoundsService, ParsingService, ScreeningHandoffService, WorkspaceGuard, CoreRecordClient, JdContentFacade, QuickStartService,
   ],
 })
 export class IntakeModule {}

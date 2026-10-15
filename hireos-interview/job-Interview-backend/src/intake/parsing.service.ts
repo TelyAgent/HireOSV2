@@ -3,6 +3,7 @@ import { Prisma } from '@prisma/client';
 import { randomUUID } from 'node:crypto';
 import { PrismaService } from '../persistence/prisma.service';
 import { AiService, ParseFailure } from './ai.service';
+import { CoreRecordClient } from '../core-record/core-record.client';
 import type { ParseInput } from './contracts';
 
 @Injectable()
@@ -10,7 +11,7 @@ export class ParsingService implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(ParsingService.name);
   private timer?: ReturnType<typeof setInterval>;
   private pending?: Promise<void>;
-  constructor(private readonly db: PrismaService, private readonly ai: AiService) {}
+  constructor(private readonly db: PrismaService, private readonly ai: AiService, private readonly coreRecord: CoreRecordClient) {}
   onModuleInit() {
     this.timer = setInterval(() => {
       if (!this.pending) this.pending = this.tick().catch(() => this.logger.error('Parsing worker failed; pending tasks remain persisted')).finally(() => { this.pending = undefined; });
@@ -37,6 +38,7 @@ export class ParsingService implements OnModuleInit, OnModuleDestroy {
         status: 'needs_review', result: output.result, model: output.model, usage: output.usage,
         errorCode: null, leaseToken: null, leaseUntil: null,
       } });
+      if (job.type === 'resume' && job.resumeId) await this.flagPossibleDuplicate(job.workspaceId, job.resumeId, output.result);
     } catch (error) {
       const failure = error instanceof ParseFailure ? error : new ParseFailure('AI_REQUEST_FAILED', true);
       const retry = failure.retryable && job.attempt < 2;
@@ -46,6 +48,27 @@ export class ParsingService implements OnModuleInit, OnModuleDestroy {
       } });
     }
   }
+  /**
+   * Phase-1 candidate dedupe: if the résumé's parsed email belongs to a different Core Record
+   * candidate, flag this one for a human to check. Never merges, never blocks parsing --
+   * Core Record being unreachable just means no flag this time.
+   */
+  private async flagPossibleDuplicate(workspaceId: string, resumeId: string, result: unknown) {
+    const email = (result as { email?: { value?: unknown } | null } | null)?.email?.value;
+    if (typeof email !== 'string' || !/^\S+@\S+\.\S+$/.test(email.trim())) return;
+    try {
+      const resume = await this.db.resume.findUnique({ where: { id: resumeId }, include: { candidate: true } });
+      const own = resume?.candidate.coreCandidateId;
+      if (!resume || !own) return;
+      const matches = await this.coreRecord.findCandidatesByEmail({ workspaceId, actorId: 'interview-parser', roles: [] }, email.trim());
+      if (matches.some((c) => c.id !== own)) {
+        await this.db.candidate.update({ where: { id: resume.candidateId }, data: { possibleDuplicate: true } });
+      }
+    } catch (error) {
+      this.logger.warn(`Duplicate check skipped for résumé ${resumeId}: ${error instanceof Error ? error.message : error}`);
+    }
+  }
+
   async get(workspaceId: string, id: string) {
     const job = await this.db.parseJob.findFirst({ where: { id, workspaceId }, select: {
       id: true, jobId: true, resumeId: true, taskId: true, type: true, status: true, errorCode: true, result: true, inputVersion: true, attempt: true,

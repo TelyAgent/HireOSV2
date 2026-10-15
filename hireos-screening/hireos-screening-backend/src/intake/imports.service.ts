@@ -410,7 +410,7 @@ export class ImportsService implements OnModuleInit, OnModuleDestroy {
     });
     try {
       const material = await this.db.material.findUniqueOrThrow({ where: { id: job.materialId } });
-      const candidate = await this.createCandidateFromMaterial(identity, material.id, material.name, input.channel);
+      const candidate = await this.createCandidateFromMaterial(identity, material.id, material.name, input.channel, material.coreMaterialId);
       const batch = await this.db.importBatch.findUnique({ where: { id: input.batchId }, select: { targetJobId: true } });
       await this.profiles.enqueue(job.workspaceId, candidate.id, candidate.resumeVersionId, material.id, batch?.targetJobId ?? undefined);
       await this.updateItem(identity, input.operationId, input.batchId, input.itemId, {
@@ -651,13 +651,19 @@ export class ImportsService implements OnModuleInit, OnModuleDestroy {
     await this.db.activityEvent.create({ data: input });
   }
 
-  private async createCandidateFromMaterial(identity: Identity, materialId: string, fileName: string, channel: ImportChannel) {
+  private async createCandidateFromMaterial(identity: Identity, materialId: string, fileName: string, channel: ImportChannel, coreMaterialId?: string | null) {
     const displayName = displayNameFromFileName(fileName);
-    const coreCandidate = await this.coreRecord.createCandidate(
-      identity,
-      { displayName, source: channel },
-      `screening:candidate:material:${identity.workspaceId}:${materialId}`,
-    );
+    // A file already stored in Core Record resolves to the candidate other subsystems linked to
+    // it (Interview/Written may have seen this résumé first), so one person stays one Core
+    // candidate. Screening has already turned away an identical file as a duplicate before
+    // reaching here, so a reused Core id is never one this service has a local row for.
+    const coreCandidate = coreMaterialId
+      ? await this.coreRecord.resolveCandidateForMaterial(identity, { materialId: coreMaterialId, displayName, source: channel })
+      : await this.coreRecord.createCandidate(
+        identity,
+        { displayName, source: channel },
+        `screening:candidate:material:${identity.workspaceId}:${materialId}`,
+      );
     return this.db.$transaction(async (tx) => {
       const candidate = await tx.candidate.create({
         data: { ...(coreCandidate?.id ? { id: coreCandidate.id } : {}), workspaceId: identity.workspaceId, displayName, ownerId: identity.actorId },

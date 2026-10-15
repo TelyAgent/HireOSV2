@@ -2,13 +2,10 @@ import { useCallback, useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useStore } from "../store/StoreContext";
 import { listJobs } from "../data/api/jobs";
-import { BASE_URL } from "../data/api/shared";
 import type { Job, JobFunnel, JobStatus } from "../data/fixtures/jobs";
 import { Badge, Button, PageHeader } from "../components/ui/Primitives";
 import { Icon } from "../components/ui/Icons";
-
-/** Jobs are created in the JD subsystem; it is served next to this app (/screening/ ↔ /jd/). */
-const JD_NEW_JOB_URL = `${BASE_URL.replace(/screening\/$/, "jd/")}jobs/new`;
+import { NewJobModal } from "../features/jobs/NewJobModal";
 
 const SOURCE_LABEL: Record<string, string> = { manual_upload: "Local upload", email: "Email", folder: "Folder", api: "API" };
 
@@ -54,9 +51,10 @@ function SourceChips({ sources }: { sources: JobFunnel["sources"] }) {
 const EMPTY_FUNNEL: JobFunnel = { resumes: 0, matched: 0, linked: 0, pending: 0, today: 0, sources: [] };
 
 export function JobsListPage() {
-  const { t } = useStore();
+  const { t, say, state } = useStore();
   const navigate = useNavigate();
   const [jobs, setJobs] = useState<Job[]>([]);
+  const [newJobOpen, setNewJobOpen] = useState(false);
 
   const load = useCallback(() => {
     listJobs().then(setJobs);
@@ -72,10 +70,23 @@ export function JobsListPage() {
         title={t("Jobs")}
         subtitle={t("Each job is screened independently — applications, standards and permissions never mix across roles.")}
         actions={
-          <Button variant="primary" icon="add" onClick={() => window.open(JD_NEW_JOB_URL, "_blank", "noopener")}>
+          <Button variant="primary" icon="add" onClick={() => setNewJobOpen(true)}>
             {t("New job")}
           </Button>
         }
+      />
+      <NewJobModal
+        open={newJobOpen}
+        onClose={() => setNewJobOpen(false)}
+        onCreated={(job, duplicate) => {
+          setNewJobOpen(false);
+          const zh = state.lang === "zh";
+          say(duplicate
+            ? (zh ? `已存在相同职位「${job.title}」，已打开该职位。` : `A job with the same JD already exists ("${job.title}") — opened it.`)
+            : t("Job created. Review and confirm the rubric to start screening."));
+          load();
+          navigate(`/jobs/${job.id}/criteria`);
+        }}
       />
       <div className="card">
         <table className="data-table jobs-table">

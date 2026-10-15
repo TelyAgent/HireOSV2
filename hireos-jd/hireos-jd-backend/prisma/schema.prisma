@@ -177,3 +177,26 @@ model JobDocumentVersion {
 
   @@unique([workspaceId, jobId, versionNo])
 }
+
+/// The raw JD text another subsystem's "new task" entry created a job from (see IntakeService).
+/// `contentHash` is over whitespace-normalized text and unique per workspace, so pasting the same
+/// JD again resolves to the job it already created instead of a duplicate.
+model JdSource {
+  id             String   @id @default(uuid())
+  workspaceId    String
+  jobId          String
+  text           String
+  contentHash    String
+  coreMaterialId String?
+  sourceService  String
+  createdBy      String
+  createdAt      DateTime @default(now())
+  // The draft intake wrote from the AI's reading of the text, with the content hash it was written
+  // with. Drafts are edited in place, so "still intake's draft" means same id AND same hash AND not
+  // yet confirmed; while that holds the raw text is the authoritative JD (see isIntakeOwned).
+  draftId     String?
+  draftHash   String?
+
+  @@unique([workspaceId, contentHash])
+  @@index([workspaceId, jobId])
+}

@@ -141,7 +141,7 @@ export const COMPARISONS: Record<string, Comparison> = {};
 export interface Mail { id: string; from: string; subject: string; receivedAt: string; authStatus: string; threadStatus: string; matchReason: string; classification: string; caseId: string | null; attachments: string[]; missing?: string[] }
 export const MAIL: Record<string, Mail> = {};
 
-export interface Task { id: string; title: string; type: string; assignee: string | null; queue?: string; status: string; waitingReason?: string; waitingUntil?: string; dueAt: string; link: string; sourceRef: string }
+export interface Task { id: string; title: string; type: string; assignee: string | null; queue?: string; status: string; waitingReason?: string; waitingUntil?: string; dueAt: string; createdAt?: string; link: string; sourceRef: string }
 // Filled only with real tasks from hireos-written-backend at runtime (see data/realTasksMerge.ts).
 export const TASKS: Record<string, Task> = {};
 

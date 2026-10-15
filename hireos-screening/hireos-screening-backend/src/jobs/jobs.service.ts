@@ -1,9 +1,12 @@
 import { BadRequestException, Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { randomUUID } from 'node:crypto';
+import { z } from 'zod';
 import { PrismaService } from '../persistence/prisma.service';
 import type { Identity } from '../auth/workspace.guard';
 import { criteriaSchema, validate, type CriteriaInput } from './contracts';
 import { CoreRecordClient } from '../core-record/core-record.client';
 import { JobCriteriaFacade, type RemoteCriteriaProjection } from './job-criteria.facade';
+import { invalidSchemaFromZod } from '../http/invalid-schema';
 
 const DEFAULT_DIMENSIONS = [
   { id: 'dim-skills', name: 'Skills', weight: 0.25, rubric: 'How closely the candidate skills match the role.' },
@@ -116,16 +119,14 @@ export class JobsService {
     if (!coreJobs.length) return;
     const local = await this.db.job.findMany({
       where: { workspaceId: identity.workspaceId, id: { in: coreJobs.map((job) => job.id) } },
-      select: { id: true, title: true, status: true },
+      select: { id: true, title: true, status: true, origin: true, team: true, location: true, employmentType: true, seniority: true, openings: true },
     });
     const localById = new Map(local.map((job) => [job.id, job]));
 
     for (const core of coreJobs) {
       const existing = localById.get(core.id);
       if (existing) {
-        if (existing.title !== core.title || existing.status !== core.status) {
-          await this.db.job.update({ where: { id: core.id }, data: { title: core.title, status: core.status } });
-        }
+        await this.syncFromCore(existing, core);
         continue;
       }
       if (core.status !== 'open') continue;
@@ -137,31 +138,11 @@ export class JobsService {
       } catch (error) {
         this.logger.warn(`No JD content for job ${core.id}: ${error instanceof Error ? error.message : String(error)}`);
       }
-      await this.db.$transaction(async (tx) => {
-        await tx.job.create({
-          data: {
-            id: core.id,
-            workspaceId: identity.workspaceId,
-            title: core.title,
-            team: core.team || 'Unassigned',
-            location: core.location || 'Unspecified',
-            employmentType: core.employmentType || 'Unspecified',
-            seniority: core.seniority || 'Unspecified',
-            status: core.status,
-            openings: core.openings || 1,
-            jdText: content ? formatJdText(core.title, content) : null,
-          },
-        });
-        await tx.jobCriteriaVersion.create({
-          data: {
-            workspaceId: identity.workspaceId,
-            jobId: core.id,
-            version: 0,
-            requirements: content ? toScreeningRequirements(content.requirements, DEFAULT_DIMENSIONS) : [],
-            dimensions: DEFAULT_DIMENSIONS,
-          },
-        });
-      });
+      await this.createLocalJob(identity, {
+        id: core.id, title: core.title, team: core.team, location: core.location, employmentType: core.employmentType,
+        seniority: core.seniority, openings: core.openings, status: core.status, origin: 'jd_published',
+        jdText: content ? formatJdText(core.title, content) : null,
+      }, content);
     }
   }
 
@@ -173,16 +154,113 @@ export class JobsService {
   private async archiveDeletedJobs(identity: Identity, coreIds: string[]) {
     const missing = await this.db.job.findMany({
       where: { workspaceId: identity.workspaceId, status: 'open', id: { notIn: coreIds } },
-      select: { id: true },
+      select: { id: true, origin: true },
     });
-    for (const { id } of missing) {
+    for (const { id, origin } of missing) {
       try {
         const core = await this.coreRecord.getJob(identity, id);
-        await this.db.job.update({ where: { id }, data: { status: core ? core.status : 'archived' } });
+        await this.db.job.update({ where: { id }, data: { status: core ? screeningStatus(core.status, origin) : 'archived' } });
       } catch (error) {
         this.logger.warn(`Could not check Core Record job ${id}: ${error instanceof Error ? error.message : String(error)}`);
       }
     }
+  }
+
+  /**
+   * Screening's "New job" entry: the pasted JD becomes a draft job in HireOS JD + Core Record (JD
+   * has AI read it first -- title, location, requirements -- and dedupes an identical JD), and Screening starts using
+   * it right away as a quick_start job -- no one has to publish it in JD first, since Screening
+   * can be sold and used on its own. Its criteria are reviewed and confirmed here, as for any job.
+   */
+  async quickStart(identity: Identity, raw: unknown, idempotencyKey?: string) {
+    const parsed = quickStartSchema.safeParse(raw);
+    if (!parsed.success) throw invalidSchemaFromZod(parsed.error);
+    const { text } = parsed.data;
+    if (!this.criteriaFacade.isRemote()) {
+      // Mock mode (no Core Record / JD): a local-only job, as before Core Record existed.
+      const title = (text.split('\n').map((line) => line.trim()).find(Boolean) || text).slice(0, 200);
+      const id = randomUUID();
+      await this.createLocalJob(identity, { id, title, jdText: text, origin: 'quick_start', status: 'open' }, null);
+      return { job: await this.get(identity, id), duplicate: false };
+    }
+    const created = await this.criteriaFacade.createFromText(identity, text, `screening.quick-start:${idempotencyKey?.trim() || randomUUID()}`);
+    const existing = await this.db.job.findFirst({ where: { id: created.coreJobId, workspaceId: identity.workspaceId } });
+    if (existing) {
+      // Already in Screening (published earlier, or created here before). A job that went back to
+      // draft in JD is adopted as Screening's own again; paused/closed/archived stay as they are.
+      if (existing.status === 'draft') {
+        await this.db.job.update({ where: { id: existing.id }, data: { status: 'open', origin: 'quick_start' } });
+      }
+      return { job: await this.get(identity, existing.id), duplicate: created.duplicate };
+    }
+    const core = await this.coreRecord.getJob(identity, created.coreJobId);
+    if (!core) throw new NotFoundException({ code: 'NOT_FOUND' });
+    let content: RemoteCriteriaProjection | null = null;
+    try {
+      content = await this.criteriaFacade.get(identity, core.id);
+    } catch (error) {
+      this.logger.warn(`No JD content yet for job ${core.id}: ${error instanceof Error ? error.message : String(error)}`);
+    }
+    await this.createLocalJob(identity, {
+      id: core.id, title: core.title, team: core.team, location: core.location, employmentType: core.employmentType,
+      seniority: core.seniority, openings: core.openings, jdText: created.jdText, origin: 'quick_start',
+      status: screeningStatus(core.status, 'quick_start'),
+    }, content);
+    return { job: await this.get(identity, core.id), duplicate: created.duplicate };
+  }
+
+  private async createLocalJob(
+    identity: Identity,
+    job: { id: string; title: string; team?: string; location?: string; employmentType?: string; seniority?: string; openings?: number; jdText: string | null; origin: string; status: string },
+    content: RemoteCriteriaProjection | null,
+  ) {
+    await this.db.$transaction(async (tx) => {
+      await tx.job.create({
+        data: {
+          id: job.id,
+          workspaceId: identity.workspaceId,
+          title: job.title,
+          team: job.team || 'Unassigned',
+          location: job.location || 'Unspecified',
+          employmentType: job.employmentType || 'Unspecified',
+          seniority: job.seniority || 'Unspecified',
+          status: job.status,
+          origin: job.origin,
+          openings: job.openings || 1,
+          jdText: job.jdText,
+        },
+      });
+      await tx.jobCriteriaVersion.create({
+        data: {
+          workspaceId: identity.workspaceId,
+          jobId: job.id,
+          version: 0,
+          requirements: content ? toScreeningRequirements(content.requirements, DEFAULT_DIMENSIONS) : [],
+          dimensions: DEFAULT_DIMENSIONS,
+        },
+      });
+    });
+  }
+
+  /** Title, status and the descriptive fields follow Core Record -- e.g. edits made in HireOS JD. */
+  private async syncFromCore(
+    existing: { id: string; title: string; status: string; origin: string; team: string; location: string; employmentType: string; seniority: string; openings: number },
+    core: { title: string; status: string; team?: string; location?: string; employmentType?: string; seniority?: string; openings?: number },
+  ) {
+    const synced = {
+      title: core.title,
+      status: screeningStatus(core.status, existing.origin),
+      team: core.team || 'Unassigned',
+      location: core.location || 'Unspecified',
+      employmentType: core.employmentType || 'Unspecified',
+      seniority: core.seniority || 'Unspecified',
+      openings: core.openings || 1,
+    };
+    if ((Object.keys(synced) as (keyof typeof synced)[]).some((key) => existing[key] !== synced[key])) {
+      await this.db.job.update({ where: { id: existing.id }, data: synced });
+      return true;
+    }
+    return false;
   }
 
   async get(identity: Identity, id: string) {
@@ -378,6 +456,17 @@ function asArray(value: unknown) {
 // "Move to Interview" for any job unless it (or an explicit title marker) opts in.
 export function jobRequiresAssessment(job: { assessmentRequired: boolean; title: string }): boolean {
   return job.assessmentRequired || job.title.toLowerCase().includes('assessment-required');
+}
+
+const quickStartSchema = z.object({ text: z.string().trim().min(1).max(150000) }).strict();
+
+/**
+ * Screening's own view of a Core Record job status. A quick_start job is a JD draft that Screening
+ * already uses, so a Core 'draft' reads as 'open' here; every other status (published, paused,
+ * closed, archived) is followed as-is, and jobs published from JD follow Core exactly.
+ */
+export function screeningStatus(coreStatus: string, origin: string) {
+  return origin === 'quick_start' && coreStatus === 'draft' ? 'open' : coreStatus;
 }
 
 function formatJdText(title: string, content: RemoteCriteriaProjection): string {

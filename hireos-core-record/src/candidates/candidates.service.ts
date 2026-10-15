@@ -14,6 +14,12 @@ const createSchema = z.object({
   source: z.string().trim().max(80).optional(),
 });
 
+const resolveForMaterialSchema = z.object({
+  materialId: z.string().uuid(),
+  displayName: z.string().trim().min(1).max(200),
+  source: z.string().trim().max(80).optional(),
+});
+
 const patchSchema = createSchema.partial().extend({
   status: z.enum(['provisional', 'active', 'merged', 'archived', 'deleted']).optional(),
   retentionPolicy: z.string().trim().max(100).optional(),
@@ -57,6 +63,55 @@ export class CandidatesService {
         payload: { candidateId: candidate.id, displayName: candidate.displayName },
       });
       return result;
+    });
+  }
+
+  async findByEmail(identity: Identity, raw?: string) {
+    const email = z.string().trim().email().parse(raw);
+    const rows = await this.db.candidate.findMany({
+      where: { workspaceId: identity.workspaceId, email: { equals: email, mode: 'insensitive' }, status: { notIn: ['merged', 'deleted'] } },
+      orderBy: { createdAt: 'asc' },
+      take: 50,
+    });
+    return rows.map(serialize);
+  }
+
+  /**
+   * "Which candidate is this résumé?" -- the one shared answer every subsystem uses, so the same
+   * file never becomes two Core candidates (e.g. once in Interview, again in Written). Returns
+   * the candidate the material is already linked to, or creates one and links it. The material
+   * row is locked for the duration, so two subsystems resolving the same file at once still
+   * end up with a single candidate.
+   */
+  async resolveForMaterial(identity: Identity, raw: unknown, meta: RequestMeta) {
+    const input = resolveForMaterialSchema.parse(raw);
+    return this.db.$transaction(async (tx) => {
+      const locked = await tx.$queryRaw<{ id: string; candidateId: string | null }[]>`
+        SELECT id, "candidateId" FROM "Material" WHERE id = ${input.materialId} AND "workspaceId" = ${identity.workspaceId} FOR UPDATE`;
+      if (!locked.length) throw new NotFoundException({ code: 'NOT_FOUND' });
+      if (locked[0].candidateId) {
+        const existing = await tx.candidate.findUniqueOrThrow({ where: { id: locked[0].candidateId } });
+        return { ...serialize(existing), created: false };
+      }
+      const candidate = await tx.candidate.create({
+        data: { workspaceId: identity.workspaceId, displayName: input.displayName, ownerId: identity.actorId },
+      });
+      await tx.material.update({ where: { id: input.materialId }, data: { candidateId: candidate.id } });
+      await writeAudit(tx, identity, meta, {
+        action: 'candidate.created',
+        objectType: 'Candidate',
+        objectId: candidate.id,
+        afterVersion: candidate.version,
+        payload: { source: input.source || 'api', materialId: input.materialId },
+      });
+      await writeOutbox(tx, identity, meta, {
+        eventType: 'candidate.created',
+        aggregateType: 'Candidate',
+        aggregateId: candidate.id,
+        aggregateVersion: candidate.version,
+        payload: { candidateId: candidate.id, displayName: candidate.displayName, materialId: input.materialId },
+      });
+      return { ...serialize(candidate), created: true };
     });
   }
 

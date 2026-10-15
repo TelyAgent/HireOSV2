@@ -8,6 +8,7 @@ import { PrismaService } from '../persistence/prisma.service';
 import type { Identity } from '../auth/workspace.guard';
 import { MailService, MailApiError, type MailInboxMessage, type MailAttachmentMessage, type MailboxCredentials } from './mail.service';
 import { ImportsService } from '../intake/imports.service';
+import { invalidSchemaFromZod } from '../http/invalid-schema';
 
 const corporateMailboxSchema = z.object({
   name: z.string().trim().max(200).optional(),
@@ -139,7 +140,7 @@ export class SettingsService {
   // back to what's already stored).
   async testCorporateMailbox(identity: Identity, raw: unknown, id?: string) {
     const parsed = testCorporateMailboxSchema.safeParse(raw);
-    if (!parsed.success) throw new BadRequestException({ code: 'INVALID_INPUT', fieldErrors: parsed.error.flatten() });
+    if (!parsed.success) throw invalidSchemaFromZod(parsed.error);
     const input = parsed.data;
     const existing = id ? await this.getMailboxSetting(identity.workspaceId, id) : null;
     const prev = existing ? (existing.payload as any) : null;
@@ -185,7 +186,7 @@ export class SettingsService {
 
   private async persistCorporateMailbox(identity: Identity, existing: { id: string; key: string; version: number; payload: unknown } | null, raw: unknown) {
     const parsed = corporateMailboxSchema.safeParse(raw);
-    if (!parsed.success) throw new BadRequestException({ code: 'INVALID_INPUT', fieldErrors: parsed.error.flatten() });
+    if (!parsed.success) throw invalidSchemaFromZod(parsed.error);
     const input = parsed.data;
     const prev = existing ? (existing.payload as any) : null;
     const password = normalizePassword(input.password) || prev?.password;

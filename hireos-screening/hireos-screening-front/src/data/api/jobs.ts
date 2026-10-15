@@ -1,6 +1,6 @@
 import { db } from "../db";
 import type { Job, Dimension, Requirement } from "../fixtures/jobs";
-import { apiFetch } from "./shared";
+import { ApiError, apiFetch, apiUpload } from "./shared";
 
 export async function listJobs(): Promise<Job[]> {
   const jobs = await apiFetch<Job[]>("/jobs");
@@ -62,4 +62,22 @@ export async function listJobBelowThreshold(id: string): Promise<BelowThresholdC
  * criteria; returns immediately. New suggestions appear as each candidate finishes. */
 export async function runJobMatch(id: string): Promise<{ status: "queued"; candidatesQueued: number; alreadyPending: number }> {
   return apiFetch(`/jobs/${id}/match`, { method: "POST" });
+}
+
+/** "New job": pasted JD text -> a draft job in JD + Core Record that Screening uses right away. */
+export async function quickStartJob(text: string, idempotencyKey: string): Promise<{ job: Job; duplicate: boolean }> {
+  const result = await apiFetch<{ job: Job; duplicate: boolean }>("/jobs/quick-start", {
+    method: "POST",
+    headers: { "Idempotency-Key": idempotencyKey },
+    body: JSON.stringify({ text }),
+  });
+  db.jobs[result.job.id] = result.job;
+  return result;
+}
+
+/** Text of a JD file, to fill the paste box (the file itself is not kept). */
+export async function readJdFile(file: File): Promise<{ name: string; text: string; errorCode: string | null }> {
+  if (file.size > 10 * 1024 * 1024) throw new ApiError("FILE_TOO_LARGE");
+  if (!/\.(pdf|docx|txt)$/i.test(file.name)) throw new ApiError("UNSUPPORTED_FILE_TYPE");
+  return apiUpload("/jobs/jd-file", [file], "file");
 }

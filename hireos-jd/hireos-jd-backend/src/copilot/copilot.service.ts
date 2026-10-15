@@ -9,6 +9,7 @@ import { PrismaService } from '../persistence/prisma.service';
 import { findIdempotent, json, requestHash, storeIdempotency, type RequestMeta } from '../records';
 import { LlmProvider, type ChatTurn, type WebAnswer } from './llm-provider';
 import { PromptRegistry } from './prompt-registry';
+import { fieldsToDraftContent } from './draft-mapping';
 import { ReplyStreamExtractor } from './reply-stream-extractor';
 import {
   autoCompleteInputSchema,
@@ -264,43 +265,11 @@ export class CopilotService {
       `copilot.confirm-draft:${id}:job:${key}`,
     );
 
-    // Core's role-version schema requires each requirement to carry id/label/dimension/hard/kind
-    // (see hireos-core-record's RoleVersionsService requirementSchema) — a `statement` string alone
-    // isn't enough. This service doesn't yet have a real dimension taxonomy, so everything collected
-    // by the JD-intake chat lands under a generic "experience" dimension for now.
-    const requirements = [
-      ...(fields.mustHave || []).map((label, index) => ({
-        id: `must-${index}`,
-        label,
-        dimension: 'experience',
-        priority: 'must_have' as const,
-        hard: true,
-        kind: 'general',
-      })),
-      ...(fields.niceToHave || []).map((label, index) => ({
-        id: `nice-${index}`,
-        label,
-        dimension: 'experience',
-        priority: 'preferred' as const,
-        hard: false,
-        kind: 'general',
-      })),
-    ];
     const draft = await this.drafts.create(
       identity,
       job.id,
       {
-        roleSummary: fields.roleSummary,
-        responsibilities: fields.responsibilities || [],
-        requirements,
-        publicCompensation: fields.publicCompensation ?? null,
-        ...(fields.businessProblem || fields.expectedOutcomes?.length
-          ? { hiringContext: { businessProblem: fields.businessProblem, expectedOutcomes: fields.expectedOutcomes } }
-          : {}),
-        // Same `{ period, statement }` shape the role blueprint reads; the period lives in the statement text.
-        ...(fields.successCriteria?.length
-          ? { successCriteria: fields.successCriteria.map((statement) => ({ period: '90 days', statement })) }
-          : {}),
+        ...fieldsToDraftContent(fields),
         sourceRefs: [{ kind: 'copilot_conversation', id }],
         origin: 'jd_module',
       },

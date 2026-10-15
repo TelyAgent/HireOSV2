@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { BadRequestException } from '@nestjs/common';
+import { invalidSchemaFromZod } from '../http/invalid-schema';
 
 // This module owns every schema and validation rule for Requirements & Rubric end to
 // end — the only thing it borrows from `intake` is the generic AI-call plumbing
@@ -86,6 +86,6 @@ export const confirmRubricSchema = z.object({ version: z.number().int().positive
 
 export function validate<T>(schema: z.ZodType<T>, value: unknown): T {
   const parsed = schema.safeParse(value);
-  if (!parsed.success) throw new BadRequestException({ code: 'INVALID_INPUT', fieldErrors: parsed.error.flatten() });
+  if (!parsed.success) throw invalidSchemaFromZod(parsed.error);
   return parsed.data;
 }

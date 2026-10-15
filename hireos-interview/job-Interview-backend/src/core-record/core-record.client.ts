@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException, ServiceUnavailableException } from '@nestjs/common';
+import { ConflictException, Injectable, NotFoundException, ServiceUnavailableException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { randomUUID } from 'node:crypto';
 import type { Identity } from '../intake/workspace.guard';
@@ -23,11 +23,14 @@ export type CoreMaterial = {
   securityStatus: string;
 };
 
+export type CoreCandidate = { id: string; displayName: string; email?: string; identityStatus: string; status: string };
+export type CoreApplication = { id: string; candidateId: string; jobId: string; status: string };
+
 /**
- * Read-only on purpose: Interview never originates a Job (see Job's schema comment) --
- * it only looks up jobs that JD or Screening already registered with Core Record. This
- * mirrors hireos-screening-backend's core-record.client.ts, trimmed to the two calls
- * Interview actually needs.
+ * Interview's window onto Core Record's master records. It never originates a Job (JD does,
+ * see JdContentFacade.createFromText) but registers the Candidate and Application a task
+ * hangs off, so every subsystem sees the same (job, candidate) pair. Mirrors
+ * hireos-screening-backend's core-record.client.ts.
  */
 @Injectable()
 export class CoreRecordClient {
@@ -39,13 +42,34 @@ export class CoreRecordClient {
     this.serviceName = this.config.get<string>('CORE_RECORD_SERVICE_NAME', 'interview');
   }
 
-  async listJobs(identity: Identity, query?: string): Promise<CoreJob[]> {
-    const qs = query?.trim() ? `?q=${encodeURIComponent(query.trim())}` : '';
-    return this.request<CoreJob[]>(`/jobs${qs}`, identity, 'GET');
+  /** Core Record's job directory; `status: 'open'` = published jobs only (filtered before Core's row cap). */
+  async listJobs(identity: Identity, query?: string, status?: string): Promise<CoreJob[]> {
+    const params = new URLSearchParams();
+    if (query?.trim()) params.set('q', query.trim());
+    if (status) params.set('status', status);
+    const qs = params.toString();
+    return this.request<CoreJob[]>(`/jobs${qs ? `?${qs}` : ''}`, identity, 'GET');
   }
 
   async getJob(identity: Identity, id: string): Promise<CoreJob> {
     return this.request<CoreJob>(`/jobs/${id}`, identity, 'GET');
+  }
+
+  async createCandidate(identity: Identity, body: { displayName: string; source: string }, idempotencyKey: string): Promise<CoreCandidate> {
+    return this.request<CoreCandidate>('/candidates', identity, 'POST', body, idempotencyKey);
+  }
+
+  /** The Core candidate a résumé file belongs to -- shared by every subsystem that sees the same file. */
+  async resolveCandidateForMaterial(identity: Identity, body: { materialId: string; displayName: string; source: string }): Promise<CoreCandidate & { created: boolean }> {
+    return this.request<CoreCandidate & { created: boolean }>('/candidates/from-material', identity, 'POST', body, randomUUID());
+  }
+
+  async findCandidatesByEmail(identity: Identity, email: string): Promise<CoreCandidate[]> {
+    return this.request<CoreCandidate[]>(`/candidates?email=${encodeURIComponent(email)}`, identity, 'GET');
+  }
+
+  async createApplication(identity: Identity, body: { candidateId: string; jobId: string; origin: string; linkReason: string }, idempotencyKey: string): Promise<CoreApplication> {
+    return this.request<CoreApplication>('/applications', identity, 'POST', body, idempotencyKey);
   }
 
   async getMaterial(identity: Identity, id: string): Promise<CoreMaterial> {
@@ -129,12 +153,14 @@ export class CoreRecordClient {
     return body as CoreMaterial;
   }
 
-  private async request<T>(path: string, identity: Identity, method: 'GET'): Promise<T> {
+  private async request<T>(path: string, identity: Identity, method: 'GET' | 'POST', body?: unknown, idempotencyKey?: string): Promise<T> {
     let response: Response;
     try {
       response = await globalThis.fetch(`${this.baseUrl}${path}`, {
         method,
+        body: body === undefined ? undefined : JSON.stringify(body),
         headers: {
+          ...(idempotencyKey ? { 'idempotency-key': idempotencyKey } : {}),
           'content-type': 'application/json',
           'x-request-id': randomUUID(),
           'x-correlation-id': `${this.serviceName}:${randomUUID()}`,
@@ -151,12 +177,14 @@ export class CoreRecordClient {
       });
     }
     if (response.status === 404) throw new NotFoundException({ code: 'NOT_FOUND' });
-    const body = await parseBody(response);
+    const result = await parseBody(response);
     if (!response.ok) {
-      const error = body as { code?: string; message?: string };
+      const error = result as { code?: string; message?: string };
+      // e.g. JOB_NOT_OPEN when linking a candidate to a closed/archived job.
+      if (response.status === 409) throw new ConflictException({ code: error.code || 'CORE_RECORD_CONFLICT', message: error.message });
       throw new ServiceUnavailableException({ code: error.code || 'CORE_RECORD_ERROR', message: error.message || `Core Record returned HTTP ${response.status}.` });
     }
-    return body as T;
+    return result as T;
   }
 }
 

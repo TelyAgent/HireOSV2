@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable, Logger, ServiceUnavailableException } from '@nestjs/common';
+import { Injectable, Logger, ServiceUnavailableException } from '@nestjs/common';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { z } from 'zod';
@@ -117,7 +117,7 @@ export class DocAiService {
   ) {}
 
   async section(identity: Identity, jobId: string, raw: unknown) {
-    const input = parse(sectionInputSchema, raw);
+    const input = sectionInputSchema.parse(raw);
     const system = [
       '你是 HireOS 的 JD（职位描述）写作助手。下面是团队的 JD 完整性标准，你写的内容必须满足其中对应条目的“完整标准”，并避开“常见缺陷”。',
       '',
@@ -164,7 +164,7 @@ export class DocAiService {
   }
 
   async analyze(identity: Identity, jobId: string, raw: unknown) {
-    const input = parse(analyzeInputSchema, raw);
+    const input = analyzeInputSchema.parse(raw);
     const system = [
       '你是 HireOS 的 JD 审核助手。请严格按照下面的 JD 完整性标准检查一份 JD，找出质量问题、跨项一致性问题（第 3 节）、分级与合规问题（第 4 节）和语言质量问题（第 5 节）。',
       '',
@@ -232,8 +232,3 @@ function stripBullets(text: string) {
   return text.replace(/^\s*(?:[-•]|#{1,6})\s+/gm, '').trim();
 }
 
-function parse<T>(schema: z.ZodType<T>, raw: unknown): T {
-  const result = schema.safeParse(raw);
-  if (!result.success) throw new BadRequestException({ code: 'INVALID_AI_REQUEST', message: result.error.message });
-  return result.data;
-}

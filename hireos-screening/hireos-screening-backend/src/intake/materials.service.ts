@@ -123,6 +123,17 @@ export class MaterialsService {
     };
   }
 
+  /**
+   * Text of a JD file for the "New job" entry -- scanned and extracted like a résumé, but never
+   * stored as a candidate material (the JD text itself is kept by the JD subsystem).
+   */
+  async extractJdText(file?: MulterFile) {
+    if (!file || !file.size) throw new BadRequestException({ code: 'EMPTY_FILE' });
+    const originalName = decodeOriginalFileName(file.originalname);
+    const parsed = await this.analyze(file, originalName);
+    return { name: originalName, text: parsed.text, errorCode: parsed.errorCode };
+  }
+
   async get(workspaceId: string, id: string) {
     const material = await this.db.material.findFirst({
       where: { id, workspaceId },
