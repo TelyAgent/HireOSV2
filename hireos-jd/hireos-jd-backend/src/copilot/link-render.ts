@@ -29,6 +29,8 @@ export type RenderResult = { html: string } | { blocked: 'private_address' } | {
 
 /** How long a page gets to show its posting. */
 export const RENDER_TIMEOUT_MS = 20_000;
+/** Starting (or connecting to) a browser; a cold start, e.g. a fresh container or CI runner, can take a while. */
+const LAUNCH_TIMEOUT_MS = 60_000;
 /** On top of the render time: the most launch and teardown may add, whatever the page does. */
 const HARD_STOP_GRACE_MS = 5_000;
 const MAX_RENDER_REQUESTS = 200;
@@ -64,13 +66,13 @@ async function openBrowser(renderer: Renderer): Promise<Browser> {
   if (renderer.kind === 'remote') {
     // The renderer starts a fresh browser per connection; closing this connection ends that browser.
     return chromium.connect(renderer.url, {
-      timeout: RENDER_TIMEOUT_MS,
+      timeout: LAUNCH_TIMEOUT_MS,
       headers: { 'x-playwright-launch-options': JSON.stringify({ proxy: DEAD_PROXY }) },
     });
   }
   return chromium.launch({
     executablePath: renderer.executablePath,
-    timeout: RENDER_TIMEOUT_MS,
+    timeout: LAUNCH_TIMEOUT_MS,
     proxy: DEAD_PROXY,
     args: ['--disable-dev-shm-usage'],
     // The page is untrusted: a local browser gets none of the service's environment (database URL, API keys).
