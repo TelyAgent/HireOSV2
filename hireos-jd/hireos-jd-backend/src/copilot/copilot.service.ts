@@ -11,6 +11,7 @@ import { LlmProvider, type ChatTurn, type WebAnswer } from './llm-provider';
 import { PromptRegistry } from './prompt-registry';
 import { fieldsToDraftContent } from './draft-mapping';
 import { ReplyStreamExtractor } from './reply-stream-extractor';
+import { factsInstruction, pickFacts, pinFacts, type JobFacts } from './variant-facts';
 import { changedJdFields, refineReply } from './refine-summary';
 import { OUT_OF_SCOPE_REPLY, SALARY_ANSWER_RULES, fixAnnualSalary, workflowGuide } from './jd-agent-scope';
 import {
@@ -381,42 +382,56 @@ export class CopilotService {
   }
 
   /**
-   * "Start with a job title": three complete drafts of the same role in different writing styles, generated
-   * in parallel. Nothing is committed — the user picks one, which is then saved through `setFields`.
+   * "Start with a job title": three complete drafts of the same role in different writing styles. Nothing is
+   * committed — the user picks one, which is then saved through `setFields`. The first version settles the
+   * job facts; the other two are written in parallel from those facts and pinned to them, so the three only
+   * differ in style, never in location, headcount or pay (#71).
    */
   async titleVariants(identity: Identity, id: string, raw: unknown) {
     const input = titleVariantsInputSchema.parse(raw);
     const conversation = await this.loadConversation(identity, id);
     if (conversation.phase === 'completed') throw new ConflictException({ code: 'CONVERSATION_COMPLETED' });
 
-    const variants = await Promise.all(
-      TITLE_VARIANT_STYLES.map(async (style) => {
-        const turns: ChatTurn[] = [
-          { role: 'user', content: `岗位名称：${input.title}\n\n请直接生成一份完整 JD。写作风格：${style.label}——${style.instruction}` },
-        ];
-        const parsed = await this.runAutoCompleteTurn(identity, id, turns);
-        const fields: JdFields = { headcount: 1, ...parsed.fields, title: parsed.fields.title || input.title };
-        return { key: style.key, label: style.label, description: style.description, fields };
-      }),
-    );
-    return { title: input.title, variants };
+    const write = async (style: (typeof TITLE_VARIANT_STYLES)[number], facts?: JobFacts) => {
+      const content = [
+        `岗位名称：${input.title}`,
+        '',
+        `请直接生成一份完整 JD。写作风格：${style.label}——${style.instruction}`,
+        ...(facts ? ['', factsInstruction(facts)] : []),
+      ].join('\n');
+      const parsed = await this.runAutoCompleteTurn(identity, id, [{ role: 'user', content }]);
+      const drafted: JdFields = { headcount: 1, ...parsed.fields, title: parsed.fields.title || input.title };
+      return { key: style.key, label: style.label, description: style.description, fields: facts ? pinFacts(drafted, facts) : drafted };
+    };
+    const [firstStyle, ...otherStyles] = TITLE_VARIANT_STYLES;
+    const first = await write(firstStyle);
+    const facts = pickFacts(first.fields);
+    const others = await Promise.all(otherStyles.map((style) => write(style, facts)));
+    return { title: input.title, variants: [first, ...others] };
   }
 
   /**
-   * Refine every title variant with the same note, in parallel. Like `titleVariants`, nothing is committed —
-   * each version keeps its own writing style and only changes what the note asks for.
+   * Refine every title variant with the same note. Like `titleVariants`, nothing is committed — each version
+   * keeps its own writing style and only changes what the note asks for. The version the user is looking at
+   * (`primary`) is refined first and settles the job facts; the others follow from them, so after "make it
+   * remote" all three say the same thing about where and how the job is done (#71).
    */
   async refineVariants(identity: Identity, id: string, raw: unknown) {
     const input = refineVariantsInputSchema.parse(raw);
     const conversation = await this.loadConversation(identity, id);
     if (conversation.phase === 'completed') throw new ConflictException({ code: 'CONVERSATION_COMPLETED' });
-    const answer = await this.answerIfQuestion(identity, id, input.variants[0]?.fields ?? {}, input.note);
+    const primary = Math.min(input.primary ?? 0, input.variants.length - 1);
+    const answer = await this.answerIfQuestion(identity, id, input.variants[primary]?.fields ?? {}, input.note);
     if (answer) return { variants: input.variants, answer };
 
+    const lead = input.variants[primary];
+    const leadFields = await this.runRefineTurn(identity, id, lead.fields, input.note, lead.label);
+    const facts = pickFacts(leadFields);
     const variants = await Promise.all(
-      input.variants.map(async (variant) => {
-        const fields = await this.runRefineTurn(identity, id, variant.fields, input.note, variant.label);
-        return { ...variant, fields };
+      input.variants.map(async (variant, index) => {
+        if (index === primary) return { ...variant, fields: leadFields };
+        const fields = await this.runRefineTurn(identity, id, pinFacts(variant.fields, facts), input.note, variant.label, facts);
+        return { ...variant, fields: pinFacts(fields, facts) };
       }),
     );
     return { variants };
@@ -531,7 +546,7 @@ export class CopilotService {
    * One refine pass over a complete JD. The model gets the whole current JD and must return every field in
    * full; a result that lost required content is rejected instead of overwriting a good draft.
    */
-  private async runRefineTurn(identity: Identity, id: string, current: JdFields, note: string, style?: string): Promise<JdFields> {
+  private async runRefineTurn(identity: Identity, id: string, current: JdFields, note: string, style?: string, facts?: JobFacts): Promise<JdFields> {
     const turns: ChatTurn[] = [
       {
         role: 'user',
@@ -544,6 +559,7 @@ export class CopilotService {
           'fields 必须输出修改后的完整 JD：每个字段都要给出，列表字段（responsibilities、mustHave、niceToHave）要列出全部条目，不能只输出改动的条目。',
           '业务背景、预期成果、入职成功标准分别写进 businessProblem、expectedOutcomes、successCriteria。这三项和 publicCompensation 是可选字段：当前草稿里没有、意见也没明确要求的，不要输出，更不要自行编写。',
           '薪资写进 publicCompensation（结构见字段 schema），不要放进其他字段，也不要新增 schema 以外的字段；意见没提薪资时原样保留。',
+          ...(facts ? ['', factsInstruction(facts)] : []),
         ].join('\n'),
       },
     ];

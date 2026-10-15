@@ -123,6 +123,8 @@ export const refineVariantsInputSchema = z
       )
       .min(1)
       .max(3),
+    /** Index of the version the user is looking at: refined first, its job facts are the shared ones (#71). */
+    primary: z.number().int().min(0).max(2).optional(),
   })
   .strict();
 
