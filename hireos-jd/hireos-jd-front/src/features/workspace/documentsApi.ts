@@ -23,7 +23,7 @@ export interface JobDocumentDto {
 export interface CurrentDraftDto {
   roleSummary: string | null;
   responsibilities: string[];
-  requirements: { label?: string; priority?: string }[];
+  requirements: { label?: string; priority?: string; group?: string }[];
   internalCompensation: MoneyRange | null;
   publicCompensation: MoneyRange | null;
   hiringContext?: { businessProblem?: string; expectedOutcomes?: string[] } | null;

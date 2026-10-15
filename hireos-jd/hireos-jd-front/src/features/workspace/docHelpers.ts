@@ -72,6 +72,19 @@ function listBlocks(bid: () => string, items: string[], level: BlockLevel): DocB
   return items.map((item) => mkBlock(bid(), "ul", [item], { level }));
 }
 
+/** Bullets under a sub-heading per group the user wrote them in (#86); ungrouped items stay plain bullets. */
+function groupedListBlocks(bid: () => string, items: { label?: string; group?: string }[], level: BlockLevel): DocBlock[] {
+  const blocks: DocBlock[] = [];
+  let current = "";
+  for (const item of items) {
+    const group = item.group?.trim() ?? "";
+    if (group && group !== current) blocks.push(mkBlock(bid(), "h3", group, { level }));
+    current = group;
+    blocks.push(mkBlock(bid(), "ul", [item.label as string], { level }));
+  }
+  return blocks;
+}
+
 export function buildDefaultDraft(state: AppState, jobId: string): DocumentDraft {
   const j = state.jobs[jobId];
   const rv = j.activeRoleVersionRef ? state.roleVersions[j.activeRoleVersionRef] : null;
@@ -119,10 +132,9 @@ export function buildDefaultDraft(state: AppState, jobId: string): DocumentDraft
  * when the job was created), using the same layout as `buildDefaultDraft`.
  */
 export function buildDraftFromBackend(title: string, content: CurrentDraftDto, jobId: string): DocumentDraft {
-  const labels = (priority: string) =>
-    content.requirements.filter((r) => r.priority === priority && r.label).map((r) => r.label as string);
-  const must = labels("must_have");
-  const pref = labels("preferred");
+  const ofPriority = (priority: string) => content.requirements.filter((r) => r.priority === priority && r.label);
+  const must = ofPriority("must_have");
+  const pref = ofPriority("preferred");
 
   const blocks: DocBlock[] = [];
   let n = 1;
@@ -141,11 +153,11 @@ export function buildDraftFromBackend(title: string, content: CurrentDraftDto, j
   }
   if (must.length) {
     blocks.push(mkBlock(bid(), "h2", "Requirements", { level: "public" }));
-    blocks.push(...listBlocks(bid, must, "public"));
+    blocks.push(...groupedListBlocks(bid, must, "public"));
   }
   if (pref.length) {
     blocks.push(mkBlock(bid(), "h2", "Preferred", { level: "public" }));
-    blocks.push(...listBlocks(bid, pref, "public"));
+    blocks.push(...groupedListBlocks(bid, pref, "public"));
   }
   blocks.push(mkBlock(bid(), "h2", "Compensation", { level: "public" }));
   blocks.push(mkBlock(bid(), "p", money(content.publicCompensation), { level: "public" }));

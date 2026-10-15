@@ -34,6 +34,7 @@ import { fmtRelative } from "../../lib/format";
 import type { Audience, Requirement } from "../../data/types";
 import type { ConversationActionOption, GeminiCreatePath, GeminiCreateRetry, GeminiDraft, GeminiMsg, GeminiOrigin, GeminiRequestRetry, GeminiVariant } from "../../store/types";
 import { ATTACHMENT_FILE_EMPTY, ATTACHMENT_TOO_LARGE, MAX_ATTACHMENT_MB, describeCopilotError } from "./copilotErrors";
+import { toGroupedLines, toLines } from "./formLines";
 import { safeRandomUUID } from "../../lib/uuid";
 
 /** Converts a fetched conversation's raw messages back into the panel's bubble shapes. There's no
@@ -313,13 +314,6 @@ function diffDrafts(prev: GeminiDraft | undefined, next: GeminiDraft): DraftChan
   return changes.count ? changes : null;
 }
 
-/** Splits a textarea into list items, dropping bullets/numbering the user typed. */
-function toLines(text: string): string[] {
-  return text
-    .split(/\r?\n/)
-    .map((line) => line.replace(/^\s*(?:[-•*]|\d+[.)、])\s*/, "").trim())
-    .filter(Boolean);
-}
 
 /**
  * "Ask Copilot" — the Gemini-in-Docs-style voice/chat drawer. A parallel
@@ -1687,8 +1681,9 @@ function ManualJobForm({
     if (!values.location.trim()) return fail("location", "Please enter a work location.");
     if (!Number.isInteger(headcount) || headcount < 1) return fail("headcount", "Headcount must be a whole number of 1 or more.");
     const responsibilities = toLines(values.responsibilities);
-    const mustHave = toLines(values.mustHave);
-    const niceToHave = toLines(values.niceToHave);
+    // Requirements keep the groups they are written in, e.g. "1.基础条件" / "2.专业能力" (#86).
+    const { items: mustHave, groups: mustHaveGroups } = toGroupedLines(values.mustHave);
+    const { items: niceToHave, groups: niceToHaveGroups } = toGroupedLines(values.niceToHave);
     if (!responsibilities.length) return fail("responsibilities", "Please add at least one responsibility.");
     if (!mustHave.length) return fail("mustHave", "Please add at least one requirement.");
     // Optional, entered in thousands like the editor's salary dialog; both ends or neither.
@@ -1717,7 +1712,9 @@ function ManualJobForm({
         ...(values.summary.trim() ? { roleSummary: values.summary.trim() } : {}),
         responsibilities,
         mustHave,
+        ...(mustHaveGroups.some(Boolean) ? { mustHaveGroups } : {}),
         ...(niceToHave.length ? { niceToHave } : {}),
+        ...(niceToHaveGroups.some(Boolean) ? { niceToHaveGroups } : {}),
         ...(publicCompensation ? { publicCompensation } : {}),
       },
       values.level,

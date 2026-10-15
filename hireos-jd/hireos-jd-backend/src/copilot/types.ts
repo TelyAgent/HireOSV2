@@ -23,6 +23,10 @@ export const jdFieldsSchema = z
     responsibilities: z.array(z.string().trim().min(1)).optional(),
     mustHave: z.array(z.string().trim().min(1)).optional(),
     niceToHave: z.array(z.string().trim().min(1)).optional(),
+    // Group heading of each requirement as the user typed it (e.g. "1.基础条件"), "" when ungrouped; one entry per
+    // item of mustHave / niceToHave. Only the manual form sets these (#86).
+    mustHaveGroups: z.array(z.string().trim().max(200)).optional(),
+    niceToHaveGroups: z.array(z.string().trim().max(200)).optional(),
     publicCompensation: compensationSchema.optional(),
     // Optional internal sections of the editor template (business problem, expected outcomes, success criteria).
     businessProblem: z.string().trim().min(1).optional(),

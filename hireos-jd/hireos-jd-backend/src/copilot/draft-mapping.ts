@@ -10,12 +10,16 @@ import type { JdFields } from './types';
  * "experience" dimension for now.
  */
 export function fieldsToDraftContent(fields: JdFields) {
+  const mustGroups = groupsFor(fields.mustHave, fields.mustHaveGroups);
+  const niceGroups = groupsFor(fields.niceToHave, fields.niceToHaveGroups);
   const requirements = [
     ...(fields.mustHave || []).map((label, index) => ({
       id: `must-${index}`, label, dimension: 'experience', priority: 'must_have' as const, hard: true, kind: 'general',
+      ...(mustGroups[index] ? { group: mustGroups[index] } : {}),
     })),
     ...(fields.niceToHave || []).map((label, index) => ({
       id: `nice-${index}`, label, dimension: 'experience', priority: 'preferred' as const, hard: false, kind: 'general',
+      ...(niceGroups[index] ? { group: niceGroups[index] } : {}),
     })),
   ];
   return {
@@ -31,4 +35,9 @@ export function fieldsToDraftContent(fields: JdFields) {
       ? { successCriteria: fields.successCriteria.map((statement) => ({ period: '90 days', statement })) }
       : {}),
   };
+}
+
+/** The group heading of each item (#86); ignored unless there is exactly one per item. */
+function groupsFor(items: string[] | undefined, groups: string[] | undefined): string[] {
+  return items && groups && groups.length === items.length ? groups : [];
 }

@@ -44,6 +44,9 @@ export interface CopilotJdFields {
   responsibilities?: string[];
   mustHave?: string[];
   niceToHave?: string[];
+  /** Group heading of each mustHave / niceToHave item ("" when ungrouped); set by the manual form (#86). */
+  mustHaveGroups?: string[];
+  niceToHaveGroups?: string[];
   /** Public salary range; only set when the user (or source material) gave one — never AI-estimated. */
   publicCompensation?: MoneyRange;
   /** Optional internal sections of the editor template. */
