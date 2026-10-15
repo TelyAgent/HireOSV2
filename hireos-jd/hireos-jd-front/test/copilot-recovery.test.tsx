@@ -14,6 +14,8 @@ vi.mock('../src/features/copilot/copilotApi', async (importOriginal) => {
     listCopilotConversations: vi.fn(async () => []),
     getCopilotConversation: vi.fn(),
     autoCompleteCopilotConversation: vi.fn(),
+  quickStartCopilotConversation: vi.fn(),
+  TITLE_UNCONFIRMED: 'title_unconfirmed',
     generateCopilotTitleVariants: vi.fn(),
     importCopilotSource: vi.fn(),
     refineCopilotDraft: vi.fn(),

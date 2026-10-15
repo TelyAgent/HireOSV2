@@ -12,6 +12,8 @@ vi.mock('../src/features/copilot/copilotApi', async (importOriginal) => ({
   listCopilotConversations: vi.fn(async () => []),
   getCopilotConversation: vi.fn(),
   autoCompleteCopilotConversation: vi.fn(),
+  quickStartCopilotConversation: vi.fn(),
+  TITLE_UNCONFIRMED: 'title_unconfirmed',
   generateCopilotTitleVariants: vi.fn(),
   importCopilotSource: vi.fn(),
   refineCopilotDraft: vi.fn(),
@@ -214,7 +216,7 @@ describe('#99: refine only reports real changes', () => {
   it('single draft: lists what changed and calls out an unchanged salary', async () => {
     const conv = (fields: object) => ({ id: 'conv-1', jobId: null, phase: 'ready_to_confirm', fields, missingFields: [], stateRevision: 2, createdAt: '', updatedAt: '', messages: [] }) as never;
     const base = { title: 'Product Designer', location: 'Beijing', responsibilities: ['Design flows'], mustHave: ['Figma'] };
-    api.autoCompleteCopilotConversation.mockResolvedValue(conv(base));
+    api.quickStartCopilotConversation.mockResolvedValue(conv(base));
     renderPanel();
     fireEvent.click(await screen.findByText('Quick Start'));
     send('Product Designer\nBeijing\nFigma');
