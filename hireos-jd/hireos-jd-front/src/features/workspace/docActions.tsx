@@ -39,6 +39,7 @@ import {
 } from "./documentsApi";
 import { nowISO, uid } from "../../lib/format";
 import { SalaryModal } from "./SalaryModal";
+import { describePublishGate, publishGate } from "./publishGate";
 import {
   REQ_ITEMS,
   detectLanguage,
@@ -263,26 +264,13 @@ export function useDocActions(jobId: string) {
       };
     };
 
-    /** The page's own Analyze / Publish status in words, so "can I submit?" is answered from it (#106 AC-2). */
+    /** The page's own Publish gate in words — the same rule as the button — so "can I submit?" is answered from it (#106 AC-2). */
     const readiness = (): string | undefined => {
       const job = state.jobs[jobId];
       if (!job) return undefined;
       const loaded = state.wsVersions[jobId];
       const ev = evaluateJob(job, selectDraft(state, jobId), "en", loaded ? loaded.jdCode || null : undefined);
-      const missing = ev.rows.filter((r) => !r.ok).map((r) => r.item.label);
-      const weak = ev.rows.filter((r) => r.ok && r.weak).map((r) => r.item.label);
-      const blockers = ev.flags.filter((f) => f.severity === "blocker").map((f) => f.rule);
-      const unsaved = selectDraft(state, jobId).saveState !== "saved";
-      return [
-        `Required items: ${ev.passed}/${ev.total} pass.`,
-        missing.length ? `Missing: ${missing.join(", ")}.` : "",
-        weak.length ? `To revise: ${weak.join(", ")}.` : "",
-        blockers.length ? `Blocking issues: ${blockers.join(", ")}.` : "",
-        unsaved ? "The document has unsaved changes." : "",
-        missing.length || weak.length || blockers.length ? "The Publish button is disabled until these are fixed." : "The Publish button is available.",
-      ]
-        .filter(Boolean)
-        .join(" ");
+      return describePublishGate(publishGate(state, jobId, ev), selectDraft(state, jobId).saveState !== "saved");
     };
 
     /** Turns a rewrite result into a suggestion the user can accept or reject — the only path that proposes edits. */

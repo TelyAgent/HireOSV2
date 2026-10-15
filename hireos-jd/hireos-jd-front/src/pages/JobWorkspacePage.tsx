@@ -15,7 +15,7 @@ import { PublishModal, VersionHistoryDrawer } from "../features/workspace/Versio
 import { diffBlocks, getVersions } from "../features/workspace/versions";
 import { selectDraft } from "../features/workspace/docHelpers";
 import { useCompleteness } from "../features/workspace/useCompleteness";
-import { issueCount } from "../features/workspace/completeness";
+import { publishGate } from "../features/workspace/publishGate";
 import { useSubmitForApproval, useActivateVersion } from "../features/workspace/approvalActions";
 import { getJob } from "../features/jobs/jobsApi";
 import { coreJobToLocalJob } from "../features/jobs/jobsMapping";
@@ -119,18 +119,18 @@ export function JobWorkspacePage() {
   }
 
   const approval = state.approvals[id];
-  // Publishing needs every required item filled, nothing left to revise and no blocking issue.
-  const issues = completeness ? issueCount(completeness) : 0;
   const versionInfo = state.wsVersions[id];
   const latestVersion = versionInfo?.versions[versionInfo.versions.length - 1];
   const unpublished = latestVersion ? diffBlocks(latestVersion.blocks, selectDraft(state, id).blocks).count : 0;
-  const publishBlockedReason = !versionInfo
-    ? t("Loading…")
-    : issues
-      ? `${issues} ${t("item(s) to complete or revise before publishing — see Analysis")}`
-      : latestVersion && !unpublished
-        ? t("No changes since v{n}.").replace("{n}", String(latestVersion.versionNo))
-        : undefined;
+  const gate = publishGate(state, id, completeness);
+  const publishBlockedReason =
+    gate.kind === "loading"
+      ? t("Loading…")
+      : gate.kind === "issues"
+        ? `${gate.count} ${t("item(s) to complete or revise before publishing — see Analysis")}`
+        : gate.kind === "no_changes"
+          ? t("No changes since v{n}.").replace("{n}", String(gate.versionNo))
+          : undefined;
   const collaborators = [job.owner, job.hiringManager].filter((v, i, a) => v && a.indexOf(v) === i);
 
   const primaryAction = () => {
