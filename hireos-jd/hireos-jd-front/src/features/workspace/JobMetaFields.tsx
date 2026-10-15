@@ -1,7 +1,8 @@
 /**
  * Job fields shown under the document title (completeness standard group A). Location, Headcount and
- * Level are required and always visible — flagged when empty. The optional ones are added on demand
- * through "Add field" and can be removed from the view again.
+ * Level are required and always visible — flagged when empty. Workplace type is optional but always
+ * visible too. The other optional ones are added on demand through "Add field" and can be removed from
+ * the view again.
  *
  * Fields Core Record holds (location, headcount, level, team, employment type) are saved to the job
  * right away; the rest live in the document's `meta` and are saved with the document.
@@ -34,11 +35,15 @@ const REQUIRED_FIELDS: FieldDef[] = [
   { key: "level", label: "Level", icon: "military_tech", type: "text", core: "seniority" },
 ];
 
+/** Optional but always visible next to the required ones, so it never has to be found first (#76). */
+const FIXED_FIELDS: FieldDef[] = [
+  { key: "workplaceType", label: "Workplace type", icon: "home_work", type: "select", options: ["On-site", "Hybrid", "Remote"] },
+];
+
 const OPTIONAL_FIELDS: FieldDef[] = [
   { key: "department", label: "Department", icon: "apartment", type: "text" },
   { key: "team", label: "Team", icon: "groups", type: "text", core: "team" },
   { key: "employmentType", label: "Employment type", icon: "badge", type: "select", options: ["Full-time", "Part-time", "Contract", "Intern"], core: "employmentType" },
-  { key: "workplaceType", label: "Workplace type", icon: "home_work", type: "select", options: ["On-site", "Hybrid", "Remote"] },
   { key: "hiringManager", label: "Hiring manager", icon: "person", type: "person" },
   { key: "recruiter", label: "Recruiter", icon: "person_search", type: "person" },
   { key: "reportsTo", label: "Reports to", icon: "account_tree", type: "text" },
@@ -134,6 +139,9 @@ export function JobMetaFields({ jobId, ev }: { jobId: string; ev: Evaluation | n
           />
         );
       })}
+      {FIXED_FIELDS.map((f) => (
+        <MetaField key={f.key} def={f} value={valueOf(f)} onSave={(v) => save(f, v)} />
+      ))}
       {optional.map((f) => (
         <MetaField
           key={f.key}

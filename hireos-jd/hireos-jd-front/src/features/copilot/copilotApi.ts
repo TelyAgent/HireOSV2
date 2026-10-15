@@ -23,11 +23,14 @@ function idempotencyKey(prefix: string): string {
 export class CopilotRequestError extends Error {
   readonly status: number;
   readonly code?: string;
-  constructor(status: number, problem: { code?: string; message?: string }) {
+  /** Request fields the backend refused (422 INVALID_SCHEMA), e.g. `fields.title`. */
+  readonly fieldPaths: string[];
+  constructor(status: number, problem: { code?: string; message?: string; fieldPaths?: string[] }) {
     super(problem.message || problem.code || `Copilot request failed (${status})`);
     this.name = "CopilotRequestError";
     this.status = status;
     this.code = problem.code;
+    this.fieldPaths = Array.isArray(problem.fieldPaths) ? problem.fieldPaths : [];
   }
 }
 

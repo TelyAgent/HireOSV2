@@ -855,6 +855,7 @@ a:focus-visible, button:focus-visible, [tabindex]:focus-visible, input:focus-vis
 .gm-inline-form input, .gm-inline-form select, .gm-inline-form textarea{ display:block; margin-top:4px; width:100%; box-sizing:border-box; padding:7px 9px; border:1px solid var(--border-strong); border-radius:6px; background:var(--surface); color:var(--text); font:inherit; font-size:var(--fs-sm); }
 .gm-inline-form textarea{ resize:vertical; }
 .gm-inline-form .gm-invalid{ border-color:var(--danger-text); }
+.gm-inline-form .gm-field-error{ font-size:var(--fs-xs); color:var(--danger-text); }
 .gm-form-bubble{ max-width:100%; }
 .gm-form-grid{ grid-template-columns:1fr 1fr; gap:8px 10px; }
 .gm-form-grid .full{ grid-column:1 / -1; }
@@ -879,6 +880,7 @@ a:focus-visible, button:focus-visible, [tabindex]:focus-visible, input:focus-vis
 .gm-msg-option:hover{ background:var(--surface); }
 .gm-msg-option .material-icons-o{ flex:0 0 auto; color:var(--text-tertiary); font-size:16px; }
 .gemini-input-wrap{ border-top:1px solid var(--border); padding:14px 20px 18px; }
+.gm-composer-hint{ font-size:var(--fs-xs); color:var(--danger-text); padding:0 4px 6px; }
 .gm-listening-row{ display:flex; align-items:center; gap:8px; font-size:var(--fs-xs); color:var(--accent-600); padding:0 4px 6px; }
 .gm-listening-row .gm-dot{ width:7px; height:7px; border-radius:50%; background:#ea4335; animation:gmpulse 1s infinite ease-in-out; }
 
