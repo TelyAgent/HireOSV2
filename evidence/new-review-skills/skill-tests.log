@@ -1,0 +1,425 @@
+TAP version 13
+# Subtest: static, text-only and long-headline designs produce advisory findings
+ok 1 - static, text-only and long-headline designs produce advisory findings
+  ---
+  duration_ms: 3.907958
+  ...
+# Subtest: brand aliases apply across gate rule vocabularies
+ok 2 - brand aliases apply across gate rule vocabularies
+  ---
+  duration_ms: 0.387166
+  ...
+# Subtest: allowances cannot hide functional findings
+ok 3 - allowances cannot hide functional findings
+  ---
+  duration_ms: 0.775625
+  ...
+# Subtest: allow parsing preserves source arguments and rejects missing values
+ok 4 - allow parsing preserves source arguments and rejects missing values
+  ---
+  duration_ms: 0.536833
+  ...
+# Subtest: lint preserves branded styles but still fails on placeholder copy
+ok 5 - lint preserves branded styles but still fails on placeholder copy
+  ---
+  duration_ms: 134.514375
+  ...
+# Subtest: unclassified rules retain severity and cannot be allowed away
+ok 6 - unclassified rules retain severity and cannot be allowed away
+  ---
+  duration_ms: 0.118166
+  ...
+# Subtest: inspector has fixed widths and rejects unsupported options before browser startup
+ok 7 - inspector has fixed widths and rejects unsupported options before browser startup
+  ---
+  duration_ms: 383.0815
+  ...
+# Subtest: accepts an empty ledger and complete units
+ok 8 - accepts an empty ledger and complete units
+  ---
+  duration_ms: 11.490375
+  ...
+# Subtest: accepts a complete ledger through the CLI
+ok 9 - accepts a complete ledger through the CLI
+  ---
+  duration_ms: 48.410583
+  ...
+# Subtest: text preflight ignores structural characters and escapes inside strings
+ok 10 - text preflight ignores structural characters and escapes inside strings
+  ---
+  duration_ms: 40.19925
+  ...
+# Subtest: text preflight enforces structural cardinality limits
+ok 11 - text preflight enforces structural cardinality limits
+  ---
+  duration_ms: 76.155417
+  ...
+# Subtest: text preflight rejects malformed structural truncation cleanly
+ok 12 - text preflight rejects malformed structural truncation cleanly
+  ---
+  duration_ms: 0.229666
+  ...
+# Subtest: derives collision-free canonical IDs from exact UTF-8 references
+ok 13 - derives collision-free canonical IDs from exact UTF-8 references
+  ---
+  duration_ms: 0.945125
+  ...
+# Subtest: rejects noncanonical, duplicate, and colliding IDs
+ok 14 - rejects noncanonical, duplicate, and colliding IDs
+  ---
+  duration_ms: 1.793458
+  ...
+# Subtest: requires canonical references to be own properties
+ok 15 - requires canonical references to be own properties
+  ---
+  duration_ms: 0.401375
+  ...
+# Subtest: rejects aliases for one semantic tuple
+ok 16 - rejects aliases for one semantic tuple
+  ---
+  duration_ms: 122.240041
+  ...
+# Subtest: requires lexicographic order
+ok 17 - requires lexicographic order
+  ---
+  duration_ms: 0.728584
+  ...
+# Subtest: validates assignment block maps
+ok 18 - validates assignment block maps
+  ---
+  duration_ms: 0.851583
+  ...
+# Subtest: requires owned artifacts for local checks and null artifacts for source checks
+ok 19 - requires owned artifacts for local checks and null artifacts for source checks
+  ---
+  duration_ms: 1.45975
+  ...
+# Subtest: requires canonical lowercase filesystem-safe agent IDs
+ok 20 - requires canonical lowercase filesystem-safe agent IDs
+  ---
+  duration_ms: 0.222292
+  ...
+# Subtest: enforces state evidence
+ok 21 - enforces state evidence
+  ---
+  duration_ms: 2.848917
+  ...
+# Subtest: archives prior evidence when a critic assigns a fresh owner
+ok 22 - archives prior evidence when a critic assigns a fresh owner
+  ---
+  duration_ms: 0.982667
+  ...
+# Subtest: preserves candidate provenance when reassignment must be deferred
+ok 23 - preserves candidate provenance when reassignment must be deferred
+  ---
+  duration_ms: 0.512292
+  ...
+# Subtest: rejects reassignment owner reuse and evidence mixing
+ok 24 - rejects reassignment owner reuse and evidence mixing
+  ---
+  duration_ms: 2.574459
+  ...
+# Subtest: rejects unsafe paths and malformed fingerprints
+ok 25 - rejects unsafe paths and malformed fingerprints
+  ---
+  duration_ms: 0.550208
+  ...
+# Subtest: rejects format, default-ignorable, and invalid-scalar prose
+ok 26 - rejects format, default-ignorable, and invalid-scalar prose
+  ---
+  duration_ms: 0.797625
+  ...
+# Subtest: quotes input-derived controls in direct validation errors
+ok 27 - quotes input-derived controls in direct validation errors
+  ---
+  duration_ms: 0.799458
+  ...
+# Subtest: quotes input-derived controls in CLI validation errors
+ok 28 - quotes input-derived controls in CLI validation errors
+  ---
+  duration_ms: 58.97125
+  ...
+# Subtest: returns a generic syntax error without parser-supplied controls
+ok 29 - returns a generic syntax error without parser-supplied controls
+  ---
+  duration_ms: 41.248417
+  ...
+# Subtest: does not reflect controls from a failed CLI input path
+ok 30 - does not reflect controls from a failed CLI input path
+  ---
+  duration_ms: 52.719416
+  ...
+# Subtest: rejects invalid UTF-8 through the CLI
+ok 31 - rejects invalid UTF-8 through the CLI
+  ---
+  duration_ms: 46.552917
+  ...
+# Subtest: rejects a FIFO through the CLI without blocking
+ok 32 - rejects a FIFO through the CLI without blocking
+  ---
+  duration_ms: 55.716166
+  ...
+# Subtest: rejects a symlink through the CLI
+ok 33 - rejects a symlink through the CLI
+  ---
+  duration_ms: 41.454167
+  ...
+# Subtest: rejects deeply nested input without recursion failure
+ok 34 - rejects deeply nested input without recursion failure
+  ---
+  duration_ms: 42.393834
+  ...
+# Subtest: rejects multi-megabyte nesting under a constrained Node heap
+ok 35 - rejects multi-megabyte nesting under a constrained Node heap
+  ---
+  duration_ms: 161.582792
+  ...
+# Subtest: caps malformed 10000-unit validation output
+ok 36 - caps malformed 10000-unit validation output
+  ---
+  duration_ms: 78.542708
+  ...
+# Subtest: rejects malformed top-level data and excessive unit counts
+ok 37 - rejects malformed top-level data and excessive unit counts
+  ---
+  duration_ms: 1.4575
+  ...
+# Subtest: accepts a canonical ID derived from near-maximum multibyte references
+ok 38 - accepts a canonical ID derived from near-maximum multibyte references
+  ---
+  duration_ms: 69.099917
+  ...
+# Subtest: schema is an actual top-level array with exactly three branches
+ok 39 - schema is an actual top-level array with exactly three branches
+  ---
+  duration_ms: 1.14475
+  ...
+# Subtest: accepts a producer-shaped findings document through the CLI
+ok 40 - accepts a producer-shaped findings document through the CLI
+  ---
+  duration_ms: 105.4135
+  ...
+# Subtest: accepts empty output and each complete branch
+ok 41 - accepts empty output and each complete branch
+  ---
+  duration_ms: 7.860375
+  ...
+# Subtest: allows a one-line finding trace
+ok 42 - allows a one-line finding trace
+  ---
+  duration_ms: 0.389666
+  ...
+# Subtest: rejects empty required content
+ok 43 - rejects empty required content
+  ---
+  duration_ms: 5.048917
+  ...
+# Subtest: preserves exact payload and replacement-code strings
+ok 44 - preserves exact payload and replacement-code strings
+  ---
+  duration_ms: 0.439916
+  ...
+# Subtest: rejects invalid scalars and whitespace, control, format, or default-ignorable prose
+ok 45 - rejects invalid scalars and whitespace, control, format, or default-ignorable prose
+  ---
+  duration_ms: 23.108667
+  ...
+# Subtest: quotes input-derived controls in direct validation values and paths
+ok 46 - quotes input-derived controls in direct validation values and paths
+  ---
+  duration_ms: 1.765167
+  ...
+# Subtest: rejects line zero
+ok 47 - rejects line zero
+  ---
+  duration_ms: 0.935417
+  ...
+# Subtest: does not treat inherited or Object-prototype properties as schema properties
+ok 48 - does not treat inherited or Object-prototype properties as schema properties
+  ---
+  duration_ms: 0.695417
+  ...
+# Subtest: oneOf requires exactly one passing branch
+ok 49 - oneOf requires exactly one passing branch
+  ---
+  duration_ms: 0.134417
+  ...
+# Subtest: rejects duplicate fingerprints and unique array entries
+ok 50 - rejects duplicate fingerprints and unique array entries
+  ---
+  duration_ms: 0.630083
+  ...
+# Subtest: uses canonical Set uniqueness for structured entries at the array limit
+ok 51 - uses canonical Set uniqueness for structured entries at the array limit
+  ---
+  duration_ms: 5.667542
+  ...
+# Subtest: bounds canonical uniqueness keys and Set storage
+ok 52 - bounds canonical uniqueness keys and Set storage
+  ---
+  duration_ms: 41.94175
+  ...
+# Subtest: requires findings to be sorted by fingerprint
+ok 53 - requires findings to be sorted by fingerprint
+  ---
+  duration_ms: 1.537917
+  ...
+# Subtest: rejects severity above demonstrated impact
+ok 54 - rejects severity above demonstrated impact
+  ---
+  duration_ms: 0.806333
+  ...
+# Subtest: rejects unsafe source paths
+ok 55 - rejects unsafe source paths
+  ---
+  duration_ms: 14.78825
+  ...
+# Subtest: accepts legitimate Unicode source paths and prose
+ok 56 - accepts legitimate Unicode source paths and prose
+  ---
+  duration_ms: 0.823834
+  ...
+# Subtest: CLI rejects input above the byte limit without an exception trace
+ok 57 - CLI rejects input above the byte limit without an exception trace
+  ---
+  duration_ms: 70.070792
+  ...
+# Subtest: CLI rejects invalid UTF-8 without replacement or an exception trace
+ok 58 - CLI rejects invalid UTF-8 without replacement or an exception trace
+  ---
+  duration_ms: 51.816458
+  ...
+# Subtest: quotes input-derived controls in CLI validation errors
+ok 59 - quotes input-derived controls in CLI validation errors
+  ---
+  duration_ms: 57.834459
+  ...
+# Subtest: returns a generic syntax error without parser-supplied controls
+ok 60 - returns a generic syntax error without parser-supplied controls
+  ---
+  duration_ms: 45.013958
+  ...
+# Subtest: does not reflect controls from a failed CLI input path
+ok 61 - does not reflect controls from a failed CLI input path
+  ---
+  duration_ms: 56.049125
+  ...
+# Subtest: CLI rejects lone-surrogate prose without changing payload semantics
+ok 62 - CLI rejects lone-surrogate prose without changing payload semantics
+  ---
+  duration_ms: 51.083291
+  ...
+# Subtest: CLI rejects Unicode format controls in source paths
+ok 63 - CLI rejects Unicode format controls in source paths
+  ---
+  duration_ms: 47.24275
+  ...
+# Subtest: CLI rejects a FIFO without blocking
+ok 64 - CLI rejects a FIFO without blocking
+  ---
+  duration_ms: 60.027625
+  ...
+# Subtest: CLI rejects a symlink without following it
+ok 65 - CLI rejects a symlink without following it
+  ---
+  duration_ms: 48.485583
+  ...
+# Subtest: CLI rejects input above the nesting-depth limit without an exception trace
+ok 66 - CLI rejects input above the nesting-depth limit without an exception trace
+  ---
+  duration_ms: 49.9255
+  ...
+# Subtest: CLI rejects an oversized array without an exception trace
+ok 67 - CLI rejects an oversized array without an exception trace
+  ---
+  duration_ms: 61.688459
+  ...
+# Subtest: checks pattern and branch invariants
+ok 68 - checks pattern and branch invariants
+  ---
+  duration_ms: 1.240083
+  ...
+# Subtest: rejects unsupported and malformed schema keywords
+ok 69 - rejects unsupported and malformed schema keywords
+  ---
+  duration_ms: 0.244166
+  ...
+# Subtest: caps malformed 1000-finding validation output
+ok 70 - caps malformed 1000-finding validation output
+  ---
+  duration_ms: 65.343458
+  ...
+# Subtest: caps amplified in-limit findings output under a constrained Node heap
+ok 71 - caps amplified in-limit findings output under a constrained Node heap
+  ---
+  duration_ms: 315.243292
+  ...
+# Subtest: keeps shared helpers aligned with the coverage-ledger validator
+ok 72 - keeps shared helpers aligned with the coverage-ledger validator
+  ---
+  duration_ms: 4.796916
+  ...
+# Subtest: consistent finalized links pass
+ok 73 - consistent finalized links pass
+  ---
+  duration_ms: 2.176584
+  ...
+# Subtest: finding must have current ledger link
+ok 74 - finding must have current ledger link
+  ---
+  duration_ms: 0.270708
+  ...
+# Subtest: ledger and verification verdicts must match
+ok 75 - ledger and verification verdicts must match
+  ---
+  duration_ms: 0.099708
+  ...
+# Subtest: complete cannot omit candidates or leave units planned
+ok 76 - complete cannot omit candidates or leave units planned
+  ---
+  duration_ms: 0.847084
+  ...
+# Subtest: incomplete may retain unvalidated candidates only in ledger with reason
+ok 77 - incomplete may retain unvalidated candidates only in ledger with reason
+  ---
+  duration_ms: 2.508833
+  ...
+# Subtest: standard rejects same reviewer and hunter verification
+ok 78 - standard rejects same reviewer and hunter verification
+  ---
+  duration_ms: 0.116667
+  ...
+# Subtest: quick shares a fresh verifier across both phases
+ok 79 - quick shares a fresh verifier across both phases
+  ---
+  duration_ms: 0.255709
+  ...
+# Subtest: carried-owner exception requires compatible prior state
+ok 80 - carried-owner exception requires compatible prior state
+  ---
+  duration_ms: 0.135375
+  ...
+# Subtest: rejected records require Phase 3 but no Phase 5
+ok 81 - rejected records require Phase 3 but no Phase 5
+  ---
+  duration_ms: 0.162417
+  ...
+# Subtest: orphan verifications and dispositions fail
+ok 82 - orphan verifications and dispositions fail
+  ---
+  duration_ms: 0.25875
+  ...
+# Subtest: CLI validates complete zero-findings run and rejects unsafe/malformed inputs
+ok 83 - CLI validates complete zero-findings run and rejects unsafe/malformed inputs
+  ---
+  duration_ms: 141.717875
+  ...
+1..83
+# tests 83
+# suites 0
+# pass 83
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 1392.543
