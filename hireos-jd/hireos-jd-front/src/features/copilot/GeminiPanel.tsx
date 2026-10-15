@@ -812,7 +812,7 @@ export function GeminiPanel({ ctx }: { ctx: GeminiCtx }) {
   };
 
   const handleAutoComplete = async () => {
-    if (working) return;
+    if (working || path === "questions") return;
     push({ role: "user", text: AUTO_COMPLETE_LABEL });
     await runStep((conversationId) => autoCompleteCopilotConversation(conversationId));
   };
@@ -1145,7 +1145,8 @@ export function GeminiPanel({ ctx }: { ctx: GeminiCtx }) {
                 <button
                   className="gemini-composer-tool"
                   type="button"
-                  disabled={working}
+                  // Quick Start drafts only from its three answers; auto-complete would skip that check (#65).
+                  disabled={working || path === "questions"}
                   onClick={() => void handleAutoComplete()}
                   title={AUTO_COMPLETE_LABEL}
                   aria-label={AUTO_COMPLETE_LABEL}

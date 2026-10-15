@@ -174,3 +174,10 @@ test('#65 review: opening a conversation tells whether a Quick Start is still co
   await svc.quickStart(identity, 'c1', { answers: 'No one owns growth\nBuild a growth process' }, meta());
   assert.equal((await svc.getConversation(identity, 'c1')).quickStartOpen, true);
 });
+
+test('#65 review: auto-complete is refused while a Quick Start is still collecting answers', async () => {
+  const { svc, db } = service({ answered: [true, true, false], title: 'X', titleFromUser: false });
+  await svc.quickStart(identity, 'c1', { answers: 'No one owns growth\nBuild a growth process' }, meta());
+  await assert.rejects(svc.autoComplete(identity, 'c1', {}, meta()), (e) => e.getResponse().code === 'QUICK_START_IN_PROGRESS');
+  assert.deepEqual(db.conv.fields, {}, 'no draft written');
+});

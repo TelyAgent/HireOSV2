@@ -71,6 +71,11 @@ describe('Quick Start', () => {
 
     expect(await screen.findByText(/What hard skills must the candidate have\?/)).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /Create job from this draft/ })).toBeNull();
+    // Auto-complete would skip the three-question check, so it is off while Quick Start collects answers.
+    const autoComplete = document.querySelectorAll('.gemini-composer-tool')[1] as HTMLButtonElement;
+    expect(autoComplete).toBeDisabled();
+    fireEvent.click(autoComplete);
+    expect(api.autoCompleteCopilotConversation).not.toHaveBeenCalled();
 
     send('Performance marketing, SQL');
     await screen.findByRole('button', { name: /Create job from this draft/ });

@@ -631,6 +631,10 @@ export class CopilotService {
     const key = meta.idempotencyKey?.trim();
     if (!key) throw new ConflictException({ code: 'IDEMPOTENCY_KEY_REQUIRED' });
     const operation = `copilot.autocomplete:${id}`;
+    // A Quick Start still collecting its three answers can't be skipped by auto-complete (#65).
+    if (conversation.phase === 'intake' && (await this.pendingQuickStartAnswers(identity, id, `copilot.quick-start:${id}`)).length > 0) {
+      throw new ConflictException({ code: 'QUICK_START_IN_PROGRESS', message: '快速开始还在收集回答，请先回答完 3 个问题。' });
+    }
     const userText = input.text || '自动补全并优化内容';
     const hash = requestHash({ userText });
 
