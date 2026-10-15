@@ -70,6 +70,8 @@ function fixtureNetwork() {
           return html('<html><body><p>Welcome to Example Careers. Please wait while we load the job.</p><div id="app"></div><script src="https://cdn.example.test/challenge.js"></script></body></html>');
         case 'cdn.example.test/challenge.js':
           return new Response('document.body.innerHTML = "<h1>Verify you are human</h1>";', { status: 200, headers: { 'content-type': 'application/javascript' } });
+        case 'jobs.example.test/loading-empty':
+          return html('<html><body><p>Welcome to Example Careers. Please wait while we load the job.</p><script>document.body.innerHTML = "";</script></body></html>');
         case 'jobs.example.test/short-static':
           return html('<html><body><h1>运营专员</h1><p>地点：杭州</p><ul><li>负责社群日常运营与活动策划</li><li>两年以上运营经验</li></ul></body></html>');
         case 'jobs.example.test/static':
@@ -216,6 +218,17 @@ test('#64 review AC-3: what the render finds out (a human check) is reported, no
   // With no render possible, the same loading text is not a posting either — but there is nothing more to know.
   const text = await extractTextFromLink('https://jobs.example.test/loading', { network, renderer: null });
   assert.match(text, /Please wait/);
+});
+
+test('#64 review AC-3: a page whose render is empty is no content, even if it said "loading" before', needsBrowser, async () => {
+  const { network } = fixtureNetwork();
+  await rejectsWith(extractTextFromLink('https://jobs.example.test/loading-empty', { network, renderer }), /没有找到职位内容.*粘贴/);
+});
+
+test('#64: a short static posting that renders the same is read', needsBrowser, async () => {
+  const { network } = fixtureNetwork();
+  const text = await extractTextFromLink('https://jobs.example.test/short-static', { network, renderer });
+  assert.match(text, /运营专员/);
 });
 
 /** A `playwright run-server` like the jd-renderer container, when this machine has Playwright's own Chromium. */

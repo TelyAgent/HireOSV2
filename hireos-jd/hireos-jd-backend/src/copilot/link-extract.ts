@@ -120,14 +120,14 @@ export async function extractTextFromLink(rawUrl: string, options: LinkExtractOp
 class RenderUnavailable extends Error {}
 
 /**
- * A short static page may be a script-rendered shell, or simply a short posting. Rendering is only used when it
- * yields more. When no render could be done, a static text that already reads as content is kept (#64 review);
- * but what the render did find out about the page — a human check, a redirect into the intranet — is reported.
+ * A short static page may be a script-rendered shell or simply a short posting, and only rendering tells.
+ * Once a page has been rendered, the rendered page is what counts: static text such as "please wait while we
+ * load the job" is not a posting, and an empty render is reported as no content (AC-3). The static text is
+ * used only when no render could be done at all (#64 review).
  */
 async function preferRendered(staticText: string, url: URL, network: LinkNetwork, options: LinkExtractOptions): Promise<string> {
   try {
-    const rendered = await renderedText(url, network, options);
-    return rendered.length > staticText.length ? rendered : staticText;
+    return await renderedText(url, network, options);
   } catch (error) {
     if (!(error instanceof RenderUnavailable)) throw error;
     if (staticText.length >= MIN_CONTENT_CHARS) return staticText;
