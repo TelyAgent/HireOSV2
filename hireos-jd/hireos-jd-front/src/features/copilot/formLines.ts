@@ -20,23 +20,29 @@ export function toLines(text: string): string[] {
  *   2.专业能力
  *   ● 熟悉 RAG
  *
- * A line is a group heading when it ends with a colon, or when the lines under it are bullets or indented
- * further and it is not one itself. Plain lines — numbered or not — stay a flat list. `groups[i]` is the
- * heading of `items[i]`, "" for items before any heading.
+ * A line is a group heading when it ends with a colon, when the lines under it are indented further, or when
+ * the whole text is written as headings over bullets — every plain line followed by bullets, at least twice.
+ * A single plain line above some bullets ("1. 4+ years in B2B sales" / "- Fluent English") stays an item: when
+ * in doubt, a line is kept as a requirement rather than turned into a heading. Plain lines — numbered or not —
+ * stay a flat list. `groups[i]` is the heading of `items[i]`, "" for items before any heading.
  */
 export function toGroupedLines(text: string): { items: string[]; groups: string[] } {
   const lines = text.split(/\r?\n/).filter((line) => line.trim());
+  const plain = lines.map((line, index) => ({ index, line })).filter(({ line }) => !BULLET.test(line));
+  const overBullets = (index: number) => lines[index + 1] !== undefined && BULLET.test(lines[index + 1]);
+  const headingsOverBullets = plain.length >= 2 && plain.every(({ index }) => overBullets(index));
+  const opensGroup = (index: number) => {
+    const line = lines[index];
+    const next = lines[index + 1];
+    if (BULLET.test(line) || next === undefined) return false;
+    return /[:：]\s*$/.test(line) || INDENT(next) > INDENT(line) || headingsOverBullets;
+  };
+
   const items: string[] = [];
   const groups: string[] = [];
   let group = "";
   lines.forEach((line, index) => {
-    const next = lines[index + 1];
-    const isBullet = BULLET.test(line);
-    const opensGroup =
-      !isBullet &&
-      next !== undefined &&
-      (/[:：]\s*$/.test(line) || BULLET.test(next) || INDENT(next) > INDENT(line));
-    if (opensGroup) {
+    if (opensGroup(index)) {
       group = line.trim();
       return;
     }

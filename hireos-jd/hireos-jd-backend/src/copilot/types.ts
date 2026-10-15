@@ -80,12 +80,17 @@ export const sendMessageInputSchema = z
   })
   .strict();
 
-export function computeMissingFields(fields: JdFields): string[] {
+/**
+ * Required fields still missing for a ready draft. Lists need two items, except those in `fromSource`: what the
+ * user's own material says is enough as it is, and is not padded out by AI to reach a count (#79 review).
+ */
+export function computeMissingFields(fields: JdFields, fromSource: Array<'responsibilities' | 'mustHave'> = []): string[] {
   const missing: string[] = [];
+  const enough = (key: 'responsibilities' | 'mustHave') => (fields[key]?.length ?? 0) >= (fromSource.includes(key) ? 1 : 2);
   if (!fields.title) missing.push('title');
   if (!fields.roleSummary) missing.push('roleSummary');
-  if (!fields.responsibilities || fields.responsibilities.length < 2) missing.push('responsibilities');
-  if (!fields.mustHave || fields.mustHave.length < 2) missing.push('mustHave');
+  if (!enough('responsibilities')) missing.push('responsibilities');
+  if (!enough('mustHave')) missing.push('mustHave');
   return missing;
 }
 

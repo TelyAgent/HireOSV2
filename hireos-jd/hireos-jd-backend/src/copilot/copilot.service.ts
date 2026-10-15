@@ -186,10 +186,11 @@ export class CopilotService {
     pending?: string[],
     forcePhase?: 'intake',
     userFields: string[] = [],
+    sourceLists: Array<'responsibilities' | 'mustHave'> = [],
   ): Promise<SerializedConversation> {
     const { operation, key, hash, userMessage, capabilityCode, currentFields } = prep;
     const mergedFields: JdFields = { ...currentFields, ...parsed.fields };
-    const computed = computeMissingFields(mergedFields);
+    const computed = computeMissingFields(mergedFields, sourceLists);
     const phase = forcePhase ?? (computed.length === 0 ? 'ready_to_confirm' : 'intake');
     const conversation = await this.loadConversation(identity, id);
     const kept = pending ?? pendingConfirmations(conversation);
@@ -607,7 +608,9 @@ export class CopilotService {
     for (const [field, mentioned] of OPTIONAL_SECTION_MENTIONS) {
       if (current[field] === undefined && !mentioned.test(note)) delete fields[field];
     }
-    if (computeMissingFields(fields).length > 0) {
+    // A list the draft holds fewer than two of came that way from the user's material (#79 review).
+    const shortLists = (['responsibilities', 'mustHave'] as const).filter((key) => (current[key]?.length ?? 0) === 1);
+    if (computeMissingFields(fields, [...shortLists]).length > 0) {
       throw new ServiceUnavailableException({ code: 'REFINE_INCOMPLETE', message: '这次修改没有生成完整的 JD，原草稿未改动，请换个说法再试一次。' });
     }
     return fields;
@@ -722,7 +725,7 @@ export class CopilotService {
       // History holds no source text (an upload is stored as just "[已上传文件]"), so the facts already read
       // from it are passed explicitly; without them the model rebuilt the job from the file name (#79 #80).
       ...(Object.keys(currentFields).length
-        ? [{ role: 'user' as const, content: `当前草稿已有的字段（来自用户或其提供的资料，视为已确认）：\n${JSON.stringify(currentFields)}\n只补全缺失的字段，已有字段原样保留，不要改写其中的岗位类别、地点、工作方式、经验年限等事实；职责或任职要求不足两条时，可在原有条目之后补充，补充的条目不得出现与已有内容冲突的经验年限、地点或岗位类别。` }]
+        ? [{ role: 'user' as const, content: `当前草稿已有的字段（来自用户或其提供的资料，视为已确认）：\n${JSON.stringify(currentFields)}\n只补全缺失的字段，已有字段原样保留，不要改写其中的岗位类别、地点、工作方式、经验年限等事实。` }]
         : []),
       { role: 'user', content: userText },
     ];
@@ -740,7 +743,9 @@ export class CopilotService {
       turns,
       currentFields,
     };
-    return this.commitTurn(identity, id, prep, parsed);
+    // A list the draft already has came from the user or their material: as many items as it has are enough.
+    const sourceLists = (['responsibilities', 'mustHave'] as const).filter((key) => (currentFields[key]?.length ?? 0) > 0);
+    return this.commitTurn(identity, id, prep, parsed, undefined, undefined, [], [...sourceLists]);
   }
 
   /**
@@ -1038,22 +1043,8 @@ export function sourceContent(kind: string, text: string): string {
   ].join('\n');
 }
 
-/** Lists a draft needs at least two items of before it is ready (see `computeMissingFields`). */
-const LISTS_NEEDING_TWO = ['responsibilities', 'mustHave'] as const;
-
-/**
- * What auto-complete may write: the fields the draft doesn't have yet, and — for a list still short of what a
- * ready draft needs — items added after the ones already there, which stay first and unchanged (#79 review).
- */
+/** The fields of `generated` the draft doesn't have yet. */
 function onlyMissing(generated: JdFields, current: JdFields): JdFields {
   const has = (value: unknown) => value !== undefined && value !== null && value !== '' && !(Array.isArray(value) && value.length === 0);
-  const out = Object.fromEntries(Object.entries(generated).filter(([key]) => !has((current as Record<string, unknown>)[key]))) as JdFields;
-  for (const key of LISTS_NEEDING_TWO) {
-    const kept = current[key];
-    const suggested = generated[key];
-    if (!kept?.length || kept.length >= 2 || !suggested?.length) continue;
-    const added = suggested.filter((item) => !kept.includes(item));
-    if (added.length) out[key] = [...kept, ...added];
-  }
-  return out;
+  return Object.fromEntries(Object.entries(generated).filter(([key]) => !has((current as Record<string, unknown>)[key]))) as JdFields;
 }

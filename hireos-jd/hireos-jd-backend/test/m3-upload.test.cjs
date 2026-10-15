@@ -121,23 +121,22 @@ test('#80 AC-3: a Chinese PDF keeps 销售经理 / 新加坡 / 远程 / 四年�
   }
 });
 
-test('#79 review: a file with a single duty or requirement still reaches a draft; its own item stays first, unchanged', async () => {
+test('#79 review: a file with a single duty or requirement reaches a draft as it is, not padded with AI items', async () => {
   const calls = [];
   const llm = {
-    completeJson: async (system, turns) => {
+    completeJson: async (system) => {
       calls.push(system.includes('JD File Extract') ? 'extract' : 'autotake');
       if (system.includes('JD File Extract')) {
-        return JSON.stringify({ reply: '已读取', phase: 'intake', missingFields: ['responsibilities', 'mustHave'], fields: { title: 'Sales Manager', location: 'Singapore (remote)', roleSummary: 'Grow B2B accounts.', responsibilities: [SOURCE_DUTIES[0]], mustHave: ['4+ years of experience in B2B sales.'] } });
+        return JSON.stringify({ reply: '已读取', phase: 'intake', missingFields: ['responsibilities', 'mustHave'], fields: { title: 'Sales Manager', location: 'Singapore (remote)', responsibilities: [SOURCE_DUTIES[0]], mustHave: ['4+ years of experience in B2B sales.'] } });
       }
-      return JSON.stringify({ reply: '已补全', phase: 'ready_to_confirm', missingFields: [], fields: { title: '销售专员', location: '中国大陆', responsibilities: ['开发客户', SOURCE_DUTIES[0]], mustHave: ['1 年及以上销售经验', 'CRM 使用经验'] } });
+      return JSON.stringify({ reply: '已补全', phase: 'ready_to_confirm', missingFields: [], fields: { title: '销售专员', location: '中国大陆', roleSummary: 'Grow B2B accounts.', responsibilities: ['开发客户', SOURCE_DUTIES[0]], mustHave: ['1 年及以上销售经验', 'CRM 使用经验'] } });
     },
   };
   const { fields, phase } = await runUpload(llm, 'sales-manager.docx');
   assert.deepEqual(calls, ['extract', 'autotake']);
-  assert.equal(phase, 'ready_to_confirm');
-  assert.deepEqual(fields.responsibilities, [SOURCE_DUTIES[0], '开发客户']);
-  assert.equal(fields.mustHave[0], '4+ years of experience in B2B sales.');
-  assert.equal(fields.mustHave.length, 3);
-  assert.equal(fields.title, 'Sales Manager');
-  assert.equal(fields.location, 'Singapore (remote)');
+  assert.equal(phase, 'ready_to_confirm', 'one item from the file is enough');
+  assert.deepEqual(fields.responsibilities, [SOURCE_DUTIES[0]]);
+  assert.deepEqual(fields.mustHave, ['4+ years of experience in B2B sales.']);
+  assert.doesNotMatch(JSON.stringify(fields), /1 年|销售专员|中国大陆/);
+  assert.equal(fields.roleSummary, 'Grow B2B accounts.', 'what was missing is still filled');
 });

@@ -46,6 +46,15 @@ describe('toGroupedLines (#86)', () => {
     expect(toGroupedLines('Basics\n  Degree in CS\n  3+ years')).toEqual({ items: ['Degree in CS', '3+ years'], groups: ['Basics', 'Basics'] });
   });
 
+  it('review: one plain line above some bullets stays a requirement, not a heading', () => {
+    expect(toGroupedLines('1. 4+ years in B2B sales\n- Fluent English\n- CRM experience')).toEqual({
+      items: ['4+ years in B2B sales', 'Fluent English', 'CRM experience'],
+      groups: ['', '', ''],
+    });
+    // A line between groups that has no bullets under it is an item too, so the text isn't read as groups.
+    expect(toGroupedLines('1.基础条件\n● 本科\nMust relocate to Hangzhou\n2.专业能力\n● SQL').items).toContain('Must relocate to Hangzhou');
+  });
+
   it('AC-3: plain lines, numbered or not, stay one flat list with no groups', () => {
     expect(toGroupedLines('1. Own partner APIs\n2. Ship SDKs\nWrite docs')).toEqual({ items: ['Own partner APIs', 'Ship SDKs', 'Write docs'], groups: ['', '', ''] });
     expect(toGroupedLines('- Node.js\n- 3+ years')).toEqual({ items: ['Node.js', '3+ years'], groups: ['', ''] });
