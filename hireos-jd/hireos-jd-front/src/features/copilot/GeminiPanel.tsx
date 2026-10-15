@@ -1018,7 +1018,9 @@ export function GeminiPanel({ ctx }: { ctx: GeminiCtx }) {
     setBusy(true);
     try {
       const result = await confirmCopilotFields(conversationId, fields, revisions);
-      updateMsg(index, { fieldMeta: result.fieldMeta, titlePending: titlePendingIn(result) });
+      // Values too, not just the marks: a field changed elsewhere must show its new value before anyone
+      // confirms it at its new revision (#68 review).
+      updateMsg(index, { draft: jdFieldsToGeminiDraft(result.fields), fieldMeta: result.fieldMeta, titlePending: titlePendingIn(result) });
     } catch (error) {
       say(errorText(error), { type: "error" });
       // The draft changed elsewhere (e.g. another tab): show what it is now, to review before confirming.

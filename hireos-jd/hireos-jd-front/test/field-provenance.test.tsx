@@ -113,6 +113,18 @@ describe('Quick Start draft provenance (#68)', () => {
     expect(document.querySelector('.gemini-expand-column .gm-ws-doc')).toHaveTextContent('Excel');
   });
 
+  it('review: a confirm also brings in values changed elsewhere, so they are seen before being confirmed', async () => {
+    // Another tab changed mustHave meanwhile; confirming the summary here returns the whole current draft.
+    api.confirmCopilotFields.mockResolvedValue(
+      conv({ fields: { ...FIELDS, mustHave: ['SQL', 'Python'] }, fieldMeta: { ...META, roleSummary: { source: 'ai', revision: 1, status: 'confirmed' }, mustHave: ai(2) } }),
+    );
+    await quickStart();
+    fireEvent.click(within(markOf('roleSummary')!).getByRole('button', { name: 'Confirm' }));
+    await waitFor(() => expect(document.querySelector('.gemini-expand-column .gm-ws-doc')).toHaveTextContent('Python'));
+    expect(markOf('mustHave')).toHaveTextContent('v2');
+    expect(markOf('mustHave')).toHaveTextContent('AI suggested · to confirm');
+  });
+
   it('AC-3: Captured inputs still lists the raw answers, separate from the per-field marks', async () => {
     await quickStart();
     const inputs = document.querySelector('.gemini-expand-column .gm-ws-inputs') as HTMLElement;

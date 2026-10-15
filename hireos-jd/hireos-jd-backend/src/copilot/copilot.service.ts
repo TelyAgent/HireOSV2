@@ -62,6 +62,8 @@ type TurnPrep =
       capabilityCode: string;
       turns: ChatTurn[];
       currentFields: JdFields;
+      /** The conversation's stateRevision when `currentFields` was read, before the model call (#68 review). */
+      baseRevision: number;
     };
 
 @Injectable()
@@ -169,6 +171,7 @@ export class CopilotService {
       capabilityCode: 'jd_intake_turn',
       turns,
       currentFields: asRecord(conversation.fields) as JdFields,
+      baseRevision: conversation.stateRevision,
     };
   }
 
@@ -213,9 +216,9 @@ export class CopilotService {
         // — using the sequence captured back in prepareTurn (before the slow LLM call) would let two
         // concurrent turns compute the same number and collide on the (conversationId, sequence)
         // constraint, which is exactly what an earlier version of this code did.
-        // Conditional on the state the turn's field meta was computed from: a turn that committed in between
-        // makes this one fail rather than write revisions computed from a stale snapshot (#68 review).
-        const updated = await updateIfUnchanged(tx, id, conversation.stateRevision, {
+        // Conditional on the state the turn started from, before the model call: anything committed meanwhile
+        // (a user edit, another turn) makes this one fail instead of writing back stale fields (#68 review).
+        const updated = await updateIfUnchanged(tx, id, prep.baseRevision, {
           fields: json(mergedFields),
           missingFields: json(missingFields),
           fieldMeta: json(fieldMeta),
@@ -405,6 +408,7 @@ export class CopilotService {
       capabilityCode: 'jd_file_extract_turn',
       turns,
       currentFields: asRecord(conversation.fields) as JdFields,
+      baseRevision: conversation.stateRevision,
     };
     return this.commitTurn(identity, id, prep, parsed);
   }
@@ -737,6 +741,7 @@ export class CopilotService {
       capabilityCode: 'jd_autotake_turn',
       turns,
       currentFields,
+      baseRevision: conversation.stateRevision,
     };
     // A list the draft already has came from the user or their material: as many items as it has are enough.
     const sourceLists = (['responsibilities', 'mustHave'] as const).filter((key) => (currentFields[key]?.length ?? 0) > 0);
@@ -780,6 +785,7 @@ export class CopilotService {
       capabilityCode,
       turns,
       currentFields,
+      baseRevision: conversation.stateRevision,
     });
 
     const ask = followUp(assessment, answers);

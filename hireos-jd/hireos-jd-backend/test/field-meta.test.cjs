@@ -183,3 +183,19 @@ test('#68 review: two overlapping refines can\'t both write the next revision; t
   const confirmed = await svc.confirmFields(identity, 'c1', { fields: ['mustHave'], revisions: { mustHave: 2 } });
   assert.equal(confirmed.fieldMeta.mustHave.status, 'confirmed');
 });
+
+test('#68 review: a user edit made while a turn waits for the model is not overwritten by that turn', async () => {
+  const { svc, db } = service({ titleFromUser: false });
+  await svc.quickStart(identity, 'c1', { answers: ANSWERS }, meta());
+  let releaseModel;
+  const model = new Promise((resolve) => (releaseModel = resolve));
+  svc.llm.completeJson = async () => { await model; return JSON.stringify({ reply: '已补全', phase: 'ready_to_confirm', missingFields: [], fields: { businessProblem: 'No one owns growth.' } }); };
+  const turn = svc.autoComplete(identity, 'c1', {}, meta());
+  // Meanwhile the user changes the location and saves.
+  await svc.setFields(identity, 'c1', { fields: { ...db.conv.fields, location: 'London' }, label: 'Edit location' }, meta());
+  releaseModel();
+
+  await assert.rejects(turn, (e) => e.response?.code === 'DRAFT_CHANGED');
+  assert.equal(db.conv.fields.location, 'London');
+  assert.deepEqual(db.conv.fieldMeta.location, { source: 'user', revision: 1, status: 'confirmed' });
+});
