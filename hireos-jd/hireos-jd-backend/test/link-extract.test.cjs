@@ -113,6 +113,9 @@ function fixtureNetwork() {
         case 'jobs.example.test/intro-then-posting':
           // A long intro is there from the start; the posting only arrives after 2.5 s.
           return html(`<html><body><section><h2>About Example</h2><p>${'Example builds AI products for teams across Asia and Europe, with offices in Singapore, Hangzhou and Berlin. '.repeat(3)}</p></section><div id="app"></div><script>setTimeout(() => { const s = document.createElement('script'); s.src = 'https://cdn.example.test/app.js'; document.body.appendChild(s); }, 2500);</script></body></html>`, { 'set-cookie': 'csrf=token-1; Path=/' });
+        case 'jobs.example.test/loading-stuck':
+          // The posting's script fails to load: the placeholder text stays, the mount point stays empty.
+          return html('<html><body><p>Welcome to Example Careers. Please wait while we load the job.</p><div id="app"></div><script src="https://cdn.example.test/missing.js"></script></body></html>');
         case 'jobs.example.test/short-static':
           return html('<html><body><h1>运营专员</h1><p>地点：杭州</p><ul><li>负责社群日常运营与活动策划</li><li>两年以上运营经验</li></ul></body></html>');
         case 'jobs.example.test/static':
@@ -329,6 +332,11 @@ test('#64 review: a long intro that is there from the start does not end the wai
   const text = await extractTextFromLink('https://jobs.example.test/intro-then-posting', { network, renderer, renderTimeoutMs: 15000 });
   assert.match(text, /AI应用算法工程师/);
   assert.match(text, /About Example/);
+});
+
+test('#64 review AC-3: a page whose posting never loads is refused, not read as its placeholder text', needsBrowser, async () => {
+  const { network } = fixtureNetwork();
+  await rejectsWith(extractTextFromLink('https://jobs.example.test/loading-stuck', { network, renderer, renderTimeoutMs: 4000 }), /没有找到职位内容.*粘贴/);
 });
 
 /** A `playwright run-server` like the jd-renderer container, when this machine has Playwright's own Chromium. */

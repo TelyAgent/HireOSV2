@@ -208,9 +208,13 @@ async function renderedText(url: URL, network: LinkNetwork, options: LinkExtract
     if ([401, 403, 429].includes(result.status)) throw linkError(result.status === 429 ? BLOCKED_MESSAGE : LOGIN_MESSAGE);
     throw linkError(`打开这个链接失败（${result.status}），请改为粘贴 JD 文案。`);
   }
-  const text = (jobPostingText(result.html) || htmlToText(result.html)).trim();
+  const posting = jobPostingText(result.html);
+  const text = (posting || htmlToText(result.html)).trim();
   if (looksLikeBotChallenge(text)) throw linkError(BLOCKED_MESSAGE);
   if (looksLikeLoginWall(text)) throw linkError(LOGIN_MESSAGE);
+  // Still an empty mount point after rendering: the posting never loaded, and what text there is is the page's
+  // placeholder ("please wait while we load the job"), not the posting (#64 review AC-3).
+  if (!posting && looksLikeScriptShell(result.html)) throw linkError(NO_CONTENT_MESSAGE);
   return text;
 }
 
