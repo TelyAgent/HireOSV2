@@ -47,3 +47,13 @@ test('#95 AC-1/AC-3: two runs on the minimal seed never write unsourced years or
   assert.deepEqual(first.toConfirm, ['1 年以上数据分析经验', 'Spreadsheet software']);
   assert.deepEqual(second.toConfirm, ['Mid-level 薪资 20K–30K']);
 });
+
+test('#95 review: decimals, dotted names and words starting with K are left alone', () => {
+  const { sentencesOf } = require('../dist/copilot/unsourced-facts');
+  assert.deepEqual(separateUnsourced(['Use 10 Kubernetes clusters'], true, 'Use SQL'), { items: ['Use 10 Kubernetes clusters'], toConfirm: [] });
+  const sourced = separateUnsourced(['You need 1.5 years of experience. You review data.'], false, 'You need 1.5 years of experience.');
+  assert.deepEqual(sourced, { items: ['You need 1.5 years of experience. You review data.'], toConfirm: [] });
+  assert.deepEqual(separateUnsourced(['Experience with Node.js and SQL.'], false, 'SQL'), { items: ['Experience with Node.js and SQL.'], toConfirm: [] });
+  assert.deepEqual(sentencesOf('Uses Node.js. Has 2.5 years. 负责数据。会 SQL！'), ['Uses Node.js.', 'Has 2.5 years.', '负责数据。', '会 SQL！']);
+  assert.deepEqual(separateUnsourced(['Ships weekly. Needs 2.5 years in analytics.'], false, 'Ships weekly'), { items: ['Ships weekly.'], toConfirm: ['Needs 2.5 years in analytics.'] });
+});

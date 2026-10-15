@@ -149,6 +149,10 @@ export function useDocActions(jobId: string) {
           toConfirm={toConfirm}
           onKeep={() => {
             apply();
+            // The rule check recomputes on its own; a past AI Analyze is run again on the kept text (M6).
+            mutate((draft) => {
+              if (draft.wsAiAnalysis[jobId]) draft.wsReanalyze = { jobId, n: (draft.wsReanalyze?.n ?? 0) + 1 };
+            });
             say(`${t(done)} “${t(label)}” — ${t("you can undo it.")}`, { type: "success" });
           }}
         />,
@@ -563,6 +567,11 @@ export function useDocActions(jobId: string) {
       },
 
       /* ---------------- completeness ---------------- */
+
+      /** Runs the AI review again on the current text, without switching tabs. */
+      reanalyze() {
+        void runAiAnalysis();
+      },
 
       /** Analyze: refreshes the rule check, opens the Analysis tab and runs the AI review. */
       analyze() {

@@ -8,35 +8,51 @@ import { useEffect, useState } from 'react';
 vi.mock('../src/features/workspace/documentsApi', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../src/features/workspace/documentsApi')>()),
   aiSection: vi.fn(),
+  aiAnalyze: vi.fn(async () => ({ verdict: 'needs_work', summary: 'ok', items: [] })),
+  saveJobDocument: vi.fn(async (_job, _aud, blocks) => ({ revision: 2, blocks })),
 }));
 
 import * as docsApi from '../src/features/workspace/documentsApi';
 import { StoreProvider, useStore } from '../src/store/StoreContext';
-import { AnalysisPanel } from '../src/features/workspace/AnalysisPanel';
 import { OverlayHost } from '../src/components/ui/Overlays';
 import { mkBlock } from '../src/data/fixtures/documents';
 import { coreJobToLocalJob } from '../src/features/jobs/jobsMapping';
 import { docKey, selectDraft, blockPlainText } from '../src/features/workspace/docHelpers';
 import { useDocActions } from '../src/features/workspace/docActions';
+import { useDocumentSaver } from '../src/features/workspace/useDocumentSaver';
+import { SidePanel } from '../src/features/workspace/SidePanel';
 
 const api = vi.mocked(docsApi);
 
-/** Shows the document's responsibility bullets so a test can read what was written. */
-function Bullets() {
+/** Shows the document's bullets and paragraphs so a test can read what was written. */
+function Doc() {
   const { state } = useStore();
   const blocks = selectDraft(state, 'j1').blocks;
-  return <ul data-testid="doc">{blocks.filter((b) => b.kind === 'ul').map((b) => <li key={b.id}>{blockPlainText(b)}</li>)}</ul>;
+  return (
+    <>
+      <ul data-testid="doc">{blocks.filter((b) => b.kind === 'ul').map((b) => <li key={b.id}>{blockPlainText(b)}</li>)}</ul>
+      <div data-testid="paras">{blocks.filter((b) => b.kind === 'p').map((b) => <p key={b.id}>{blockPlainText(b)}</p>)}</div>
+    </>
+  );
 }
-function UndoButton() {
+function Controls() {
   const actions = useDocActions('j1');
-  return <button onClick={() => actions.undoAi()}>undo-ai</button>;
+  const save = useDocumentSaver('j1');
+  return (
+    <>
+      <button onClick={() => actions.undoAi()}>undo-ai</button>
+      <button onClick={() => void save({ quiet: true })}>save-doc</button>
+    </>
+  );
 }
-function Seeded() {
+function Seeded({ withAnalysis = false }: { withAnalysis?: boolean }) {
   const { mutate } = useStore();
   const [ready, setReady] = useState(false);
   useEffect(() => {
     mutate((d) => {
       d.jobs = { ...d.jobs, j1: coreJobToLocalJob({ id: 'j1', title: 'Data Analyst', location: 'Shanghai', openings: 1, status: 'draft' } as never) };
+      if (withAnalysis) d.wsAiAnalysis = { j1: { at: 1, revision: 1, result: { verdict: 'needs_work', summary: 's', items: [] } } };
+      d.wsSideTab = 'analysis';
       d.drafts = {
         ...d.drafts,
         [docKey('j1')]: {
@@ -53,17 +69,19 @@ function Seeded() {
       };
     });
     setReady(true);
-  }, [mutate]);
+  }, [mutate, withAnalysis]);
   return ready ? (
     <>
-      <AnalysisPanel jobId="j1" />
-      <Bullets />
-      <UndoButton />
+      <SidePanel jobId="j1" />
+      <Doc />
+      <Controls />
       <OverlayHost />
     </>
   ) : null;
 }
-const renderPanel = () => render(<AntApp><StoreProvider><Seeded /></StoreProvider></AntApp>);
+const renderPanel = (withAnalysis = false) => render(<AntApp><StoreProvider><Seeded withAnalysis={withAnalysis} /></StoreProvider></AntApp>);
+const paras = () => [...screen.getByTestId('paras').querySelectorAll('p')].map((p) => p.textContent);
+const SUMMARY = 'Turns product data into weekly decisions for the team.';
 /** The "AI fix" link in the row for `label`. */
 async function aiFixFor(label: string) {
   let el: HTMLElement | null = await screen.findByText(label);
@@ -107,6 +125,54 @@ describe('single AI fix (#94)', () => {
 
     fireEvent.click(screen.getByText('undo-ai'));
     await waitFor(() => expect(bullets()).toEqual(ORIGINAL));
+  });
+});
+
+describe('single AI fix — paragraph, save round-trip, re-analysis (#94 review)', () => {
+  const NEW_SUMMARY = 'Turns weekly product data into clear decisions for the product team.';
+
+  it('AC-3: a paragraph fix is kept, saved, undone and saved again — what is saved matches each step exactly', async () => {
+    api.aiSection.mockResolvedValue({ items: [NEW_SUMMARY], explain: 'clearer', toConfirm: [] });
+    renderPanel();
+    fireEvent.click(await aiFixFor('Role summary'));
+    expect(await screen.findByText(NEW_SUMMARY)).toBeInTheDocument();
+    expect(document.querySelector('.ai-diff-line.is-removed')).toHaveTextContent(SUMMARY);
+    fireEvent.click(screen.getByRole('button', { name: 'Keep' }));
+    await waitFor(() => expect(paras()).toContain(NEW_SUMMARY));
+
+    fireEvent.click(screen.getByText('save-doc'));
+    await waitFor(() => expect(api.saveJobDocument).toHaveBeenCalledTimes(1));
+    const kept = api.saveJobDocument.mock.calls[0][2].map((b) => blockPlainText(b));
+    expect(kept).toContain(NEW_SUMMARY);
+    expect(kept).not.toContain(SUMMARY);
+
+    fireEvent.click(screen.getByText('undo-ai'));
+    await waitFor(() => expect(paras()).toEqual([SUMMARY]));
+    fireEvent.click(screen.getByText('save-doc'));
+    await waitFor(() => expect(api.saveJobDocument).toHaveBeenCalledTimes(2));
+    // What a reload would read back is the original document, block for block.
+    const reloaded = api.saveJobDocument.mock.calls[1][2].map((b) => blockPlainText(b));
+    expect(reloaded).toEqual(['Data Analyst', SUMMARY, 'Responsibilities', ...ORIGINAL.slice(0, 1), 'Requirements', ORIGINAL[1]]);
+  });
+
+  it('AC-2: keeping a change re-runs AI Analyze on the new text when the job had been analyzed', async () => {
+    api.aiSection.mockResolvedValue({ items: [NEW_SUMMARY], explain: 'clearer', toConfirm: [] });
+    renderPanel(true);
+    fireEvent.click(await aiFixFor('Role summary'));
+    fireEvent.click(await screen.findByRole('button', { name: 'Keep' }));
+    await waitFor(() => expect(api.aiAnalyze).toHaveBeenCalledTimes(1));
+    const sent = api.aiAnalyze.mock.calls[0][2].blocks.map((b) => b.text);
+    expect(sent).toContain(NEW_SUMMARY);
+  });
+
+  it('Reject never triggers a re-analysis', async () => {
+    api.aiSection.mockResolvedValue({ items: [NEW_SUMMARY], explain: 'clearer', toConfirm: [] });
+    renderPanel(true);
+    fireEvent.click(await aiFixFor('Role summary'));
+    fireEvent.click(await screen.findByRole('button', { name: 'Reject' }));
+    await new Promise((r) => setTimeout(r, 50));
+    expect(api.aiAnalyze).not.toHaveBeenCalled();
+    expect(paras()).toEqual([SUMMARY]);
   });
 });
 

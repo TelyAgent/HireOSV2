@@ -18,6 +18,12 @@ import type { CopilotMsg, SideTab } from "../../store/types";
 export function SidePanel({ jobId }: { jobId: string }) {
   const { state, t } = useStore();
   const actions = useDocActions(jobId);
+  // After an AI change is kept, re-run AI Analyze on the new text (#94 AC-2). This render has the new document.
+  const reanalyze = state.wsReanalyze;
+  useEffect(() => {
+    if (reanalyze?.jobId === jobId) actions.reanalyze();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [reanalyze?.n]);
   const ev = useCompleteness(jobId);
   const issues = ev ? issueCount(ev) : 0;
   const tabs: { key: SideTab; label: string; count?: number; tone?: string }[] = [

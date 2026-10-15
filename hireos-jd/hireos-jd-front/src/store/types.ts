@@ -171,6 +171,8 @@ export interface AppState {
   wsFocusBlockId: string | null;
   /** Bumped to ask the open document to save itself (e.g. after accepting a suggestion). */
   wsSaveRequest: number;
+  /** Bumped after an AI change is kept, so the job's AI Analyze runs again on the new text (#94). */
+  wsReanalyze: { jobId: string; n: number } | null;
   /** When Analyze was last run per job (shows optional-section suggestions). */
   wsAnalyzedAt: Record<string, number>;
   /** Ask the open document to focus a block (from the Analysis panel's "Fill in"); `n` makes repeats distinct. */
