@@ -54,6 +54,8 @@ model CopilotConversation {
   phase         String   @default("intake")
   fields        Json     @default("{}")
   missingFields Json     @default("[]")
+  /// Per-field source / revision / confirmation status of the draft (#68), see src/copilot/field-meta.ts.
+  fieldMeta     Json     @default("{}")
   stateRevision Int      @default(0)
   summary       String?
   createdAt     DateTime @default(now())

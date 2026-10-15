@@ -11,12 +11,14 @@ import { LlmProvider, type ChatTurn, type WebAnswer } from './llm-provider';
 import { PromptRegistry } from './prompt-registry';
 import { fieldsToDraftContent } from './draft-mapping';
 import { ReplyStreamExtractor } from './reply-stream-extractor';
+import { asFieldMeta, confirmFields, recordChanges } from './field-meta';
 import { QUICK_START_ASSESS_PROMPT, TITLE_UNCONFIRMED, followUp, parseAssessment, tooThinToAssess } from './quick-start';
 import { factsInstruction, pickFacts, pinFacts, type JobFacts } from './variant-facts';
 import { changedJdFields, refineReply } from './refine-summary';
 import { OUT_OF_SCOPE_REPLY, SALARY_ANSWER_RULES, fixAnnualSalary, workflowGuide } from './jd-agent-scope';
 import {
   autoCompleteInputSchema,
+  confirmFieldsInputSchema,
   quickStartInputSchema,
   computeMissingAuthoredFields,
   computeMissingFields,
@@ -39,6 +41,7 @@ type ConversationRow = {
   phase: string;
   fields: unknown;
   missingFields: unknown;
+  fieldMeta?: unknown;
   stateRevision: number;
   createdAt: Date;
   updatedAt: Date;
@@ -182,12 +185,16 @@ export class CopilotService {
     parsed: LlmTurnResult,
     pending?: string[],
     forcePhase?: 'intake',
+    userFields: string[] = [],
   ): Promise<SerializedConversation> {
     const { operation, key, hash, userMessage, capabilityCode, currentFields } = prep;
     const mergedFields: JdFields = { ...currentFields, ...parsed.fields };
     const computed = computeMissingFields(mergedFields);
     const phase = forcePhase ?? (computed.length === 0 ? 'ready_to_confirm' : 'intake');
-    const kept = pending ?? pendingConfirmations(await this.loadConversation(identity, id));
+    const conversation = await this.loadConversation(identity, id);
+    const kept = pending ?? pendingConfirmations(conversation);
+    // What the model wrote is an AI suggestion awaiting confirmation; `userFields` are the user's own words (#68).
+    const fieldMeta = recordChanges(asFieldMeta(conversation.fieldMeta), currentFields, parsed.fields, (field) => (userFields.includes(field) ? 'user' : 'ai'));
     const missingFields = [...computed, ...kept];
 
     try {
@@ -210,6 +217,7 @@ export class CopilotService {
           data: {
             fields: json(mergedFields),
             missingFields: json(missingFields),
+            fieldMeta: json(fieldMeta),
             phase,
             stateRevision: { increment: 1 },
           },
@@ -615,9 +623,14 @@ export class CopilotService {
       const operation = `copilot.fields:${id}`;
       const prior = await findIdempotent(tx, identity, operation, meta, input);
       if (prior.prior) return prior.prior.responseBody;
+      // The user wrote or picked these: changed fields become theirs; saving also confirms the title (#66 #68).
+      const fieldMeta = confirmFields(
+        recordChanges(asFieldMeta(conversation.fieldMeta), asRecord(conversation.fields), input.fields, () => 'user'),
+        ['title'],
+      );
       const updated = await tx.copilotConversation.update({
         where: { id },
-        data: { fields: json(input.fields), missingFields: json([]), phase: 'ready_to_confirm', stateRevision: { increment: 1 } },
+        data: { fields: json(input.fields), missingFields: json([]), fieldMeta: json(fieldMeta), phase: 'ready_to_confirm', stateRevision: { increment: 1 } },
       });
       const latest = await tx.copilotMessage.findFirst({ where: { conversationId: id }, orderBy: { sequence: 'desc' } });
       const sequence = (latest?.sequence ?? 0) + 1;
@@ -630,6 +643,30 @@ export class CopilotService {
       await storeIdempotency(tx, identity, operation, prior.key, prior.hash, result);
       return result;
     });
+  }
+
+  /**
+   * The user confirms AI-suggested fields as they are (#68 AC-2): their status becomes confirmed, value and
+   * revision stay. Confirming the title also lifts the title confirmation Create waits for (#66).
+   */
+  async confirmFields(identity: Identity, id: string, raw: unknown) {
+    const input = confirmFieldsInputSchema.parse(raw);
+    const conversation = await this.loadConversation(identity, id);
+    if (conversation.phase === 'completed') throw new ConflictException({ code: 'CONVERSATION_COMPLETED' });
+    const fields = asRecord(conversation.fields);
+    const unknown = input.fields.filter((field) => fields[field] === undefined);
+    if (unknown.length) throw new BadRequestException({ code: 'FIELD_NOT_IN_DRAFT', message: `草稿里没有这些字段：${unknown.join(', ')}` });
+
+    const fieldMeta = confirmFields(asFieldMeta(conversation.fieldMeta), input.fields);
+    const missingFields = input.fields.includes('title')
+      ? (Array.isArray(conversation.missingFields) ? conversation.missingFields : []).filter((f) => f !== TITLE_UNCONFIRMED)
+      : conversation.missingFields;
+    const updated = await this.db.copilotConversation.update({
+      where: { id },
+      data: { fieldMeta: json(fieldMeta), missingFields: json(missingFields), stateRevision: { increment: 1 } },
+    });
+    const messages = await this.db.copilotMessage.findMany({ where: { conversationId: id }, orderBy: { sequence: 'asc' } });
+    return serializeConversation(updated, messages);
   }
 
   /**
@@ -755,7 +792,15 @@ export class CopilotService {
     const turns: ChatTurn[] = [{ role: 'user', content: brief }];
     const parsed = await this.runAutoCompleteTurn(identity, id, turns);
     const result: LlmTurnResult = { ...parsed, fields: { ...parsed.fields, title: assessment.title! } };
-    return this.commitTurn(identity, id, prep('jd_autotake_turn', turns), result, assessment.titleFromUser ? [] : [TITLE_UNCONFIRMED]);
+    return this.commitTurn(
+      identity,
+      id,
+      prep('jd_autotake_turn', turns),
+      result,
+      assessment.titleFromUser ? [] : [TITLE_UNCONFIRMED],
+      undefined,
+      assessment.titleFromUser ? ['title'] : [],
+    );
   }
 
   /**
@@ -923,6 +968,7 @@ function serializeConversation(conversation: ConversationRow, messages: MessageR
     phase: conversation.phase,
     fields: conversation.fields,
     missingFields: conversation.missingFields,
+    fieldMeta: asFieldMeta(conversation.fieldMeta),
     stateRevision: conversation.stateRevision,
     createdAt: conversation.createdAt,
     updatedAt: conversation.updatedAt,

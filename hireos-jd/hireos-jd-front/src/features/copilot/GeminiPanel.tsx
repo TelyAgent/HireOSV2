@@ -10,6 +10,7 @@ import { money, nowISO } from "../../lib/format";
 import {
   TITLE_UNCONFIRMED,
   autoCompleteCopilotConversation,
+  confirmCopilotFields,
   confirmCopilotDraft,
   createCopilotConversation,
   generateCopilotTitleVariants,
@@ -32,7 +33,7 @@ import { VoiceInputButton, type VoiceInputHandle, type VoiceInputStatus } from "
 import { mergeVoiceTranscript } from "../../lib/voice-stream";
 import { fmtRelative } from "../../lib/format";
 import type { Audience, Requirement } from "../../data/types";
-import type { ConversationActionOption, GeminiCreatePath, GeminiCreateRetry, GeminiDraft, GeminiMsg, GeminiOrigin, GeminiRequestRetry, GeminiVariant } from "../../store/types";
+import type { ConversationActionOption, FieldMetaMap, GeminiCreatePath, GeminiCreateRetry, GeminiDraft, GeminiMsg, GeminiOrigin, GeminiRequestRetry, GeminiVariant } from "../../store/types";
 import { ATTACHMENT_FILE_EMPTY, ATTACHMENT_TOO_LARGE, MAX_ATTACHMENT_MB, describeCopilotError } from "./copilotErrors";
 import { toGroupedLines, toLines } from "./formLines";
 import { safeRandomUUID } from "../../lib/uuid";
@@ -46,7 +47,7 @@ function conversationToGeminiMsgs(dto: CopilotConversationDto): GeminiMsg[] {
   );
   if (dto.phase === "ready_to_confirm") {
     if (msgs.length && msgs[msgs.length - 1].role === "ai") msgs.pop();
-    msgs.push({ role: "ai", draft: jdFieldsToGeminiDraft(dto.fields), titlePending: titlePendingIn(dto) });
+    msgs.push({ role: "ai", draft: jdFieldsToGeminiDraft(dto.fields), titlePending: titlePendingIn(dto), fieldMeta: dto.fieldMeta });
   }
   return msgs;
 }
@@ -169,7 +170,7 @@ const JD_FILE_ACCEPT =
 function resultToMsg(result: CopilotConversationDto, origin?: GeminiOrigin, prev?: GeminiDraft): GeminiMsg {
   const lastReply = result.messages[result.messages.length - 1];
   return result.phase === "ready_to_confirm"
-    ? { role: "ai", draft: jdFieldsToGeminiDraft(result.fields), titlePending: titlePendingIn(result), origin, prev }
+    ? { role: "ai", draft: jdFieldsToGeminiDraft(result.fields), titlePending: titlePendingIn(result), fieldMeta: result.fieldMeta, origin, prev }
     : { role: "ai", text: lastReply?.text || "" };
 }
 
@@ -392,7 +393,7 @@ export function GeminiPanel({ ctx }: { ctx: GeminiCtx }) {
 
   const updateMsg = (
     index: number,
-    patch: { done?: boolean; picked?: number; selected?: number; superseded?: boolean; created?: boolean; titlePending?: boolean; draft?: GeminiDraft },
+    patch: { done?: boolean; picked?: number; selected?: number; superseded?: boolean; created?: boolean; titlePending?: boolean; draft?: GeminiDraft; fieldMeta?: FieldMetaMap },
   ) =>
     mutate((draft) => {
       const list = [...(draft.geminiChats[key] ?? [])];
@@ -957,7 +958,7 @@ export function GeminiPanel({ ctx }: { ctx: GeminiCtx }) {
     try {
       const conversation = await getCopilotConversation(conversationId);
       const result = await setCopilotFields(conversationId, { ...conversation.fields, title: clean }, `${t("Confirm job title")}: ${clean}`);
-      updateMsg(index, { draft: jdFieldsToGeminiDraft(result.fields), titlePending: false });
+      updateMsg(index, { draft: jdFieldsToGeminiDraft(result.fields), titlePending: false, fieldMeta: result.fieldMeta });
     } catch (error) {
       say(errorText(error), { type: "error" });
     } finally {
@@ -996,6 +997,21 @@ export function GeminiPanel({ ctx }: { ctx: GeminiCtx }) {
       seniority: seniority || undefined,
       formIndex: index,
     });
+  };
+
+  /** The user confirms AI-suggested fields as they are (#68 AC-2). */
+  const confirmDraftFields = async (index: number, fields: string[]) => {
+    const conversationId = state.geminiConversationIds[key];
+    if (working || !conversationId || !fields.length) return;
+    setBusy(true);
+    try {
+      const result = await confirmCopilotFields(conversationId, fields);
+      updateMsg(index, { fieldMeta: result.fieldMeta, titlePending: titlePendingIn(result) });
+    } catch (error) {
+      say(errorText(error), { type: "error" });
+    } finally {
+      setBusy(false);
+    }
   };
 
   /** "Retry" on a failure card: run the same create again (same conversation, same idempotency key). */
@@ -1182,6 +1198,8 @@ export function GeminiPanel({ ctx }: { ctx: GeminiCtx }) {
       {showWorkspace && active && (
         <CopilotWorkspace
           msg={active.msg}
+          busy={working}
+          onConfirmFields={(fields) => void confirmDraftFields(active.index, fields)}
           onSelectVariant={(variantIndex) => updateMsg(active.index, { selected: variantIndex })}
           onClose={() => setWsOpen(false)}
         />
@@ -1436,10 +1454,14 @@ const ORIGIN_DETAIL_LABELS: Record<GeminiCreatePath, string> = {
 /** The right-hand Workspace column: the open draft as a document, with version tabs and change highlights. */
 function CopilotWorkspace({
   msg,
+  busy,
+  onConfirmFields,
   onSelectVariant,
   onClose,
 }: {
   msg: ActiveDraftMsg;
+  busy: boolean;
+  onConfirmFields: (fields: string[]) => void;
   onSelectVariant: (variantIndex: number) => void;
   onClose: () => void;
 }) {
@@ -1485,7 +1507,13 @@ function CopilotWorkspace({
             <div className="tiny" style={{ margin: "0 0 10px" }}>{t(msg.variants[selected].description)}</div>
           </>
         )}
-        <WorkspaceDoc d={draft} changes={diffDrafts(prev, draft)} origin={origin} />
+        <WorkspaceDoc
+          d={draft}
+          changes={diffDrafts(prev, draft)}
+          origin={origin}
+          // Field-by-field source and confirmation are shown for Quick Start drafts (M1, #68).
+          provenance={!isVariants && origin?.path === "questions" && msg.fieldMeta ? { meta: msg.fieldMeta, busy, onConfirm: onConfirmFields } : undefined}
+        />
         {origin && (
           <details className="gm-ws-inputs">
             <summary>{t("Captured inputs")}</summary>
@@ -1506,8 +1534,51 @@ function CopilotWorkspace({
   );
 }
 
-function WorkspaceDoc({ d, changes, origin }: { d: GeminiDraft; changes: DraftChanges | null; origin?: GeminiOrigin }) {
+type Provenance = { meta: FieldMetaMap; busy: boolean; onConfirm: (fields: string[]) => void };
+
+/** Backend field name of each part of the draft (field meta is keyed by these). */
+const FIELD_NAMES = {
+  title: "title",
+  department: "department",
+  location: "location",
+  employmentType: "employmentType",
+  headcount: "headcount",
+  summary: "roleSummary",
+  businessProblem: "businessProblem",
+  responsibilities: "responsibilities",
+  must: "mustHave",
+  pref: "niceToHave",
+  compensation: "publicCompensation",
+  outcomes: "expectedOutcomes",
+  success: "successCriteria",
+} as const;
+
+/** Source, status and revision of one field: AI suggestions are flagged until the user confirms them (#68). */
+function FieldMark({ field, provenance }: { field: string; provenance?: Provenance }) {
   const { t } = useStore();
+  const m = provenance?.meta[field];
+  if (!provenance || !m) return null;
+  const pending = m.status === "pending";
+  return (
+    <span className={`gm-field-mark${pending ? " pending" : ""}`} data-field={field}>
+      <span className={pending ? "gm-ai-tag" : "gm-user-tag"}>
+        {pending ? t("AI suggested · to confirm") : m.source === "ai" ? t("AI suggested · confirmed") : t("Your answer · confirmed")}
+      </span>
+      <span className="gm-field-rev">v{m.revision}</span>
+      {pending && field !== "title" && (
+        <button type="button" className="req-link" disabled={provenance.busy} onClick={() => provenance.onConfirm([field])}>
+          {t("Confirm")}
+        </button>
+      )}
+    </span>
+  );
+}
+
+function WorkspaceDoc({ d, changes, origin, provenance }: { d: GeminiDraft; changes: DraftChanges | null; origin?: GeminiOrigin; provenance?: Provenance }) {
+  const { t } = useStore();
+  const mark = (part: keyof typeof FIELD_NAMES) => <FieldMark field={FIELD_NAMES[part]} provenance={provenance} />;
+  const pendingCls = (part: keyof typeof FIELD_NAMES) => (provenance?.meta[FIELD_NAMES[part]]?.status === "pending" ? " gm-pending" : "");
+  const pendingFields = provenance ? Object.entries(provenance.meta).filter(([, m]) => m.status === "pending").map(([f]) => f) : [];
   const changed = (field: keyof DraftChanges["fields"]) => !!changes && field in changes.fields;
   const was = (field: keyof DraftChanges["fields"]) =>
     changed(field) ? t("Was: %s").replace("%s", changes?.fields[field] || "—") : undefined;
@@ -1527,10 +1598,11 @@ function WorkspaceDoc({ d, changes, origin }: { d: GeminiDraft; changes: DraftCh
     internal = false,
   ) =>
     items && items.length > 0 ? (
-      <>
+      <div className={`gm-field${pendingCls(key)}`}>
         <h4>
           {t(title)}
           {internal && internalTag}
+          {mark(key)}
         </h4>
         <ul>
           {items.map((item, i) => {
@@ -1543,7 +1615,7 @@ function WorkspaceDoc({ d, changes, origin }: { d: GeminiDraft; changes: DraftCh
             );
           })}
         </ul>
-      </>
+      </div>
     ) : null;
   const sourceNote =
     origin?.path === "upload" && origin.detail
@@ -1559,26 +1631,41 @@ function WorkspaceDoc({ d, changes, origin }: { d: GeminiDraft; changes: DraftCh
           <span>{t("Updated draft — %s change(s) highlighted").replace("%s", String(changes.count))}</span>
         </div>
       )}
+      {pendingFields.length > 0 && (
+        <div className="gm-ws-note gm-pending-note">
+          <Icon name="help" />
+          <span>{t("%s AI-suggested field(s) to confirm — highlighted below").replace("%s", String(pendingFields.length))}</span>
+          <button type="button" className="req-link" disabled={provenance?.busy} onClick={() => provenance?.onConfirm(pendingFields)}>
+            {t("Confirm all")}
+          </button>
+        </div>
+      )}
       <div className="eyebrow" style={{ marginBottom: 6 }}>{t("Drafted job")}</div>
-      <h3 className={`gm-ws-doc-title${changed("title") ? " gm-changed" : ""}`} title={was("title")}>
+      <h3 className={`gm-ws-doc-title${changed("title") ? " gm-changed" : ""}${pendingCls("title")}`} title={was("title")}>
         {d.title}
         {changed("title") && tag("Updated")}
+        {mark("title")}
       </h3>
-      <div className="tiny" title={was("department")}>
+      <div className={`tiny${pendingCls("department")}`} title={was("department")}>
         {d.department}
         {changed("department") && tag("Updated")}
+        {d.department && mark("department")}
       </div>
       <div className="gm-draft-meta">
         {origin && <span className="badge badge-info">{t(ORIGIN_LABELS[origin.path])}</span>}
         {meta("location", d.location)}
+        {d.location && mark("location")}
         {meta("employmentType", d.employmentType ? t(d.employmentType) : undefined)}
+        {d.employmentType && mark("employmentType")}
         {meta("headcount", d.headcount ? t("%s openings").replace("%s", String(d.headcount)) : undefined)}
+        {d.headcount ? mark("headcount") : null}
       </div>
       {sourceNote && <div className="tiny gm-ws-source">{sourceNote}</div>}
       {d.summary && (
-        <p className={changed("summary") ? "gm-changed" : undefined} title={was("summary")}>
+        <p className={`${changed("summary") ? "gm-changed" : ""}${pendingCls("summary")}`} title={was("summary")}>
           {d.summary}
           {changed("summary") && tag("Updated")}
+          {mark("summary")}
         </p>
       )}
       {d.businessProblem && (
@@ -1586,6 +1673,7 @@ function WorkspaceDoc({ d, changes, origin }: { d: GeminiDraft; changes: DraftCh
           <h4>
             {t("Business problem")}
             {internalTag}
+            {mark("businessProblem")}
           </h4>
           <p className={changed("businessProblem") ? "gm-changed" : undefined} title={was("businessProblem")}>
             {d.businessProblem}
@@ -1596,7 +1684,10 @@ function WorkspaceDoc({ d, changes, origin }: { d: GeminiDraft; changes: DraftCh
       {list("Responsibilities", d.responsibilities, "responsibilities")}
       {list("Requirements", d.must, "must")}
       {list("Nice-to-have", d.pref, "pref")}
-      <h4>{t("Compensation")}</h4>
+      <h4>
+        {t("Compensation")}
+        {d.compensation && mark("compensation")}
+      </h4>
       <p className={changed("compensation") ? "gm-changed" : undefined} title={was("compensation")}>
         {money(d.compensation)}
         {changed("compensation") && tag("Updated")}

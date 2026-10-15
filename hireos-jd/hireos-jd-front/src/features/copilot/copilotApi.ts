@@ -1,4 +1,5 @@
 import type { MoneyRange } from "../../lib/format";
+import type { FieldMetaMap } from "../../store/types";
 /**
  * Thin client for the real `hireos-jd-backend` Copilot endpoints
  * (`/api/copilot/conversations/...`). Used by GeminiPanel's "create a job"
@@ -76,6 +77,8 @@ export interface CopilotConversationDto {
   phase: "intake" | "drafting" | "ready_to_confirm" | "completed";
   fields: CopilotJdFields;
   missingFields: string[];
+  /** Per-field source / revision / confirmation status (#68). */
+  fieldMeta?: FieldMetaMap;
   stateRevision: number;
   createdAt: string;
   updatedAt: string;
@@ -304,6 +307,15 @@ export function refineCopilotVariants(
 }
 
 /** Saves user-authored (manual form) or user-picked (title variant) fields as-is; the conversation becomes ready to confirm. */
+/** Confirm AI-suggested draft fields as they are (#68); confirming `title` also lifts the title check (#66). */
+export function confirmCopilotFields(conversationId: string, fields: string[]): Promise<CopilotConversationDto> {
+  return request(`${BASE}/${conversationId}/fields/confirm`, {
+    method: "POST",
+    body: JSON.stringify({ fields }),
+    idempotencyKey: idempotencyKey("copilot-confirm-fields"),
+  });
+}
+
 export function setCopilotFields(conversationId: string, fields: CopilotJdFields, label: string): Promise<CopilotConversationDto> {
   return request(`${BASE}/${conversationId}/fields`, {
     method: "POST",

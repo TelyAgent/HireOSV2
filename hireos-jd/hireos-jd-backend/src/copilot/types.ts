@@ -169,3 +169,7 @@ export function computeMissingAuthoredFields(fields: JdFields): string[] {
   if (!fields.mustHave || fields.mustHave.length < 1) missing.push('mustHave');
   return missing;
 }
+
+export const confirmFieldsInputSchema = z
+  .object({ fields: z.array(z.enum(Object.keys(jdFieldsSchema.shape) as [string, ...string[]])).min(1).max(30) })
+  .strict();
