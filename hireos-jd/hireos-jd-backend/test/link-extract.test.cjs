@@ -215,9 +215,8 @@ test('#64 review: the browser does not inherit the service environment', () => {
 test('#64 review AC-3: what the render finds out (a human check) is reported, not hidden behind the loading text', needsBrowser, async () => {
   const { network } = fixtureNetwork();
   await rejectsWith(extractTextFromLink('https://jobs.example.test/loading', { network, renderer }), /人机验证/);
-  // With no render possible, the same loading text is not a posting either — but there is nothing more to know.
-  const text = await extractTextFromLink('https://jobs.example.test/loading', { network, renderer: null });
-  assert.match(text, /Please wait/);
+  // With no render possible, the shell's loading text is not taken for a posting either.
+  await rejectsWith(extractTextFromLink('https://jobs.example.test/loading', { network, renderer: null }), /网页脚本加载.*粘贴/);
 });
 
 test('#64 review AC-3: a page whose render is empty is no content, even if it said "loading" before', needsBrowser, async () => {
@@ -258,5 +257,26 @@ test('#64 review: the remote renderer (jd-renderer) reads the posting, with inte
     assert.deepEqual(requested.filter((r) => r.url.includes('intranet.example.test')), []);
   } finally {
     await server.stop();
+  }
+});
+
+test('#64 review: every connection goes to the address that was checked; a name that turns internal is refused', async () => {
+  const { publicLookup, defaultNetwork } = require('../dist/copilot/link-extract');
+  const call = (resolve, host, all) => new Promise((done) => publicLookup(resolve)(host, { all }, (error, address) => done({ error, address })));
+  const pub = async () => [{ address: '93.184.216.34', family: 4 }];
+  const internal = async () => [{ address: '10.0.0.8', family: 4 }];
+  assert.equal((await call(pub, 'jobs.example.test', false)).address, '93.184.216.34');
+  assert.deepEqual((await call(pub, 'jobs.example.test', true)).address, [{ address: '93.184.216.34', family: 4 }]);
+  assert.match((await call(internal, 'jobs.example.test', false)).error.message, /internal address/);
+
+  // The real network: a request whose name resolves to loopback is refused at connect time, check or no check.
+  const http = require('node:http');
+  const server = http.createServer((_req, res) => res.end('SECRET')).listen(0, '127.0.0.1');
+  await new Promise((resolve) => server.once('listening', resolve));
+  try {
+    await assert.rejects(defaultNetwork.fetch(`http://localhost:${server.address().port}/`), (e) => /internal address/.test(String(e.cause?.message ?? e.message)));
+    await rejectsWith(extractTextFromLink(`http://localhost:${server.address().port}/`, { renderer: null }), /内网地址/);
+  } finally {
+    server.close();
   }
 });

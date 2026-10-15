@@ -1,6 +1,8 @@
 import { BadRequestException, Logger } from '@nestjs/common';
+import type { LookupAddress } from 'node:dns';
 import { lookup } from 'node:dns/promises';
 import { BlockList, isIP } from 'node:net';
+import { Agent, fetch as pinnedFetch } from 'undici';
 import { renderPage, type Renderer } from './link-render';
 
 const MAX_EXTRACTED_CHARS = 12_000;
@@ -21,6 +23,45 @@ for (const [net, prefix] of [
 ] as const) PRIVATE_RANGES.addSubnet(net, prefix, 'ipv4');
 for (const [net, prefix] of [['::', 128], ['::1', 128], ['fc00::', 7], ['fe80::', 10], ['ff00::', 8]] as const) {
   PRIVATE_RANGES.addSubnet(net, prefix, 'ipv6');
+}
+
+function isPrivateAddress(address: string, family: number): boolean {
+  const mapped = family === 6 && address.toLowerCase().startsWith('::ffff:') ? address.slice(7) : null;
+  return mapped && isIP(mapped) === 4 ? PRIVATE_RANGES.check(mapped, 'ipv4') : PRIVATE_RANGES.check(address, family === 6 ? 'ipv6' : 'ipv4');
+}
+
+type LookupCallback = (error: NodeJS.ErrnoException | null, address: string | LookupAddress[], family?: number) => void;
+
+/**
+ * The DNS lookup every connection of `defaultNetwork` makes: it resolves and checks in one step, so the socket
+ * connects to exactly the address that was checked. A separate check before fetch would leave a window for a
+ * name to resolve to a public address for the check and to an internal one for the connection (#64 review, #137).
+ */
+export function publicLookup(resolve: (host: string) => Promise<LookupAddress[]> = (host) => lookup(host, { all: true })) {
+  return (hostname: string, options: { all?: boolean }, callback: LookupCallback) => {
+    resolve(hostname).then(
+      (addresses) => {
+        if (!addresses.length) return callback(Object.assign(new Error(`no address for ${hostname}`), { code: 'ENOTFOUND' }), []);
+        if (addresses.some((a) => isPrivateAddress(a.address, a.family))) {
+          return callback(Object.assign(new Error(`${hostname} resolves to an internal address`), { code: PRIVATE_CODE }), []);
+        }
+        if (options.all) callback(null, addresses);
+        else callback(null, addresses[0].address, addresses[0].family);
+      },
+      (error: NodeJS.ErrnoException) => callback(error, []),
+    );
+  };
+}
+
+const PRIVATE_CODE = 'EHIREOS_PRIVATE_ADDRESS';
+const pinnedAgent = new Agent({ connect: { lookup: publicLookup() } });
+
+/** Errors (or their causes) from a connection `publicLookup` refused. */
+function isPrivateRefusal(error: unknown): boolean {
+  for (let e = error as { code?: unknown; cause?: unknown } | undefined; e; e = e.cause as typeof e) {
+    if (e.code === PRIVATE_CODE) return true;
+  }
+  return false;
 }
 
 const logger = new Logger('LinkExtract');
@@ -53,9 +94,11 @@ function configuredRenderer(): Renderer | null {
   return executablePath ? { kind: 'local', executablePath } : null;
 }
 
-const defaultNetwork: LinkNetwork = {
+/** Real network: each connection goes to the address `publicLookup` checked (an IP literal is checked up front). */
+export const defaultNetwork: LinkNetwork = {
   lookup: (host) => lookup(host, { all: true }),
-  fetch: (input, init) => fetch(input, init),
+  fetch: ((input: string | URL, init?: RequestInit) =>
+    pinnedFetch(input, { ...(init as object), dispatcher: pinnedAgent })) as unknown as typeof fetch,
 };
 
 function linkError(message: string): BadRequestException {
@@ -67,13 +110,8 @@ async function assertPublicUrl(url: URL, network: LinkNetwork): Promise<void> {
   const host = url.hostname.replace(/^\[|\]$/g, '');
   const addresses = isIP(host) ? [{ address: host, family: isIP(host) }] : await network.lookup(host).catch(() => []);
   if (addresses.length === 0) throw linkError('无法解析这个链接的域名。');
-  for (const { address, family } of addresses) {
-    const mapped = family === 6 && address.toLowerCase().startsWith('::ffff:') ? address.slice(7) : null;
-    const blocked = mapped && isIP(mapped) === 4
-      ? PRIVATE_RANGES.check(mapped, 'ipv4')
-      : PRIVATE_RANGES.check(address, family === 6 ? 'ipv6' : 'ipv4');
-    if (blocked) throw linkError(PRIVATE_MESSAGE);
-  }
+  // An early, readable refusal; the connection itself is pinned to a checked address by `publicLookup`.
+  if (addresses.some(({ address, family }) => isPrivateAddress(address, family))) throw linkError(PRIVATE_MESSAGE);
 }
 
 /**
@@ -90,8 +128,8 @@ export async function extractTextFromLink(rawUrl: string, options: LinkExtractOp
       redirect: 'manual',
       signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
       headers: { 'user-agent': 'Mozilla/5.0 (compatible; HireOS-JD/1.0)', accept: 'text/html,text/plain;q=0.9,*/*;q=0.5' },
-    }).catch(() => {
-      throw linkError('打开这个链接失败，请检查链接是否可以公开访问。');
+    }).catch((error: unknown) => {
+      throw linkError(isPrivateRefusal(error) ? PRIVATE_MESSAGE : '打开这个链接失败，请检查链接是否可以公开访问。');
     });
     const location = response.headers.get('location');
     if (response.status >= 300 && response.status < 400 && location) {
@@ -111,7 +149,7 @@ export async function extractTextFromLink(rawUrl: string, options: LinkExtractOp
   // Job boards publish schema.org JobPosting for search engines; it is cleaner than the page chrome around it.
   let text = ((isHtml && jobPostingText(body)) || (isHtml ? htmlToText(body) : body)).trim();
   if (looksLikeBotChallenge(text)) throw linkError(BLOCKED_MESSAGE);
-  if (isHtml && text.length < MIN_STATIC_CHARS) text = await preferRendered(text, url, network, options);
+  if (isHtml && text.length < MIN_STATIC_CHARS) text = await preferRendered(text, looksLikeScriptShell(body), url, network, options);
   if (text.length < MIN_CONTENT_CHARS) throw linkError(NO_CONTENT_MESSAGE);
   return text.length > MAX_EXTRACTED_CHARS ? text.slice(0, MAX_EXTRACTED_CHARS) : text;
 }
@@ -125,27 +163,31 @@ class RenderUnavailable extends Error {}
  * load the job" is not a posting, and an empty render is reported as no content (AC-3). The static text is
  * used only when no render could be done at all (#64 review).
  */
-async function preferRendered(staticText: string, url: URL, network: LinkNetwork, options: LinkExtractOptions): Promise<string> {
+async function preferRendered(staticText: string, scriptShell: boolean, url: URL, network: LinkNetwork, options: LinkExtractOptions): Promise<string> {
   try {
     return await renderedText(url, network, options);
   } catch (error) {
     if (!(error instanceof RenderUnavailable)) throw error;
-    if (staticText.length >= MIN_CONTENT_CHARS) return staticText;
+    // A shell's own text ("please wait while we load the job") is not the posting.
+    if (!scriptShell && staticText.length >= MIN_CONTENT_CHARS) return staticText;
     throw linkError(SCRIPT_PAGE_MESSAGE);
   }
+}
+
+/** The HTML is an app shell whose content arrives by script: an empty mount point, or a "please enable JavaScript". */
+function looksLikeScriptShell(html: string): boolean {
+  return (
+    /<(div|main|section)\b[^>]*\bid=["'](app|root|__next|__nuxt|main-app)["'][^>]*>\s*<\/\1>/i.test(html) ||
+    /<noscript\b[^>]*>[\s\S]*?(enable|turn on|启用|开启|打开)[\s\S]{0,20}javascript/i.test(html)
+  );
 }
 
 async function renderedText(url: URL, network: LinkNetwork, options: LinkExtractOptions): Promise<string> {
   const renderer = options.renderer === undefined ? configuredRenderer() : options.renderer;
   if (!renderer) throw new RenderUnavailable('no renderer configured');
-  // One page load makes dozens of requests to a handful of hosts; resolve each host once.
-  const checked = new Map<string, Promise<void>>();
+  // Checked per request, not cached per host: a name may resolve differently from one request to the next.
   const result = await renderPage(url, renderer, {
-    assertPublic: (target) => {
-      const key = `${target.protocol}//${target.hostname}`;
-      if (!checked.has(key)) checked.set(key, assertPublicUrl(target, network));
-      return checked.get(key)!;
-    },
+    assertPublic: (target) => assertPublicUrl(target, network),
     fetch: network.fetch,
   }).catch((error: unknown) => {
     if (error instanceof BadRequestException) throw error;
