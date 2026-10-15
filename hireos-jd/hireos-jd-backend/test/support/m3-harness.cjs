@@ -24,6 +24,12 @@ function memoryDb() {
         conv.stateRevision += 1;
         return conv;
       },
+      updateMany: async ({ where, data }) => {
+        if (where.stateRevision !== undefined && where.stateRevision !== conv.stateRevision) return { count: 0 };
+        for (const [k, v] of Object.entries(data)) if (k !== 'stateRevision') conv[k] = v;
+        conv.stateRevision += 1;
+        return { count: 1 };
+      },
     },
     copilotMessage: {
       findFirst: async () => messages[messages.length - 1] ?? null,

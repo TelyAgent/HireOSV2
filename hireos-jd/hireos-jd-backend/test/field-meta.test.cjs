@@ -18,7 +18,8 @@ function memoryDb() {
   const db = {
     conv,
     copilotConversation: {
-      findFirst: async () => conv,
+      // A snapshot, like a real query: later writes don't change a row already read.
+      findFirst: async () => ({ ...conv }),
       update: async ({ data }) => {
         for (const [k, v] of Object.entries(data)) if (k !== 'stateRevision') conv[k] = v;
         conv.stateRevision += 1;
@@ -153,4 +154,32 @@ test('#68 review: a change that lands between the check and the write makes the 
   };
   await assert.rejects(svc.confirmFields(identity, 'c1', { fields: ['title'], revisions: { title: 1 } }), (e) => e.response?.code === 'DRAFT_CHANGED');
   assert.equal(db.conv.fieldMeta.title.status, 'pending');
+});
+
+test('#68 review: two overlapping refines can\'t both write the next revision; the later one is refused', async () => {
+  const { svc, db } = service({ titleFromUser: false });
+  await svc.quickStart(identity, 'c1', { answers: ANSWERS }, meta());
+  const refineTo = (mustHave) => async () => JSON.stringify({ reply: '已修改', phase: 'ready_to_confirm', missingFields: [], fields: { ...DRAFT, mustHave } });
+
+  // Both refines read the draft at the same state; the first commits while the second waits for the model.
+  let releaseSecond;
+  const secondModel = new Promise((resolve) => (releaseSecond = resolve));
+  svc.llm.completeJson = async (_system, turns) => {
+    const input = turns.map((t) => t.content).join('\n');
+    if (input.includes('加 Python')) {
+      await secondModel;
+      return refineTo(['SQL', 'Python'])();
+    }
+    return refineTo(['SQL', 'Excel'])();
+  };
+  const second = svc.refineDraft(identity, 'c1', { note: '加 Python' }, meta());
+  const firstResult = await svc.refineDraft(identity, 'c1', { note: '加 Excel' }, meta());
+  releaseSecond();
+
+  await assert.rejects(second, (e) => e.response?.code === 'DRAFT_CHANGED');
+  assert.deepEqual(firstResult.fieldMeta.mustHave, { source: 'ai', revision: 2, status: 'pending' });
+  assert.deepEqual(db.conv.fields.mustHave, ['SQL', 'Excel'], 'the refused refine wrote nothing');
+  // A page that saw "SQL, Excel" at v2 confirms exactly that.
+  const confirmed = await svc.confirmFields(identity, 'c1', { fields: ['mustHave'], revisions: { mustHave: 2 } });
+  assert.equal(confirmed.fieldMeta.mustHave.status, 'confirmed');
 });

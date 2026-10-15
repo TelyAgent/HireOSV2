@@ -213,15 +213,13 @@ export class CopilotService {
         // — using the sequence captured back in prepareTurn (before the slow LLM call) would let two
         // concurrent turns compute the same number and collide on the (conversationId, sequence)
         // constraint, which is exactly what an earlier version of this code did.
-        const updated = await tx.copilotConversation.update({
-          where: { id },
-          data: {
-            fields: json(mergedFields),
-            missingFields: json(missingFields),
-            fieldMeta: json(fieldMeta),
-            phase,
-            stateRevision: { increment: 1 },
-          },
+        // Conditional on the state the turn's field meta was computed from: a turn that committed in between
+        // makes this one fail rather than write revisions computed from a stale snapshot (#68 review).
+        const updated = await updateIfUnchanged(tx, id, conversation.stateRevision, {
+          fields: json(mergedFields),
+          missingFields: json(missingFields),
+          fieldMeta: json(fieldMeta),
+          phase,
         });
         const latest = await tx.copilotMessage.findFirst({ where: { conversationId: id }, orderBy: { sequence: 'desc' } });
         const userSequence = (latest?.sequence ?? 0) + 1;
@@ -512,18 +510,16 @@ export class CopilotService {
     return this.db.$transaction(async (tx) => {
       const prior = await findIdempotent(tx, identity, operation, meta, input);
       if (prior.prior) return prior.prior.responseBody;
+      // Conditional on the draft the refine started from: two overlapping refines can't both write the next
+      // revision of a field, so a stale page can't confirm content it never saw (#68 review).
       const updated = changed
-        ? await tx.copilotConversation.update({
-            where: { id },
+        ? await updateIfUnchanged(tx, id, conversation.stateRevision, {
+            fields: json(fields),
             // A refine keeps an unconfirmed AI title unconfirmed; only the user confirming it clears that.
-            data: {
-              fields: json(fields),
-              missingFields: json(pendingConfirmations(conversation)),
-              // What the refine rewrote is AI's again: pending, at the next revision (#68 review).
-              fieldMeta: json(recordChanges(asFieldMeta(conversation.fieldMeta), current, fields, () => 'ai')),
-              phase: 'ready_to_confirm',
-              stateRevision: { increment: 1 },
-            },
+            missingFields: json(pendingConfirmations(conversation)),
+            // What the refine rewrote is AI's again: pending, at the next revision (#68 review).
+            fieldMeta: json(recordChanges(asFieldMeta(conversation.fieldMeta), current, fields, () => 'ai')),
+            phase: 'ready_to_confirm',
           })
         : conversation;
       const latest = await tx.copilotMessage.findFirst({ where: { conversationId: id }, orderBy: { sequence: 'desc' } });
@@ -677,12 +673,11 @@ export class CopilotService {
       ? (Array.isArray(conversation.missingFields) ? conversation.missingFields : []).filter((f) => f !== TITLE_UNCONFIRMED)
       : conversation.missingFields;
     // Conditional on the state just checked: a turn landing in between makes this match nothing.
-    const { count } = await this.db.copilotConversation.updateMany({
-      where: { id, stateRevision: conversation.stateRevision },
-      data: { fieldMeta: json(fieldMeta), missingFields: json(missingFields), stateRevision: { increment: 1 } },
-    });
-    if (count !== 1) throw draftChanged(input.fields);
-    const updated = await this.loadConversation(identity, id);
+    const updated = await updateIfUnchanged(this.db, id, conversation.stateRevision, { fieldMeta: json(fieldMeta), missingFields: json(missingFields) }).catch(
+      (error: unknown) => {
+        throw error instanceof ConflictException ? draftChanged(input.fields) : error;
+      },
+    );
     const messages = await this.db.copilotMessage.findMany({ where: { conversationId: id }, orderBy: { sequence: 'asc' } });
     return serializeConversation(updated, messages);
   }
@@ -1015,6 +1010,21 @@ function isUniqueConstraintError(error: unknown): boolean {
 /** Confirmations still owed on the conversation's draft (see `TITLE_UNCONFIRMED`). */
 function pendingConfirmations(conversation: { missingFields: unknown }): string[] {
   return Array.isArray(conversation.missingFields) ? conversation.missingFields.filter((f): f is string => f === TITLE_UNCONFIRMED) : [];
+}
+
+/**
+ * Writes the conversation only if it is still at `stateRevision` (and moves it on); otherwise another turn
+ * committed since this one read it, and this write is refused instead of overwriting it.
+ */
+async function updateIfUnchanged(
+  db: Pick<Prisma.TransactionClient, 'copilotConversation'>,
+  id: string,
+  stateRevision: number,
+  data: Prisma.CopilotConversationUpdateManyMutationInput,
+) {
+  const { count } = await db.copilotConversation.updateMany({ where: { id, stateRevision }, data: { ...data, stateRevision: { increment: 1 } } });
+  if (count !== 1) throw new ConflictException({ code: 'DRAFT_CHANGED', message: '草稿刚被另一处修改，请查看最新内容后再试。' });
+  return (await db.copilotConversation.findFirst({ where: { id } }))!;
 }
 
 function draftChanged(fields: string[]) {
