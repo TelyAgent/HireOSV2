@@ -187,7 +187,7 @@ export function useDocActions(jobId: string) {
         });
         const kind = item.list ? "ul" : "p";
         const level = item.level ?? "internal";
-        const fresh = res.items.map((text) => ({ ...mkBlock(uid("nb"), kind, kind === "ul" ? [text] : text, { level }), aiDraft: true }));
+        const fresh = res.items.map((text) => ({ ...mkBlock(uid("nb"), kind, kind === "ul" ? [text] : text, { level }), aiDraft: !preview }));
         const apply = () =>
           applyAi(
             item.label,
@@ -238,7 +238,7 @@ export function useDocActions(jobId: string) {
         const ids = new Set(current.map((b) => b.id));
         const level = blockLevel(current[0]);
         const kind = item.list ? "ul" : "p";
-        const fresh = res.items.map((text) => ({ ...mkBlock(uid("nb"), kind, kind === "ul" ? [text] : text, { level }), aiDraft: true }));
+        const fresh = res.items.map((text) => ({ ...mkBlock(uid("nb"), kind, kind === "ul" ? [text] : text, { level }), aiDraft: !preview }));
         const apply = () =>
           applyAi(
             item.label,
@@ -892,7 +892,32 @@ function applySuggestionToBlock(block: DocBlock, s: Suggestion): boolean {
    Modals used by the actions above
    --------------------------------------------------------------- */
 /** Items in `a` that aren't in `b` (order kept). */
-const missingFrom = (a: string[], b: string[]) => a.filter((x) => !b.includes(x));
+/**
+ * Line diff in the order the result will have (#94 review): an LCS walk over before / after, so a removed
+ * line shows where it was and every added or unchanged line sits where it will be written.
+ */
+export function lineDiff(before: string[], after: string[]): { kind: "same" | "removed" | "added"; text: string }[] {
+  const n = before.length;
+  const m = after.length;
+  const lcs = Array.from({ length: n + 1 }, () => new Array<number>(m + 1).fill(0));
+  for (let i = n - 1; i >= 0; i--) {
+    for (let j = m - 1; j >= 0; j--) lcs[i][j] = before[i] === after[j] ? lcs[i + 1][j + 1] + 1 : Math.max(lcs[i + 1][j], lcs[i][j + 1]);
+  }
+  const out: { kind: "same" | "removed" | "added"; text: string }[] = [];
+  let i = 0;
+  let j = 0;
+  while (i < n && j < m) {
+    if (before[i] === after[j]) {
+      out.push({ kind: "same", text: after[j] });
+      i++;
+      j++;
+    } else if (lcs[i + 1][j] >= lcs[i][j + 1]) out.push({ kind: "removed", text: before[i++] });
+    else out.push({ kind: "added", text: after[j++] });
+  }
+  while (i < n) out.push({ kind: "removed", text: before[i++] });
+  while (j < m) out.push({ kind: "added", text: after[j++] });
+  return out;
+}
 
 /**
  * Before / after of one AI change (#94): removed lines, added lines and unchanged ones, plus anything the AI
@@ -912,30 +937,16 @@ export function AiChangePreview({
   onKeep: () => void;
 }) {
   const { t, closeModal } = useStore();
-  const removed = missingFrom(before, after);
-  const added = missingFrom(after, before);
-  const same = after.filter((x) => before.includes(x));
+  const lines = lineDiff(before, after);
   return (
     <>
       <ModalHeader title={`${t("Review AI change")} · ${t(label)}`} />
       <ModalBody>
         <div className="ai-diff">
-          {removed.map((x, i) => (
-            <div key={`r${i}`} className="ai-diff-line is-removed">
-              <span className="ai-diff-sign">−</span>
-              {x}
-            </div>
-          ))}
-          {added.map((x, i) => (
-            <div key={`a${i}`} className="ai-diff-line is-added">
-              <span className="ai-diff-sign">+</span>
-              {x}
-            </div>
-          ))}
-          {same.map((x, i) => (
-            <div key={`s${i}`} className="ai-diff-line">
-              <span className="ai-diff-sign"> </span>
-              {x}
+          {lines.map((line, i) => (
+            <div key={i} className={`ai-diff-line${line.kind === "same" ? "" : ` is-${line.kind}`}`}>
+              <span className="ai-diff-sign">{line.kind === "removed" ? "−" : line.kind === "added" ? "+" : " "}</span>
+              {line.text}
             </div>
           ))}
         </div>

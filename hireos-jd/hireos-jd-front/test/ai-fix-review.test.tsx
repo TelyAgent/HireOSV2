@@ -30,7 +30,7 @@ function Doc() {
   const blocks = selectDraft(state, 'j1').blocks;
   return (
     <>
-      <ul data-testid="doc">{blocks.filter((b) => b.kind === 'ul').map((b) => <li key={b.id}>{blockPlainText(b)}</li>)}</ul>
+      <ul data-testid="doc">{blocks.filter((b) => b.kind === 'ul').map((b) => <li key={b.id} data-ai-draft={b.aiDraft ? 'yes' : 'no'}>{blockPlainText(b)}</li>)}</ul>
       <div data-testid="paras">{blocks.filter((b) => b.kind === 'p').map((b) => <p key={b.id}>{blockPlainText(b)}</p>)}</div>
     </>
   );
@@ -42,6 +42,7 @@ function Controls() {
     <>
       <button onClick={() => actions.undoAi()}>undo-ai</button>
       <button onClick={() => void save({ quiet: true })}>save-doc</button>
+      <button onClick={() => actions.reanalyze()}>analyze-now</button>
     </>
   );
 }
@@ -176,6 +177,49 @@ describe('single AI fix — paragraph, save round-trip, re-analysis (#94 review)
   });
 });
 
+describe('#94 review', () => {
+  it('the preview lists lines in the order they will be written, and Keep confirms them (no second keep)', async () => {
+    api.aiSection.mockResolvedValue({ items: ['Review product data weekly and share findings', 'Build dashboards', 'Answer data questions'], explain: '', toConfirm: [] });
+    renderPanel();
+    fireEvent.click(await aiFixFor('Core responsibilities'));
+    await screen.findByText(/Review AI change/);
+    const shown = [...document.querySelectorAll('.ai-diff-line')].map((el) => el.textContent?.slice(1).trim());
+    expect(shown).toEqual(['Review product data weekly and share findings', 'Build dashboards', 'Answer data questions']);
+    fireEvent.click(screen.getByRole('button', { name: 'Keep' }));
+    await waitFor(() => expect(bullets()).toContain('Build dashboards'));
+    // Kept in the review = confirmed: no block is left marked as an AI draft to keep a second time.
+    expect(screen.getByTestId('doc').querySelectorAll('[data-ai-draft="yes"]')).toHaveLength(0);
+  });
+
+  it('a re-analysis asked for while an analysis is running runs after it, on the kept text', async () => {
+    let finishFirst!: () => void;
+    api.aiAnalyze.mockImplementationOnce(() => new Promise((resolve) => (finishFirst = () => resolve({ verdict: 'needs_work', summary: 'old', items: [] }))) as never);
+    api.aiSection.mockResolvedValue({ items: ['A clearer summary of the role.'], explain: '', toConfirm: [] });
+    renderPanel(true);
+    fireEvent.click(await screen.findByText('analyze-now'));
+    await waitFor(() => expect(api.aiAnalyze).toHaveBeenCalledTimes(1));
+    fireEvent.click(await aiFixFor('Role summary'));
+    fireEvent.click(await screen.findByRole('button', { name: 'Keep' }));
+    await new Promise((r) => setTimeout(r, 30));
+    expect(api.aiAnalyze).toHaveBeenCalledTimes(1); // still busy: waits
+    finishFirst();
+    await waitFor(() => expect(api.aiAnalyze).toHaveBeenCalledTimes(2));
+    expect(api.aiAnalyze.mock.calls[1][2].blocks.map((b) => b.text)).toContain('A clearer summary of the role.');
+  });
+});
+
+describe('lineDiff', () => {
+  it('keeps the result order with removed lines where they were', async () => {
+    const { lineDiff } = await import('../src/features/workspace/docActions');
+    expect(lineDiff(['A', 'X', 'C'], ['A', 'B', 'C'])).toEqual([
+      { kind: 'same', text: 'A' },
+      { kind: 'removed', text: 'X' },
+      { kind: 'added', text: 'B' },
+      { kind: 'same', text: 'C' },
+    ]);
+  });
+});
+
 describe('batch AI fix (#95)', () => {
   it('AC-2: the batch says what it handles, and lists what a person must fill with a way to get there', async () => {
     renderPanel();
@@ -201,6 +245,8 @@ describe('batch AI fix (#95)', () => {
       await new Promise((r) => setTimeout(r, 20));
     }
     await waitFor(() => expect(screen.queryByText('Working…')).toBeNull());
+    // The batch writes without a review, so its blocks stay marked as AI drafts to check one by one.
+    expect(screen.getByTestId('doc').querySelectorAll('[data-ai-draft="yes"]').length).toBeGreaterThan(0);
     const all = bullets();
     expect(new Set(all).size).toBe(all.length);
   });
