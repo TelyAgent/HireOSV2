@@ -24,11 +24,13 @@ export type RenderNetwork = {
   fetch: typeof fetch;
 };
 
-export type RenderResult = { html: string } | { blocked: 'private_address' };
+/** The rendered page, or why it can't be read: an internal address, or an HTTP error status of the page itself. */
+export type RenderResult = { html: string } | { blocked: 'private_address' } | { status: number };
 
-const RENDER_TIMEOUT_MS = 20_000;
-/** Upper bound on a whole render, launch to teardown, whatever the page does. */
-const HARD_STOP_MS = RENDER_TIMEOUT_MS + 5_000;
+/** How long a page gets to show its posting. */
+export const RENDER_TIMEOUT_MS = 20_000;
+/** On top of the render time: the most launch and teardown may add, whatever the page does. */
+const HARD_STOP_GRACE_MS = 5_000;
 const MAX_RENDER_REQUESTS = 200;
 const MAX_RESPONSE_BYTES = 10 * 1024 * 1024;
 export const MAX_TOTAL_BYTES = 24 * 1024 * 1024;
@@ -76,7 +78,8 @@ async function openBrowser(renderer: Renderer): Promise<Browser> {
   });
 }
 
-export async function renderPage(url: URL, renderer: Renderer, network: RenderNetwork, hardStopMs = HARD_STOP_MS): Promise<RenderResult> {
+export async function renderPage(url: URL, renderer: Renderer, network: RenderNetwork, timeoutMs = RENDER_TIMEOUT_MS): Promise<RenderResult> {
+  const hardStopMs = timeoutMs + HARD_STOP_GRACE_MS;
   return withRenderSlot(async () => {
     const browser = await openBrowser(renderer);
     // A page can hang its renderer (e.g. a busy loop), and then calls like page.content() never return. The hard
@@ -90,7 +93,7 @@ export async function renderPage(url: URL, renderer: Renderer, network: RenderNe
       }, hardStopMs);
     });
     try {
-      return await Promise.race([render(browser, url, network), stopped]);
+      return await Promise.race([render(browser, url, network, timeoutMs), stopped]);
     } finally {
       clearTimeout(hardStop);
       await browser.close().catch(() => undefined);
@@ -98,8 +101,8 @@ export async function renderPage(url: URL, renderer: Renderer, network: RenderNe
   });
 }
 
-async function render(browser: Browser, url: URL, network: RenderNetwork): Promise<RenderResult> {
-  const deadline = Date.now() + RENDER_TIMEOUT_MS;
+async function render(browser: Browser, url: URL, network: RenderNetwork, timeoutMs: number): Promise<RenderResult> {
+  const deadline = Date.now() + timeoutMs;
   const remaining = () => Math.max(1, deadline - Date.now());
   const context = await browser.newContext({ serviceWorkers: 'block', locale: 'zh-CN', acceptDownloads: false });
   const state = { requests: 0, bytes: 0, documentBlocked: false };
@@ -110,20 +113,23 @@ async function render(browser: Browser, url: URL, network: RenderNetwork): Promi
   });
   await context.route('**/*', (route) => handleRoute(route, network, state, remaining));
   mainPage = await context.newPage();
+  const page = mainPage;
+  // The status of the document the page ends up on: a script may navigate to a login or error page (#64 review).
+  let documentStatus = 0;
+  page.on('response', (response) => {
+    if (response.request().isNavigationRequest() && response.frame() === page.mainFrame()) documentStatus = response.status();
+  });
   try {
-    const response = await mainPage.goto(url.href, { waitUntil: 'domcontentloaded', timeout: remaining() }).catch(() => null);
+    const response = await page.goto(url.href, { waitUntil: 'domcontentloaded', timeout: remaining() }).catch(() => null);
     if (state.documentBlocked) return { blocked: 'private_address' };
     if (!response) return { html: '' };
-    // Content arrives from XHRs after the shell loads. Analytics keep many pages from ever going network-idle,
-    // so also stop once the text is long enough and has stopped changing, and always at the deadline.
-    const page = mainPage;
-    await Promise.race([
-      page.waitForLoadState('networkidle', { timeout: remaining() }).catch(() => undefined),
-      // The loser keeps polling until the page closes; its rejection then must not go unhandled.
-      waitForStableText(page, deadline).catch(() => undefined),
-    ]);
+    // The posting arrives from scripts, possibly after a pause with the network idle (a timer, a lazy request),
+    // so idle network is no sign it has loaded. Stop once the text is long enough and has stopped changing,
+    // else at the deadline (#64 review).
+    await waitForStableText(page, deadline).catch(() => undefined);
     if (state.documentBlocked) return { blocked: 'private_address' };
-    return { html: await mainPage.content() };
+    if (documentStatus >= 400) return { status: documentStatus };
+    return { html: await page.content() };
   } finally {
     await context.close().catch(() => undefined);
   }

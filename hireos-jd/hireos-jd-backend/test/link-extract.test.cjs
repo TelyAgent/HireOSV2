@@ -72,6 +72,17 @@ function fixtureNetwork() {
           return new Response('document.body.innerHTML = "<h1>Verify you are human</h1>";', { status: 200, headers: { 'content-type': 'application/javascript' } });
         case 'jobs.example.test/loading-empty':
           return html('<html><body><p>Welcome to Example Careers. Please wait while we load the job.</p><script>document.body.innerHTML = "";</script></body></html>');
+        case 'jobs.example.test/delayed':
+          // The network goes idle first; the posting is requested a moment later.
+          return html(SHELL.replace('app.js', 'delayed.js'), { 'set-cookie': 'csrf=token-1; Path=/' });
+        case 'cdn.example.test/delayed.js':
+          return new Response(`setTimeout(() => { ${APP_JS} }, 1200);`, { status: 200, headers: { 'content-type': 'application/javascript' } });
+        case 'jobs.example.test/to-login':
+          return html('<html><body><div id="app"></div><script>setTimeout(() => { location.href = "/login"; }, 100);</script></body></html>');
+        case 'jobs.example.test/login':
+          return new Response('<html><body><h1>Forbidden</h1><p>Your session has expired. We could not show this page.</p></body></html>', { status: 403, headers: { 'content-type': 'text/html' } });
+        case 'jobs.example.test/login-wall':
+          return html('<html><body><div id="app"></div><script>document.getElementById("app").innerHTML = "<h2>Please sign in to view this job posting.</h2><p>Enter your email and password.</p>";</script></body></html>');
         case 'jobs.example.test/short-static':
           return html('<html><body><h1>运营专员</h1><p>地点：杭州</p><ul><li>负责社群日常运营与活动策划</li><li>两年以上运营经验</li></ul></body></html>');
         case 'jobs.example.test/static':
@@ -114,7 +125,7 @@ async function rejectsWith(promise, pattern) {
 
 test('#64 AC-5: a page whose initial HTML has no posting is rendered, and the posting the script loads is read', needsBrowser, async () => {
   const { network, requested } = fixtureNetwork();
-  const text = await extractTextFromLink('https://jobs.example.test/position/42', { network, renderer });
+  const text = await extractTextFromLink('https://jobs.example.test/position/42', { network, renderer, renderTimeoutMs: 4000 });
 
   assert.match(text, /AI应用算法工程师/);
   assert.match(text, /北京 \/ 广州 \/ 杭州 \/ 上海/);
@@ -125,7 +136,7 @@ test('#64 AC-5: a page whose initial HTML has no posting is rendered, and the po
 
 test('#64 AC-5: inside the rendered page, internal hosts stay unreachable, directly or via a public redirect', needsBrowser, async () => {
   const { network, requested } = fixtureNetwork();
-  const text = await extractTextFromLink('https://jobs.example.test/position/42', { network, renderer });
+  const text = await extractTextFromLink('https://jobs.example.test/position/42', { network, renderer, renderTimeoutMs: 4000 });
 
   assert.doesNotMatch(text, /SECRET-INTERNAL-DATA/);
   assert.deepEqual(requested.filter((r) => r.url.includes('intranet.example.test')), []);
@@ -134,7 +145,7 @@ test('#64 AC-5: inside the rendered page, internal hosts stay unreachable, direc
 
 test('#64 AC-3: a rendered page that still has no posting is refused with the reason and the paste path', needsBrowser, async () => {
   const { network } = fixtureNetwork();
-  await rejectsWith(extractTextFromLink('https://jobs.example.test/empty-shell', { network, renderer }), /没有找到职位内容.*粘贴/);
+  await rejectsWith(extractTextFromLink('https://jobs.example.test/empty-shell', { network, renderer, renderTimeoutMs: 4000 }), /没有找到职位内容.*粘贴/);
 });
 
 test('#64 AC-3: without a browser configured, a script-rendered page says so and points to pasting the JD', async () => {
@@ -144,11 +155,11 @@ test('#64 AC-3: without a browser configured, a script-rendered page says so and
 
 test('#64 AC-5: internal addresses, non-http schemes and redirects into the intranet are still refused', async () => {
   const { network, requested } = fixtureNetwork();
-  await rejectsWith(extractTextFromLink('http://127.0.0.1:3005/health', { network, renderer }), /内网地址/);
-  await rejectsWith(extractTextFromLink('http://[::ffff:10.0.0.1]/', { network, renderer }), /内网地址/);
-  await rejectsWith(extractTextFromLink('http://intranet.example.test/admin', { network, renderer }), /内网地址/);
-  await rejectsWith(extractTextFromLink('ftp://jobs.example.test/file', { network, renderer }), /http 或 https/);
-  await rejectsWith(extractTextFromLink('https://jobs.example.test/to-intranet', { network, renderer }), /内网地址/);
+  await rejectsWith(extractTextFromLink('http://127.0.0.1:3005/health', { network, renderer, renderTimeoutMs: 4000 }), /内网地址/);
+  await rejectsWith(extractTextFromLink('http://[::ffff:10.0.0.1]/', { network, renderer, renderTimeoutMs: 4000 }), /内网地址/);
+  await rejectsWith(extractTextFromLink('http://intranet.example.test/admin', { network, renderer, renderTimeoutMs: 4000 }), /内网地址/);
+  await rejectsWith(extractTextFromLink('ftp://jobs.example.test/file', { network, renderer, renderTimeoutMs: 4000 }), /http 或 https/);
+  await rejectsWith(extractTextFromLink('https://jobs.example.test/to-intranet', { network, renderer, renderTimeoutMs: 4000 }), /内网地址/);
   assert.deepEqual(requested.filter((r) => r.url.includes('intranet.example.test')), []);
 });
 
@@ -199,11 +210,11 @@ test('#64 review: a page that hangs its renderer is stopped, and the render slot
   const renderNetwork = { assertPublic: async () => {}, fetch: network.fetch };
   const startedAt = Date.now();
   // Three hung renders against two slots: the third only starts once a slot is freed.
-  const hung = await Promise.allSettled([1, 2, 3].map(() => renderPage(new URL('https://jobs.example.test/hang'), renderer, renderNetwork, 3000)));
+  const hung = await Promise.allSettled([1, 2, 3].map(() => renderPage(new URL('https://jobs.example.test/hang'), renderer, renderNetwork, 1000)));
   assert.deepEqual(hung.map((r) => r.status), ['rejected', 'rejected', 'rejected']);
-  assert.ok(Date.now() - startedAt < 12_000, `stopped in ${Date.now() - startedAt}ms`);
+  assert.ok(Date.now() - startedAt < 20_000, `stopped in ${Date.now() - startedAt}ms`);
 
-  const text = await extractTextFromLink('https://jobs.example.test/position/42', { network, renderer });
+  const text = await extractTextFromLink('https://jobs.example.test/position/42', { network, renderer, renderTimeoutMs: 4000 });
   assert.match(text, /AI应用算法工程师/, 'later renders still run');
 });
 
@@ -214,20 +225,32 @@ test('#64 review: the browser does not inherit the service environment', () => {
 
 test('#64 review AC-3: what the render finds out (a human check) is reported, not hidden behind the loading text', needsBrowser, async () => {
   const { network } = fixtureNetwork();
-  await rejectsWith(extractTextFromLink('https://jobs.example.test/loading', { network, renderer }), /人机验证/);
+  await rejectsWith(extractTextFromLink('https://jobs.example.test/loading', { network, renderer, renderTimeoutMs: 4000 }), /人机验证/);
   // With no render possible, the shell's loading text is not taken for a posting either.
   await rejectsWith(extractTextFromLink('https://jobs.example.test/loading', { network, renderer: null }), /网页脚本加载.*粘贴/);
 });
 
 test('#64 review AC-3: a page whose render is empty is no content, even if it said "loading" before', needsBrowser, async () => {
   const { network } = fixtureNetwork();
-  await rejectsWith(extractTextFromLink('https://jobs.example.test/loading-empty', { network, renderer }), /没有找到职位内容.*粘贴/);
+  await rejectsWith(extractTextFromLink('https://jobs.example.test/loading-empty', { network, renderer, renderTimeoutMs: 4000 }), /没有找到职位内容.*粘贴/);
 });
 
 test('#64: a short static posting that renders the same is read', needsBrowser, async () => {
   const { network } = fixtureNetwork();
-  const text = await extractTextFromLink('https://jobs.example.test/short-static', { network, renderer });
+  const text = await extractTextFromLink('https://jobs.example.test/short-static', { network, renderer, renderTimeoutMs: 4000 });
   assert.match(text, /运营专员/);
+});
+
+test('#64 review: a posting requested after the network went idle is still waited for', needsBrowser, async () => {
+  const { network } = fixtureNetwork();
+  const text = await extractTextFromLink('https://jobs.example.test/delayed', { network, renderer, renderTimeoutMs: 4000 });
+  assert.match(text, /AI应用算法工程师/);
+});
+
+test('#64 review AC-3: a page that ends on an error status, or only asks to sign in, is refused with the reason', needsBrowser, async () => {
+  const { network } = fixtureNetwork();
+  await rejectsWith(extractTextFromLink('https://jobs.example.test/to-login', { network, renderer, renderTimeoutMs: 3000 }), /需要登录.*粘贴/);
+  await rejectsWith(extractTextFromLink('https://jobs.example.test/login-wall', { network, renderer, renderTimeoutMs: 3000 }), /需要登录.*粘贴/);
 });
 
 /** A `playwright run-server` like the jd-renderer container, when this machine has Playwright's own Chromium. */
@@ -251,7 +274,7 @@ test('#64 review: the remote renderer (jd-renderer) reads the posting, with inte
   if (!server) return t.skip('Playwright Chromium not installed (npx playwright-core install chromium)');
   try {
     const { network, requested } = fixtureNetwork();
-    const text = await extractTextFromLink('https://jobs.example.test/position/42', { network, renderer: { kind: 'remote', url: server.url } });
+    const text = await extractTextFromLink('https://jobs.example.test/position/42', { network, renderer: { kind: 'remote', url: server.url }, renderTimeoutMs: 4000 });
     assert.match(text, /AI应用算法工程师/);
     assert.doesNotMatch(text, /SECRET-INTERNAL-DATA/);
     assert.deepEqual(requested.filter((r) => r.url.includes('intranet.example.test')), []);

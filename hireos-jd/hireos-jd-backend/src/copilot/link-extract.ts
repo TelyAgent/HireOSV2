@@ -70,6 +70,7 @@ const PASTE_HINT = '请打开链接复制 JD 全文，粘贴到下方。';
 const BLOCKED_MESSAGE = `这个网站开启了人机验证，无法自动读取职位内容。${PASTE_HINT}`;
 const PRIVATE_MESSAGE = '不支持访问内网地址。';
 const SCRIPT_PAGE_MESSAGE = `这个页面的职位内容由网页脚本加载，当前无法自动读取。${PASTE_HINT}`;
+const LOGIN_MESSAGE = `这个页面需要登录才能查看职位内容，无法自动读取。${PASTE_HINT}`;
 const NO_CONTENT_MESSAGE = `页面已打开，但没有找到职位内容，可能需要登录，或职位已下线。${PASTE_HINT}`;
 
 /** Network access used to read a link; injectable so tests run without the internet. */
@@ -85,6 +86,8 @@ export type LinkExtractOptions = {
    * else a local Chromium (JD_LINK_BROWSER_PATH, for development). `null`, or neither set, disables rendering.
    */
   renderer?: Renderer | null;
+  /** How long a page gets to render its posting; tests use less. */
+  renderTimeoutMs?: number;
 };
 
 function configuredRenderer(): Renderer | null {
@@ -149,6 +152,7 @@ export async function extractTextFromLink(rawUrl: string, options: LinkExtractOp
   // Job boards publish schema.org JobPosting for search engines; it is cleaner than the page chrome around it.
   let text = ((isHtml && jobPostingText(body)) || (isHtml ? htmlToText(body) : body)).trim();
   if (looksLikeBotChallenge(text)) throw linkError(BLOCKED_MESSAGE);
+  if (looksLikeLoginWall(text)) throw linkError(LOGIN_MESSAGE);
   if (isHtml && text.length < MIN_STATIC_CHARS) text = await preferRendered(text, looksLikeScriptShell(body), url, network, options);
   if (text.length < MIN_CONTENT_CHARS) throw linkError(NO_CONTENT_MESSAGE);
   return text.length > MAX_EXTRACTED_CHARS ? text.slice(0, MAX_EXTRACTED_CHARS) : text;
@@ -189,15 +193,20 @@ async function renderedText(url: URL, network: LinkNetwork, options: LinkExtract
   const result = await renderPage(url, renderer, {
     assertPublic: (target) => assertPublicUrl(target, network),
     fetch: network.fetch,
-  }).catch((error: unknown) => {
+  }, options.renderTimeoutMs).catch((error: unknown) => {
     if (error instanceof BadRequestException) throw error;
     // e.g. the renderer unreachable or crashed: the user gets the paste path, operators get the cause.
     logger.warn(`rendering ${url.origin} failed: ${error instanceof Error ? error.message : String(error)}`);
     throw new RenderUnavailable(error instanceof Error ? error.message : String(error));
   });
   if ('blocked' in result) throw linkError(PRIVATE_MESSAGE);
+  if ('status' in result) {
+    if ([401, 403, 429].includes(result.status)) throw linkError(result.status === 429 ? BLOCKED_MESSAGE : LOGIN_MESSAGE);
+    throw linkError(`打开这个链接失败（${result.status}），请改为粘贴 JD 文案。`);
+  }
   const text = (jobPostingText(result.html) || htmlToText(result.html)).trim();
   if (looksLikeBotChallenge(text)) throw linkError(BLOCKED_MESSAGE);
+  if (looksLikeLoginWall(text)) throw linkError(LOGIN_MESSAGE);
   return text;
 }
 
@@ -243,6 +252,16 @@ const CHALLENGE_PATTERNS = [
   /security check/i, /verify (that )?you are (a )?human/i, /are you a robot/i, /checking your browser/i,
   /just a moment/i, /captcha/i, /access denied/i, /enable javascript and cookies/i, /人机验证/, /安全验证/, /验证码/,
 ];
+
+// A page that only asks to sign in: what it says is a login form, not the posting (#64 review AC-3).
+const LOGIN_PATTERNS = [
+  /\b(sign|log)\s?in to (view|see|continue|apply|access)/i, /please (sign|log)\s?in/i, /\blogin required\b/i,
+  /(登录|登陆)后(查看|继续|才能)/, /请先?(登录|登陆)/, /需要(登录|登陆)/,
+];
+
+function looksLikeLoginWall(text: string): boolean {
+  return text.length < 1500 && LOGIN_PATTERNS.some((pattern) => pattern.test(text));
+}
 
 function looksLikeBotChallenge(text: string): boolean {
   return text.length < 1500 && CHALLENGE_PATTERNS.some((pattern) => pattern.test(text));
