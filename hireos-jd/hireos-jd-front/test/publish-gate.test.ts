@@ -1,6 +1,6 @@
 // #106 AC-2 — the Copilot's "can I publish?" context uses exactly the Publish button's rule.
 import { describe, expect, it } from 'vitest';
-import { describeAiAnalysis, describePublishGate, publishGate } from '../src/features/workspace/publishGate';
+import { MAX_STATUS_CONTEXT, describeAiAnalysis, describePublishGate, publishGate, statusContext } from '../src/features/workspace/publishGate';
 import type { AppState } from '../src/store/types';
 import type { Evaluation } from '../src/features/workspace/completeness';
 import { mkBlock } from '../src/data/fixtures/documents';
@@ -83,4 +83,13 @@ describe('describeAiAnalysis', () => {
     expect(describeAiAnalysis(state([]), 'j1')).toMatch(/has not been run/);
   });
 
+
+  it('stays bounded with many findings and keeps the gate conclusion first', () => {
+    const flags = Array.from({ length: 40 }, (_, n) => ({ rule: 'R1', severity: 'warning' as const, blockId: 'b2', message: `Wording issue ${n} `.repeat(20), evidence: 'x' }));
+    const gate = describePublishGate(publishGate(state([]), 'j1', ev({ flags, weakCount: 40 })), false);
+    expect(gate).toMatch(/and 32 more/);
+    const text = statusContext(gate, 'A'.repeat(20000));
+    expect(text.length).toBeLessThanOrEqual(MAX_STATUS_CONTEXT);
+    expect(text.startsWith('The Publish button is disabled: 40 item(s)')).toBe(true);
+  });
 });

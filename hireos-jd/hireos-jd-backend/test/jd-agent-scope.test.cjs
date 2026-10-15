@@ -125,3 +125,9 @@ test('#103 #104: the global Agent\'s chat prompt carries the same scope and Hire
   assert.match(prompt, /不要让用户去其他 ATS/);
   assert.match(prompt, /超出了职位工作区的范围/);
 });
+
+test('#106: the status context the page sends (up to 6000 chars) is accepted', async () => {
+  const { svc } = service(fakeLlm({ intent: 'answer' }));
+  const res = await svc.ask(identity, 'job-1', 'internal', { message: '能提交吗？', context: { documentText: DOC, readiness: 'x'.repeat(6000) } });
+  assert.equal(res.kind, 'answer');
+});

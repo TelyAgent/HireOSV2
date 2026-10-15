@@ -57,7 +57,7 @@ const askInputSchema = z.object({
     .optional(),
   context: rewriteInputSchema.shape.context.extend({
     /** The page's own Analyze / Publish status in words, so "can I submit?" is answered from it. */
-    readiness: z.string().max(2000).optional(),
+    readiness: z.string().max(8000).optional(),
   }),
 });
 

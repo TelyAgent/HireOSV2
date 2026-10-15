@@ -39,7 +39,7 @@ import {
 } from "./documentsApi";
 import { nowISO, uid } from "../../lib/format";
 import { SalaryModal } from "./SalaryModal";
-import { describeAiAnalysis, describePublishGate, publishGate } from "./publishGate";
+import { describeAiAnalysis, describePublishGate, publishGate, statusContext } from "./publishGate";
 import {
   REQ_ITEMS,
   detectLanguage,
@@ -245,7 +245,8 @@ export function useDocActions(jobId: string) {
       const block = blockId ? selectDraft(state, jobId).blocks.find((b) => b.id === blockId) : undefined;
       if (!block || !selText.trim()) return null;
       const items = Array.isArray(block.text) ? block.text.map(stripHtml) : null;
-      const selected = selText.trim();
+      // Inside the backend's 8000-character selection limit.
+      const selected = selText.trim().slice(0, 7900);
       const scope: RewriteRequest["scope"] = items && !items.some((x) => x.includes(selected)) ? "items" : "fragment";
       const target: RewriteRequest["target"] = items ? { kind: block.kind, items } : { kind: block.kind, text: stripHtml(block.text as string) };
       return { block, items, selected, scope, target };
@@ -260,7 +261,9 @@ export function useDocActions(jobId: string) {
         documentText: selectDraft(state, jobId)
           .blocks.filter((b) => blockLevel(b) !== "confidential")
           .map((b) => (b.kind === "ul" ? `- ${blockPlainText(b)}` : blockPlainText(b)))
-          .join("\n"),
+          .join("\n")
+          // Inside the backend's 40000-character limit, so a very long JD never fails the whole request.
+          .slice(0, 39000),
       };
     };
 
@@ -270,7 +273,10 @@ export function useDocActions(jobId: string) {
       if (!job) return undefined;
       const loaded = state.wsVersions[jobId];
       const ev = evaluateJob(job, selectDraft(state, jobId), "en", loaded ? loaded.jdCode || null : undefined);
-      return `${describePublishGate(publishGate(state, jobId, ev), selectDraft(state, jobId).saveState !== "saved")} ${describeAiAnalysis(state, jobId)}`;
+      return statusContext(
+        describePublishGate(publishGate(state, jobId, ev), selectDraft(state, jobId).saveState !== "saved"),
+        describeAiAnalysis(state, jobId),
+      );
     };
 
     /** Turns a rewrite result into a suggestion the user can accept or reject — the only path that proposes edits. */

@@ -7,6 +7,24 @@ import { blockLevel, selectDraft } from "./docHelpers";
 import { issueCount, type ComplianceFlag, type Evaluation } from "./completeness";
 import { diffBlocks } from "./versions";
 
+/** The backend accepts up to 8000 characters of status context; stay well inside it (#106 review). */
+export const MAX_STATUS_CONTEXT = 6000;
+const MAX_LISTED = 8;
+
+/** At most MAX_LISTED entries, each at most 200 characters, then "and N more". */
+function listOf(items: string[], sep: string): string {
+  const shown = items.slice(0, MAX_LISTED).map((x) => (x.length > 200 ? `${x.slice(0, 200)}…` : x));
+  return items.length > MAX_LISTED ? `${shown.join(sep)}${sep}and ${items.length - MAX_LISTED} more` : shown.join(sep);
+}
+
+/**
+ * The whole status for the Copilot, bounded: the gate's conclusion comes first so a cut never drops it.
+ */
+export function statusContext(gate: string, analysis: string): string {
+  const text = `${gate} ${analysis}`;
+  return text.length <= MAX_STATUS_CONTEXT ? text : `${text.slice(0, MAX_STATUS_CONTEXT - 1)}…`;
+}
+
 export type PublishGate =
   | { kind: "loading" }
   | { kind: "issues"; count: number; missing: string[]; revise: string[]; blockers: string[] }
@@ -44,9 +62,9 @@ export function describePublishGate(gate: PublishGate, unsaved: boolean): string
   if (gate.kind === "loading") lines.push("The job's versions are still loading, so the Publish button is disabled for now.");
   if (gate.kind === "issues") {
     lines.push(`The Publish button is disabled: ${gate.count} item(s) to complete or revise (see Analysis).`);
-    if (gate.missing.length) lines.push(`Missing: ${gate.missing.join(", ")}.`);
-    if (gate.revise.length) lines.push(`To revise: ${gate.revise.join("; ")}.`);
-    if (gate.blockers.length) lines.push(`Blocking issues: ${gate.blockers.join("; ")}.`);
+    if (gate.missing.length) lines.push(`Missing: ${listOf(gate.missing, ", ")}.`);
+    if (gate.revise.length) lines.push(`To revise: ${listOf(gate.revise, "; ")}.`);
+    if (gate.blockers.length) lines.push(`Blocking issues: ${listOf(gate.blockers, "; ")}.`);
   }
   if (gate.kind === "no_changes") lines.push(`The Publish button is disabled: nothing has changed since v${gate.versionNo} was published.`);
   if (gate.kind === "ready") lines.push("The Publish button is available.");
@@ -70,7 +88,7 @@ export function describeAiAnalysis(state: AppState, jobId: string): string {
     .map((i) => `${i.id} (${i.severity}): ${i.reason}${i.evidence && !(i.blockId && confidential.has(i.blockId)) ? ` — “${i.evidence}”` : ""}`);
   return [
     `Current AI Analyze result: ${run.result.verdict}. ${run.result.summary}`,
-    findings.length ? `Findings: ${findings.join("; ")}.` : "",
+    findings.length ? `Findings: ${listOf(findings, "; ")}.` : "",
   ]
     .filter(Boolean)
     .join(" ");
