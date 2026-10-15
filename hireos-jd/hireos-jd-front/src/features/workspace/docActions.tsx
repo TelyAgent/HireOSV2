@@ -32,13 +32,13 @@ import {
   updateSuggestion,
   type AiBlock,
   type AiFinding,
-  type AskRequest,
   type NewSuggestion,
   type RewriteRequest,
   type RewriteResult,
 } from "./documentsApi";
 import { nowISO, uid } from "../../lib/format";
 import { SalaryModal } from "./SalaryModal";
+import { fitAskRequest, fitBytes } from "./askBudget";
 import { describeAiAnalysis, describePublishGate, publishGate, statusContext } from "./publishGate";
 import {
   REQ_ITEMS,
@@ -55,26 +55,6 @@ import {
 import type { BlockKind, BlockLevel, DocBlock, DocumentDraft, Suggestion } from "../../data/types";
 import type { SideTab } from "../../store/types";
 
-/**
- * Byte budget for the document text in one Copilot request: the backend's JSON body limit is 100 KB and a
- * CJK character is 3 bytes in UTF-8. Worst case: 50 KB document + ~24 KB selection + ~18 KB status < 100 KB.
- */
-const MAX_DOCUMENT_BYTES = 50_000;
-
-/** The longest prefix of `text` that fits in `maxBytes` of UTF-8. */
-function fitBytes(text: string, maxBytes: number): string {
-  const encoder = new TextEncoder();
-  if (encoder.encode(text).length <= maxBytes) return text;
-  let lo = 0;
-  let hi = text.length;
-  while (lo < hi) {
-    const mid = Math.ceil((lo + hi) / 2);
-    if (encoder.encode(text.slice(0, mid)).length <= maxBytes) lo = mid;
-    else hi = mid - 1;
-  }
-  return text.slice(0, lo);
-}
-const withoutFlag = ({ truncated: _truncated, ...context }: RewriteRequest["context"] & { truncated: boolean }) => context;
 
 export function useDocActions(jobId: string) {
   const { state, t, set, mutate, say, openModal, closeModal } = useStore();
@@ -266,23 +246,23 @@ export function useDocActions(jobId: string) {
       const block = blockId ? selectDraft(state, jobId).blocks.find((b) => b.id === blockId) : undefined;
       if (!block || !selText.trim()) return null;
       const items = Array.isArray(block.text) ? block.text.map(stripHtml) : null;
-      // Inside the backend's 8000-character selection limit.
-      const selected = selText.trim().slice(0, 7900);
+      const selected = selText.trim();
       const scope: RewriteRequest["scope"] = items && !items.some((x) => x.includes(selected)) ? "items" : "fragment";
       const target: RewriteRequest["target"] = items ? { kind: block.kind, items } : { kind: block.kind, text: stripHtml(block.text as string) };
       return { block, items, selected, scope, target };
     };
 
     /** Job title, department and the whole JD minus Confidential blocks (completeness standard V5). */
-    const docContext = (): RewriteRequest["context"] & { truncated: boolean } => {
+    const docContext = (): RewriteRequest["context"] => {
       const job = state.jobs[jobId];
-      const full = selectDraft(state, jobId)
-        .blocks.filter((b) => blockLevel(b) !== "confidential")
-        .map((b) => (b.kind === "ul" ? `- ${blockPlainText(b)}` : blockPlainText(b)))
-        .join("\n");
-      // Inside the backend's limit; a JD longer than that is sent in part and the answer says so (#106 review).
-      const documentText = fitBytes(full, MAX_DOCUMENT_BYTES);
-      return { jobTitle: job?.title, department: job?.department, documentText, truncated: documentText.length < full.length };
+      return {
+        jobTitle: job?.title,
+        department: job?.department,
+        documentText: selectDraft(state, jobId)
+          .blocks.filter((b) => blockLevel(b) !== "confidential")
+          .map((b) => (b.kind === "ul" ? `- ${blockPlainText(b)}` : blockPlainText(b)))
+          .join("\n"),
+      };
     };
 
     /** The page's own Publish gate in words — the same rule as the button — so "can I submit?" is answered from it (#106 AC-2). */
@@ -344,7 +324,8 @@ export function useDocActions(jobId: string) {
           action,
           target: sel.target,
           scope: sel.scope,
-          context: withoutFlag(docContext()),
+          // Quick actions send the same document context; keep it inside the request limit too.
+          context: { ...docContext(), documentText: fitBytes(docContext().documentText ?? "", 50_000) },
         });
         await proposeEdit(sel, result, instruction || action, supersedes);
       } catch (error) {
@@ -368,12 +349,12 @@ export function useDocActions(jobId: string) {
       }
       if (state.wsCopilotBusy) return;
 
-      const context = docContext();
-      const body: AskRequest = {
+      // Sized on the whole request; a JD too long to fit is sent in part and the answer says so (#106 review).
+      const { body, truncated } = fitAskRequest({
         message,
         selection: sel ? { text: sel.selected, target: sel.target, scope: sel.scope, implicit } : undefined,
-        context: { ...withoutFlag(context), readiness: readiness() },
-      };
+        context: { ...docContext(), readiness: readiness() },
+      });
       set({ wsCopilotBusy: true, wsSideTab: "copilot" });
       try {
         const result = await askDocumentCopilot(jobId, DOC_AUDIENCE, body);
@@ -385,7 +366,7 @@ export function useDocActions(jobId: string) {
         mutate((draft) => {
           draft.wsCopilotThread = [
             ...draft.wsCopilotThread,
-            { kind: "text", text: result.text, basis: context.truncated ? "partial" : result.contextScope, sources: result.sources },
+            { kind: "text", text: result.text, basis: truncated ? "partial" : result.contextScope, sources: result.sources },
           ];
           draft.wsSelection = null;
         });
