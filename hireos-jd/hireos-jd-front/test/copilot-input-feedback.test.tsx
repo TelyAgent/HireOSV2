@@ -181,6 +181,14 @@ describe('#99: refine only reports real changes', () => {
     expect(screen.queryByText(/Updated all/)).toBeNull();
   });
 
+  it('a list that only went from missing to empty is not a change', async () => {
+    await openVariants();
+    const withEmpty = (key: string) => ({ ...variant(key, 'Remote'), fields: { ...variant(key, 'Remote').fields, niceToHave: [] } });
+    api.refineCopilotVariants.mockResolvedValue({ variants: [withEmpty('A'), withEmpty('B'), withEmpty('C')] } as never);
+    send('put the salary in the JD');
+    expect(await screen.findByText(/Nothing changed — none of the versions needed an edit/)).toBeInTheDocument();
+  });
+
   it('only some versions changed → names them; all changed → says all, and that they are unsaved', async () => {
     await openVariants();
     api.refineCopilotVariants.mockResolvedValueOnce({ variants: [variant('A', 'Shanghai'), variant('B', 'Remote'), variant('C', 'Remote')] } as never);

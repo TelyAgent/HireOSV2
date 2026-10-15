@@ -166,14 +166,14 @@ function resultToMsg(result: CopilotConversationDto, origin?: GeminiOrigin, prev
     : { role: "ai", text: lastReply?.text || "" };
 }
 
-/** Deep equality for draft fields, ignoring key order and empty/absent values. */
+/** Deep equality for draft fields, ignoring key order and empty/absent values (a missing list equals `[]`). */
 function sameFields(a: unknown, b: unknown): boolean {
   const canon = (v: unknown): unknown => {
     if (Array.isArray(v)) return v.map(canon);
     if (v && typeof v === "object") {
       return Object.fromEntries(
         Object.entries(v as Record<string, unknown>)
-          .filter(([, x]) => x !== undefined && x !== null && x !== "")
+          .filter(([, x]) => x !== undefined && x !== null && x !== "" && !(Array.isArray(x) && x.length === 0))
           .sort(([x], [y]) => (x < y ? -1 : x > y ? 1 : 0))
           .map(([k, x]) => [k, canon(x)]),
       );
