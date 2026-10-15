@@ -937,6 +937,11 @@ a:focus-visible, button:focus-visible, [tabindex]:focus-visible, input:focus-vis
 .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
 .copilot-sources{ margin:8px 0 0; padding-left:18px; font-size:var(--fs-xs); }
 .copilot-basis{ margin-top:8px; font-size:var(--fs-xs); color:var(--text-tertiary); }
+.gm-title-confirm{ margin-top:10px; padding:10px 12px; border:1px solid var(--warning-border); border-radius:8px; background:var(--warning-bg); }
+.gm-title-confirm-head{ font-size:var(--fs-sm); display:flex; gap:8px; align-items:baseline; flex-wrap:wrap; }
+.gm-ai-tag{ font-size:var(--fs-xs); font-weight:600; color:var(--warning-text); white-space:nowrap; }
+.gm-title-confirm-row{ display:flex; gap:8px; margin-top:8px; }
+.gm-title-confirm-row input{ flex:1; min-width:0; padding:6px 8px; border:1px solid var(--border-strong); border-radius:6px; background:var(--surface); color:var(--text); font:inherit; font-size:var(--fs-sm); }
 .ai-diff{ display:flex; flex-direction:column; gap:4px; font-size:var(--fs-sm); }
 .ai-diff-line{ padding:4px 8px; border-radius:6px; white-space:pre-wrap; }
 .ai-diff-line.is-removed{ background:var(--danger-bg); color:var(--danger-text); text-decoration:line-through; }

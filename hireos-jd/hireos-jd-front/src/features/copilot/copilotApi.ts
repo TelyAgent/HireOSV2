@@ -77,6 +77,8 @@ export interface CopilotConversationDto {
   createdAt: string;
   updatedAt: string;
   messages: CopilotMessageDto[];
+  /** Returned when opening a conversation: a Quick Start is still collecting answers there (#65). */
+  quickStartOpen?: boolean;
 }
 
 async function request<T>(path: string, init: RequestInit & { idempotencyKey: string }): Promise<T> {
@@ -227,6 +229,22 @@ export function autoCompleteCopilotConversation(conversationId: string, text?: s
     idempotencyKey: idempotencyKey("copilot-autocomplete"),
   });
 }
+
+/**
+ * Quick Start (#65 #66): one more message of answers; the backend adds it to the ones already sent in this
+ * conversation. It drafts only once all three questions have a real answer and a job title can be suggested;
+ * otherwise it replies asking for what's missing.
+ */
+export function quickStartCopilotConversation(conversationId: string, answers: string): Promise<CopilotConversationDto> {
+  return request(`${BASE}/${conversationId}/quick-start`, {
+    method: "POST",
+    body: JSON.stringify({ answers }),
+    idempotencyKey: idempotencyKey("copilot-quick-start"),
+  });
+}
+
+/** Marker in `missingFields`: the draft's job title is an AI suggestion the user hasn't confirmed yet. */
+export const TITLE_UNCONFIRMED = "title_unconfirmed";
 
 /** "Refine" on a ready draft: the backend rewrites the full current JD with the note and keeps it ready to confirm. */
 export function refineCopilotDraft(conversationId: string, note: string): Promise<CopilotConversationDto & { answer?: CopilotWebAnswer }> {

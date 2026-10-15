@@ -8,6 +8,7 @@ import { mkBlock } from "../../data/fixtures/documents";
 import { docKey, normalizeBlocks } from "../workspace/docHelpers";
 import { money, nowISO } from "../../lib/format";
 import {
+  TITLE_UNCONFIRMED,
   autoCompleteCopilotConversation,
   confirmCopilotDraft,
   createCopilotConversation,
@@ -17,6 +18,7 @@ import {
   refineCopilotDraft,
   refineCopilotVariants,
   listCopilotConversations,
+  quickStartCopilotConversation,
   setCopilotFields,
   streamCopilotMessage,
   uploadCopilotAttachment,
@@ -43,9 +45,13 @@ function conversationToGeminiMsgs(dto: CopilotConversationDto): GeminiMsg[] {
   );
   if (dto.phase === "ready_to_confirm") {
     if (msgs.length && msgs[msgs.length - 1].role === "ai") msgs.pop();
-    msgs.push({ role: "ai", draft: jdFieldsToGeminiDraft(dto.fields) });
+    msgs.push({ role: "ai", draft: jdFieldsToGeminiDraft(dto.fields), titlePending: titlePendingIn(dto) });
   }
   return msgs;
+}
+
+function titlePendingIn(dto: Pick<CopilotConversationDto, "missingFields">): boolean {
+  return Array.isArray(dto.missingFields) && dto.missingFields.includes(TITLE_UNCONFIRMED);
 }
 
 export function jdFieldsToGeminiDraft(fields: CopilotJdFields): GeminiDraft {
@@ -162,7 +168,7 @@ const JD_FILE_ACCEPT =
 function resultToMsg(result: CopilotConversationDto, origin?: GeminiOrigin, prev?: GeminiDraft): GeminiMsg {
   const lastReply = result.messages[result.messages.length - 1];
   return result.phase === "ready_to_confirm"
-    ? { role: "ai", draft: jdFieldsToGeminiDraft(result.fields), origin, prev }
+    ? { role: "ai", draft: jdFieldsToGeminiDraft(result.fields), titlePending: titlePendingIn(result), origin, prev }
     : { role: "ai", text: lastReply?.text || "" };
 }
 
@@ -390,7 +396,10 @@ export function GeminiPanel({ ctx }: { ctx: GeminiCtx }) {
       draft.geminiChats = { ...draft.geminiChats, [key]: [...list, msg] };
     });
 
-  const updateMsg = (index: number, patch: { done?: boolean; picked?: number; selected?: number; superseded?: boolean; created?: boolean }) =>
+  const updateMsg = (
+    index: number,
+    patch: { done?: boolean; picked?: number; selected?: number; superseded?: boolean; created?: boolean; titlePending?: boolean; draft?: GeminiDraft },
+  ) =>
     mutate((draft) => {
       const list = [...(draft.geminiChats[key] ?? [])];
       const current = list[index];
@@ -485,17 +494,21 @@ export function GeminiPanel({ ctx }: { ctx: GeminiCtx }) {
   };
 
   /** Quick Start: the three answers go to auto-complete in one turn, which writes the whole JD. */
-  const runQuickStart = async (answers: string) => {
-    const brief = [
-      "我选择了「快速开始」。以下是我对这 3 个问题的回答，请据此直接生成一份完整 JD：",
-      ...QUICK_START_QUESTIONS.map((q, i) => `${i + 1}. ${t(q)}`),
-      "",
-      "我的回答：",
-      answers,
-    ].join("\n");
-    const retry: GeminiRequestRetry = { action: "questions", text: answers };
-    if (await runStep((conversationId) => autoCompleteCopilotConversation(conversationId, brief), false, { path: "questions", detail: answers }, retry)) {
-      setPath("home");
+  /** Quick Start (#65): the backend keeps the answers so far; each message adds to them. */
+  const runQuickStart = async (text: string) => {
+    const retry: GeminiRequestRetry = { action: "questions", text };
+    setBusy(true);
+    push({ role: "thinking" });
+    try {
+      const conversationId = await ensureConversation();
+      const result = await quickStartCopilotConversation(conversationId, text);
+      resolveThinking(resultToMsg(result, { path: "questions", detail: text }));
+      // Still collecting: stay on Quick Start so the next message answers what was asked.
+      if (result.phase === "ready_to_confirm") setPath("home");
+    } catch (error) {
+      failRequest(error, retry);
+    } finally {
+      setBusy(false);
     }
   };
 
@@ -759,7 +772,8 @@ export function GeminiPanel({ ctx }: { ctx: GeminiCtx }) {
       mutate((draft) => {
         draft.geminiConversationIds = { ...draft.geminiConversationIds, [key]: conversation.id };
         draft.geminiChats = { ...draft.geminiChats, [key]: conversationToGeminiMsgs(conversation) };
-        draft.geminiCreatePaths = { ...draft.geminiCreatePaths, [key]: "home" };
+        // A Quick Start still collecting answers resumes, so the next answer goes through its three-question check.
+        draft.geminiCreatePaths = { ...draft.geminiCreatePaths, [key]: conversation.quickStartOpen ? "questions" : "home" };
       });
       setHistoryOpen(false);
       setInput("");
@@ -798,7 +812,7 @@ export function GeminiPanel({ ctx }: { ctx: GeminiCtx }) {
   };
 
   const handleAutoComplete = async () => {
-    if (working) return;
+    if (working || path === "questions") return;
     push({ role: "user", text: AUTO_COMPLETE_LABEL });
     await runStep((conversationId) => autoCompleteCopilotConversation(conversationId));
   };
@@ -940,6 +954,23 @@ export function GeminiPanel({ ctx }: { ctx: GeminiCtx }) {
     }
   };
 
+  /** The user confirms (or edits) an AI-suggested job title; the draft becomes theirs to create (#66). */
+  const confirmDraftTitle = async (index: number, title: string) => {
+    const conversationId = state.geminiConversationIds[key];
+    const clean = title.trim();
+    if (working || !conversationId || !clean) return;
+    setBusy(true);
+    try {
+      const conversation = await getCopilotConversation(conversationId);
+      const result = await setCopilotFields(conversationId, { ...conversation.fields, title: clean }, `${t("Confirm job title")}: ${clean}`);
+      updateMsg(index, { draft: jdFieldsToGeminiDraft(result.fields), titlePending: false });
+    } catch (error) {
+      say(errorText(error), { type: "error" });
+    } finally {
+      setBusy(false);
+    }
+  };
+
   const createFromDraftCard = async (index: number, d: GeminiDraft) => {
     if (working) return;
     setBusy(true);
@@ -1051,6 +1082,7 @@ export function GeminiPanel({ ctx }: { ctx: GeminiCtx }) {
                 busy={working}
                 wsVisible={showWorkspace}
                 onCreate={(d) => void createFromDraftCard(i, d)}
+                onConfirmTitle={(title) => void confirmDraftTitle(i, title)}
                 onRefine={startRefine}
                 onSelectVariant={(variantIndex) => updateMsg(i, { selected: variantIndex })}
                 onSelectOption={handleSelectOption}
@@ -1113,7 +1145,8 @@ export function GeminiPanel({ ctx }: { ctx: GeminiCtx }) {
                 <button
                   className="gemini-composer-tool"
                   type="button"
-                  disabled={working}
+                  // Quick Start drafts only from its three answers; auto-complete would skip that check (#65).
+                  disabled={working || path === "questions"}
                   onClick={() => void handleAutoComplete()}
                   title={AUTO_COMPLETE_LABEL}
                   aria-label={AUTO_COMPLETE_LABEL}
@@ -1580,6 +1613,27 @@ function WorkspaceDoc({ d, changes, origin }: { d: GeminiDraft; changes: DraftCh
   );
 }
 
+/** An AI-suggested job title, highlighted until the user confirms or edits it (#66). */
+function TitleConfirm({ title, busy, onConfirm }: { title: string; busy: boolean; onConfirm: (title: string) => void }) {
+  const { t } = useStore();
+  const [value, setValue] = useState(title);
+  useEffect(() => setValue(title), [title]);
+  return (
+    <div className="gm-title-confirm">
+      <div className="gm-title-confirm-head">
+        <span className="gm-ai-tag">{t("AI suggested · to confirm")}</span>
+        {t("This job title is a suggestion from your answers. Confirm it or change it before creating the job.")}
+      </div>
+      <div className="gm-title-confirm-row">
+        <input value={value} aria-label={t("Job title")} onChange={(e) => setValue(e.target.value)} maxLength={200} />
+        <Button size="sm" variant="primary" disabled={busy || !value.trim()} onClick={() => onConfirm(value)}>
+          {t(value.trim() === title ? "Confirm title" : "Use this title")}
+        </Button>
+      </div>
+    </div>
+  );
+}
+
 const LEVELS = ["Intern", "Junior", "Mid", "Senior", "Staff", "Lead", "Manager", "Director"];
 const EMPLOYMENT_TYPES = ["Full-time", "Part-time", "Contract", "Internship"];
 /** Same cap as Core Record / the backend's `MAX_JOB_TITLE_LENGTH`. */
@@ -1776,6 +1830,7 @@ function GeminiMessage({
   busy,
   wsVisible,
   onCreate,
+  onConfirmTitle,
   onRefine,
   onSelectVariant,
   onSelectOption,
@@ -1790,6 +1845,7 @@ function GeminiMessage({
   busy: boolean;
   wsVisible: boolean;
   onCreate: (draft: GeminiDraft) => void;
+  onConfirmTitle: (title: string) => void;
   onRefine: () => void;
   onSelectVariant: (variantIndex: number) => void;
   onSelectOption: (option: ConversationActionOption) => void;
@@ -1879,9 +1935,16 @@ function GeminiMessage({
           </div>
         )}
         {msg.superseded && <div className="tiny" style={{ marginTop: 8 }}>{t("Superseded by a newer draft below.")}</div>}
+        {open && msg.titlePending && <TitleConfirm title={d.title} busy={busy} onConfirm={onConfirmTitle} />}
         {open && (
           <div className="gm-actions">
-            <Button variant="primary" size="sm" disabled={busy} onClick={() => onCreate(d)}>
+            <Button
+              variant="primary"
+              size="sm"
+              disabled={busy || msg.titlePending}
+              title={msg.titlePending ? t("Confirm or edit the job title first.") : undefined}
+              onClick={() => onCreate(d)}
+            >
               <Icon name="add_circle" />
               {t("Create job from this draft")}
             </Button>
