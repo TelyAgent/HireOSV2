@@ -43,3 +43,15 @@ test('#90: a 200-character manual title is accepted, 201 is a field error on fie
   assert.equal(refused.success, false);
   assert.deepEqual(refused.error.issues.map((i) => i.path.join('.')), ['fields.title']);
 });
+
+test('#99: the reply stored after a refine says what really changed, or that nothing did', () => {
+  const { refineReply, changedJdFields } = require('../dist/copilot/refine-summary');
+  const base = { title: 'Designer', location: 'Beijing', responsibilities: ['a'], mustHave: ['b'] };
+  assert.equal(refineReply(base, { ...base, niceToHave: [] }, 'add salary'), '没有改动：这条补充没有让草稿发生变化，也没有保存任何内容。');
+  const moved = refineReply(base, { ...base, location: 'Shanghai' }, '按照上面的薪资标准写到JD里');
+  assert.match(moved, /草稿中改动了：工作地点。它仍是未保存的草稿/);
+  assert.match(moved, /薪资没有改动。/);
+  const paid = { ...base, publicCompensation: { min: 15000, max: 22000, currency: 'CNY', period: 'month' } };
+  assert.doesNotMatch(refineReply(base, paid, '写入薪资'), /薪资没有改动/);
+  assert.deepEqual(changedJdFields(base, paid), ['publicCompensation']);
+});

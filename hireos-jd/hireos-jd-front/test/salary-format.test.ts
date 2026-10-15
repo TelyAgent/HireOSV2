@@ -7,5 +7,6 @@ describe('salaryText', () => {
     expect(salaryText({ min: 26, max: 36, currency: 'USD', period: 'hour' }, 'en')).toBe('26–36 / hour · USD');
     expect(salaryText({ min: 15000, max: 22000, currency: 'CNY', period: 'month', basis: 'gross' }, 'en')).toBe('15K–22K / month · gross · CNY');
     expect(salaryText({ min: 1234, max: 1239, currency: 'USD', period: 'month' }, 'en')).toBe('1.234K–1.239K / month · USD');
+    expect(salaryText({ min: 15000.25, max: 22000, currency: 'USD', period: 'month' }, 'en')).toBe('15,000.25–22K / month · USD');
   });
 });

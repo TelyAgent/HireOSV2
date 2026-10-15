@@ -247,4 +247,20 @@ describe('#99: refine only reports real changes', () => {
     expect(shown.closest('.gm-changed')).not.toBeNull();
     expect(document.body.textContent).not.toContain('0.03K');
   });
+
+  it('a fractional salary change is still highlighted in the Workspace', async () => {
+    const pay = (key: string, min: number) => ({
+      ...variant(key, 'Remote'),
+      fields: { ...variant(key, 'Remote').fields, publicCompensation: { min, max: 22000, currency: 'USD', period: 'month' } },
+    });
+    api.generateCopilotTitleVariants.mockResolvedValue({ title: 'Finance Manager', variants: [pay('A', 15000), pay('B', 15000), pay('C', 15000)] } as never);
+    renderPanel();
+    fireEvent.click(await screen.findByText('Start with a Job Title'));
+    send('Finance Manager');
+    await waitFor(() => expect(composerBox().disabled).toBe(false));
+    api.refineCopilotVariants.mockResolvedValueOnce({ variants: [pay('A', 15000.25), pay('B', 15000.25), pay('C', 15000.25)] } as never);
+    send('salary from 15000.25');
+    const shown = await screen.findByText(/15,000\.25–22K \/ month/);
+    expect(shown.closest('.gm-changed')).not.toBeNull();
+  });
 });

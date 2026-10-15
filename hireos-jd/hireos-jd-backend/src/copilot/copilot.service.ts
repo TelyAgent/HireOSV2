@@ -11,6 +11,7 @@ import { LlmProvider, type ChatTurn, type WebAnswer } from './llm-provider';
 import { PromptRegistry } from './prompt-registry';
 import { fieldsToDraftContent } from './draft-mapping';
 import { ReplyStreamExtractor } from './reply-stream-extractor';
+import { changedJdFields, refineReply } from './refine-summary';
 import {
   autoCompleteInputSchema,
   computeMissingAuthoredFields,
@@ -460,18 +461,22 @@ export class CopilotService {
     }
 
     const fields = await this.runRefineTurn(identity, id, current, input.note);
+    // Nothing really changed: keep the draft and its revision as they are, and say so in the history (#99).
+    const changed = changedJdFields(current, fields).length > 0;
     return this.db.$transaction(async (tx) => {
       const prior = await findIdempotent(tx, identity, operation, meta, input);
       if (prior.prior) return prior.prior.responseBody;
-      const updated = await tx.copilotConversation.update({
-        where: { id },
-        data: { fields: json(fields), missingFields: json([]), phase: 'ready_to_confirm', stateRevision: { increment: 1 } },
-      });
+      const updated = changed
+        ? await tx.copilotConversation.update({
+            where: { id },
+            data: { fields: json(fields), missingFields: json([]), phase: 'ready_to_confirm', stateRevision: { increment: 1 } },
+          })
+        : conversation;
       const latest = await tx.copilotMessage.findFirst({ where: { conversationId: id }, orderBy: { sequence: 'desc' } });
       const sequence = (latest?.sequence ?? 0) + 1;
       await tx.copilotMessage.create({ data: { conversationId: id, sequence, role: 'user', text: input.note, idempotencyKey: prior.key } });
       await tx.copilotMessage.create({
-        data: { conversationId: id, sequence: sequence + 1, role: 'assistant', text: '已按你的补充意见更新草稿，改动已在工作区中标出。' },
+        data: { conversationId: id, sequence: sequence + 1, role: 'assistant', text: refineReply(current, fields, input.note) },
       });
       const messages = await tx.copilotMessage.findMany({ where: { conversationId: id }, orderBy: { sequence: 'asc' } });
       const result = serializeConversation(updated, messages);

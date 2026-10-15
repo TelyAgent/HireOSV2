@@ -290,7 +290,8 @@ function diffDrafts(prev: GeminiDraft | undefined, next: GeminiDraft): DraftChan
       changes.count++;
     }
   }
-  if (money(prev.compensation) !== money(next.compensation)) {
+  // Compare the amounts themselves, not their display text, so any real change is highlighted.
+  if (JSON.stringify(canonFields(prev.compensation ?? {})) !== JSON.stringify(canonFields(next.compensation ?? {}))) {
     changes.fields.compensation = money(prev.compensation);
     changes.count++;
   }
