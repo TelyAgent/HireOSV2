@@ -116,23 +116,28 @@ export async function extractTextFromLink(rawUrl: string, options: LinkExtractOp
   return text.length > MAX_EXTRACTED_CHARS ? text.slice(0, MAX_EXTRACTED_CHARS) : text;
 }
 
+/** No browser to render with, or the render broke down (connection, crash, timeout) — says nothing about the page. */
+class RenderUnavailable extends Error {}
+
 /**
  * A short static page may be a script-rendered shell, or simply a short posting. Rendering is only used when it
- * yields more: if it is unavailable or fails, a static text that already reads as content is kept (#64 review).
+ * yields more. When no render could be done, a static text that already reads as content is kept (#64 review);
+ * but what the render did find out about the page — a human check, a redirect into the intranet — is reported.
  */
 async function preferRendered(staticText: string, url: URL, network: LinkNetwork, options: LinkExtractOptions): Promise<string> {
   try {
     const rendered = await renderedText(url, network, options);
     return rendered.length > staticText.length ? rendered : staticText;
   } catch (error) {
+    if (!(error instanceof RenderUnavailable)) throw error;
     if (staticText.length >= MIN_CONTENT_CHARS) return staticText;
-    throw error;
+    throw linkError(SCRIPT_PAGE_MESSAGE);
   }
 }
 
 async function renderedText(url: URL, network: LinkNetwork, options: LinkExtractOptions): Promise<string> {
   const renderer = options.renderer === undefined ? configuredRenderer() : options.renderer;
-  if (!renderer) throw linkError(SCRIPT_PAGE_MESSAGE);
+  if (!renderer) throw new RenderUnavailable('no renderer configured');
   // One page load makes dozens of requests to a handful of hosts; resolve each host once.
   const checked = new Map<string, Promise<void>>();
   const result = await renderPage(url, renderer, {
@@ -144,9 +149,9 @@ async function renderedText(url: URL, network: LinkNetwork, options: LinkExtract
     fetch: network.fetch,
   }).catch((error: unknown) => {
     if (error instanceof BadRequestException) throw error;
-    // e.g. Chromium missing or crashed: the user gets the paste path, operators get the cause.
+    // e.g. the renderer unreachable or crashed: the user gets the paste path, operators get the cause.
     logger.warn(`rendering ${url.origin} failed: ${error instanceof Error ? error.message : String(error)}`);
-    throw linkError(SCRIPT_PAGE_MESSAGE);
+    throw new RenderUnavailable(error instanceof Error ? error.message : String(error));
   });
   if ('blocked' in result) throw linkError(PRIVATE_MESSAGE);
   const text = (jobPostingText(result.html) || htmlToText(result.html)).trim();

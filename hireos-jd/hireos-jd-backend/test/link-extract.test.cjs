@@ -66,6 +66,10 @@ function fixtureNetwork() {
           return new Response('', { status: 301, headers: { location: 'http://intranet.example.test/admin' } });
         case 'jobs.example.test/hang':
           return html('<html><body><div id="app"></div><script>setTimeout(() => { for (;;) {} }, 50);</script></body></html>');
+        case 'jobs.example.test/loading':
+          return html('<html><body><p>Welcome to Example Careers. Please wait while we load the job.</p><div id="app"></div><script src="https://cdn.example.test/challenge.js"></script></body></html>');
+        case 'cdn.example.test/challenge.js':
+          return new Response('document.body.innerHTML = "<h1>Verify you are human</h1>";', { status: 200, headers: { 'content-type': 'application/javascript' } });
         case 'jobs.example.test/short-static':
           return html('<html><body><h1>运营专员</h1><p>地点：杭州</p><ul><li>负责社群日常运营与活动策划</li><li>两年以上运营经验</li></ul></body></html>');
         case 'jobs.example.test/static':
@@ -204,6 +208,14 @@ test('#64 review: a page that hangs its renderer is stopped, and the render slot
 test('#64 review: the browser does not inherit the service environment', () => {
   const source = require('node:fs').readFileSync(require.resolve('../dist/copilot/link-render'), 'utf8');
   assert.match(source, /env: \{ PATH: process\.env\.PATH/);
+});
+
+test('#64 review AC-3: what the render finds out (a human check) is reported, not hidden behind the loading text', needsBrowser, async () => {
+  const { network } = fixtureNetwork();
+  await rejectsWith(extractTextFromLink('https://jobs.example.test/loading', { network, renderer }), /人机验证/);
+  // With no render possible, the same loading text is not a posting either — but there is nothing more to know.
+  const text = await extractTextFromLink('https://jobs.example.test/loading', { network, renderer: null });
+  assert.match(text, /Please wait/);
 });
 
 /** A `playwright run-server` like the jd-renderer container, when this machine has Playwright's own Chromium. */
