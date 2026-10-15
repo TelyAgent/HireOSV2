@@ -104,6 +104,17 @@ export class CopilotController {
     return this.copilot.confirmDraft(req.identity, id, meta(headers));
   }
 
+  /** Quick Start: checks the three answers and the job title before any draft (#65 #66). */
+  @Post(':id/quick-start')
+  quickStart(
+    @Req() req: { identity: Identity },
+    @Headers() headers: Record<string, string | undefined>,
+    @Param('id') id: string,
+    @Body() body: unknown,
+  ) {
+    return this.copilot.quickStart(req.identity, id, body, meta(headers));
+  }
+
   @Post(':id/auto-complete')
   autoComplete(
     @Req() req: { identity: Identity },

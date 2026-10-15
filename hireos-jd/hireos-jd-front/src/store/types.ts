@@ -92,6 +92,8 @@ export type GeminiMsg =
   | {
       role: "ai";
       draft: GeminiDraft;
+      /** The job title is an AI suggestion the user must confirm or edit before creating (#66). */
+      titlePending?: boolean;
       prev?: GeminiDraft;
       origin?: GeminiOrigin;
       superseded?: boolean;

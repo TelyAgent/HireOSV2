@@ -11,10 +11,12 @@ import { LlmProvider, type ChatTurn, type WebAnswer } from './llm-provider';
 import { PromptRegistry } from './prompt-registry';
 import { fieldsToDraftContent } from './draft-mapping';
 import { ReplyStreamExtractor } from './reply-stream-extractor';
+import { QUICK_START_ASSESS_PROMPT, TITLE_UNCONFIRMED, followUp, parseAssessment, tooThinToAssess } from './quick-start';
 import { changedJdFields, refineReply } from './refine-summary';
 import { OUT_OF_SCOPE_REPLY, SALARY_ANSWER_RULES, fixAnnualSalary, workflowGuide } from './jd-agent-scope';
 import {
   autoCompleteInputSchema,
+  quickStartInputSchema,
   computeMissingAuthoredFields,
   computeMissingFields,
   importSourceInputSchema,
@@ -162,16 +164,19 @@ export class CopilotService {
     };
   }
 
+  /** `pending`: confirmations still owed on a complete draft (e.g. TITLE_UNCONFIRMED); they don't change the phase. */
   private async commitTurn(
     identity: Identity,
     id: string,
     prep: Extract<TurnPrep, { cached: null }>,
     parsed: LlmTurnResult,
+    pending: string[] = [],
   ): Promise<SerializedConversation> {
     const { operation, key, hash, userMessage, capabilityCode, currentFields } = prep;
     const mergedFields: JdFields = { ...currentFields, ...parsed.fields };
-    const missingFields = computeMissingFields(mergedFields);
-    const phase = missingFields.length === 0 ? 'ready_to_confirm' : 'intake';
+    const computed = computeMissingFields(mergedFields);
+    const phase = computed.length === 0 ? 'ready_to_confirm' : 'intake';
+    const missingFields = [...computed, ...pending];
 
     try {
       return await this.db.$transaction(async (tx) => {
@@ -244,6 +249,10 @@ export class CopilotService {
     const conversation = await this.loadConversation(identity, id);
     if (conversation.jobId) return { conversationId: conversation.id, jobId: conversation.jobId };
     if (conversation.phase !== 'ready_to_confirm') throw new ConflictException({ code: 'CONVERSATION_NOT_READY' });
+    // An AI-suggested job title has to be confirmed (or edited) by the user before a job exists (#66 AC-2).
+    if (pendingConfirmations(conversation).includes(TITLE_UNCONFIRMED)) {
+      throw new ConflictException({ code: 'TITLE_UNCONFIRMED', message: '职位名称是 AI 建议的，请先确认或修改职位名称再创建职位。' });
+    }
 
     const key = meta.idempotencyKey?.trim();
     if (!key) throw new ConflictException({ code: 'IDEMPOTENCY_KEY_REQUIRED' });
@@ -470,7 +479,8 @@ export class CopilotService {
       const updated = changed
         ? await tx.copilotConversation.update({
             where: { id },
-            data: { fields: json(fields), missingFields: json([]), phase: 'ready_to_confirm', stateRevision: { increment: 1 } },
+            // A refine keeps an unconfirmed AI title unconfirmed; only the user confirming it clears that.
+            data: { fields: json(fields), missingFields: json(pendingConfirmations(conversation)), phase: 'ready_to_confirm', stateRevision: { increment: 1 } },
           })
         : conversation;
       const latest = await tx.copilotMessage.findFirst({ where: { conversationId: id }, orderBy: { sequence: 'desc' } });
@@ -641,6 +651,71 @@ export class CopilotService {
     return this.commitTurn(identity, id, prep, parsed);
   }
 
+  /**
+   * Quick Start (#65 #66): generate a full draft only when all three questions have a real answer and a job
+   * title can be suggested. Otherwise ask for exactly what's missing, without a draft. An AI-suggested
+   * title is marked unconfirmed, and the job can't be created until the user confirms or edits it.
+   */
+  async quickStart(identity: Identity, id: string, raw: unknown, meta: RequestMeta) {
+    const input = quickStartInputSchema.parse(raw);
+    const conversation = await this.loadConversation(identity, id);
+    if (conversation.phase === 'completed') throw new ConflictException({ code: 'CONVERSATION_COMPLETED' });
+    const key = meta.idempotencyKey?.trim();
+    if (!key) throw new ConflictException({ code: 'IDEMPOTENCY_KEY_REQUIRED' });
+    const operation = `copilot.quick-start:${id}`;
+    const hash = requestHash({ answers: input.answers });
+    const existing = await this.db.idempotencyKey.findUnique({
+      where: { workspaceId_operation_key: { workspaceId: identity.workspaceId, operation, key } },
+    });
+    if (existing) {
+      if (existing.requestHash !== hash) throw new ConflictException({ code: 'IDEMPOTENCY_CONFLICT' });
+      return existing.responseBody;
+    }
+
+    const assessment = tooThinToAssess(input.answers)
+      ? { answered: [false, false, false] as [boolean, boolean, boolean], title: null, titleFromUser: false }
+      : await this.assessQuickStart(identity, id, input.answers);
+    const currentFields = asRecord(conversation.fields) as JdFields;
+    const prep = (capabilityCode: string, turns: ChatTurn[]): Extract<TurnPrep, { cached: null }> => ({
+      cached: null,
+      operation,
+      key,
+      hash,
+      userMessage: { text: input.answers },
+      capabilityCode,
+      turns,
+      currentFields,
+    });
+
+    const ask = followUp(assessment, input.answers);
+    if (ask) {
+      // Nothing to draft yet: keep collecting, no fields written, no draft shown.
+      return this.commitTurn(identity, id, prep('jd_quick_start_follow_up', []), { reply: ask, phase: 'intake', fields: {}, missingFields: [] });
+    }
+
+    const brief = [
+      '我选择了「快速开始」。以下是我对 3 个问题的回答，请据此直接生成一份完整 JD：',
+      '1. 遇到了什么困难想招人；2. 希望候选人解决什么问题；3. 候选人必须具备哪些硬技能。',
+      '',
+      '我的回答：',
+      input.answers,
+      '',
+      assessment.titleFromUser ? `职位名称（用户给出）：${assessment.title}` : `职位名称（AI 根据回答建议，待用户确认）：${assessment.title}`,
+    ].join('\n');
+    const turns: ChatTurn[] = [{ role: 'user', content: brief }];
+    const parsed = await this.runAutoCompleteTurn(identity, id, turns);
+    const result: LlmTurnResult = { ...parsed, fields: { ...parsed.fields, title: assessment.title! } };
+    return this.commitTurn(identity, id, prep('jd_autotake_turn', turns), result, assessment.titleFromUser ? [] : [TITLE_UNCONFIRMED]);
+  }
+
+  private async assessQuickStart(identity: Identity, id: string, answers: string) {
+    try {
+      return parseAssessment(await this.llm.completeJson(QUICK_START_ASSESS_PROMPT, [{ role: 'user', content: answers }]));
+    } catch (error) {
+      throw await this.recordLlmFailure(identity, id, 'jd_quick_start_assess', error);
+    }
+  }
+
   private async loadConversation(identity: Identity, id: string): Promise<ConversationRow> {
     const conversation = await this.db.copilotConversation.findFirst({ where: { id, workspaceId: identity.workspaceId } });
     if (!conversation) throw new NotFoundException({ code: 'CONVERSATION_NOT_FOUND' });
@@ -799,4 +874,9 @@ function asRecord(value: unknown): Record<string, unknown> {
 
 function isUniqueConstraintError(error: unknown): boolean {
   return error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002';
+}
+
+/** Confirmations still owed on the conversation's draft (see `TITLE_UNCONFIRMED`). */
+function pendingConfirmations(conversation: { missingFields: unknown }): string[] {
+  return Array.isArray(conversation.missingFields) ? conversation.missingFields.filter((f): f is string => f === TITLE_UNCONFIRMED) : [];
 }

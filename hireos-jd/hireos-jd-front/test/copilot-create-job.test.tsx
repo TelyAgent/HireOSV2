@@ -12,6 +12,8 @@ vi.mock('../src/features/copilot/copilotApi', async (importOriginal) => ({
   listCopilotConversations: vi.fn(async () => []),
   getCopilotConversation: vi.fn(),
   autoCompleteCopilotConversation: vi.fn(),
+  quickStartCopilotConversation: vi.fn(),
+  TITLE_UNCONFIRMED: 'title_unconfirmed',
   generateCopilotTitleVariants: vi.fn(),
   importCopilotSource: vi.fn(),
   refineCopilotDraft: vi.fn(),
@@ -102,7 +104,7 @@ describe('Copilot → create job (#34)', () => {
   });
 
   it('#69: a Quick Start draft opens the new job’s editor after Create, and a double click creates it once', async () => {
-    api.autoCompleteCopilotConversation.mockResolvedValue({
+    api.quickStartCopilotConversation.mockResolvedValue({
       id: 'conv-new', jobId: null, phase: 'ready_to_confirm', fields: FIELDS, missingFields: [], stateRevision: 2, createdAt: '', updatedAt: '', messages: [],
     } as never);
     let finish!: (v: { conversationId: string; jobId: string }) => void;

@@ -86,6 +86,13 @@ export function computeMissingFields(fields: JdFields): string[] {
 }
 
 /** Optional user turn for auto-complete — e.g. the Quick Start answers — instead of the bare "自动补全" trigger. */
+/** Quick Start (M1): everything the user has answered so far for the three questions. */
+export const quickStartInputSchema = z
+  .object({
+    answers: z.string().trim().min(1).max(4000),
+  })
+  .strict();
+
 export const autoCompleteInputSchema = z
   .object({
     text: z.string().trim().min(1).max(4000).optional(),
