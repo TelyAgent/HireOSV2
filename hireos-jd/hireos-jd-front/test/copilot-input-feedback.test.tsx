@@ -228,4 +228,23 @@ describe('#99: refine only reports real changes', () => {
     send('add the salary');
     expect(await screen.findByText(/Nothing changed — the draft didn’t need an edit/)).toBeInTheDocument();
   });
+
+  it('a small salary change (hourly 26–36 → 29–39) shows the new amount, highlighted, in the Workspace', async () => {
+    const hourly = (key: string, min: number, max: number) => ({
+      ...variant(key, 'Remote'),
+      fields: { ...variant(key, 'Remote').fields, publicCompensation: { min, max, currency: 'USD', period: 'hour' } },
+    });
+    api.generateCopilotTitleVariants.mockResolvedValue({ title: 'Finance Manager', variants: [hourly('A', 26, 36), hourly('B', 26, 36), hourly('C', 26, 36)] } as never);
+    renderPanel();
+    fireEvent.click(await screen.findByText('Start with a Job Title'));
+    send('Finance Manager');
+    await waitFor(() => expect(composerBox().disabled).toBe(false));
+
+    api.refineCopilotVariants.mockResolvedValueOnce({ variants: [hourly('A', 29, 39), hourly('B', 29, 39), hourly('C', 29, 39)] } as never);
+    send('raise the hourly salary to 29-39');
+    expect(await screen.findByText(/- Version A: Salary/)).toBeInTheDocument();
+    const shown = await screen.findByText(/29–39 \/ hour/);
+    expect(shown.closest('.gm-changed')).not.toBeNull();
+    expect(document.body.textContent).not.toContain('0.03K');
+  });
 });
