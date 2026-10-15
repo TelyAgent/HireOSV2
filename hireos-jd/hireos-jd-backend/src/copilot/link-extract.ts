@@ -101,9 +101,23 @@ export async function extractTextFromLink(rawUrl: string, options: LinkExtractOp
   // Job boards publish schema.org JobPosting for search engines; it is cleaner than the page chrome around it.
   let text = ((isHtml && jobPostingText(body)) || (isHtml ? htmlToText(body) : body)).trim();
   if (looksLikeBotChallenge(text)) throw linkError(BLOCKED_MESSAGE);
-  if (isHtml && text.length < MIN_STATIC_CHARS) text = await renderedText(url, network, options);
+  if (isHtml && text.length < MIN_STATIC_CHARS) text = await preferRendered(text, url, network, options);
   if (text.length < MIN_CONTENT_CHARS) throw linkError(NO_CONTENT_MESSAGE);
   return text.length > MAX_EXTRACTED_CHARS ? text.slice(0, MAX_EXTRACTED_CHARS) : text;
+}
+
+/**
+ * A short static page may be a script-rendered shell, or simply a short posting. Rendering is only used when it
+ * yields more: if it is unavailable or fails, a static text that already reads as content is kept (#64 review).
+ */
+async function preferRendered(staticText: string, url: URL, network: LinkNetwork, options: LinkExtractOptions): Promise<string> {
+  try {
+    const rendered = await renderedText(url, network, options);
+    return rendered.length > staticText.length ? rendered : staticText;
+  } catch (error) {
+    if (staticText.length >= MIN_CONTENT_CHARS) return staticText;
+    throw error;
+  }
 }
 
 async function renderedText(url: URL, network: LinkNetwork, options: LinkExtractOptions): Promise<string> {

@@ -64,6 +64,8 @@ function fixtureNetwork() {
           return html('<!doctype html><html><body><div id="app"></div><script>document.title = "x";</script></body></html>');
         case 'jobs.example.test/to-intranet':
           return new Response('', { status: 301, headers: { location: 'http://intranet.example.test/admin' } });
+        case 'jobs.example.test/short-static':
+          return html('<html><body><h1>运营专员</h1><p>地点：杭州</p><ul><li>负责社群日常运营与活动策划</li><li>两年以上运营经验</li></ul></body></html>');
         case 'jobs.example.test/static':
           return html(`<html><body><h1>Sales Manager</h1><p>${'Own B2B sales in Singapore, remote-friendly, 4+ years. '.repeat(8)}</p></body></html>`);
         default:
@@ -170,4 +172,14 @@ test('#64 review: parallel responses share one byte budget, so together they nev
   assert.ok(delivered <= MAX_TOTAL_BYTES, `delivered ${delivered / MB} MiB`);
   assert.ok(bodies.some((body) => body === null), 'responses past the budget are dropped');
   assert.equal((await readWithinBudget(new Response(new Uint8Array(11 * MB)), 10 * MB, { bytes: 0 })), null, 'one response over its own limit is dropped');
+});
+
+test('#64 review: a short static posting is still read when rendering is unavailable or fails', async () => {
+  const { network } = fixtureNetwork();
+  for (const browser of [null, '/nonexistent/chromium']) {
+    const text = await extractTextFromLink('https://jobs.example.test/short-static', { network, browserPath: browser });
+    assert.match(text, /运营专员/);
+    assert.match(text, /杭州/);
+    assert.ok(text.length < 200, 'short enough to have tried rendering');
+  }
 });
