@@ -722,7 +722,7 @@ export class CopilotService {
       // History holds no source text (an upload is stored as just "[已上传文件]"), so the facts already read
       // from it are passed explicitly; without them the model rebuilt the job from the file name (#79 #80).
       ...(Object.keys(currentFields).length
-        ? [{ role: 'user' as const, content: `当前草稿已有的字段（来自用户或其提供的资料，视为已确认）：\n${JSON.stringify(currentFields)}\n只补全缺失的字段，已有字段原样保留，不要改写其中的岗位类别、地点、工作方式、经验年限等事实。` }]
+        ? [{ role: 'user' as const, content: `当前草稿已有的字段（来自用户或其提供的资料，视为已确认）：\n${JSON.stringify(currentFields)}\n只补全缺失的字段，已有字段原样保留，不要改写其中的岗位类别、地点、工作方式、经验年限等事实；职责或任职要求不足两条时，可在原有条目之后补充，补充的条目不得出现与已有内容冲突的经验年限、地点或岗位类别。` }]
         : []),
       { role: 'user', content: userText },
     ];
@@ -1038,8 +1038,22 @@ export function sourceContent(kind: string, text: string): string {
   ].join('\n');
 }
 
-/** The fields of `generated` the draft doesn't have yet. */
+/** Lists a draft needs at least two items of before it is ready (see `computeMissingFields`). */
+const LISTS_NEEDING_TWO = ['responsibilities', 'mustHave'] as const;
+
+/**
+ * What auto-complete may write: the fields the draft doesn't have yet, and — for a list still short of what a
+ * ready draft needs — items added after the ones already there, which stay first and unchanged (#79 review).
+ */
 function onlyMissing(generated: JdFields, current: JdFields): JdFields {
   const has = (value: unknown) => value !== undefined && value !== null && value !== '' && !(Array.isArray(value) && value.length === 0);
-  return Object.fromEntries(Object.entries(generated).filter(([key]) => !has((current as Record<string, unknown>)[key]))) as JdFields;
+  const out = Object.fromEntries(Object.entries(generated).filter(([key]) => !has((current as Record<string, unknown>)[key]))) as JdFields;
+  for (const key of LISTS_NEEDING_TWO) {
+    const kept = current[key];
+    const suggested = generated[key];
+    if (!kept?.length || kept.length >= 2 || !suggested?.length) continue;
+    const added = suggested.filter((item) => !kept.includes(item));
+    if (added.length) out[key] = [...kept, ...added];
+  }
+  return out;
 }
