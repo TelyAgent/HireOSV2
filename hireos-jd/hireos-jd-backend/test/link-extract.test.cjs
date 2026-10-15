@@ -107,6 +107,9 @@ function fixtureNetwork() {
           return new Response(APP_JS, { status: 200, headers: { 'content-type': 'application/javascript' } });
         case 'jobs.example.test/go-intranet':
           return html('<html><body><div id="app"></div><script>setTimeout(() => { location.href = "/to-intranet"; }, 50);</script></body></html>');
+        case 'jobs.example.test/intro-and-shell':
+          // A long company intro in the HTML; the posting itself is loaded into #app by script.
+          return html(`<html><body><section><h2>About Example</h2><p>${'Example builds AI products for teams across Asia and Europe, with offices in Singapore, Hangzhou and Berlin. '.repeat(3)}</p></section><div id="app"></div><script src="https://cdn.example.test/app.js"></script></body></html>`, { 'set-cookie': 'csrf=token-1; Path=/' });
         case 'jobs.example.test/short-static':
           return html('<html><body><h1>运营专员</h1><p>地点：杭州</p><ul><li>负责社群日常运营与活动策划</li><li>两年以上运营经验</li></ul></body></html>');
         case 'jobs.example.test/static':
@@ -308,6 +311,14 @@ test('#64 review: a page redirect into the intranet is still refused', needsBrow
   const { network, requested } = fixtureNetwork();
   await rejectsWith(extractTextFromLink('https://jobs.example.test/go-intranet', { network, renderer, renderTimeoutMs: 10000 }), /内网地址/);
   assert.deepEqual(requested.filter((r) => r.url.includes('intranet.example.test')), []);
+});
+
+test('#64 review: an app shell with a long static intro is still rendered, so the posting is read', needsBrowser, async () => {
+  const { network } = fixtureNetwork();
+  const text = await extractTextFromLink('https://jobs.example.test/intro-and-shell', { network, renderer, renderTimeoutMs: 15000 });
+  assert.match(text, /AI应用算法工程师/);
+  // Without a browser the intro is not passed off as the posting.
+  await rejectsWith(extractTextFromLink('https://jobs.example.test/intro-and-shell', { network, renderer: null }), /网页脚本加载.*粘贴/);
 });
 
 /** A `playwright run-server` like the jd-renderer container, when this machine has Playwright's own Chromium. */

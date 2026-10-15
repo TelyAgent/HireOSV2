@@ -150,10 +150,14 @@ export async function extractTextFromLink(rawUrl: string, options: LinkExtractOp
   const body = await readLimited(response);
   const isHtml = /html/i.test(contentType);
   // Job boards publish schema.org JobPosting for search engines; it is cleaner than the page chrome around it.
-  let text = ((isHtml && jobPostingText(body)) || (isHtml ? htmlToText(body) : body)).trim();
+  const posting = isHtml ? jobPostingText(body) : null;
+  let text = (posting || (isHtml ? htmlToText(body) : body)).trim();
   if (looksLikeBotChallenge(text)) throw linkError(BLOCKED_MESSAGE);
   if (looksLikeLoginWall(text)) throw linkError(LOGIN_MESSAGE);
-  if (isHtml && text.length < MIN_STATIC_CHARS) text = await preferRendered(text, looksLikeScriptShell(body), url, network, options);
+  // Render when the HTML is too thin to be the posting, or is an app shell whose posting arrives by script even
+  // if other static text (a company intro) is long (#64 review). Structured JobPosting data needs no render.
+  const scriptShell = isHtml && !posting && looksLikeScriptShell(body);
+  if (isHtml && !posting && (text.length < MIN_STATIC_CHARS || scriptShell)) text = await preferRendered(text, scriptShell, url, network, options);
   if (text.length < MIN_CONTENT_CHARS) throw linkError(NO_CONTENT_MESSAGE);
   return text.length > MAX_EXTRACTED_CHARS ? text.slice(0, MAX_EXTRACTED_CHARS) : text;
 }
