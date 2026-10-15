@@ -293,7 +293,7 @@ export class CopilotService {
       job.id,
       {
         ...fieldsToDraftContent(fields),
-        sourceRefs: [{ kind: 'copilot_conversation', id }],
+        sourceRefs: [{ kind: 'copilot_conversation', id }, ...(await this.linkSourceRefs(id))],
         origin: 'jd_module',
       },
       { ...meta, idempotencyKey: `${key}:draft` },
@@ -303,6 +303,23 @@ export class CopilotService {
     this.logger.log(`confirm-draft completed: conversation=${id} job=${job.id}`);
 
     return { conversationId: id, jobId: job.id, draft };
+  }
+
+  /** Job links read in this conversation, so the created draft keeps where its content came from (#64 AC-2). */
+  private async linkSourceRefs(id: string): Promise<Array<{ kind: 'link'; url: string }>> {
+    const messages = await this.db.copilotMessage.findMany({
+      where: { conversationId: id, role: 'user' },
+      orderBy: { sequence: 'asc' },
+      select: { attachments: true },
+    });
+    const urls = new Set<string>();
+    for (const message of messages) {
+      for (const attachment of Array.isArray(message.attachments) ? message.attachments : []) {
+        const ref = asRecord(attachment);
+        if (ref.kind === 'link' && typeof ref.url === 'string') urls.add(ref.url);
+      }
+    }
+    return [...urls].map((url) => ({ kind: 'link', url }));
   }
 
   async processAttachment(identity: Identity, id: string, file: UploadedAttachment, meta: RequestMeta) {

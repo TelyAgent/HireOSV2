@@ -14,6 +14,16 @@ npm run start:dev
 
 The service listens on `http://127.0.0.1:3005/api`.
 
+### Reading job links rendered by scripts
+
+"Paste a Link or Text" first reads the page's HTML. When that HTML has no posting (the page loads it with
+scripts), the service renders the page in Chromium if `JD_LINK_BROWSER_PATH` points to a Chromium binary;
+otherwise it tells the user to paste the JD text. The Docker image installs Chromium and sets the variable.
+Locally, any Chromium works, e.g. one installed by `npx playwright install chromium`.
+
+The browser never connects out by itself: every request it makes goes through the same public-address check
+as the HTML fetch, and requests count, size and time are capped (`src/copilot/link-render.ts`).
+
 ## Current Phase
 
 The first backend slice supports:

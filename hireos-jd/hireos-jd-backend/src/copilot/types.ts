@@ -46,8 +46,15 @@ const llmListSchema = z.preprocess(
   z.array(z.string().trim().min(1)).optional(),
 );
 
+// A posting open in several cities (e.g. 北京 / 广州 / 杭州 / 上海, #64) comes back as a list; keep every city.
+const llmLocationSchema = z.preprocess(
+  (value) => (Array.isArray(value) && value.every((item) => typeof item === 'string') ? value.map((item) => item.trim()).filter(Boolean).join(' / ') || undefined : value),
+  z.string().trim().min(1).optional(),
+);
+
 const llmFieldsSchema = jdFieldsSchema
   .extend({
+    location: llmLocationSchema,
     responsibilities: llmListSchema,
     mustHave: llmListSchema,
     niceToHave: llmListSchema,

@@ -21,7 +21,7 @@ import {
   stripHtml,
 } from "./docHelpers";
 import { BLOCK_DRAG_MIME, RichBlockEditor } from "./RichBlockEditor";
-import { getCurrentDraft, getJobDocument, listSuggestions } from "./documentsApi";
+import { getCurrentDraft, getJobDocument, listSuggestions, sourceLinks } from "./documentsApi";
 import { getPerson } from "../../data/fixtures/people";
 import { updateJobFields } from "../jobs/jobsApi";
 import { coreJobToLocalJob } from "../jobs/jobsMapping";
@@ -67,6 +67,7 @@ export function DocumentTab({ jobId }: { jobId: string }) {
   // editors — which only read their content on mount — remount with the new text.
   const [docEpoch, setDocEpoch] = useState(0);
   const [loading, setLoading] = useState(true);
+  const [sources, setSources] = useState<string[]>([]);
   const docRef = useRef<HTMLDivElement>(null);
   const wrapRef = useRef<HTMLDivElement>(null);
   const [pendingSel, setPendingSel] = useState<PendingSel | null>(null);
@@ -143,6 +144,20 @@ export function DocumentTab({ jobId }: { jobId: string }) {
       cancelled = true;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [jobId]);
+
+  // Where the job's content was read from stays visible after the document is edited and saved (#64 AC-2).
+  useEffect(() => {
+    let cancelled = false;
+    setSources([]);
+    getCurrentDraft(jobId)
+      .then((content) => {
+        if (!cancelled) setSources(sourceLinks(content));
+      })
+      .catch((error) => console.warn("Failed to load the job's sources:", error));
+    return () => {
+      cancelled = true;
+    };
   }, [jobId]);
 
   // Suggestions live server-side so they survive reloads and are shared with the team.
@@ -408,6 +423,17 @@ export function DocumentTab({ jobId }: { jobId: string }) {
 
       <div className="jw-body">
         <div className="jw-doc-wrap" ref={wrapRef}>
+          {sources.length > 0 && (
+            <div className="jw-source tiny">
+              <Icon name="link" size={16} />
+              {t("Source")}:
+              {sources.map((url) => (
+                <a key={url} href={url} target="_blank" rel="noopener noreferrer">
+                  {url}
+                </a>
+              ))}
+            </div>
+          )}
           <div
             className="jw-doc"
             ref={docRef}

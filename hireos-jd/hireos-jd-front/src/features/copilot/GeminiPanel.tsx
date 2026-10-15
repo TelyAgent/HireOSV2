@@ -396,6 +396,11 @@ export function GeminiPanel({ ctx }: { ctx: GeminiCtx }) {
       draft.geminiChats = { ...draft.geminiChats, [key]: [...list, msg] };
     });
 
+  const removeMsg = (index: number) =>
+    mutate((draft) => {
+      draft.geminiChats = { ...draft.geminiChats, [key]: (draft.geminiChats[key] ?? []).filter((_, i) => i !== index) };
+    });
+
   const updateMsg = (
     index: number,
     patch: { done?: boolean; picked?: number; selected?: number; superseded?: boolean; created?: boolean; titlePending?: boolean; draft?: GeminiDraft },
@@ -727,7 +732,10 @@ export function GeminiPanel({ ctx }: { ctx: GeminiCtx }) {
     const msg = msgs[index];
     if (working || !msg || msg.role !== "ai" || msg.kind !== "request-failed" || msg.done || !msg.retry) return;
     const retry = msg.retry;
-    updateMsg(index, { done: true });
+    // The new attempt shows its own outcome, so the old card goes rather than stacking a second identical
+    // error under it (#64 AC-4). Upload only reopens the file picker, which can be cancelled: keep that card.
+    if (retry.action === "upload") updateMsg(index, { done: true });
+    else removeMsg(index);
     if ("text" in retry) setInput((current) => (current.trim() === retry.text.trim() ? "" : current));
     switch (retry.action) {
       case "chat":
