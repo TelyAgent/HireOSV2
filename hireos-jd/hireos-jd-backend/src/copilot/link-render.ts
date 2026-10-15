@@ -101,11 +101,22 @@ export async function renderPage(url: URL, renderer: Renderer, network: RenderNe
   });
 }
 
+type RenderState = {
+  requests: number;
+  bytes: number;
+  documentBlocked: boolean;
+  documentRedirects: number;
+  /** Where the first load was redirected to, for `render` to navigate on. */
+  redirectTo?: string;
+  /** The first load is done: later page redirects are navigated on by the route handler. */
+  loaded: boolean;
+};
+
 async function render(browser: Browser, url: URL, network: RenderNetwork, timeoutMs: number): Promise<RenderResult> {
   const deadline = Date.now() + timeoutMs;
   const remaining = () => Math.max(1, deadline - Date.now());
   const context = await browser.newContext({ serviceWorkers: 'block', locale: 'zh-CN', acceptDownloads: false });
-  const state = { requests: 0, bytes: 0, documentBlocked: false };
+  const state: RenderState = { requests: 0, bytes: 0, documentBlocked: false, documentRedirects: 0, loaded: false };
   let mainPage: Page | null = null;
   context.on('page', (page) => {
     // Pop-ups a page opens are never part of the posting.
@@ -120,13 +131,19 @@ async function render(browser: Browser, url: URL, network: RenderNetwork, timeou
     if (response.request().isNavigationRequest() && response.frame() === page.mainFrame()) documentStatus = response.status();
   });
   try {
-    const response = await page.goto(url.href, { waitUntil: 'domcontentloaded', timeout: remaining() }).catch(() => null);
+    let response = await page.goto(url.href, { waitUntil: 'domcontentloaded', timeout: remaining() }).catch(() => null);
+    while (!response && state.redirectTo && !state.documentBlocked) {
+      const next = state.redirectTo;
+      state.redirectTo = undefined;
+      response = await page.goto(next, { waitUntil: 'domcontentloaded', timeout: remaining() }).catch(() => null);
+    }
+    state.loaded = true;
     if (state.documentBlocked) return { blocked: 'private_address' };
     if (!response) return { html: '' };
     // The posting arrives from scripts, possibly after a pause with the network idle (a timer, a lazy request),
     // so idle network is no sign it has loaded. Stop once the text is long enough and has stopped changing,
     // else at the deadline (#64 review).
-    await waitForStableText(page, deadline, () => documentStatus >= 400).catch(() => undefined);
+    await waitForStableText(page, deadline, () => documentStatus >= 400 || state.documentBlocked).catch(() => undefined);
     if (state.documentBlocked) return { blocked: 'private_address' };
     if (documentStatus >= 400) return { status: documentStatus };
     return { html: await page.content() };
@@ -164,7 +181,7 @@ async function waitForStableText(page: Page, deadline: number, done: () => boole
 async function handleRoute(
   route: Route,
   network: RenderNetwork,
-  state: { requests: number; bytes: number; documentBlocked: boolean },
+  state: RenderState,
   remaining: () => number,
 ): Promise<void> {
   const request = route.request();
@@ -204,8 +221,20 @@ async function handleRoute(
         delete headers.cookie;
         delete headers.authorization;
       }
+      if (next.protocol !== 'http:' && next.protocol !== 'https:') return await route.abort('blockedbyclient');
+      // A page redirect must change the browser's address, or relative scripts and APIs resolve against the old
+      // one (#64 review): the browser navigates to the next hop itself, which is routed and checked like this one.
+      if (isDocument) {
+        if (++state.documentRedirects > MAX_REDIRECTS) return await route.abort('blockedbyclient');
+        await route.abort('aborted').catch(() => undefined);
+        if (state.loaded) {
+          void request.frame().goto(next.href, { waitUntil: 'domcontentloaded', timeout: remaining() }).catch(() => undefined);
+        } else {
+          state.redirectTo = next.href; // the first load is followed up by `render`
+        }
+        return;
+      }
       target = next;
-      if (target.protocol !== 'http:' && target.protocol !== 'https:') return await route.abort('blockedbyclient');
       // Like a browser: 303, and 301/302 after POST, continue as GET without a body.
       if (response.status === 303 || ((response.status === 301 || response.status === 302) && method === 'POST')) {
         method = 'GET';

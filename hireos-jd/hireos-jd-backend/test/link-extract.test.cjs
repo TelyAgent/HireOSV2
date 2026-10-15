@@ -96,6 +96,17 @@ function fixtureNetwork() {
           return html(`<html><body><div id="app"></div><script>/* ${'x'.repeat(600)} */ setTimeout(() => { ${APP_JS} }, 2500);</script></body></html>`, { 'set-cookie': 'csrf=token-1; Path=/' });
         case 'jobs.example.test/sign-in-to-apply':
           return html('<html><body><h1>运营专员</h1><p>地点：杭州</p><ul><li>负责社群日常运营与活动策划</li><li>两年以上运营经验</li></ul><button>Sign in to apply</button></body></html>');
+        case 'jobs.example.test/go-start':
+          return html('<html><body><div id="app"></div><script>setTimeout(() => { location.href = "/go"; }, 50);</script></body></html>');
+        case 'jobs.example.test/go':
+          return new Response('', { status: 302, headers: { location: '/positions/42/' } });
+        case 'jobs.example.test/positions/42/':
+          // A relative script: it only loads if the browser knows it is now at /positions/42/.
+          return html('<html><body><div id="app"></div><script src="app.js"></script></body></html>', { 'set-cookie': 'csrf=token-1; Path=/' });
+        case 'jobs.example.test/positions/42/app.js':
+          return new Response(APP_JS, { status: 200, headers: { 'content-type': 'application/javascript' } });
+        case 'jobs.example.test/go-intranet':
+          return html('<html><body><div id="app"></div><script>setTimeout(() => { location.href = "/to-intranet"; }, 50);</script></body></html>');
         case 'jobs.example.test/short-static':
           return html('<html><body><h1>运营专员</h1><p>地点：杭州</p><ul><li>负责社群日常运营与活动策划</li><li>两年以上运营经验</li></ul></body></html>');
         case 'jobs.example.test/static':
@@ -279,6 +290,24 @@ test('#64 review: a posting with a "Sign in to apply" button is read, not taken 
     assert.match(text, /运营专员/);
     assert.match(text, /Sign in to apply/);
   }
+});
+
+test('#64 review: a page redirect moves the browser, so relative scripts load from the new address', needsBrowser, async () => {
+  const { network, requested } = fixtureNetwork();
+  const text = await extractTextFromLink('https://jobs.example.test/go-start', { network, renderer, renderTimeoutMs: 15000 });
+  assert.match(text, /AI应用算法工程师/);
+  assert.ok(requested.some((r) => r.url === 'https://jobs.example.test/positions/42/app.js'));
+
+  // The first load itself redirected: rendering follows it the same way.
+  const { renderPage } = require('../dist/copilot/link-render');
+  const result = await renderPage(new URL('https://jobs.example.test/go'), renderer, { assertPublic: async () => {}, fetch: network.fetch }, 15000);
+  assert.match(result.html, /AI应用算法工程师/);
+});
+
+test('#64 review: a page redirect into the intranet is still refused', needsBrowser, async () => {
+  const { network, requested } = fixtureNetwork();
+  await rejectsWith(extractTextFromLink('https://jobs.example.test/go-intranet', { network, renderer, renderTimeoutMs: 10000 }), /内网地址/);
+  assert.deepEqual(requested.filter((r) => r.url.includes('intranet.example.test')), []);
 });
 
 /** A `playwright run-server` like the jd-renderer container, when this machine has Playwright's own Chromium. */
