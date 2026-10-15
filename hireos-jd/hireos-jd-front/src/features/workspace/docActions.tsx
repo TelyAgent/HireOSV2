@@ -57,9 +57,9 @@ import type { SideTab } from "../../store/types";
 
 /**
  * Byte budget for the document text in one Copilot request: the backend's JSON body limit is 100 KB and a
- * CJK character is 3 bytes in UTF-8, so the text plus the rest of the request must fit well inside it.
+ * CJK character is 3 bytes in UTF-8. Worst case: 50 KB document + ~24 KB selection + ~18 KB status < 100 KB.
  */
-const MAX_DOCUMENT_BYTES = 60_000;
+const MAX_DOCUMENT_BYTES = 50_000;
 
 /** The longest prefix of `text` that fits in `maxBytes` of UTF-8. */
 function fitBytes(text: string, maxBytes: number): string {
