@@ -31,7 +31,7 @@ import { mergeVoiceTranscript } from "../../lib/voice-stream";
 import { fmtRelative } from "../../lib/format";
 import type { Audience, Requirement } from "../../data/types";
 import type { ConversationActionOption, GeminiCreatePath, GeminiCreateRetry, GeminiDraft, GeminiMsg, GeminiOrigin, GeminiRequestRetry, GeminiVariant } from "../../store/types";
-import { describeCopilotError } from "./copilotErrors";
+import { ATTACHMENT_FILE_EMPTY, ATTACHMENT_TOO_LARGE, MAX_ATTACHMENT_MB, describeCopilotError } from "./copilotErrors";
 import { safeRandomUUID } from "../../lib/uuid";
 
 /** Converts a fetched conversation's raw messages back into the panel's bubble shapes. There's no
@@ -166,6 +166,55 @@ function resultToMsg(result: CopilotConversationDto, origin?: GeminiOrigin, prev
     : { role: "ai", text: lastReply?.text || "" };
 }
 
+/** Comparable form of draft fields: key order and empty/absent values ignored (a missing list equals `[]`). */
+function canonFields(v: unknown): unknown {
+  if (Array.isArray(v)) return v.map(canonFields);
+  if (v && typeof v === "object") {
+    return Object.fromEntries(
+      Object.entries(v as Record<string, unknown>)
+        .filter(([, x]) => x !== undefined && x !== null && x !== "" && !(Array.isArray(x) && x.length === 0))
+        .sort(([x], [y]) => (x < y ? -1 : x > y ? 1 : 0))
+        .map(([k, x]) => [k, canonFields(x)]),
+    );
+  }
+  return v;
+}
+
+/** Labels for the draft fields a refine can change — both the API's field names and the panel's draft names. */
+const REFINE_FIELD_LABELS: Record<string, string> = {
+  title: "Job title",
+  department: "Department",
+  location: "Location",
+  headcount: "Headcount",
+  employmentType: "Employment type",
+  roleSummary: "Role summary",
+  summary: "Role summary",
+  responsibilities: "Responsibilities",
+  mustHave: "Requirements",
+  must: "Requirements",
+  niceToHave: "Preferred",
+  pref: "Preferred",
+  publicCompensation: "Salary",
+  compensation: "Salary",
+  businessProblem: "Business problem",
+  expectedOutcomes: "Expected outcomes",
+  outcomes: "Expected outcomes",
+  successCriteria: "Success criteria",
+  success: "Success criteria",
+};
+const SALARY_FIELDS = ["publicCompensation", "compensation"];
+/** A note asking for salary content — then an unchanged salary must be called out, not hidden behind other edits. */
+const SALARY_NOTE = /salary|compensation|pay\b|wage|薪|工资|待遇|年薪|月薪/i;
+
+/** Which fields really differ between two drafts (#99), in a stable order. */
+function changedFields(next: unknown, prev: unknown): string[] {
+  const a = canonFields(next) as Record<string, unknown>;
+  const b = canonFields(prev) as Record<string, unknown>;
+  return [...new Set([...Object.keys(a), ...Object.keys(b)])]
+    .filter((k) => JSON.stringify(a[k]) !== JSON.stringify(b[k]))
+    .sort();
+}
+
 function formatWebAnswer(answer: CopilotWebAnswer, sourcesLabel: string): string {
   if (answer.sources.length === 0) return answer.text;
   return `${answer.text}\n\n${sourcesLabel}\n${answer.sources.map((source) => `- ${source.title} ${source.url}`).join("\n")}`;
@@ -241,7 +290,8 @@ function diffDrafts(prev: GeminiDraft | undefined, next: GeminiDraft): DraftChan
       changes.count++;
     }
   }
-  if (money(prev.compensation) !== money(next.compensation)) {
+  // Compare the amounts themselves, not their display text, so any real change is highlighted.
+  if (JSON.stringify(canonFields(prev.compensation ?? {})) !== JSON.stringify(canonFields(next.compensation ?? {}))) {
     changes.fields.compensation = money(prev.compensation);
     changes.count++;
   }
@@ -278,6 +328,8 @@ export function GeminiPanel({ ctx }: { ctx: GeminiCtx }) {
   const path: GeminiCreatePath = state.geminiCreatePaths[key] ?? "home";
 
   const [input, setInput] = useState("");
+  /** Why the last Send did nothing (empty / not a title), shown above the composer. */
+  const [composerHint, setComposerHint] = useState("");
   const [voiceStatus, setVoiceStatus] = useState<VoiceInputStatus>("idle");
   const [voiceLevel, setVoiceLevel] = useState(0);
   const [busy, setBusy] = useState(false);
@@ -484,25 +536,52 @@ export function GeminiPanel({ ctx }: { ctx: GeminiCtx }) {
       const conversationId = await ensureConversation();
       const { index, msg } = target;
       let reply: GeminiMsg;
+      // Only claim what actually changed (#99): list the fields each version really changed, say these are
+      // unsaved drafts, and when the note asked for salary but the salary didn't change, say so plainly.
+      const fieldList = (keys: string[]) => keys.map((k) => t(REFINE_FIELD_LABELS[k] ?? k)).join(", ");
+      const salaryAsked = SALARY_NOTE.test(note);
+      let summary: string;
       if (msg.kind === "variants") {
         const result = await refineCopilotVariants(conversationId, note, msg.variants);
         if (result.answer) return void resolveThinking({ role: "ai", text: formatWebAnswer(result.answer, t("Sources:")) });
+        const changes = result.variants.map((v, i) => ({ letter: String.fromCharCode(65 + i), fields: changedFields(v.fields, msg.variants[i]?.fields) }));
+        if (changes.every((c) => !c.fields.length)) {
+          return void resolveThinking({ role: "ai", text: t("Nothing changed — none of the versions needed an edit for that note. Nothing has been saved.") });
+        }
         reply = { ...msg, variants: result.variants, prev: msg.variants, superseded: undefined };
+        const lines = changes.map((c) =>
+          `- ${t("Version %s").replace("%s", c.letter)}: ${c.fields.length ? fieldList(c.fields) : t("no change")}`,
+        );
+        const noSalary = changes.filter((c) => !c.fields.some((k) => SALARY_FIELDS.includes(k))).map((c) => c.letter);
+        summary = [
+          t("Changed by your note (still unsaved drafts — nothing is written to a job until you create one; changes are highlighted in the Workspace):"),
+          ...lines,
+          ...(salaryAsked && noSalary.length
+            ? [
+                noSalary.length === changes.length
+                  ? t("The salary was not changed in any version.")
+                  : t("The salary was not changed in version %s.").replace("%s", noSalary.join(", ")),
+              ]
+            : []),
+        ].join("\n");
       } else {
         const result = await refineCopilotDraft(conversationId, note);
         // A question, not an edit: show the answer and keep the current draft as-is.
         if (result.answer) return void resolveThinking({ role: "ai", text: formatWebAnswer(result.answer, t("Sources:")) });
         reply = resultToMsg(result, msg.origin, msg.draft);
+        // Copilot replied with a question or a note instead of a new draft: show it, claim nothing.
+        if (!("draft" in reply) || !reply.draft) return void resolveThinking(reply);
+        const fields = changedFields(reply.draft, msg.draft);
+        if (!fields.length) {
+          return void resolveThinking({ role: "ai", text: t("Nothing changed — the draft didn’t need an edit for that note. Nothing has been saved.") });
+        }
+        summary = [
+          t("Changed in the draft: %s. It’s still an unsaved draft — nothing is written to a job until you create one; changes are highlighted in the Workspace.").replace("%s", fieldList(fields)),
+          ...(salaryAsked && !fields.some((k) => SALARY_FIELDS.includes(k)) ? [t("The salary was not changed.")] : []),
+        ].join("\n");
       }
       updateMsg(index, { superseded: true });
-      resolveThinking({
-        role: "ai",
-        text: t(
-          msg.kind === "variants"
-            ? "Updated all versions with your note — the changes are highlighted in the Workspace."
-            : "Updated the draft with your note — the changes are highlighted in the Workspace.",
-        ),
-      });
+      resolveThinking({ role: "ai", text: summary });
       push(reply);
       setRefining(false);
       setWsOpen(true);
@@ -531,7 +610,13 @@ export function GeminiPanel({ ctx }: { ctx: GeminiCtx }) {
       return;
     }
     const text = (overrideText ?? input).trim();
-    if (!text || working) return;
+    if (working) return;
+    // Say why nothing happens instead of silently ignoring the click (#75); the typed text stays.
+    if (!text) return void setComposerHint(path === "title" ? "Enter a job title first." : "Type a message first.");
+    if (path === "title" && !/\p{L}/u.test(text)) {
+      return void setComposerHint("That doesn’t look like a job title — use words, e.g. “Finance Manager” or “CFO”.");
+    }
+    setComposerHint("");
     setInput("");
     push({ role: "user", text });
     if (active && path === "home") return void refineDraft(text, active);
@@ -552,6 +637,7 @@ export function GeminiPanel({ ctx }: { ctx: GeminiCtx }) {
     // The file dialog has to open inside the click gesture, before any state update.
     if (p.key === "upload") attachFileInputRef.current?.click();
     setPath(p.key);
+    setComposerHint("");
     push({ role: "user", text: t(p.title) });
     if (p.key === "questions") {
       push({
@@ -690,6 +776,12 @@ export function GeminiPanel({ ctx }: { ctx: GeminiCtx }) {
       draft.geminiChats = { ...draft.geminiChats, [key]: list };
     });
     push({ role: "user", text: `[${t("Uploaded file")}] ${file.name}` });
+    // Nothing to send: say exactly why and offer to pick another file (#82).
+    const refused = file.size === 0 ? ATTACHMENT_FILE_EMPTY : file.size > MAX_ATTACHMENT_MB * 1024 * 1024 ? ATTACHMENT_TOO_LARGE : null;
+    if (refused) {
+      push({ role: "ai", kind: "request-failed", text: t(refused), retry: { action: "upload", fileName: file.name } });
+      return;
+    }
     setAttaching(true);
     try {
       if (
@@ -726,10 +818,11 @@ export function GeminiPanel({ ctx }: { ctx: GeminiCtx }) {
         title: d.title,
         department: d.department,
         team: d.department,
-        location: d.location || "Ho Chi Minh City, VN",
-        employmentType: d.employmentType || "Full-time",
-        workplaceType: "Hybrid",
-        level: seniority || "Mid",
+        // Only what the user or the draft actually gave; "—" is the mapping's "not set" (#76, #88).
+        location: d.location || "—",
+        employmentType: d.employmentType || "—",
+        workplaceType: "—",
+        level: seniority || "—",
         priority: "normal",
         headcount: d.headcount || 1,
         hiringManager: draft.currentUserId,
@@ -771,7 +864,8 @@ export function GeminiPanel({ ctx }: { ctx: GeminiCtx }) {
         saveState: "saved",
         blocks: normalizeBlocks([
           mkBlock(bid(), "h2", d.title),
-          mkBlock(bid(), "p", d.summary || "Drafted live with Ask Copilot from a spoken/typed description."),
+          // An empty summary stays empty (the editor shows its placeholder), not invented copy (#89).
+          mkBlock(bid(), "p", d.summary || ""),
           ...(d.businessProblem
             ? [
                 mkBlock(bid(), "h2", "Business problem", { level: "internal" }),
@@ -979,6 +1073,11 @@ export function GeminiPanel({ ctx }: { ctx: GeminiCtx }) {
               {t("Connecting…")}
             </div>
           )}
+          {composerHint && (
+            <div className="gm-composer-hint" role="alert">
+              {t(composerHint)}
+            </div>
+          )}
           <div className="gemini-composer-shell">
             <textarea
               ref={composerRef}
@@ -986,7 +1085,11 @@ export function GeminiPanel({ ctx }: { ctx: GeminiCtx }) {
               placeholder={t(refining && active ? "What would you like to change?" : COMPOSER_PLACEHOLDERS[path])}
               value={input}
               disabled={voiceStatus !== "idle"}
-              onChange={(e) => setInput(e.target.value)}
+              aria-invalid={composerHint ? true : undefined}
+              onChange={(e) => {
+                setInput(e.target.value);
+                setComposerHint("");
+              }}
               onKeyDown={(e) => {
                 if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) {
                   e.preventDefault();
@@ -1479,6 +1582,8 @@ function WorkspaceDoc({ d, changes, origin }: { d: GeminiDraft; changes: DraftCh
 
 const LEVELS = ["Intern", "Junior", "Mid", "Senior", "Staff", "Lead", "Manager", "Director"];
 const EMPLOYMENT_TYPES = ["Full-time", "Part-time", "Contract", "Internship"];
+/** Same cap as Core Record / the backend's `MAX_JOB_TITLE_LENGTH`. */
+const MAX_JOB_TITLE_LENGTH = 200;
 
 /** "Create Manually": the user writes the JD fields themselves — no AI drafting. */
 function ManualJobForm({
@@ -1496,7 +1601,8 @@ function ManualJobForm({
     location: "",
     headcount: "",
     level: "",
-    employmentType: "Full-time",
+    // Optional: left unset unless the user picks one, so no type is recorded as if confirmed (#88).
+    employmentType: "",
     department: "",
     summary: "",
     responsibilities: "",
@@ -1509,18 +1615,21 @@ function ManualJobForm({
     basis: "gross",
   });
   const [invalid, setInvalid] = useState<string | null>(null);
+  const [invalidReason, setInvalidReason] = useState("");
   const set = (field: keyof typeof values) => (e: { target: { value: string } }) => {
     setValues((v) => ({ ...v, [field]: e.target.value }));
     if (invalid === field) setInvalid(null);
   };
   const fail = (field: string, message: string) => {
     setInvalid(field);
+    setInvalidReason(message);
     say(t(message), { type: "error" });
   };
 
   const submit = () => {
     const headcount = Number(values.headcount);
     if (!values.title.trim()) return fail("title", "Please enter a job title.");
+    if (values.title.trim().length > MAX_JOB_TITLE_LENGTH) return fail("title", "Job title can be at most 200 characters.");
     if (!values.location.trim()) return fail("location", "Please enter a work location.");
     if (!Number.isInteger(headcount) || headcount < 1) return fail("headcount", "Headcount must be a whole number of 1 or more.");
     const responsibilities = toLines(values.responsibilities);
@@ -1549,7 +1658,7 @@ function ManualJobForm({
         title: values.title.trim(),
         location: values.location.trim(),
         headcount,
-        employmentType: values.employmentType,
+        ...(values.employmentType ? { employmentType: values.employmentType } : {}),
         ...(values.department.trim() ? { department: values.department.trim() } : {}),
         ...(values.summary.trim() ? { roleSummary: values.summary.trim() } : {}),
         responsibilities,
@@ -1570,6 +1679,7 @@ function ManualJobForm({
         <label className="full">
           {t("Job title")} *
           <input className={cls("title")} value={values.title} onChange={set("title")} placeholder={t("e.g. Growth Operations Manager")} autoFocus />
+          {invalid === "title" && <span className="gm-field-error">{t(invalidReason)}</span>}
         </label>
         <label>
           {t("Location")} *
@@ -1593,6 +1703,7 @@ function ManualJobForm({
         <label>
           {t("Employment type")}
           <select value={values.employmentType} onChange={set("employmentType")}>
+            <option value="">{t("Not set")}</option>
             {EMPLOYMENT_TYPES.map((x) => (
               <option key={x} value={x}>
                 {t(x)}

@@ -100,4 +100,23 @@ describe('Copilot → create job (#34)', () => {
     expect(api.confirmCopilotDraft.mock.calls.map((c) => c[0])).toEqual(['conv-new', 'conv-new']);
     expect(api.createCopilotConversation).toHaveBeenCalledTimes(1);
   });
+
+  it('#69: a Quick Start draft opens the new job’s editor after Create, and a double click creates it once', async () => {
+    api.autoCompleteCopilotConversation.mockResolvedValue({
+      id: 'conv-new', jobId: null, phase: 'ready_to_confirm', fields: FIELDS, missingFields: [], stateRevision: 2, createdAt: '', updatedAt: '', messages: [],
+    } as never);
+    let finish!: (v: { conversationId: string; jobId: string }) => void;
+    api.confirmCopilotDraft.mockReturnValue(new Promise((resolve) => (finish = resolve)));
+    renderPanel();
+    fireEvent.click(await screen.findByText('Quick Start'));
+    fireEvent.change(document.querySelector('.gemini-composer-shell textarea')!, { target: { value: 'Partner Integrations Engineer\nShanghai\nNode.js' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Send' }));
+
+    const create = await screen.findByRole('button', { name: /Create job from this draft/ });
+    fireEvent.click(create);
+    fireEvent.click(create);
+    finish({ conversationId: 'conv-new', jobId: 'job-qs-1' });
+    expect(await screen.findByTestId('editor')).toHaveTextContent('editor:job-qs-1');
+    expect(api.confirmCopilotDraft).toHaveBeenCalledTimes(1);
+  });
 });

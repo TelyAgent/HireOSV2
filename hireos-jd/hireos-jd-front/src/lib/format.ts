@@ -102,7 +102,14 @@ export const CURRENCY_ZH: Record<string, string> = {
  */
 export function salaryText(range: MoneyRange, lang: "zh" | "en"): string {
   const zh = lang === "zh";
-  const k = (n: number | null) => (n == null ? "—" : `${Number((n / 1000).toFixed(2)).toLocaleString("en-US")}K`);
+  // Never rounds, so two different salaries never render the same (#99 review): whole thousands in K
+  // (15000 → 15K, 1234 → 1.234K), anything else (an hourly 26, or 15000.25) as the full number.
+  const k = (n: number | null) =>
+    n == null
+      ? "—"
+      : Number.isInteger(n) && Math.abs(n) >= 1000
+        ? `${(n / 1000).toLocaleString("en-US", { maximumFractionDigits: 3 })}K`
+        : n.toLocaleString("en-US", { maximumFractionDigits: 6 });
   const amount = `${k(range.min)}–${k(range.max)}`;
   const period = range.period === "year" ? (zh ? "年" : "year") : range.period === "hour" ? (zh ? "小时" : "hour") : zh ? "月" : "month";
   const basis = range.basis === "gross" ? (zh ? "税前" : "gross") : range.basis === "net" ? (zh ? "税后" : "net") : range.basis;

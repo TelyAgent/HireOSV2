@@ -128,15 +128,23 @@ export const refineVariantsInputSchema = z
 
 export const titleVariantsInputSchema = z
   .object({
-    title: z.string().trim().min(1).max(120),
+    // Digits or symbols alone (`123`, `???`) are not a job title; `CFO`, `3D 设计师` are (#75).
+    title: z.string().trim().min(1).max(120).regex(/\p{L}/u, 'A job title needs at least one letter.'),
   })
   .strict();
 
 /** Fields the user authored or picked directly (manual form, a chosen title variant) — no LLM turn. */
+export const MAX_JOB_TITLE_LENGTH = 200;
+
 export const setFieldsInputSchema = z
   .object({
-    fields: jdFieldsSchema,
-    label: z.string().trim().min(1).max(200),
+    // Core Record caps a job title at 200 characters; refuse a longer one here as a field error (#90).
+    fields: jdFieldsSchema.refine((fields) => !fields.title || fields.title.length <= MAX_JOB_TITLE_LENGTH, {
+      message: `Job title can be at most ${MAX_JOB_TITLE_LENGTH} characters.`,
+      path: ['title'],
+    }),
+    // The label echoes the title ("Create Manually: <title>"), so it must fit a full-length title.
+    label: z.string().trim().min(1).max(MAX_JOB_TITLE_LENGTH + 200),
   })
   .strict();
 

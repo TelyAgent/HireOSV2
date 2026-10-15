@@ -129,7 +129,7 @@ export function buildDraftFromBackend(title: string, content: CurrentDraftDto, j
   const bid = () => `b${jobId.slice(-3)}-${n++}`;
 
   blocks.push(mkBlock(bid(), "h2", title, { level: "public" }));
-  blocks.push(mkBlock(bid(), "p", content.roleSummary || "No role summary on file.", { level: "public" }));
+  blocks.push(mkBlock(bid(), "p", content.roleSummary || "", { level: "public" }));
   const businessProblem = content.hiringContext?.businessProblem;
   if (businessProblem) {
     blocks.push(mkBlock(bid(), "h2", "Business problem", { level: "internal" }));

@@ -119,8 +119,10 @@ export function DocumentTab({ jobId }: { jobId: string }) {
             blocks,
             meta: saved.meta ?? undefined,
             serverRevision: saved.revision,
-            // Documents saved before per-block visibility get migrated here; save that once.
-            saveState: blocks === saved.blocks ? "saved" : "dirty",
+            // Documents saved before per-block visibility get migrated here. That is a display-only
+            // normalization, not an edit: it goes out with the user's next real save, and just opening
+            // the job doesn't say "Unsaved changes" (#97).
+            saveState: "saved",
           };
         });
       } else {

@@ -1,15 +1,20 @@
 import {
+  type ArgumentsHost,
   BadRequestException,
   Body,
+  Catch,
   Controller,
+  type ExceptionFilter,
   Get,
   Headers,
   HttpException,
   Param,
+  PayloadTooLargeException,
   Post,
   Req,
   Res,
   UploadedFile,
+  UseFilters,
   UseGuards,
   UseInterceptors,
 } from '@nestjs/common';
@@ -19,7 +24,20 @@ import { WorkspaceGuard, type Identity } from '../auth/workspace.guard';
 import type { RequestMeta } from '../records';
 import { CopilotService } from './copilot.service';
 
-const MAX_ATTACHMENT_BYTES = 10 * 1024 * 1024;
+export const MAX_ATTACHMENT_BYTES = 10 * 1024 * 1024;
+
+/** Multer's "File too large" becomes a coded 413 that says what the limit is (#82). */
+@Catch(PayloadTooLargeException)
+export class AttachmentTooLargeFilter implements ExceptionFilter {
+  catch(_exception: PayloadTooLargeException, host: ArgumentsHost) {
+    const response = host.switchToHttp().getResponse<{ status: (code: number) => { json: (body: unknown) => void } }>();
+    response.status(413).json({
+      code: 'ATTACHMENT_TOO_LARGE',
+      message: `文件超过 ${MAX_ATTACHMENT_BYTES / 1024 / 1024} MB 上限，请压缩或拆分后重新上传。`,
+      maxBytes: MAX_ATTACHMENT_BYTES,
+    });
+  }
+}
 
 @Controller('copilot/conversations')
 @UseGuards(WorkspaceGuard)
@@ -137,6 +155,7 @@ export class CopilotController {
   }
 
   @Post(':id/attachments')
+  @UseFilters(AttachmentTooLargeFilter)
   @UseInterceptors(FileInterceptor('file', { limits: { fileSize: MAX_ATTACHMENT_BYTES } }))
   uploadAttachment(
     @Req() req: { identity: Identity },
@@ -145,6 +164,7 @@ export class CopilotController {
     @UploadedFile() file?: Express.Multer.File,
   ) {
     if (!file) throw new BadRequestException({ code: 'ATTACHMENT_REQUIRED', message: '请选择要上传的文件。' });
+    if (file.size === 0) throw new BadRequestException({ code: 'ATTACHMENT_FILE_EMPTY', message: '文件是空的（0 字节），请重新选择有内容的文件。' });
     return this.copilot.processAttachment(req.identity, id, file, meta(headers));
   }
 }
