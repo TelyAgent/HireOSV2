@@ -166,21 +166,53 @@ function resultToMsg(result: CopilotConversationDto, origin?: GeminiOrigin, prev
     : { role: "ai", text: lastReply?.text || "" };
 }
 
-/** Deep equality for draft fields, ignoring key order and empty/absent values (a missing list equals `[]`). */
-function sameFields(a: unknown, b: unknown): boolean {
-  const canon = (v: unknown): unknown => {
-    if (Array.isArray(v)) return v.map(canon);
-    if (v && typeof v === "object") {
-      return Object.fromEntries(
-        Object.entries(v as Record<string, unknown>)
-          .filter(([, x]) => x !== undefined && x !== null && x !== "" && !(Array.isArray(x) && x.length === 0))
-          .sort(([x], [y]) => (x < y ? -1 : x > y ? 1 : 0))
-          .map(([k, x]) => [k, canon(x)]),
-      );
-    }
-    return v;
-  };
-  return JSON.stringify(canon(a)) === JSON.stringify(canon(b));
+/** Comparable form of draft fields: key order and empty/absent values ignored (a missing list equals `[]`). */
+function canonFields(v: unknown): unknown {
+  if (Array.isArray(v)) return v.map(canonFields);
+  if (v && typeof v === "object") {
+    return Object.fromEntries(
+      Object.entries(v as Record<string, unknown>)
+        .filter(([, x]) => x !== undefined && x !== null && x !== "" && !(Array.isArray(x) && x.length === 0))
+        .sort(([x], [y]) => (x < y ? -1 : x > y ? 1 : 0))
+        .map(([k, x]) => [k, canonFields(x)]),
+    );
+  }
+  return v;
+}
+
+/** Labels for the draft fields a refine can change — both the API's field names and the panel's draft names. */
+const REFINE_FIELD_LABELS: Record<string, string> = {
+  title: "Job title",
+  department: "Department",
+  location: "Location",
+  headcount: "Headcount",
+  employmentType: "Employment type",
+  roleSummary: "Role summary",
+  summary: "Role summary",
+  responsibilities: "Responsibilities",
+  mustHave: "Requirements",
+  must: "Requirements",
+  niceToHave: "Preferred",
+  pref: "Preferred",
+  publicCompensation: "Salary",
+  compensation: "Salary",
+  businessProblem: "Business problem",
+  expectedOutcomes: "Expected outcomes",
+  outcomes: "Expected outcomes",
+  successCriteria: "Success criteria",
+  success: "Success criteria",
+};
+const SALARY_FIELDS = ["publicCompensation", "compensation"];
+/** A note asking for salary content — then an unchanged salary must be called out, not hidden behind other edits. */
+const SALARY_NOTE = /salary|compensation|pay\b|wage|薪|工资|待遇|年薪|月薪/i;
+
+/** Which fields really differ between two drafts (#99), in a stable order. */
+function changedFields(next: unknown, prev: unknown): string[] {
+  const a = canonFields(next) as Record<string, unknown>;
+  const b = canonFields(prev) as Record<string, unknown>;
+  return [...new Set([...Object.keys(a), ...Object.keys(b)])]
+    .filter((k) => JSON.stringify(a[k]) !== JSON.stringify(b[k]))
+    .sort();
 }
 
 function formatWebAnswer(answer: CopilotWebAnswer, sourcesLabel: string): string {
@@ -503,23 +535,34 @@ export function GeminiPanel({ ctx }: { ctx: GeminiCtx }) {
       const conversationId = await ensureConversation();
       const { index, msg } = target;
       let reply: GeminiMsg;
-      // Only claim what actually changed (#99): these are unsaved drafts, so say so, and never report an
-      // update for a version whose content came back identical.
+      // Only claim what actually changed (#99): list the fields each version really changed, say these are
+      // unsaved drafts, and when the note asked for salary but the salary didn't change, say so plainly.
+      const fieldList = (keys: string[]) => keys.map((k) => t(REFINE_FIELD_LABELS[k] ?? k)).join(", ");
+      const salaryAsked = SALARY_NOTE.test(note);
       let summary: string;
       if (msg.kind === "variants") {
         const result = await refineCopilotVariants(conversationId, note, msg.variants);
         if (result.answer) return void resolveThinking({ role: "ai", text: formatWebAnswer(result.answer, t("Sources:")) });
-        const changed = result.variants
-          .map((v, i) => (sameFields(v.fields, msg.variants[i]?.fields) ? null : String.fromCharCode(65 + i)))
-          .filter((letter): letter is string => letter !== null);
-        if (!changed.length) {
+        const changes = result.variants.map((v, i) => ({ letter: String.fromCharCode(65 + i), fields: changedFields(v.fields, msg.variants[i]?.fields) }));
+        if (changes.every((c) => !c.fields.length)) {
           return void resolveThinking({ role: "ai", text: t("Nothing changed — none of the versions needed an edit for that note. Nothing has been saved.") });
         }
         reply = { ...msg, variants: result.variants, prev: msg.variants, superseded: undefined };
-        summary =
-          changed.length === result.variants.length
-            ? t("Updated all %n versions with your note. They’re still unsaved drafts — nothing is written to a job until you create one. Changes are highlighted in the Workspace.").replace("%n", String(changed.length))
-            : t("Updated version %s with your note; the other versions didn’t change. They’re still unsaved drafts — nothing is written to a job until you create one.").replace("%s", changed.join(", "));
+        const lines = changes.map((c) =>
+          `- ${t("Version %s").replace("%s", c.letter)}: ${c.fields.length ? fieldList(c.fields) : t("no change")}`,
+        );
+        const noSalary = changes.filter((c) => !c.fields.some((k) => SALARY_FIELDS.includes(k))).map((c) => c.letter);
+        summary = [
+          t("Changed by your note (still unsaved drafts — nothing is written to a job until you create one; changes are highlighted in the Workspace):"),
+          ...lines,
+          ...(salaryAsked && noSalary.length
+            ? [
+                noSalary.length === changes.length
+                  ? t("The salary was not changed in any version.")
+                  : t("The salary was not changed in version %s.").replace("%s", noSalary.join(", ")),
+              ]
+            : []),
+        ].join("\n");
       } else {
         const result = await refineCopilotDraft(conversationId, note);
         // A question, not an edit: show the answer and keep the current draft as-is.
@@ -527,10 +570,14 @@ export function GeminiPanel({ ctx }: { ctx: GeminiCtx }) {
         reply = resultToMsg(result, msg.origin, msg.draft);
         // Copilot replied with a question or a note instead of a new draft: show it, claim nothing.
         if (!("draft" in reply) || !reply.draft) return void resolveThinking(reply);
-        if (sameFields(reply.draft, msg.draft)) {
+        const fields = changedFields(reply.draft, msg.draft);
+        if (!fields.length) {
           return void resolveThinking({ role: "ai", text: t("Nothing changed — the draft didn’t need an edit for that note. Nothing has been saved.") });
         }
-        summary = t("Updated the draft with your note. It’s still an unsaved draft — nothing is written to a job until you create one. Changes are highlighted in the Workspace.");
+        summary = [
+          t("Changed in the draft: %s. It’s still an unsaved draft — nothing is written to a job until you create one; changes are highlighted in the Workspace.").replace("%s", fieldList(fields)),
+          ...(salaryAsked && !fields.some((k) => SALARY_FIELDS.includes(k)) ? [t("The salary was not changed.")] : []),
+        ].join("\n");
       }
       updateMsg(index, { superseded: true });
       resolveThinking({ role: "ai", text: summary });

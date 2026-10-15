@@ -1096,13 +1096,16 @@ export const ZH: Record<string, string> = {
     "我已按 3 种风格起草「%s」，可在工作区中对比，选择最合适的一版。",
   "Superseded by a newer draft below.": "已被下方的新草稿取代。",
   "What would you like to change?": "你想修改哪些内容？",
-  "Updated all %n versions with your note. They’re still unsaved drafts — nothing is written to a job until you create one. Changes are highlighted in the Workspace.":
-    "已按你的补充更新全部 %n 个版本。它们仍是未保存的候选稿，创建职位前不会写入任何职位。改动已在工作区中标出。",
-  "Updated version %s with your note; the other versions didn’t change. They’re still unsaved drafts — nothing is written to a job until you create one.":
-    "已按你的补充更新版本 %s，其他版本没有变化。它们仍是未保存的候选稿，创建职位前不会写入任何职位。",
+  "Changed by your note (still unsaved drafts — nothing is written to a job until you create one; changes are highlighted in the Workspace):":
+    "按你的补充实际改动如下（仍是未保存的候选稿，创建职位前不会写入任何职位；改动已在工作区中标出）：",
+  "Version %s": "版本 %s",
+  "no change": "没有变化",
+  "The salary was not changed in any version.": "所有版本的薪资都没有改动。",
+  "The salary was not changed in version %s.": "版本 %s 的薪资没有改动。",
+  "Changed in the draft: %s. It’s still an unsaved draft — nothing is written to a job until you create one; changes are highlighted in the Workspace.":
+    "草稿中改动了：%s。它仍是未保存的草稿，创建职位前不会写入任何职位；改动已在工作区中标出。",
+  "The salary was not changed.": "薪资没有改动。",
   "Nothing changed — none of the versions needed an edit for that note. Nothing has been saved.": "没有改动：这条补充没有让任何版本发生变化，也没有保存任何内容。",
-  "Updated the draft with your note. It’s still an unsaved draft — nothing is written to a job until you create one. Changes are highlighted in the Workspace.":
-    "已按你的补充更新草稿。它仍是未保存的草稿，创建职位前不会写入任何职位。改动已在工作区中标出。",
   "Nothing changed — the draft didn’t need an edit for that note. Nothing has been saved.": "没有改动：这条补充没有让草稿发生变化，也没有保存任何内容。",
   "Enter a job title first.": "请先输入职位名称。",
   "Type a message first.": "请先输入内容。",

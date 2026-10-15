@@ -189,14 +189,43 @@ describe('#99: refine only reports real changes', () => {
     expect(await screen.findByText(/Nothing changed — none of the versions needed an edit/)).toBeInTheDocument();
   });
 
-  it('only some versions changed → names them; all changed → says all, and that they are unsaved', async () => {
+  it('lists the fields each version really changed and says they are unsaved drafts', async () => {
     await openVariants();
     api.refineCopilotVariants.mockResolvedValueOnce({ variants: [variant('A', 'Shanghai'), variant('B', 'Remote'), variant('C', 'Remote')] } as never);
     send('make it Shanghai');
-    expect(await screen.findByText(/Updated version A with your note; the other versions didn’t change/)).toBeInTheDocument();
+    expect(await screen.findByText(/still unsaved drafts/)).toHaveTextContent(/- Version A: Location\s*- Version B: no change\s*- Version C: no change/);
+  });
 
+  it('asked for salary but only other fields changed → says the salary was not changed, never "updated"', async () => {
+    await openVariants();
     api.refineCopilotVariants.mockResolvedValueOnce({ variants: [variant('A', 'Hanoi'), variant('B', 'Hanoi'), variant('C', 'Hanoi')] } as never);
-    send('make it Hanoi');
-    expect(await screen.findByText(/Updated all 3 versions with your note\. They’re still unsaved drafts/)).toBeInTheDocument();
+    send('按照上面的薪资标准写到JD里');
+    const reply = await screen.findByText(/still unsaved drafts/);
+    expect(reply).toHaveTextContent('- Version A: Location');
+    expect(reply).toHaveTextContent('The salary was not changed in any version.');
+
+    const paid = (key: string) => ({ ...variant(key, 'Hanoi'), fields: { ...variant(key, 'Hanoi').fields, publicCompensation: { min: 15000, max: 22000, currency: 'CNY', period: 'month' } } });
+    api.refineCopilotVariants.mockResolvedValueOnce({ variants: [paid('A'), variant('B', 'Hanoi'), paid('C')] } as never);
+    send('add the salary 15-22K');
+    expect(await screen.findByText(/The salary was not changed in version B\./)).toBeInTheDocument();
+    expect(screen.getAllByText(/- Version A: Salary/).length).toBeGreaterThan(0);
+  });
+
+  it('single draft: lists what changed and calls out an unchanged salary', async () => {
+    const conv = (fields: object) => ({ id: 'conv-1', jobId: null, phase: 'ready_to_confirm', fields, missingFields: [], stateRevision: 2, createdAt: '', updatedAt: '', messages: [] }) as never;
+    const base = { title: 'Product Designer', location: 'Beijing', responsibilities: ['Design flows'], mustHave: ['Figma'] };
+    api.autoCompleteCopilotConversation.mockResolvedValue(conv(base));
+    renderPanel();
+    fireEvent.click(await screen.findByText('Quick Start'));
+    send('Product Designer\nBeijing\nFigma');
+    await screen.findByRole('button', { name: /Create job from this draft/ });
+
+    api.refineCopilotDraft.mockResolvedValueOnce(conv({ ...base, location: 'Shanghai' }));
+    send('按照上面的薪资标准写到JD里');
+    expect(await screen.findByText(/Changed in the draft: Location\./)).toHaveTextContent('The salary was not changed.');
+
+    api.refineCopilotDraft.mockResolvedValueOnce(conv({ ...base, location: 'Shanghai' }));
+    send('add the salary');
+    expect(await screen.findByText(/Nothing changed — the draft didn’t need an edit/)).toBeInTheDocument();
   });
 });
