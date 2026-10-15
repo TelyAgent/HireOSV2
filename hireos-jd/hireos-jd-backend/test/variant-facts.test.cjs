@@ -59,3 +59,50 @@ test('pinFacts copies exactly the reference facts — a fact the reference lacks
   assert.deepEqual(pinned, { title: 'Y', location: 'Shanghai', roleSummary: 's' });
   assert.deepEqual(pickFacts({ title: 'Y', roleSummary: 's', headcount: 2 }), { title: 'Y', headcount: 2 });
 });
+
+test('#71 AC-3: creating with the selected version stores exactly its facts — read back from the job and its draft', async () => {
+  const { randomUUID } = require('node:crypto');
+  const conv = { id: 'c1', workspaceId: 'ws-1', jobId: null, phase: 'intake', fields: {}, missingFields: [], stateRevision: 1, createdAt: new Date(), updatedAt: new Date() };
+  const messages = [];
+  const keys = new Map();
+  const memDb = {
+    copilotConversation: {
+      findFirst: async () => conv,
+      update: async ({ data }) => { for (const [k, v] of Object.entries(data)) if (k !== 'stateRevision') conv[k] = v; return conv; },
+    },
+    copilotMessage: {
+      findFirst: async () => messages[messages.length - 1] ?? null,
+      findMany: async () => messages,
+      create: async ({ data }) => { const m = { id: randomUUID(), createdAt: new Date(), attachments: null, ...data }; messages.push(m); return m; },
+    },
+    idempotencyKey: { findUnique: async ({ where }) => keys.get(where.workspaceId_operation_key.key) ?? null, create: async ({ data }) => { keys.set(data.key, data); return data; } },
+    aiRun: { create: async () => ({}) },
+  };
+  memDb.$transaction = async (fn) => fn(memDb);
+  // Core Record and the JD draft store, as the persisted state a refresh would read again.
+  const jobs = new Map();
+  const core = { createJob: async (_i, body) => { const job = { id: 'job-1', ...body }; jobs.set(job.id, job); return job; } };
+  const draftsById = new Map();
+  const drafts = { create: async (_i, jobId, content) => { draftsById.set(jobId, content); return { jobId, ...content }; } };
+
+  const llm = driftingLlm(['上海', '远程', '北京']);
+  const service = new CopilotService(memDb, llm, { jdAutotakeSystemPrompt: 'autotake' }, core, drafts);
+  const generated = await service.titleVariants(identity, 'c1', { title: 'Finance Manager' });
+  const llm2 = driftingLlm(['远程', '远程（中国大陆）', '远程（中国大陆）']);
+  const refined = await new CopilotService(memDb, llm2, { jdAutotakeSystemPrompt: 'autotake' }, core, drafts)
+    .refineVariants(identity, 'c1', { note: 'make it remote', primary: 1, variants: generated.variants });
+  const chosen = refined.variants[1];
+
+  await service.setFields(identity, 'c1', { fields: chosen.fields, label: 'Create job with version B' }, { idempotencyKey: randomUUID() });
+  await service.confirmDraft(identity, 'c1', { idempotencyKey: randomUUID() });
+
+  const job = jobs.get('job-1');
+  assert.deepEqual(
+    [job.title, job.team, job.location, job.employmentType, job.openings],
+    [chosen.fields.title, chosen.fields.department, chosen.fields.location, chosen.fields.employmentType, chosen.fields.headcount],
+  );
+  assert.equal(job.location, '远程');
+  const stored = draftsById.get('job-1');
+  assert.equal(stored.roleSummary, chosen.fields.roleSummary, 'the chosen version’s own prose, not another style');
+  assert.deepEqual(stored.responsibilities, chosen.fields.responsibilities);
+});
