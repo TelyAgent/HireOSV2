@@ -52,13 +52,19 @@ export const SALARY_ANSWER_RULES = [
 const NUM = String.raw`(\d+(?:\.\d+)?)`;
 const DASH = String.raw`\s*(?:-|–|—|~|～|至|到)\s*`;
 
+/** Pay beyond monthly cash + bonus months: an annual figure may include these, so it isn't recomputed. */
+const NON_CASH = /股票|期权|股权|RSU|总包|津贴|补贴|分红|提成|equity|stock|package|allowance|commission/i;
+
 /**
- * Corrects an annual figure that contradicts the answer's own monthly range and bonus months (#98 AC-1):
+ * Corrects an annual cash figure that contradicts the answer's own monthly range and bonus months (#98 AC-1):
  * "月薪 15K–22K、年终奖 1–2 个月、全年约 16.5万–48.4万" → "全年约 19.5万–30.8万元". When there's an
- * annual figure but no bonus months to derive it from, the figure is marked as unverified instead.
+ * annual figure but no bonus months to derive it from, the figure is marked as unverified instead. An
+ * answer that mentions stock, allowances or a total package is left alone — its annual figure isn't
+ * monthly × (12 + bonus months), so recomputing it would make a right answer wrong.
  */
 export function fixAnnualSalary(text: string): string {
-  const annual = new RegExp(String.raw`(年薪|全年(?:收入)?|年收入|年总包)(约|大约|大概)?\s*` + NUM + String.raw`\s*万?` + DASH + NUM + String.raw`\s*万元?`);
+  if (NON_CASH.test(text)) return text;
+  const annual = new RegExp(String.raw`(年薪|全年(?:收入)?|年收入)(约|大约|大概)?\s*` + NUM + String.raw`\s*万?` + DASH + NUM + String.raw`\s*万元?`);
   const hit = annual.exec(text);
   if (!hit) return text;
   const monthly = new RegExp(String.raw`月薪[^\d]{0,8}` + NUM + String.raw`\s*([Kk千万])?` + DASH + NUM + String.raw`\s*([Kk千万])`).exec(text);

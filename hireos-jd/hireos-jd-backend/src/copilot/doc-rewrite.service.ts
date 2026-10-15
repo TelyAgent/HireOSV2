@@ -26,7 +26,7 @@ const rewriteInputSchema = z.object({
     jobTitle: z.string().max(300).optional(),
     department: z.string().max(300).optional(),
     /** Whole document as plain text, so the rewrite stays consistent with the rest of the JD. */
-    documentText: z.string().max(40000).optional(),
+    documentText: z.string().max(200000).optional(),
   }),
 });
 

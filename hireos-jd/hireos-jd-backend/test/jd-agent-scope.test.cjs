@@ -131,3 +131,16 @@ test('#106: the status context the page sends (up to 6000 chars) is accepted', a
   const res = await svc.ask(identity, 'job-1', 'internal', { message: '能提交吗？', context: { documentText: DOC, readiness: 'x'.repeat(6000) } });
   assert.equal(res.kind, 'answer');
 });
+
+test('#98 review: an answer with stock or a total package is never recomputed as monthly × (12 + bonus)', () => {
+  const pkg = '税前月薪 15K–22K，年终奖 1–2 个月，另有每年股票 10万–20万元，年总包约 29.5万–50.8万元。';
+  assert.equal(fixAnnualSalary(pkg), pkg);
+  const allowance = '月薪 15K–22K，年终奖 1–2 个月，含住房补贴，年薪约 22万–33万元。';
+  assert.equal(fixAnnualSalary(allowance), allowance);
+});
+
+test('#106 review: a long JD (well over 40000 chars) is accepted in full', async () => {
+  const { svc } = service(fakeLlm({ intent: 'answer' }));
+  const res = await svc.ask(identity, 'job-1', 'internal', { message: '有 SQL 要求吗？', context: { documentText: 'x'.repeat(150000) + '\nCan write SQL queries.' } });
+  assert.equal(res.kind, 'answer');
+});

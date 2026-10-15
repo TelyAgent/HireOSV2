@@ -55,6 +55,27 @@ import {
 import type { BlockKind, BlockLevel, DocBlock, DocumentDraft, Suggestion } from "../../data/types";
 import type { SideTab } from "../../store/types";
 
+/**
+ * Byte budget for the document text in one Copilot request: the backend's JSON body limit is 100 KB and a
+ * CJK character is 3 bytes in UTF-8, so the text plus the rest of the request must fit well inside it.
+ */
+const MAX_DOCUMENT_BYTES = 60_000;
+
+/** The longest prefix of `text` that fits in `maxBytes` of UTF-8. */
+function fitBytes(text: string, maxBytes: number): string {
+  const encoder = new TextEncoder();
+  if (encoder.encode(text).length <= maxBytes) return text;
+  let lo = 0;
+  let hi = text.length;
+  while (lo < hi) {
+    const mid = Math.ceil((lo + hi) / 2);
+    if (encoder.encode(text.slice(0, mid)).length <= maxBytes) lo = mid;
+    else hi = mid - 1;
+  }
+  return text.slice(0, lo);
+}
+const withoutFlag = ({ truncated: _truncated, ...context }: RewriteRequest["context"] & { truncated: boolean }) => context;
+
 export function useDocActions(jobId: string) {
   const { state, t, set, mutate, say, openModal, closeModal } = useStore();
   const key = docKey(jobId);
@@ -253,18 +274,15 @@ export function useDocActions(jobId: string) {
     };
 
     /** Job title, department and the whole JD minus Confidential blocks (completeness standard V5). */
-    const docContext = (): RewriteRequest["context"] => {
+    const docContext = (): RewriteRequest["context"] & { truncated: boolean } => {
       const job = state.jobs[jobId];
-      return {
-        jobTitle: job?.title,
-        department: job?.department,
-        documentText: selectDraft(state, jobId)
-          .blocks.filter((b) => blockLevel(b) !== "confidential")
-          .map((b) => (b.kind === "ul" ? `- ${blockPlainText(b)}` : blockPlainText(b)))
-          .join("\n")
-          // Inside the backend's 40000-character limit, so a very long JD never fails the whole request.
-          .slice(0, 39000),
-      };
+      const full = selectDraft(state, jobId)
+        .blocks.filter((b) => blockLevel(b) !== "confidential")
+        .map((b) => (b.kind === "ul" ? `- ${blockPlainText(b)}` : blockPlainText(b)))
+        .join("\n");
+      // Inside the backend's limit; a JD longer than that is sent in part and the answer says so (#106 review).
+      const documentText = fitBytes(full, MAX_DOCUMENT_BYTES);
+      return { jobTitle: job?.title, department: job?.department, documentText, truncated: documentText.length < full.length };
     };
 
     /** The page's own Publish gate in words — the same rule as the button — so "can I submit?" is answered from it (#106 AC-2). */
@@ -326,7 +344,7 @@ export function useDocActions(jobId: string) {
           action,
           target: sel.target,
           scope: sel.scope,
-          context: docContext(),
+          context: withoutFlag(docContext()),
         });
         await proposeEdit(sel, result, instruction || action, supersedes);
       } catch (error) {
@@ -350,10 +368,11 @@ export function useDocActions(jobId: string) {
       }
       if (state.wsCopilotBusy) return;
 
+      const context = docContext();
       const body: AskRequest = {
         message,
         selection: sel ? { text: sel.selected, target: sel.target, scope: sel.scope, implicit } : undefined,
-        context: { ...docContext(), readiness: readiness() },
+        context: { ...withoutFlag(context), readiness: readiness() },
       };
       set({ wsCopilotBusy: true, wsSideTab: "copilot" });
       try {
@@ -366,7 +385,7 @@ export function useDocActions(jobId: string) {
         mutate((draft) => {
           draft.wsCopilotThread = [
             ...draft.wsCopilotThread,
-            { kind: "text", text: result.text, basis: result.contextScope, sources: result.sources },
+            { kind: "text", text: result.text, basis: context.truncated ? "partial" : result.contextScope, sources: result.sources },
           ];
           draft.wsSelection = null;
         });

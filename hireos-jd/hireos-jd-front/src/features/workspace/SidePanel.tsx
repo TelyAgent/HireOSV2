@@ -234,7 +234,13 @@ function CopilotMessage({ msg, jobId }: { msg: CopilotMsg; jobId: string }) {
           )}
           {msg.basis && (
             <div className="copilot-basis">
-              {t(msg.basis === "selection" ? "Based on the selected text and the whole JD (Confidential excluded)" : "Based on the whole JD (Confidential excluded)")}
+              {t(
+                msg.basis === "partial"
+                  ? "Based on the first part of the JD only — it’s too long to send in full. Select the part you’re asking about for a precise answer."
+                  : msg.basis === "selection"
+                    ? "Based on the selected text and the whole JD (Confidential excluded)"
+                    : "Based on the whole JD (Confidential excluded)",
+              )}
             </div>
           )}
         </div>

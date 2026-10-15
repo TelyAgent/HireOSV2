@@ -1142,6 +1142,8 @@ export const ZH: Record<string, string> = {
   "Copilot is getting too many requests right now. Wait a moment, then retry.": "Copilot 当前请求过多，请稍等片刻再重试。",
   "Based on the selected text and the whole JD (Confidential excluded)": "依据：选中的文字和整份 JD（不含保密内容）",
   "Based on the whole JD (Confidential excluded)": "依据：整份 JD（不含保密内容）",
+  "Based on the first part of the JD only — it’s too long to send in full. Select the part you’re asking about for a precise answer.":
+    "依据：仅 JD 的前半部分（JD 过长，无法全部发送）。如需准确回答，请选中你要问的那部分。",
   "No change needed — nothing was proposed.": "无需改动，没有生成修改建议。",
   "Copilot couldn’t answer that. Please try again.": "Copilot 暂时无法回答，请重试。",
   "Copilot is temporarily unavailable. Your input is kept — retry in a moment.": "Copilot 暂时不可用，你的输入已保留，请稍后重试。",

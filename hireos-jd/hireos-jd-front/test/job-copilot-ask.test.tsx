@@ -21,7 +21,7 @@ import { docKey } from '../src/features/workspace/docHelpers';
 
 const api = vi.mocked(docsApi);
 
-function Seeded({ select, focus }: { select?: { blockId: string; text: string }; focus?: string }) {
+function Seeded({ select, focus, long }: { select?: { blockId: string; text: string }; focus?: string; long?: boolean }) {
   const { mutate } = useStore();
   const [ready, setReady] = useState(false);
   useEffect(() => {
@@ -35,6 +35,7 @@ function Seeded({ select, focus }: { select?: { blockId: string; text: string };
             mkBlock('b1', 'h2', 'Data Analyst', { level: 'public' }),
             mkBlock('b2', 'ul', ['Can write SQL queries.'], { level: 'public' }),
             mkBlock('b3', 'p', 'Internal ceiling: 30K', { level: 'confidential' }),
+            ...(long ? [mkBlock('b4', 'p', 'x'.repeat(200000), { level: 'public' })] : []),
           ],
         },
       };
@@ -43,15 +44,15 @@ function Seeded({ select, focus }: { select?: { blockId: string; text: string };
       d.wsFocusBlockId = focus ?? null;
     });
     setReady(true);
-  }, [mutate, select, focus]);
+  }, [mutate, select, focus, long]);
   return ready ? <SidePanel jobId="j1" /> : null;
 }
-const renderPanel = (select?: { blockId: string; text: string }, focus?: string) =>
+const renderPanel = (select?: { blockId: string; text: string }, focus?: string, long?: boolean) =>
   render(
     <AntApp>
       <StoreProvider>
         <MemoryRouter>
-          <Seeded select={select} focus={focus} />
+          <Seeded select={select} focus={focus} long={long} />
         </MemoryRouter>
       </StoreProvider>
     </AntApp>,
@@ -137,5 +138,15 @@ describe('job-page Copilot', () => {
     expect(body.selection).toBeUndefined();
     expect(JSON.stringify(body)).not.toContain('Internal ceiling');
     expect(body.context.readiness).toMatch(/AI Analyze has not been run/);
+  });
+
+  it('#106 review: a JD too long to send in full is answered with a "first part only" basis, never "whole JD"', async () => {
+    api.askDocumentCopilot.mockResolvedValue({ kind: 'answer', intent: 'answer', text: 'Partly.', sources: [], contextScope: 'document' });
+    renderPanel(undefined, undefined, true);
+    await type('Does it require SQL?');
+    expect(await screen.findByText(/Based on the first part of the JD only/)).toBeInTheDocument();
+    expect(screen.queryByText('Based on the whole JD (Confidential excluded)')).toBeNull();
+    expect(new TextEncoder().encode(JSON.stringify(api.askDocumentCopilot.mock.calls[0][2])).length).toBeLessThan(100 * 1024);
+    expect(api.askDocumentCopilot.mock.calls[0][2].context).not.toHaveProperty('truncated');
   });
 });

@@ -37,7 +37,7 @@ export type CopilotMsg =
       kind: "text";
       text: string;
       /** What an answer was based on (#106), e.g. the whole JD or the selection. */
-      basis?: "selection" | "document";
+      basis?: "selection" | "document" | "partial";
       sources?: { title: string; url: string }[];
     }
   | { kind: "suggestion"; suggestion: Suggestion; explain: string };
