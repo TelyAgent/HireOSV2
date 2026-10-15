@@ -208,7 +208,7 @@ async function postJson<T>(url: string, body: unknown): Promise<T> {
 
 /** Drafts a missing section, or revises one that fails a completeness rule. */
 export function aiSection(jobId: string, audience: Audience, body: AiSectionRequest) {
-  return postJson<{ items: string[]; explain: string }>(`${JOBS}/${jobId}/documents/${audience}/ai/section`, body);
+  return postJson<{ items: string[]; explain: string; toConfirm?: string[] }>(`${JOBS}/${jobId}/documents/${audience}/ai/section`, body);
 }
 
 /** The judgement-based review against the completeness standard (advisory; the rule check gates publishing). */

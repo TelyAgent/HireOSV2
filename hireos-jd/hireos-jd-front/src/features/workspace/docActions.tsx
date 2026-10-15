@@ -139,7 +139,35 @@ export function useDocActions(jobId: string) {
     };
 
     /** AI draft for a missing (or suggested) section: replaces its empty blocks / creates the section. */
-    const aiDraft = async (item: ReqItem, undo = true) => {
+    /** Opens the before / after review of one AI change; nothing is written unless the user keeps it (#94). */
+    const showPreview = (label: string, before: string[], after: string[], toConfirm: string[], apply: () => void, done: string) =>
+      openModal(
+        <AiChangePreview
+          label={label}
+          before={before}
+          after={after}
+          toConfirm={toConfirm}
+          onKeep={() => {
+            apply();
+            say(`${t(done)} “${t(label)}” — ${t("you can undo it.")}`, { type: "success" });
+          }}
+        />,
+      );
+
+    /** What the AI wanted to add without a source goes to the Copilot thread for a person to decide (#95). */
+    const noteToConfirm = (label: string, toConfirm: string[]) => {
+      if (!toConfirm.length) return;
+      pushThreadMsg(
+        "text",
+        [`${t("Not written into the JD — no source in this job's data. Confirm before adding")} (${t(label)}):`, ...toConfirm.map((x) => `- ${x}`)].join("\n"),
+      );
+    };
+
+    /**
+     * `preview`: show the result for the user to keep or reject before anything changes (#94); the batch
+     * passes false and writes directly (its blocks stay marked as AI drafts to review).
+     */
+    const aiDraft = async (item: ReqItem, undo = true, preview = false) => {
       if (!item.heading || item.noAi || state.wsAiBusy[`${jobId}:${item.id}`]) return false;
       const blocks = selectDraft(state, jobId).blocks;
       setBusy(item.id, true);
@@ -156,19 +184,23 @@ export function useDocActions(jobId: string) {
         const kind = item.list ? "ul" : "p";
         const level = item.level ?? "internal";
         const fresh = res.items.map((text) => ({ ...mkBlock(uid("nb"), kind, kind === "ul" ? [text] : text, { level }), aiDraft: true }));
-        applyAi(
-          item.label,
-          (doc) => {
-            const { sec } = findSection(groupSections(doc.blocks), item, doc.blocks);
-            if (!sec) return insertSectionOrdered(doc, item, fresh);
-            const empty = new Set(sec.blocks.filter((b) => !isFilled(blockPlainText(b).trim())).map((b) => b.id));
-            doc.blocks = doc.blocks.filter((b) => !empty.has(b.id));
-            const last = sec.blocks.filter((b) => !empty.has(b.id)).pop() ?? sec.head;
-            const at = last ? doc.blocks.findIndex((b) => b.id === last.id) + 1 : 0;
-            doc.blocks.splice(at, 0, ...fresh);
-          },
-          undo,
-        );
+        const apply = () =>
+          applyAi(
+            item.label,
+            (doc) => {
+              const { sec } = findSection(groupSections(doc.blocks), item, doc.blocks);
+              if (!sec) return insertSectionOrdered(doc, item, fresh);
+              const empty = new Set(sec.blocks.filter((b) => !isFilled(blockPlainText(b).trim())).map((b) => b.id));
+              doc.blocks = doc.blocks.filter((b) => !empty.has(b.id));
+              const last = sec.blocks.filter((b) => !empty.has(b.id)).pop() ?? sec.head;
+              const at = last ? doc.blocks.findIndex((b) => b.id === last.id) + 1 : 0;
+              doc.blocks.splice(at, 0, ...fresh);
+            },
+            undo,
+          );
+        if (preview) return void showPreview(item.label, [], res.items, res.toConfirm ?? [], apply, "Copilot drafted");
+        apply();
+        noteToConfirm(item.label, res.toConfirm ?? []);
         return true;
       } catch (error) {
         say(error instanceof Error ? error.message : t("Copilot couldn’t complete this. Please try again."), { type: "error" });
@@ -179,13 +211,13 @@ export function useDocActions(jobId: string) {
     };
 
     /** AI fix for a section that fails a "Needs revision" rule: rewrites its content in place. */
-    const aiFix = async (row: ReqRow, undo = true) => {
+    const aiFix = async (row: ReqRow, undo = true, preview = false) => {
       const item = row.item;
       if (!item.heading || item.noAi || state.wsAiBusy[`${jobId}:${item.id}`]) return false;
       const blocks = selectDraft(state, jobId).blocks;
       const { sec } = findSection(groupSections(blocks), item, blocks);
       const current = filledBlocks(sec, item);
-      if (!current.length) return aiDraft(item, undo);
+      if (!current.length) return aiDraft(item, undo, preview);
       setBusy(item.id, true);
       try {
         const res = await aiSection(jobId, DOC_AUDIENCE, {
@@ -203,16 +235,22 @@ export function useDocActions(jobId: string) {
         const level = blockLevel(current[0]);
         const kind = item.list ? "ul" : "p";
         const fresh = res.items.map((text) => ({ ...mkBlock(uid("nb"), kind, kind === "ul" ? [text] : text, { level }), aiDraft: true }));
-        applyAi(
-          item.label,
-          (doc) => {
-            const at = doc.blocks.findIndex((b) => ids.has(b.id));
-            if (at < 0) return;
-            doc.blocks = doc.blocks.filter((b) => !ids.has(b.id));
-            doc.blocks.splice(at, 0, ...fresh);
-          },
-          undo,
-        );
+        const apply = () =>
+          applyAi(
+            item.label,
+            (doc) => {
+              const at = doc.blocks.findIndex((b) => ids.has(b.id));
+              if (at < 0) return;
+              doc.blocks = doc.blocks.filter((b) => !ids.has(b.id));
+              doc.blocks.splice(at, 0, ...fresh);
+            },
+            undo,
+          );
+        if (preview) {
+          return void showPreview(item.label, current.map((b) => blockPlainText(b)), res.items, res.toConfirm ?? [], apply, "Copilot revised");
+        }
+        apply();
+        noteToConfirm(item.label, res.toConfirm ?? []);
         return true;
       } catch (error) {
         say(error instanceof Error ? error.message : t("Copilot couldn’t complete this. Please try again."), { type: "error" });
@@ -533,11 +571,11 @@ export function useDocActions(jobId: string) {
       },
 
       aiDraft(item: ReqItem) {
-        void aiDraft(item).then((ok) => ok && say(`${t("Copilot drafted")} “${t(item.label)}” — ${t("review and edit.")}`, { type: "success" }));
+        void aiDraft(item, true, true);
       },
 
       aiFix(row: ReqRow) {
-        void aiFix(row).then((ok) => ok && say(`${t("Copilot revised")} “${t(row.item.label)}” — ${t("review the change.")}`, { type: "success" }));
+        void aiFix(row, true, true);
       },
 
       /** Drafts every missing content item and fixes every weak one, as one undoable change. */
@@ -844,6 +882,83 @@ function applySuggestionToBlock(block: DocBlock, s: Suggestion): boolean {
 /* ---------------------------------------------------------------
    Modals used by the actions above
    --------------------------------------------------------------- */
+/** Items in `a` that aren't in `b` (order kept). */
+const missingFrom = (a: string[], b: string[]) => a.filter((x) => !b.includes(x));
+
+/**
+ * Before / after of one AI change (#94): removed lines, added lines and unchanged ones, plus anything the AI
+ * wanted to add without a source (#95). The document only changes on "Keep".
+ */
+export function AiChangePreview({
+  label,
+  before,
+  after,
+  toConfirm,
+  onKeep,
+}: {
+  label: string;
+  before: string[];
+  after: string[];
+  toConfirm: string[];
+  onKeep: () => void;
+}) {
+  const { t, closeModal } = useStore();
+  const removed = missingFrom(before, after);
+  const added = missingFrom(after, before);
+  const same = after.filter((x) => before.includes(x));
+  return (
+    <>
+      <ModalHeader title={`${t("Review AI change")} · ${t(label)}`} />
+      <ModalBody>
+        <div className="ai-diff">
+          {removed.map((x, i) => (
+            <div key={`r${i}`} className="ai-diff-line is-removed">
+              <span className="ai-diff-sign">−</span>
+              {x}
+            </div>
+          ))}
+          {added.map((x, i) => (
+            <div key={`a${i}`} className="ai-diff-line is-added">
+              <span className="ai-diff-sign">+</span>
+              {x}
+            </div>
+          ))}
+          {same.map((x, i) => (
+            <div key={`s${i}`} className="ai-diff-line">
+              <span className="ai-diff-sign"> </span>
+              {x}
+            </div>
+          ))}
+        </div>
+        {toConfirm.length > 0 && (
+          <div className="ai-diff-confirm">
+            <div className="tiny">{t("Not included — no source in this job's data. Add them yourself only if they're right:")}</div>
+            <ul>
+              {toConfirm.map((x, i) => (
+                <li key={i}>{x}</li>
+              ))}
+            </ul>
+          </div>
+        )}
+      </ModalBody>
+      <ModalFooter>
+        <Button variant="secondary" onClick={closeModal}>
+          {t("Reject")}
+        </Button>
+        <Button
+          variant="primary"
+          onClick={() => {
+            onKeep();
+            closeModal();
+          }}
+        >
+          {t("Keep")}
+        </Button>
+      </ModalFooter>
+    </>
+  );
+}
+
 function RefineModal({ jobId, suggestionId }: { jobId: string; suggestionId: string }) {
   const { state, t, closeModal } = useStore();
   const actions = useDocActions(jobId);

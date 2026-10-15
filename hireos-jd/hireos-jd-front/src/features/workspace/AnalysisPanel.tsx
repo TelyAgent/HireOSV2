@@ -42,7 +42,10 @@ export function AnalysisPanel({ jobId }: { jobId: string }) {
     </button>
   );
   const aiDraftLink = (item: ReqItem) => (item.heading && !item.noAi ? aiLink(item.id, "AI draft", "Drafting…", () => actions.aiDraft(item)) : null);
-  const fixable = ev.rows.filter((r) => r.item.heading && !r.item.noAi && (!r.ok || r.weak)).length;
+  const fixableRows = ev.rows.filter((r) => r.item.heading && !r.item.noAi && (!r.ok || r.weak));
+  const fixable = fixableRows.length;
+  // What AI never fills (#95): fields like Level and the salary range need a person.
+  const manual = ev.rows.filter((r) => (!r.ok || r.weak) && (r.item.field || r.item.noAi));
   const firstBlockId = selectDraft(state, jobId).blocks[0]?.id;
   const ai = state.wsAiAnalysis[jobId];
   const aiStale = !!ai && ai.revision !== selectDraft(state, jobId).revision;
@@ -101,6 +104,20 @@ export function AnalysisPanel({ jobId }: { jobId: string }) {
           <Icon name={busy("all") ? "autorenew" : "auto_awesome"} className={busy("all") ? "req-spin" : undefined} />
           {busy("all") ? t("Working…") : `${t("AI fix all")} (${fixable})`}
         </button>
+      )}
+      {fixable > 0 && (
+        <div className="ck-aiall-scope tiny">
+          {t("AI handles")}: {fixableRows.map((r) => t(r.item.label)).join(t(", "))}
+        </div>
+      )}
+      {manual.length > 0 && (
+        <CheckSection title={t("Needs you — AI won’t fill these")} n={manual.length}>
+          {manual.map((r) => (
+            <CheckRow key={`m-${r.item.id}`} icon="edit" tone="warn" name={t(r.item.label)} note={t(r.ok ? r.weak : r.note)}>
+              {fillAction(r)}
+            </CheckRow>
+          ))}
+        </CheckSection>
       )}
 
       <CheckSection title={t("Blocking")} n={blockers.length}>
