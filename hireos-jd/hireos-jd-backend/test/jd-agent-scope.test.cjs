@@ -139,8 +139,17 @@ test('#98 review: an answer with stock or a total package is never recomputed as
   assert.equal(fixAnnualSalary(allowance), allowance);
 });
 
-test('#106 review: a long JD (well over 40000 chars) is accepted in full', async () => {
-  const { svc } = service(fakeLlm({ intent: 'answer' }));
-  const res = await svc.ask(identity, 'job-1', 'internal', { message: '有 SQL 要求吗？', context: { documentText: 'x'.repeat(150000) + '\nCan write SQL queries.' } });
-  assert.equal(res.kind, 'answer');
+test('#106 review: a long JD is accepted in full; a cut one tells the model it saw only part', async () => {
+  const llm = fakeLlm({ intent: 'answer' });
+  const { svc } = service(llm);
+  const doc = 'x'.repeat(400000) + '\nCan write SQL queries.';
+  assert.equal((await svc.ask(identity, 'job-1', 'internal', { message: '有 SQL 要求吗？', context: { documentText: doc } })).kind, 'answer');
+  let input = llm.calls.find((c) => c.system?.includes('只输出 JSON：{"answer"')).input;
+  assert.match(input, /## 整份 JD/);
+  assert.match(input, /Can write SQL queries/);
+  llm.calls.length = 0;
+  await svc.ask(identity, 'job-1', 'internal', { message: '有 SQL 要求吗？', context: { documentText: 'x'.repeat(1000), documentTruncated: true } });
+  input = llm.calls.find((c) => c.system?.includes('只输出 JSON：{"answer"')).input;
+  assert.match(input, /仅前一部分/);
+  assert.match(input, /不能说 JD 里“没有”/);
 });

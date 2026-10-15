@@ -35,7 +35,7 @@ function Seeded({ select, focus, long }: { select?: { blockId: string; text: str
             mkBlock('b1', 'h2', 'Data Analyst', { level: 'public' }),
             mkBlock('b2', 'ul', ['Can write SQL queries.'], { level: 'public' }),
             mkBlock('b3', 'p', 'Internal ceiling: 30K', { level: 'confidential' }),
-            ...(long ? [mkBlock('b4', 'p', 'x'.repeat(200000), { level: 'public' })] : []),
+            ...(long ? [mkBlock('b4', 'p', 'x'.repeat(600000), { level: 'public' })] : []),
           ],
         },
       };
@@ -146,8 +146,7 @@ describe('job-page Copilot', () => {
     await type('Does it require SQL?');
     expect(await screen.findByText(/Based on the first part of the JD only/)).toBeInTheDocument();
     expect(screen.queryByText('Based on the whole JD (Confidential excluded)')).toBeNull();
-    expect(new TextEncoder().encode(JSON.stringify(api.askDocumentCopilot.mock.calls[0][2])).length).toBeLessThan(100 * 1024);
-    expect(api.askDocumentCopilot.mock.calls[0][2].context).not.toHaveProperty('truncated');
+    expect(api.askDocumentCopilot.mock.calls[0][2].context.documentTruncated).toBe(true);
   });
 
   it('#106 review: an explicit selection too long to send whole is refused with a reason — no request, nothing cut', async () => {

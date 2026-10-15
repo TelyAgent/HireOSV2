@@ -96,7 +96,7 @@ export interface AskRequest {
   message: string;
   /** The selected text or clicked block; omitted when the user just asks. */
   selection?: { text: string; target: RewriteRequest["target"]; scope: RewriteRequest["scope"]; implicit?: boolean };
-  context: RewriteRequest["context"] & { readiness?: string };
+  context: RewriteRequest["context"] & { readiness?: string; documentTruncated?: boolean };
 }
 
 /** What the job-page Copilot did with a typed message; only `edit` becomes a suggestion (#106 #107). */

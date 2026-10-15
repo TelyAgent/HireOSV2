@@ -26,7 +26,7 @@ const rewriteInputSchema = z.object({
     jobTitle: z.string().max(300).optional(),
     department: z.string().max(300).optional(),
     /** Whole document as plain text, so the rewrite stays consistent with the rest of the JD. */
-    documentText: z.string().max(200000).optional(),
+    documentText: z.string().max(500000).optional(),
   }),
 });
 
@@ -58,6 +58,8 @@ const askInputSchema = z.object({
   context: rewriteInputSchema.shape.context.extend({
     /** The page's own Analyze / Publish status in words, so "can I submit?" is answered from it. */
     readiness: z.string().max(8000).optional(),
+    /** Only the first part of an extremely long JD was sent: the model must not call the rest "absent". */
+    documentTruncated: z.boolean().optional(),
   }),
 });
 
@@ -166,8 +168,11 @@ export class DocRewriteService {
       `职位名称：${input.context.jobTitle || '未知'}`,
       `部门：${input.context.department || '未知'}`,
       '',
-      '## 整份 JD',
+      input.context.documentTruncated ? '## JD（仅前一部分：原文过长未全部发送）' : '## 整份 JD',
       input.context.documentText || '（无）',
+      ...(input.context.documentTruncated
+        ? ['', '注意：上面只是 JD 的前一部分。没出现在这里的内容不能说 JD 里“没有”，应说明只看到了前一部分，并请用户选中相关段落再问。']
+        : []),
       ...(input.selection ? ['', input.selection.implicit ? '## 光标所在的段落（用户没有选中文字）' : '## 用户选中的文字', input.selection.text] : []),
       ...(input.context.readiness ? ['', '## 当前检查结果（Analyze / 发布按钮）', input.context.readiness] : []),
     ].join('\n');

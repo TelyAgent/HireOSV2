@@ -4,10 +4,12 @@
  */
 import type { AskRequest } from "./documentsApi";
 
-/** Whole-request budget, with margin under the backend's 102400-byte limit. */
-export const MAX_ASK_BYTES = 90_000;
+/** Whole-request budget, with margin under the backend's 2 MB JSON body limit (#106 review). */
+export const MAX_ASK_BYTES = 1_800_000;
+/** The backend's limit on the document text, in characters. */
+const MAX_DOCUMENT_CHARS = 500_000;
 /** Room kept for the document next to an explicit selection, so the answer still has the JD's context. */
-const MIN_DOCUMENT_BYTES = 10_000;
+const MIN_DOCUMENT_BYTES = 100_000;
 
 const encoder = new TextEncoder();
 const bytes = (text: string) => encoder.encode(text).length;
@@ -63,7 +65,9 @@ export function fitAskRequest(body: AskRequest): FitResult {
   const rest = withoutDoc(selection);
   const room = roomWith(selection);
   if (room < 0) return { tooLarge: true };
-  let documentText = fitBytes(fullDoc, room);
+  let documentText = fitBytes(fullDoc.slice(0, MAX_DOCUMENT_CHARS), room);
   while (documentText && bytes(JSON.stringify(documentText)) - 2 > room) documentText = fitBytes(documentText, bytes(documentText) - 2_000);
-  return { body: { ...rest, context: { ...rest.context, documentText } }, truncated: documentText.length < fullDoc.length };
+  const truncated = documentText.length < fullDoc.length;
+  // Tell the backend too, so the model is told it saw only part of the JD — not just the UI label.
+  return { body: { ...rest, context: { ...rest.context, documentText, ...(truncated ? { documentTruncated: true } : {}) } }, truncated };
 }

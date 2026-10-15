@@ -13,16 +13,31 @@ const fitted = (req: AskRequest) => {
 };
 
 describe('fitAskRequest', () => {
-  it('cursor in a 16000-character paragraph, nothing selected: the paragraph is dropped, the JD is sent (marked partial) under the limit', () => {
+  it('a long JD (80000 characters, requirement at the end) is sent whole, nothing marked partial', () => {
+    const doc = `${cjk(80000)}\nCan write SQL queries.`;
+    const { body, truncated } = fitted({ message: '有 SQL 要求吗？', context: { documentText: doc } });
+    expect(body.context.documentText).toBe(doc);
+    expect(truncated).toBe(false);
+    expect(body.context).not.toHaveProperty('documentTruncated');
+  });
+
+  it('cursor in a 16000-character paragraph, nothing selected: the paragraph is kept within limits or dropped, and the JD still goes whole', () => {
     const para = cjk(16000);
     const { body, truncated } = fitted({
       message: '这份 JD 现在能发布吗？',
       selection: { text: para, target: { kind: 'p', text: para }, scope: 'fragment', implicit: true },
       context: { jobTitle: '数据分析师', documentText: `${para}\n${cjk(30000)}`, readiness: 'x'.repeat(6000) },
     });
-    expect(body.selection).toBeUndefined();
+    expect(body.selection).toBeUndefined(); // 16000 > the backend's 8000-character selection limit
     expect(size(body)).toBeLessThanOrEqual(MAX_ASK_BYTES);
+    expect(truncated).toBe(false);
+  });
+
+  it('an extreme JD that cannot fit is cut AND the backend is told so, not just the UI', () => {
+    const { body, truncated } = fitted({ message: 'q', context: { documentText: cjk(700000) } });
     expect(truncated).toBe(true);
+    expect(body.context.documentTruncated).toBe(true);
+    expect(size(body)).toBeLessThanOrEqual(MAX_ASK_BYTES);
   });
 
   it('an explicit selection is sent whole — never trimmed — when it fits', () => {
@@ -36,8 +51,12 @@ describe('fitAskRequest', () => {
   });
 
   it('an explicit selection too big to send whole is refused, not cut', () => {
-    const items = Array.from({ length: 50 }, () => cjk(2000));
-    expect(fitAskRequest({ message: 'rewrite', selection: { text: items[0], target: { kind: 'ul', items }, scope: 'items' }, context: {} })).toEqual({ tooLarge: true });
+    const many = Array.from({ length: 201 }, () => 'item');
+    expect(fitAskRequest({ message: 'rewrite', selection: { text: 'item', target: { kind: 'ul', items: many }, scope: 'items' }, context: {} })).toEqual({ tooLarge: true });
+    const longItem = [cjk(20001)];
+    expect(fitAskRequest({ message: 'rewrite', selection: { text: 'x', target: { kind: 'ul', items: longItem }, scope: 'items' }, context: {} })).toEqual({ tooLarge: true });
+    const big = Array.from({ length: 200 }, () => cjk(19000)); // within field limits, over the request budget
+    expect(fitAskRequest({ message: 'rewrite', selection: { text: 'x', target: { kind: 'ul', items: big }, scope: 'items' }, context: {} })).toEqual({ tooLarge: true });
     expect(fitAskRequest({ message: 'rewrite', selection: { text: 'a'.repeat(8001), target: { kind: 'p', text: 'a'.repeat(8001) }, scope: 'fragment' }, context: {} })).toEqual({ tooLarge: true });
   });
 
@@ -49,7 +68,7 @@ describe('fitAskRequest', () => {
   });
 
   it('newlines and quotes that grow when JSON-escaped are still counted', () => {
-    const { body } = fitted({ message: 'q', context: { documentText: '"\n'.repeat(60000) } });
+    const { body } = fitted({ message: 'q', context: { documentText: '"\n'.repeat(240000) } });
     expect(size(body)).toBeLessThanOrEqual(MAX_ASK_BYTES);
   });
 });
