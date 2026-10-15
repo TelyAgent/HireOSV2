@@ -144,7 +144,15 @@ async function waitForStableText(page: Page, deadline: number): Promise<void> {
   let same = 0;
   while (Date.now() + STABLE_POLL_MS < deadline) {
     await page.waitForTimeout(STABLE_POLL_MS);
-    const length = await page.evaluate(() => document.body?.textContent?.length ?? 0).catch(() => -1);
+    // Visible-content text only: inline scripts and styles count toward textContent but are no posting (#64 review).
+    const length = await page
+      .evaluate(() => {
+        const body = document.body?.cloneNode(true) as HTMLElement | undefined;
+        if (!body) return 0;
+        body.querySelectorAll('script, style, noscript, template, svg').forEach((node) => node.remove());
+        return (body.textContent ?? '').replace(/\s+/g, ' ').trim().length;
+      })
+      .catch(() => -1);
     same = length >= STABLE_TEXT_CHARS && length === last ? same + 1 : 0;
     if (same >= STABLE_POLLS) return;
     last = length;

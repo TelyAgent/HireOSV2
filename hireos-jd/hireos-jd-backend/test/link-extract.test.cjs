@@ -83,6 +83,11 @@ function fixtureNetwork() {
           return new Response('<html><body><h1>Forbidden</h1><p>Your session has expired. We could not show this page.</p></body></html>', { status: 403, headers: { 'content-type': 'text/html' } });
         case 'jobs.example.test/login-wall':
           return html('<html><body><div id="app"></div><script>document.getElementById("app").innerHTML = "<h2>Please sign in to view this job posting.</h2><p>Enter your email and password.</p>";</script></body></html>');
+        case 'jobs.example.test/big-inline-script':
+          // 600+ characters of inline script, and the posting only arrives after 2.5 s.
+          return html(`<html><body><div id="app"></div><script>/* ${'x'.repeat(600)} */ setTimeout(() => { ${APP_JS} }, 2500);</script></body></html>`, { 'set-cookie': 'csrf=token-1; Path=/' });
+        case 'jobs.example.test/sign-in-to-apply':
+          return html('<html><body><h1>运营专员</h1><p>地点：杭州</p><ul><li>负责社群日常运营与活动策划</li><li>两年以上运营经验</li></ul><button>Sign in to apply</button></body></html>');
         case 'jobs.example.test/short-static':
           return html('<html><body><h1>运营专员</h1><p>地点：杭州</p><ul><li>负责社群日常运营与活动策划</li><li>两年以上运营经验</li></ul></body></html>');
         case 'jobs.example.test/static':
@@ -251,6 +256,21 @@ test('#64 review AC-3: a page that ends on an error status, or only asks to sign
   const { network } = fixtureNetwork();
   await rejectsWith(extractTextFromLink('https://jobs.example.test/to-login', { network, renderer, renderTimeoutMs: 3000 }), /需要登录.*粘贴/);
   await rejectsWith(extractTextFromLink('https://jobs.example.test/login-wall', { network, renderer, renderTimeoutMs: 3000 }), /需要登录.*粘贴/);
+});
+
+test('#64 review: inline scripts don\'t count as content, so a slow posting is still waited for', needsBrowser, async () => {
+  const { network } = fixtureNetwork();
+  const text = await extractTextFromLink('https://jobs.example.test/big-inline-script', { network, renderer, renderTimeoutMs: 6000 });
+  assert.match(text, /AI应用算法工程师/);
+});
+
+test('#64 review: a posting with a "Sign in to apply" button is read, not taken for a login wall', async () => {
+  const { network } = fixtureNetwork();
+  for (const r of [null, renderer]) {
+    const text = await extractTextFromLink('https://jobs.example.test/sign-in-to-apply', { network, renderer: r || null, renderTimeoutMs: 3000 });
+    assert.match(text, /运营专员/);
+    assert.match(text, /Sign in to apply/);
+  }
 });
 
 /** A `playwright run-server` like the jd-renderer container, when this machine has Playwright's own Chromium. */

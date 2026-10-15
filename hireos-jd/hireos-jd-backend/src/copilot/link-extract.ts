@@ -253,14 +253,17 @@ const CHALLENGE_PATTERNS = [
   /just a moment/i, /captcha/i, /access denied/i, /enable javascript and cookies/i, /人机验证/, /安全验证/, /验证码/,
 ];
 
-// A page that only asks to sign in: what it says is a login form, not the posting (#64 review AC-3).
+// A page that only asks to sign in before it shows anything (#64 review AC-3). Only phrases about seeing the
+// content count: a posting with a "Sign in to apply" button is still a readable posting.
 const LOGIN_PATTERNS = [
-  /\b(sign|log)\s?in to (view|see|continue|apply|access)/i, /please (sign|log)\s?in/i, /\blogin required\b/i,
-  /(登录|登陆)后(查看|继续|才能)/, /请先?(登录|登陆)/, /需要(登录|登陆)/,
+  /\b(sign|log)\s?in to (view|see|read|access)\b/i, /\blogin required\b/i,
+  /(登录|登陆)后(查看|浏览|阅读)/, /(需要|请先?)(登录|登陆)(后|才能)(查看|浏览|阅读)/,
 ];
+// A real posting runs well past this; a login wall is a sentence or two around a form.
+const MAX_LOGIN_WALL_CHARS = 600;
 
 function looksLikeLoginWall(text: string): boolean {
-  return text.length < 1500 && LOGIN_PATTERNS.some((pattern) => pattern.test(text));
+  return text.length < MAX_LOGIN_WALL_CHARS && LOGIN_PATTERNS.some((pattern) => pattern.test(text));
 }
 
 function looksLikeBotChallenge(text: string): boolean {
