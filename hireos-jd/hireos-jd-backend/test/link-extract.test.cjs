@@ -116,6 +116,9 @@ function fixtureNetwork() {
         case 'jobs.example.test/loading-stuck':
           // The posting's script fails to load: the placeholder text stays, the mount point stays empty.
           return html('<html><body><p>Welcome to Example Careers. Please wait while we load the job.</p><div id="app"></div><script src="https://cdn.example.test/missing.js"></script></body></html>');
+        case 'jobs.example.test/noscript-shell':
+          // Like many SPAs: a noscript notice that stays in the HTML after the app has rendered the posting.
+          return html('<html><body><noscript>Please enable JavaScript to view this page.</noscript><div id="app"></div><script src="https://cdn.example.test/app.js"></script></body></html>', { 'set-cookie': 'csrf=token-1; Path=/' });
         case 'jobs.example.test/short-static':
           return html('<html><body><h1>运营专员</h1><p>地点：杭州</p><ul><li>负责社群日常运营与活动策划</li><li>两年以上运营经验</li></ul></body></html>');
         case 'jobs.example.test/static':
@@ -337,6 +340,12 @@ test('#64 review: a long intro that is there from the start does not end the wai
 test('#64 review AC-3: a page whose posting never loads is refused, not read as its placeholder text', needsBrowser, async () => {
   const { network } = fixtureNetwork();
   await rejectsWith(extractTextFromLink('https://jobs.example.test/loading-stuck', { network, renderer, renderTimeoutMs: 4000 }), /没有找到职位内容.*粘贴/);
+});
+
+test('#64 review: a rendered posting is read even though the page keeps its noscript notice', needsBrowser, async () => {
+  const { network } = fixtureNetwork();
+  const text = await extractTextFromLink('https://jobs.example.test/noscript-shell', { network, renderer, renderTimeoutMs: 15000 });
+  assert.match(text, /AI应用算法工程师/);
 });
 
 /** A `playwright run-server` like the jd-renderer container, when this machine has Playwright's own Chromium. */

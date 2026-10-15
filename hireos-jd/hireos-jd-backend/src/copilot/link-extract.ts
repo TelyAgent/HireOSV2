@@ -184,10 +184,15 @@ async function preferRendered(staticText: string, scriptShell: boolean, url: URL
 
 /** The HTML is an app shell whose content arrives by script: an empty mount point, or a "please enable JavaScript". */
 function looksLikeScriptShell(html: string): boolean {
-  return (
-    /<(div|main|section)\b[^>]*\bid=["'](app|root|__next|__nuxt|main-app)["'][^>]*>\s*<\/\1>/i.test(html) ||
-    /<noscript\b[^>]*>[\s\S]*?(enable|turn on|启用|开启|打开)[\s\S]{0,20}javascript/i.test(html)
-  );
+  return hasEmptyMountPoint(html) || /<noscript\b[^>]*>[\s\S]*?(enable|turn on|启用|开启|打开)[\s\S]{0,20}javascript/i.test(html);
+}
+
+/**
+ * The app's mount point is (still) empty. After rendering this alone tells that the posting never loaded: a
+ * `<noscript>` notice stays in the HTML even when scripts ran and filled the page (#64 review).
+ */
+function hasEmptyMountPoint(html: string): boolean {
+  return /<(div|main|section)\b[^>]*\bid=["'](app|root|__next|__nuxt|main-app)["'][^>]*>\s*<\/\1>/i.test(html);
 }
 
 async function renderedText(url: URL, network: LinkNetwork, options: LinkExtractOptions): Promise<string> {
@@ -214,7 +219,7 @@ async function renderedText(url: URL, network: LinkNetwork, options: LinkExtract
   if (looksLikeLoginWall(text)) throw linkError(LOGIN_MESSAGE);
   // Still an empty mount point after rendering: the posting never loaded, and what text there is is the page's
   // placeholder ("please wait while we load the job"), not the posting (#64 review AC-3).
-  if (!posting && looksLikeScriptShell(result.html)) throw linkError(NO_CONTENT_MESSAGE);
+  if (!posting && hasEmptyMountPoint(result.html)) throw linkError(NO_CONTENT_MESSAGE);
   return text;
 }
 
