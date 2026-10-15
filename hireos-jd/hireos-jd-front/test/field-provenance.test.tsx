@@ -85,7 +85,7 @@ describe('Quick Start draft provenance (#68)', () => {
 
     fireEvent.click(within(markOf('responsibilities')!).getByRole('button', { name: 'Confirm' }));
     await waitFor(() => expect(markOf('responsibilities')).toHaveTextContent('AI suggested · confirmed'));
-    expect(api.confirmCopilotFields).toHaveBeenCalledWith('conv-1', ['responsibilities']);
+    expect(api.confirmCopilotFields).toHaveBeenCalledWith('conv-1', ['responsibilities'], { responsibilities: 1 });
     expect(markOf('responsibilities')).toHaveTextContent('v1');
     expect(doc.querySelectorAll('.gm-pending')).toHaveLength(2);
     expect(markOf('mustHave')).toHaveTextContent('AI suggested · to confirm');
@@ -100,6 +100,17 @@ describe('Quick Start draft provenance (#68)', () => {
     await waitFor(() => expect(document.querySelectorAll('.gemini-expand-column .gm-pending')).toHaveLength(0));
     expect(api.confirmCopilotFields.mock.calls[0][1].sort()).toEqual(['mustHave', 'responsibilities', 'roleSummary']);
     expect(screen.queryByText(/AI-suggested field\(s\) to confirm/)).toBeNull();
+  });
+
+  it('review: a field changed elsewhere is not confirmed; the draft refreshes to what it is now', async () => {
+    api.confirmCopilotFields.mockRejectedValue(new copilot.CopilotRequestError(409, { code: 'DRAFT_CHANGED', message: 'The draft changed — review it, then confirm.' }));
+    api.getCopilotConversation.mockResolvedValue(conv({ fields: { ...FIELDS, mustHave: ['SQL', 'Excel'] }, fieldMeta: { ...META, mustHave: ai(2) } }));
+    await quickStart();
+    fireEvent.click(within(markOf('mustHave')!).getByRole('button', { name: 'Confirm' }));
+    await waitFor(() => expect(markOf('mustHave')).toHaveTextContent('v2'));
+    expect(api.confirmCopilotFields).toHaveBeenCalledWith('conv-1', ['mustHave'], { mustHave: 1 });
+    expect(markOf('mustHave')).toHaveTextContent('AI suggested · to confirm');
+    expect(document.querySelector('.gemini-expand-column .gm-ws-doc')).toHaveTextContent('Excel');
   });
 
   it('AC-3: Captured inputs still lists the raw answers, separate from the per-field marks', async () => {

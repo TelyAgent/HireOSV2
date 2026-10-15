@@ -171,5 +171,10 @@ export function computeMissingAuthoredFields(fields: JdFields): string[] {
 }
 
 export const confirmFieldsInputSchema = z
-  .object({ fields: z.array(z.enum(Object.keys(jdFieldsSchema.shape) as [string, ...string[]])).min(1).max(30) })
-  .strict();
+  .object({
+    fields: z.array(z.enum(Object.keys(jdFieldsSchema.shape) as [string, ...string[]])).min(1).max(30),
+    /** The revision of each field the user reviewed (#68): a newer value isn't confirmed unseen. */
+    revisions: z.record(z.string(), z.number().int().nonnegative()),
+  })
+  .strict()
+  .refine((input) => input.fields.every((field) => input.revisions[field] !== undefined), { message: 'Each field needs the revision that was reviewed.' });

@@ -48,6 +48,8 @@ function memoryDb() {
       create: async ({ data }) => { state.codes.push(data); return data; },
     },
   };
+  db.locks = [];
+  db.$executeRaw = async (strings, ...values) => { db.locks.push(values[0]); await db.onLock?.(); return 1; };
   db.$transaction = async (fn) => fn(db);
   return db;
 }
@@ -133,4 +135,30 @@ test('#96: the script dry-runs by default, then applies, then rolls back only ba
   assert.deepEqual(Object.fromEntries(rollback.results.map((r) => [r.jobId, r.result])), { 'job-a': 'kept', 'job-b': 'removed', 'job-c': 'none' });
   assert.deepEqual(db.state.versions.map((v) => [v.jobId, v.versionNo]).sort(), [['job-a', 1], ['job-a', 2]]);
   assert.deepEqual(db.state.documents.map((d) => d.jobId), ['job-a'], 'the document saved from job-b’s draft is removed with its v1');
+});
+
+test('#96 review: a Publish that lands before rollback gets the lock keeps the baseline', async () => {
+  const { db, versions } = setup({ 'job-a': { id: 'job-a', title: 'Ops Lead', status: 'open' } });
+  db.state.documents.push({ workspaceId: WS, jobId: 'job-a', audience: 'internal', blocks: SAVED_BLOCKS, revision: 3, updatedBy: 'hr-1', meta: null });
+  await versions.backfillBaseline(identity, 'job-a', { apply: true });
+
+  // v2 is published while rollback waits for the job's version lock.
+  db.onLock = () => {
+    db.onLock = null;
+    db.state.versions.push({ id: 'v2', workspaceId: WS, jobId: 'job-a', versionNo: 2, blocks: SAVED_BLOCKS, publishedBy: 'hr-1' });
+  };
+  assert.equal(await versions.rollbackBaseline(identity, 'job-a'), 'kept');
+  assert.deepEqual(db.state.versions.map((v) => v.versionNo).sort(), [1, 2]);
+  assert.ok(db.locks.every((key) => key === `jd-versions:${WS}:job-a`), 'publish, backfill and rollback share one lock per job');
+});
+
+test('#96 review: a Publish that lands before the backfill gets the lock means no baseline is added', async () => {
+  const { db, versions } = setup({ 'job-a': { id: 'job-a', title: 'Ops Lead', status: 'open' } });
+  db.state.documents.push({ workspaceId: WS, jobId: 'job-a', audience: 'internal', blocks: SAVED_BLOCKS, revision: 3, updatedBy: 'hr-1', meta: null });
+  db.onLock = () => {
+    db.onLock = null;
+    db.state.versions.push({ id: 'v1', workspaceId: WS, jobId: 'job-a', versionNo: 1, blocks: SAVED_BLOCKS, publishedBy: 'hr-1' });
+  };
+  assert.equal((await versions.backfillBaseline(identity, 'job-a', { apply: true })).result, 'has_versions');
+  assert.deepEqual(db.state.versions.map((v) => v.publishedBy), ['hr-1']);
 });

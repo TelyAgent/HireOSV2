@@ -11,6 +11,7 @@ import {
   TITLE_UNCONFIRMED,
   autoCompleteCopilotConversation,
   confirmCopilotFields,
+  CopilotRequestError,
   confirmCopilotDraft,
   createCopilotConversation,
   generateCopilotTitleVariants,
@@ -1011,12 +1012,20 @@ export function GeminiPanel({ ctx }: { ctx: GeminiCtx }) {
   const confirmDraftFields = async (index: number, fields: string[]) => {
     const conversationId = state.geminiConversationIds[key];
     if (working || !conversationId || !fields.length) return;
+    const msg = msgs[index];
+    const seen = msg && msg.role === "ai" && "fieldMeta" in msg ? (msg.fieldMeta ?? {}) : {};
+    const revisions = Object.fromEntries(fields.map((field) => [field, seen[field]?.revision ?? 0]));
     setBusy(true);
     try {
-      const result = await confirmCopilotFields(conversationId, fields);
+      const result = await confirmCopilotFields(conversationId, fields, revisions);
       updateMsg(index, { fieldMeta: result.fieldMeta, titlePending: titlePendingIn(result) });
     } catch (error) {
       say(errorText(error), { type: "error" });
+      // The draft changed elsewhere (e.g. another tab): show what it is now, to review before confirming.
+      if (error instanceof CopilotRequestError && error.code === "DRAFT_CHANGED") {
+        const latest = await getCopilotConversation(conversationId).catch(() => null);
+        if (latest) updateMsg(index, { draft: jdFieldsToGeminiDraft(latest.fields), fieldMeta: latest.fieldMeta, titlePending: titlePendingIn(latest) });
+      }
     } finally {
       setBusy(false);
     }

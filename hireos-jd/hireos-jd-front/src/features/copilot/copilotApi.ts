@@ -308,10 +308,11 @@ export function refineCopilotVariants(
 
 /** Saves user-authored (manual form) or user-picked (title variant) fields as-is; the conversation becomes ready to confirm. */
 /** Confirm AI-suggested draft fields as they are (#68); confirming `title` also lifts the title check (#66). */
-export function confirmCopilotFields(conversationId: string, fields: string[]): Promise<CopilotConversationDto> {
+export function confirmCopilotFields(conversationId: string, fields: string[], revisions: Record<string, number>): Promise<CopilotConversationDto> {
   return request(`${BASE}/${conversationId}/fields/confirm`, {
     method: "POST",
-    body: JSON.stringify({ fields }),
+    // The revision of each field as the user saw it; a field changed since is refused (#68).
+    body: JSON.stringify({ fields, revisions }),
     idempotencyKey: idempotencyKey("copilot-confirm-fields"),
   });
 }

@@ -664,14 +664,22 @@ export class CopilotService {
     const unknown = input.fields.filter((field) => fields[field] === undefined);
     if (unknown.length) throw new BadRequestException({ code: 'FIELD_NOT_IN_DRAFT', message: `草稿里没有这些字段：${unknown.join(', ')}` });
 
-    const fieldMeta = confirmFields(asFieldMeta(conversation.fieldMeta), input.fields);
+    // Only what the user reviewed: a field changed since (e.g. in another tab) is not confirmed unseen (#68 review).
+    const current = asFieldMeta(conversation.fieldMeta);
+    const stale = input.fields.filter((field) => (current[field]?.revision ?? 0) !== input.revisions[field]);
+    if (stale.length) throw draftChanged(stale);
+
+    const fieldMeta = confirmFields(current, input.fields);
     const missingFields = input.fields.includes('title')
       ? (Array.isArray(conversation.missingFields) ? conversation.missingFields : []).filter((f) => f !== TITLE_UNCONFIRMED)
       : conversation.missingFields;
-    const updated = await this.db.copilotConversation.update({
-      where: { id },
+    // Conditional on the state just checked: a turn landing in between makes this match nothing.
+    const { count } = await this.db.copilotConversation.updateMany({
+      where: { id, stateRevision: conversation.stateRevision },
       data: { fieldMeta: json(fieldMeta), missingFields: json(missingFields), stateRevision: { increment: 1 } },
     });
+    if (count !== 1) throw draftChanged(input.fields);
+    const updated = await this.loadConversation(identity, id);
     const messages = await this.db.copilotMessage.findMany({ where: { conversationId: id }, orderBy: { sequence: 'asc' } });
     return serializeConversation(updated, messages);
   }
@@ -1002,6 +1010,10 @@ function isUniqueConstraintError(error: unknown): boolean {
 /** Confirmations still owed on the conversation's draft (see `TITLE_UNCONFIRMED`). */
 function pendingConfirmations(conversation: { missingFields: unknown }): string[] {
   return Array.isArray(conversation.missingFields) ? conversation.missingFields.filter((f): f is string => f === TITLE_UNCONFIRMED) : [];
+}
+
+function draftChanged(fields: string[]) {
+  return new ConflictException({ code: 'DRAFT_CHANGED', message: `草稿在你查看之后有更新（${fields.join(', ')}），请查看最新内容后再确认。`, fields });
 }
 
 /** Conversation history as model turns; an upload is shown without its file name, which says nothing reliable about the job (#80). */

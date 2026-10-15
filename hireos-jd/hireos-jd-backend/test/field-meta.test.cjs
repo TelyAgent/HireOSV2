@@ -24,6 +24,12 @@ function memoryDb() {
         conv.stateRevision += 1;
         return conv;
       },
+      updateMany: async ({ where, data }) => {
+        if (where.stateRevision !== conv.stateRevision) return { count: 0 };
+        for (const [k, v] of Object.entries(data)) if (k !== 'stateRevision') conv[k] = v;
+        conv.stateRevision += 1;
+        return { count: 1 };
+      },
     },
     copilotMessage: {
       findFirst: async () => messages[messages.length - 1] ?? null,
@@ -72,7 +78,7 @@ test('#68 AC-2: confirming keeps value and revision; editing makes the field the
   const { svc, db } = service({ titleFromUser: false });
   await svc.quickStart(identity, 'c1', { answers: ANSWERS }, meta());
 
-  const confirmed = await svc.confirmFields(identity, 'c1', { fields: ['responsibilities', 'title'] });
+  const confirmed = await svc.confirmFields(identity, 'c1', { fields: ['responsibilities', 'title'], revisions: { responsibilities: 1, title: 1 } });
   assert.deepEqual(confirmed.fieldMeta.responsibilities, { source: 'ai', revision: 1, status: 'confirmed' });
   assert.deepEqual(confirmed.fieldMeta.title, { source: 'ai', revision: 1, status: 'confirmed' });
   assert.deepEqual(confirmed.missingFields, [], 'confirming the title lifts the title check Create waits for');
@@ -96,14 +102,14 @@ test('#68 AC-2: AI rewriting a confirmed field makes it a pending suggestion aga
 test('#68: confirming a field the draft does not have is refused', async () => {
   const { svc } = service({ titleFromUser: false });
   await svc.quickStart(identity, 'c1', { answers: ANSWERS }, meta());
-  await assert.rejects(svc.confirmFields(identity, 'c1', { fields: ['businessProblem'] }), (e) => e.response?.code === 'FIELD_NOT_IN_DRAFT');
-  await assert.rejects(svc.confirmFields(identity, 'c1', { fields: ['notAField'] }));
+  await assert.rejects(svc.confirmFields(identity, 'c1', { fields: ['businessProblem'], revisions: { businessProblem: 0 } }), (e) => e.response?.code === 'FIELD_NOT_IN_DRAFT');
+  await assert.rejects(svc.confirmFields(identity, 'c1', { fields: ['notAField'], revisions: { notAField: 0 } }));
 });
 
 test('#68 review: a refine that rewrites a confirmed field makes it a pending AI suggestion at the next revision', async () => {
   const { svc } = service({ titleFromUser: false });
   await svc.quickStart(identity, 'c1', { answers: ANSWERS }, meta());
-  await svc.confirmFields(identity, 'c1', { fields: ['mustHave', 'responsibilities'] });
+  await svc.confirmFields(identity, 'c1', { fields: ['mustHave', 'responsibilities'], revisions: { mustHave: 1, responsibilities: 1 } });
 
   svc.llm.completeJson = async () => JSON.stringify({ reply: '已修改', phase: 'ready_to_confirm', missingFields: [], fields: { ...DRAFT, mustHave: ['Performance marketing', 'SQL', 'Excel'] } });
   const refined = await svc.refineDraft(identity, 'c1', { note: '加一条 Excel' }, meta());
@@ -116,5 +122,35 @@ test('#68 review: Quick Start answers are marked, so a reopened conversation is 
   const res = await svc.quickStart(identity, 'c1', { answers: ANSWERS }, meta());
   const answers = res.messages.find((m) => m.role === 'user');
   assert.deepEqual(answers.attachments, [{ kind: 'quick_start' }]);
+  assert.equal(db.conv.fieldMeta.title.status, 'pending');
+});
+
+test('#68 review: a field changed since the user looked at it is not confirmed', async () => {
+  const { svc, db } = service({ titleFromUser: false });
+  await svc.quickStart(identity, 'c1', { answers: ANSWERS }, meta());
+  // Another tab refined the draft: mustHave is now at revision 2.
+  db.conv.fieldMeta = { ...db.conv.fieldMeta, mustHave: { source: 'ai', revision: 2, status: 'pending' } };
+
+  await assert.rejects(
+    svc.confirmFields(identity, 'c1', { fields: ['mustHave', 'title'], revisions: { mustHave: 1, title: 1 } }),
+    (e) => e.response?.code === 'DRAFT_CHANGED' && e.response.fields.includes('mustHave'),
+  );
+  assert.equal(db.conv.fieldMeta.mustHave.status, 'pending');
+  assert.equal(db.conv.fieldMeta.title.status, 'pending');
+  assert.ok(db.conv.missingFields.includes('title_unconfirmed'), 'the title check Create waits for is not lifted');
+  await assert.rejects(svc.confirmFields(identity, 'c1', { fields: ['title'] }), 'the reviewed revision is required');
+});
+
+test('#68 review: a change that lands between the check and the write makes the confirmation fail, not overwrite', async () => {
+  const { svc, db } = service({ titleFromUser: false });
+  await svc.quickStart(identity, 'c1', { answers: ANSWERS }, meta());
+  const load = db.copilotConversation.findFirst;
+  db.copilotConversation.findFirst = async () => {
+    const row = { ...(await load()) };
+    db.conv.stateRevision += 1; // another turn commits right after this read
+    db.copilotConversation.findFirst = load;
+    return row;
+  };
+  await assert.rejects(svc.confirmFields(identity, 'c1', { fields: ['title'], revisions: { title: 1 } }), (e) => e.response?.code === 'DRAFT_CHANGED');
   assert.equal(db.conv.fieldMeta.title.status, 'pending');
 });

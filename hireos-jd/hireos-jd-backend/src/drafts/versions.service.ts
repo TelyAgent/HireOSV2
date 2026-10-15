@@ -77,6 +77,7 @@ export class VersionsService {
       where: { workspaceId: identity.workspaceId, jobId },
       orderBy: { versionNo: 'desc' },
     });
+    // Checked again under the job's version lock below; this early check just avoids touching Core.
     if (latest && sameContent(latest.blocks, doc.blocks)) {
       throw new ConflictException({ code: 'NO_CHANGES', message: `与 v${latest.versionNo} 相比没有改动，无需发布。` });
     }
@@ -87,21 +88,28 @@ export class VersionsService {
       job = await this.core.updateJob(identity, jobId, { status: 'open', reason: 'published' }, `jd-publish-${jobId}-${doc.revision}`);
     }
 
-    const versionNo = (latest?.versionNo ?? 0) + 1;
     try {
-      const row = await this.db.jobDocumentVersion.create({
-        data: {
-          workspaceId: identity.workspaceId,
-          jobId,
-          versionNo,
-          code: `${jdCode}@v${versionNo}`,
-          title: job.title,
-          blocks: json(doc.blocks),
-          meta: doc.meta === null ? undefined : json(doc.meta),
-          note: input.note,
-          publishedBy: input.publishedBy ?? identity.actorId,
-          createdBy: identity.actorId,
-        },
+      const row = await this.db.$transaction(async (tx) => {
+        await lockJobVersions(tx, identity.workspaceId, jobId);
+        const current = await tx.jobDocumentVersion.findFirst({ where: { workspaceId: identity.workspaceId, jobId }, orderBy: { versionNo: 'desc' } });
+        if (current && sameContent(current.blocks, doc.blocks)) {
+          throw new ConflictException({ code: 'NO_CHANGES', message: `与 v${current.versionNo} 相比没有改动，无需发布。` });
+        }
+        const versionNo = (current?.versionNo ?? 0) + 1;
+        return tx.jobDocumentVersion.create({
+          data: {
+            workspaceId: identity.workspaceId,
+            jobId,
+            versionNo,
+            code: `${jdCode}@v${versionNo}`,
+            title: job.title,
+            blocks: json(doc.blocks),
+            meta: doc.meta === null ? undefined : json(doc.meta),
+            note: input.note,
+            publishedBy: input.publishedBy ?? identity.actorId,
+            createdBy: identity.actorId,
+          },
+        });
       });
       return { version: serialize(row), job };
     } catch (error) {
@@ -144,7 +152,10 @@ export class VersionsService {
     const baseline = { kind: 'migration_baseline', source, migratedAt: migratedAt.toISOString(), originalPublishedAt: null, originalApproval: null };
     const jdCode = await this.ensureCode(identity, jobId);
     try {
-      await this.db.$transaction(async (tx) => {
+      const created = await this.db.$transaction(async (tx) => {
+        await lockJobVersions(tx, identity.workspaceId, jobId);
+        // A Publish may have landed since the check above.
+        if (await tx.jobDocumentVersion.findFirst({ where })) return false;
         if (!doc) {
           await tx.jobDocument.create({
             data: { workspaceId: identity.workspaceId, jobId, audience: DOC_AUDIENCE, blocks: json(blocks), revision: 1, updatedBy: MIGRATION_ACTOR },
@@ -166,7 +177,9 @@ export class VersionsService {
             publishedAt: migratedAt,
           },
         });
+        return true;
       });
+      if (!created) return { jobId, result: 'has_versions' };
     } catch (error) {
       // A concurrent run (or a real Publish) got there first: the job has its v1.
       if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') return { jobId, result: 'has_versions' };
@@ -181,17 +194,19 @@ export class VersionsService {
    */
   async rollbackBaseline(identity: Identity, jobId: string): Promise<'removed' | 'kept' | 'none'> {
     const where = { workspaceId: identity.workspaceId, jobId };
-    const versions = await this.db.jobDocumentVersion.findMany({ where });
-    const v1 = versions.find((v) => v.versionNo === 1 && v.publishedBy === MIGRATION_ACTOR);
-    if (!v1) return 'none';
-    if (versions.length > 1) return 'kept';
-    await this.db.$transaction(async (tx) => {
+    // Decided and done under the job's version lock, so a Publish can't add v2 between the check and the delete.
+    return this.db.$transaction(async (tx) => {
+      await lockJobVersions(tx, identity.workspaceId, jobId);
+      const versions = await tx.jobDocumentVersion.findMany({ where });
+      const v1 = versions.find((v) => v.versionNo === 1 && v.publishedBy === MIGRATION_ACTOR);
+      if (!v1) return 'none' as const;
+      if (versions.length > 1) return 'kept' as const;
       await tx.jobDocumentVersion.delete({ where: { id: v1.id } });
       if (asRecord(asRecord(v1.meta).baseline).source === 'draft') {
         await tx.jobDocument.deleteMany({ where: { ...where, audience: DOC_AUDIENCE, updatedBy: MIGRATION_ACTOR, revision: 1 } });
       }
+      return 'removed' as const;
     });
-    return 'removed';
   }
 
   /** Returns the job's JD ID, assigning the next free number for the current year on first use. */
@@ -245,4 +260,12 @@ function serialize(row: VersionRow) {
 
 function asRecord(value: unknown): Record<string, unknown> {
   return value && typeof value === 'object' && !Array.isArray(value) ? (value as Record<string, unknown>) : {};
+}
+
+/**
+ * Serialises everything that writes or removes a job's versions — Publish, the baseline migration and its
+ * rollback (#96 review) — for the rest of the transaction. A Postgres advisory lock, so no table is locked.
+ */
+async function lockJobVersions(tx: Prisma.TransactionClient, workspaceId: string, jobId: string) {
+  await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${`jd-versions:${workspaceId}:${jobId}`}, 0))`;
 }
