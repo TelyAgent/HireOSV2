@@ -149,4 +149,12 @@ describe('job-page Copilot', () => {
     expect(new TextEncoder().encode(JSON.stringify(api.askDocumentCopilot.mock.calls[0][2])).length).toBeLessThan(100 * 1024);
     expect(api.askDocumentCopilot.mock.calls[0][2].context).not.toHaveProperty('truncated');
   });
+
+  it('#106 review: an explicit selection too long to send whole is refused with a reason — no request, nothing cut', async () => {
+    const huge = 'y'.repeat(9000);
+    renderPanel({ blockId: 'b2', text: huge });
+    await type('rewrite this');
+    expect(await screen.findByText('The selected text is too long for Copilot — select a shorter part and ask again.')).toBeInTheDocument();
+    expect(api.askDocumentCopilot).not.toHaveBeenCalled();
+  });
 });

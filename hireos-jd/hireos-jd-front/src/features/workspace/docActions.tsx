@@ -38,7 +38,7 @@ import {
 } from "./documentsApi";
 import { nowISO, uid } from "../../lib/format";
 import { SalaryModal } from "./SalaryModal";
-import { fitAskRequest, fitBytes } from "./askBudget";
+import { fitAskRequest } from "./askBudget";
 import { describeAiAnalysis, describePublishGate, publishGate, statusContext } from "./publishGate";
 import {
   REQ_ITEMS,
@@ -316,6 +316,14 @@ export function useDocActions(jobId: string) {
       if (blockLevel(sel.block) === "confidential") return void pushThreadMsg("text", t(CONFIDENTIAL_BLOCK));
       if (state.wsCopilotBusy) return;
 
+      // Same budget as a typed message: the selection is sent whole or not at all, the document fills the rest.
+      const fit = fitAskRequest({
+        message: instruction ?? "",
+        selection: { text: sel.selected, target: sel.target, scope: sel.scope },
+        context: docContext(),
+      });
+      if ("tooLarge" in fit) return void pushThreadMsg("text", t("The selected text is too long for Copilot — select a shorter part and ask again."));
+
       set({ wsCopilotBusy: true, wsSideTab: "copilot" });
       try {
         const result = await rewriteDocumentSelection(jobId, DOC_AUDIENCE, {
@@ -324,8 +332,7 @@ export function useDocActions(jobId: string) {
           action,
           target: sel.target,
           scope: sel.scope,
-          // Quick actions send the same document context; keep it inside the request limit too.
-          context: { ...docContext(), documentText: fitBytes(docContext().documentText ?? "", 50_000) },
+          context: fit.body.context,
         });
         await proposeEdit(sel, result, instruction || action, supersedes);
       } catch (error) {
@@ -350,11 +357,14 @@ export function useDocActions(jobId: string) {
       if (state.wsCopilotBusy) return;
 
       // Sized on the whole request; a JD too long to fit is sent in part and the answer says so (#106 review).
-      const { body, truncated } = fitAskRequest({
+      const fit = fitAskRequest({
         message,
         selection: sel ? { text: sel.selected, target: sel.target, scope: sel.scope, implicit } : undefined,
         context: { ...docContext(), readiness: readiness() },
       });
+      // A selection is never cut — an accepted edit replaces exactly what the model saw.
+      if ("tooLarge" in fit) return void pushThreadMsg("text", t("The selected text is too long for Copilot — select a shorter part and ask again."));
+      const { body, truncated } = fit;
       set({ wsCopilotBusy: true, wsSideTab: "copilot" });
       try {
         const result = await askDocumentCopilot(jobId, DOC_AUDIENCE, body);
