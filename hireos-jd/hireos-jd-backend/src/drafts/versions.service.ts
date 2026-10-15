@@ -30,8 +30,14 @@ const publishSchema = z.object({
   note: z.string().trim().max(1000).default(''),
   /** Revision of the saved document the user reviewed — refuses to publish anything else. */
   revision: z.number().int().positive(),
-  /** App-level person id shown as the publisher. */
-  publishedBy: z.string().trim().min(1).max(200).optional(),
+  /** App-level person id shown as the publisher; `system:` ids are reserved for the service itself (#96 review). */
+  publishedBy: z
+    .string()
+    .trim()
+    .min(1)
+    .max(200)
+    .refine((id) => !id.toLowerCase().startsWith('system:'), { message: 'publishedBy may not be a system id.' })
+    .optional(),
 });
 
 type VersionRow = {
@@ -198,7 +204,10 @@ export class VersionsService {
     return this.db.$transaction(async (tx) => {
       await lockJobVersions(tx, identity.workspaceId, jobId);
       const versions = await tx.jobDocumentVersion.findMany({ where });
-      const v1 = versions.find((v) => v.versionNo === 1 && v.publishedBy === MIGRATION_ACTOR);
+      // Only what the migration itself wrote: createdBy is set by the service, never by a client (#96 review).
+      const v1 = versions.find(
+        (v) => v.versionNo === 1 && v.createdBy === MIGRATION_ACTOR && v.publishedBy === MIGRATION_ACTOR && asRecord(asRecord(v.meta).baseline).kind === 'migration_baseline',
+      );
       if (!v1) return 'none' as const;
       if (versions.length > 1) return 'kept' as const;
       await tx.jobDocumentVersion.delete({ where: { id: v1.id } });

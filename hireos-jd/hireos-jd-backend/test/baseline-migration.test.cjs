@@ -162,3 +162,16 @@ test('#96 review: a Publish that lands before the backfill gets the lock means n
   assert.equal((await versions.backfillBaseline(identity, 'job-a', { apply: true })).result, 'has_versions');
   assert.deepEqual(db.state.versions.map((v) => v.publishedBy), ['hr-1']);
 });
+
+test('#96 review: a version someone published under the migration name is never taken for a baseline', async () => {
+  const { db, versions } = setup({ 'job-a': { id: 'job-a', title: 'Ops Lead', status: 'open' } });
+  // Published by a user who set publishedBy to the migration id: createdBy still says who did it.
+  db.state.versions.push({ id: 'real-v1', workspaceId: WS, jobId: 'job-a', versionNo: 1, blocks: SAVED_BLOCKS, publishedBy: MIGRATION_ACTOR, createdBy: 'hr-1', meta: { baseline: { kind: 'migration_baseline' } } });
+  assert.equal(await versions.rollbackBaseline(identity, 'job-a'), 'none');
+  assert.equal(db.state.versions.length, 1);
+
+  // And Publish refuses a system id as the publisher in the first place.
+  const doc = { workspaceId: WS, jobId: 'job-b', audience: 'internal', blocks: SAVED_BLOCKS, revision: 1, updatedBy: 'hr-1', meta: null };
+  db.state.documents.push(doc);
+  await assert.rejects(versions.publish({ ...identity, actorId: 'hr-1' }, 'job-b', { revision: 1, publishedBy: MIGRATION_ACTOR }), (e) => e.response?.code === 'INVALID_PUBLISH_REQUEST');
+});

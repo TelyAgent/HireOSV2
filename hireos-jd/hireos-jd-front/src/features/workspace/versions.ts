@@ -35,8 +35,12 @@ export interface JdVersions {
 
 /** The migration-baseline marker of a version, if it is one: its time is the migration's, not a real publish. */
 export function baselineOf(v: JdVersion): VersionBaseline | null {
-  return v.meta?.baseline?.kind === "migration_baseline" ? v.meta.baseline : null;
+  // The marker sits in document meta, which users can save; only the migration publishes as this id.
+  return v.publishedBy === MIGRATION_ACTOR && v.meta?.baseline?.kind === "migration_baseline" ? v.meta.baseline : null;
 }
+
+/** Publisher of the v1s the #96 migration wrote (hireos-jd-backend `MIGRATION_ACTOR`). */
+const MIGRATION_ACTOR = "system:jd-baseline-migration";
 
 /** A version's document meta without the baseline marker, for restoring it into the draft. */
 export function docMetaOf(v: JdVersion): DocMeta | null {

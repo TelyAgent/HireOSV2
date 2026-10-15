@@ -21,5 +21,6 @@ describe('migration baseline (#96)', () => {
     expect(baselineOf(v1)?.source).toBe('draft');
     expect(docMetaOf(v1)).toEqual({ values: { level: 'Senior' }, shown: ['level'] });
     expect(baselineOf({ ...v1, meta: { values: {}, shown: [] } })).toBeNull();
+    expect(baselineOf({ ...v1, publishedBy: 'hr-1' })).toBeNull();
   });
 });
