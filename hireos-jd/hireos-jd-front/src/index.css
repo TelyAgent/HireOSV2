@@ -935,3 +935,5 @@ a:focus-visible, button:focus-visible, [tabindex]:focus-visible, input:focus-vis
 @keyframes jd-sk { 0% { background-position: 100% 50%; } 100% { background-position: 0 50%; } }
 @media (prefers-reduced-motion: reduce) { .job-list-skeleton .sk-row { animation: none; } }
 .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
+.copilot-sources{ margin:8px 0 0; padding-left:18px; font-size:var(--fs-xs); }
+.copilot-basis{ margin-top:8px; font-size:var(--fs-xs); color:var(--text-tertiary); }

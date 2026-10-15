@@ -92,6 +92,29 @@ export async function rewriteDocumentSelection(jobId: string, audience: Audience
   return parseOrThrow<RewriteResult>(response);
 }
 
+export interface AskRequest {
+  message: string;
+  /** The selected text or clicked block; omitted when the user just asks. */
+  selection?: { text: string; target: RewriteRequest["target"]; scope: RewriteRequest["scope"]; implicit?: boolean };
+  context: RewriteRequest["context"] & { readiness?: string };
+}
+
+/** What the job-page Copilot did with a typed message; only `edit` becomes a suggestion (#106 #107). */
+export type AskResult =
+  | { kind: "answer"; intent: "answer" | "research" | "action" | "off_topic"; text: string; sources: { title: string; url: string }[]; contextScope: "selection" | "document" }
+  | ({ kind: "edit" } & RewriteResult)
+  | { kind: "no_change"; explain: string }
+  | { kind: "needs_target" };
+
+export async function askDocumentCopilot(jobId: string, audience: Audience, body: AskRequest): Promise<AskResult> {
+  const response = await authFetch(`${JOBS}/${jobId}/documents/${audience}/ask`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify(body),
+  });
+  return parseOrThrow<AskResult>(response);
+}
+
 export interface NewSuggestion {
   anchorBlock: string;
   author: "ai" | "human";

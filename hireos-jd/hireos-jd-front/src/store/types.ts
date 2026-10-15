@@ -33,7 +33,13 @@ export interface DocSelection {
 
 export type CopilotMsg =
   | { kind: "user"; text: string }
-  | { kind: "text"; text: string }
+  | {
+      kind: "text";
+      text: string;
+      /** What an answer was based on (#106), e.g. the whole JD or the selection. */
+      basis?: "selection" | "document";
+      sources?: { title: string; url: string }[];
+    }
   | { kind: "suggestion"; suggestion: Suggestion; explain: string };
 
 export interface GeminiDraft {

@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { HIREOS_JD_FACTS } from './jd-agent-scope';
 
 const OUTPUT_FORMAT = [
   '## 输出格式',
@@ -13,10 +14,21 @@ const OUTPUT_FORMAT = [
   '- missingFields: string[] — 你认为仍然缺失的关键字段名',
 ].join('\n');
 
-function buildSystemPrompt(skillDir: string): string {
+/** `chat`: a skill the user talks to directly, which also needs the Agent's scope and HireOS facts (#103 #104). */
+function buildSystemPrompt(skillDir: string, chat = false): string {
   const instructions = readFileSync(join(skillDir, 'instructions.md'), 'utf-8');
   const fieldSchema = readFileSync(join(skillDir, 'job-standard-v1.json'), 'utf-8');
-  return [instructions.trim(), '', '## 字段 schema（job-standard-v1）', '```json', fieldSchema.trim(), '```', '', OUTPUT_FORMAT].join('\n');
+  return [
+    instructions.trim(),
+    ...(chat ? ['', HIREOS_JD_FACTS] : []),
+    '',
+    '## 字段 schema（job-standard-v1）',
+    '```json',
+    fieldSchema.trim(),
+    '```',
+    '',
+    OUTPUT_FORMAT,
+  ].join('\n');
 }
 
 @Injectable()
@@ -26,7 +38,7 @@ export class PromptRegistry {
   private readonly autotakePrompt: string;
 
   constructor() {
-    this.intakePrompt = buildSystemPrompt(join(__dirname, 'skills', 'jd-intake'));
+    this.intakePrompt = buildSystemPrompt(join(__dirname, 'skills', 'jd-intake'), true);
     this.fileExtractPrompt = buildSystemPrompt(join(__dirname, 'skills', 'jd-file-extract'));
     this.autotakePrompt = buildSystemPrompt(join(__dirname, 'skills', 'jd-autotake'));
   }

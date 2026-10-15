@@ -218,7 +218,25 @@ function CopilotMessage({ msg, jobId }: { msg: CopilotMsg; jobId: string }) {
           <Icon name="auto_awesome" size={15} />
           Copilot
         </div>
-        <div className="bubble">{msg.text}</div>
+        <div className="bubble">
+          {msg.text}
+          {msg.sources && msg.sources.length > 0 && (
+            <ul className="copilot-sources">
+              {msg.sources.map((s) => (
+                <li key={s.url}>
+                  <a href={s.url} target="_blank" rel="noreferrer">
+                    {s.title || s.url}
+                  </a>
+                </li>
+              ))}
+            </ul>
+          )}
+          {msg.basis && (
+            <div className="copilot-basis">
+              {t(msg.basis === "selection" ? "Based on the selected text and the whole JD (Confidential excluded)" : "Based on the whole JD (Confidential excluded)")}
+            </div>
+          )}
+        </div>
       </div>
     );
   }

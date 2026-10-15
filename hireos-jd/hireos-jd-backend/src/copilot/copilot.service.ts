@@ -12,6 +12,7 @@ import { PromptRegistry } from './prompt-registry';
 import { fieldsToDraftContent } from './draft-mapping';
 import { ReplyStreamExtractor } from './reply-stream-extractor';
 import { changedJdFields, refineReply } from './refine-summary';
+import { OUT_OF_SCOPE_REPLY, SALARY_ANSWER_RULES, fixAnnualSalary, workflowGuide } from './jd-agent-scope';
 import {
   autoCompleteInputSchema,
   computeMissingAuthoredFields,
@@ -489,6 +490,8 @@ export class CopilotService {
    * The refine box doubles as a chat box once a draft exists, so a note may be a question ("what's the
    * monthly salary for this role in Wuhan?") rather than an edit. Questions are answered with web search
    * and never touch the draft; anything that asks to change the draft — or an unclear note — stays an edit.
+   * A request outside the JD workspace, or one to submit/approve/publish, gets a fixed reply that says what
+   * the Agent can do and what the real HireOS flow is (#103 #104) — it never edits the draft or acts.
    */
   private async answerIfQuestion(identity: Identity, id: string, current: JdFields, note: string): Promise<WebAnswer | null> {
     let intent = 'edit';
@@ -497,11 +500,14 @@ export class CopilotService {
         { role: 'user', content: `当前 JD 草稿：${JSON.stringify(current)}\n\n用户这句话：${note}` },
       ]);
       const parsed: unknown = JSON.parse(raw);
-      if (parsed && typeof parsed === 'object' && (parsed as { intent?: unknown }).intent === 'question') intent = 'question';
+      const said = parsed && typeof parsed === 'object' ? (parsed as { intent?: unknown }).intent : undefined;
+      if (said === 'question' || said === 'off_topic' || said === 'action') intent = said;
     } catch (error) {
       // Classification is best-effort: falling back to the old "every note is an edit" behavior.
       this.logger.warn(`refine_intent failed (conversation=${id}): ${error instanceof Error ? error.message : String(error)}`);
     }
+    if (intent === 'off_topic') return { text: OUT_OF_SCOPE_REPLY, sources: [] };
+    if (intent === 'action') return { text: workflowGuide(), sources: [] };
     if (intent !== 'question') return null;
     const startedAt = Date.now();
     try {
@@ -512,7 +518,8 @@ export class CopilotService {
         current.employmentType && `类型：${current.employmentType}`,
         current.mustHave?.length && `任职要求：${current.mustHave.join('；')}`,
       ].filter(Boolean).join('\n');
-      const answer = await this.llm.answerWithWebSearch(WEB_ANSWER_INSTRUCTIONS, `${context}\n\n问题：${note}`);
+      const raw = await this.llm.answerWithWebSearch(WEB_ANSWER_INSTRUCTIONS, `${context}\n\n问题：${note}`);
+      const answer = { ...raw, text: fixAnnualSalary(raw.text) };
       this.logger.log(`refine_web_answer succeeded in ${Date.now() - startedAt}ms (conversation=${id}, ${answer.sources.length} sources)`);
       return answer;
     } catch (error) {
@@ -730,17 +737,20 @@ const OPTIONAL_SECTION_MENTIONS: [keyof JdFields, RegExp][] = [
 
 const REFINE_INTENT_PROMPT = [
   '你是招聘 JD 助手的意图分类器。用户已经有一份 JD 草稿，现在又说了一句话。',
-  '判断这句话是要求修改草稿（edit），还是在提问、咨询、要信息或建议而没有要求改稿（question）。',
-  '明确要求修改、补充、删减、调整草稿内容（包括“改成”“加上”“写上”“去掉”等）的是 edit；',
-  '询问薪资行情、市场情况、招聘难度、写法建议、名词解释等的是 question。既提问又要求修改的算 edit。',
-  '只输出 JSON：{"intent":"edit"} 或 {"intent":"question"}。',
+  '判断这句话属于哪一类：',
+  '- edit：要求修改、补充、删减、调整草稿内容（包括“改成”“加上”“写上”“去掉”等）。既提问又要求修改的也算 edit。',
+  '- question：询问薪资行情、市场情况、招聘难度、写法建议、名词解释等，没有要求改稿。',
+  '- action：要求你代为提交审批、批准、发布职位，或代为执行其他系统操作。',
+  '- off_topic：与职位、招聘和这份 JD 都无关（天气、新闻、闲聊等）。',
+  '只输出 JSON：{"intent":"edit"}、{"intent":"question"}、{"intent":"action"} 或 {"intent":"off_topic"}。',
 ].join('\n');
 
 const WEB_ANSWER_INSTRUCTIONS = [
   '你是招聘助手。用户正在写一份 JD，下面给出岗位背景和用户的问题。',
   '需要行情、薪资、市场等时效性信息时先联网搜索，基于搜索结果回答；不确定时说明口径和不确定性。',
   '用简体中文，纯文本，不要用 Markdown，不要贴链接，也不要在末尾写“来源”（来源会单独列出）。回答简洁，控制在 200 字以内。',
-  '薪资类问题给出区间，并注明口径（税前月薪、年终/薪数等）和适用的经验段。不要修改或复述 JD。',
+  '不要修改或复述 JD。',
+  SALARY_ANSWER_RULES,
 ].join('\n');
 
 /** Stored message text for a web answer: the answer plus its sources, since the chat history is plain text. */
