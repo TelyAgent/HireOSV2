@@ -158,23 +158,32 @@ const STABLE_TEXT_CHARS = 200;
 const STABLE_POLL_MS = 500;
 const STABLE_POLLS = 3;
 
-/** Until the text is long enough and settled, `done()` (e.g. the page landed on an error status), or the deadline. */
+/** Visible-content text length: inline scripts and styles count toward textContent but are no posting (#64 review). */
+async function contentLength(page: Page): Promise<number> {
+  return page
+    .evaluate(() => {
+      const body = document.body?.cloneNode(true) as HTMLElement | undefined;
+      if (!body) return 0;
+      body.querySelectorAll('script, style, noscript, template, svg').forEach((node) => node.remove());
+      return (body.textContent ?? '').replace(/\s+/g, ' ').trim().length;
+    })
+    .catch(() => -1);
+}
+
+/**
+ * Until scripts have added a posting's worth of text and it has settled, `done()` (e.g. the page landed on an
+ * error status), or the deadline. Measured against what the page showed when its HTML had loaded: static text
+ * such as a long company intro is not the posting the scripts are still fetching (#64 review).
+ */
 async function waitForStableText(page: Page, deadline: number, done: () => boolean): Promise<void> {
+  const initial = Math.max(0, await contentLength(page));
   let last = -1;
   let same = 0;
   while (Date.now() + STABLE_POLL_MS < deadline) {
     await page.waitForTimeout(STABLE_POLL_MS);
     if (done()) return;
-    // Visible-content text only: inline scripts and styles count toward textContent but are no posting (#64 review).
-    const length = await page
-      .evaluate(() => {
-        const body = document.body?.cloneNode(true) as HTMLElement | undefined;
-        if (!body) return 0;
-        body.querySelectorAll('script, style, noscript, template, svg').forEach((node) => node.remove());
-        return (body.textContent ?? '').replace(/\s+/g, ' ').trim().length;
-      })
-      .catch(() => -1);
-    same = length >= STABLE_TEXT_CHARS && length === last ? same + 1 : 0;
+    const length = await contentLength(page);
+    same = length - initial >= STABLE_TEXT_CHARS && length === last ? same + 1 : 0;
     if (same >= STABLE_POLLS) return;
     last = length;
   }
