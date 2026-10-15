@@ -111,3 +111,21 @@ describe('Quick Start draft provenance (#68)', () => {
     expect(document.querySelectorAll('.gemini-expand-column .gm-ws-doc .gm-field-mark').length).toBe(4);
   });
 });
+
+describe('reopened from history (#68 review)', () => {
+  it('a Quick Start conversation keeps its entry, answers and field marks', async () => {
+    const { conversationToGeminiMsgs } = await import('../src/features/copilot/GeminiPanel');
+    const dto = conv({
+      messages: [
+        { id: 'm1', role: 'user', text: ANSWERS, attachments: [{ kind: 'quick_start' }], sequence: 1, createdAt: '' },
+        { id: 'm2', role: 'assistant', text: '已生成', sequence: 2, createdAt: '' },
+      ],
+    });
+    const last = conversationToGeminiMsgs(dto).at(-1) as { origin?: { path: string; detail?: string }; fieldMeta?: unknown };
+    expect(last.origin).toEqual({ path: 'questions', detail: ANSWERS });
+    expect(last.fieldMeta).toEqual(META);
+
+    const other = conversationToGeminiMsgs(conv({ messages: [{ id: 'm1', role: 'user', text: 'Sales Manager JD', sequence: 1, createdAt: '' }] }));
+    expect((other.at(-1) as { origin?: unknown }).origin).toBeUndefined();
+  });
+});

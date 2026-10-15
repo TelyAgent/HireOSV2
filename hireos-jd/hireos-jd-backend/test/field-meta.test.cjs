@@ -99,3 +99,22 @@ test('#68: confirming a field the draft does not have is refused', async () => {
   await assert.rejects(svc.confirmFields(identity, 'c1', { fields: ['businessProblem'] }), (e) => e.response?.code === 'FIELD_NOT_IN_DRAFT');
   await assert.rejects(svc.confirmFields(identity, 'c1', { fields: ['notAField'] }));
 });
+
+test('#68 review: a refine that rewrites a confirmed field makes it a pending AI suggestion at the next revision', async () => {
+  const { svc } = service({ titleFromUser: false });
+  await svc.quickStart(identity, 'c1', { answers: ANSWERS }, meta());
+  await svc.confirmFields(identity, 'c1', { fields: ['mustHave', 'responsibilities'] });
+
+  svc.llm.completeJson = async () => JSON.stringify({ reply: '已修改', phase: 'ready_to_confirm', missingFields: [], fields: { ...DRAFT, mustHave: ['Performance marketing', 'SQL', 'Excel'] } });
+  const refined = await svc.refineDraft(identity, 'c1', { note: '加一条 Excel' }, meta());
+  assert.deepEqual(refined.fieldMeta.mustHave, { source: 'ai', revision: 2, status: 'pending' });
+  assert.deepEqual(refined.fieldMeta.responsibilities, { source: 'ai', revision: 1, status: 'confirmed' }, 'untouched fields keep their status');
+});
+
+test('#68 review: Quick Start answers are marked, so a reopened conversation is still known as Quick Start', async () => {
+  const { svc, db } = service({ titleFromUser: false });
+  const res = await svc.quickStart(identity, 'c1', { answers: ANSWERS }, meta());
+  const answers = res.messages.find((m) => m.role === 'user');
+  assert.deepEqual(answers.attachments, [{ kind: 'quick_start' }]);
+  assert.equal(db.conv.fieldMeta.title.status, 'pending');
+});

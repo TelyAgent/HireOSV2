@@ -515,7 +515,14 @@ export class CopilotService {
         ? await tx.copilotConversation.update({
             where: { id },
             // A refine keeps an unconfirmed AI title unconfirmed; only the user confirming it clears that.
-            data: { fields: json(fields), missingFields: json(pendingConfirmations(conversation)), phase: 'ready_to_confirm', stateRevision: { increment: 1 } },
+            data: {
+              fields: json(fields),
+              missingFields: json(pendingConfirmations(conversation)),
+              // What the refine rewrote is AI's again: pending, at the next revision (#68 review).
+              fieldMeta: json(recordChanges(asFieldMeta(conversation.fieldMeta), current, fields, () => 'ai')),
+              phase: 'ready_to_confirm',
+              stateRevision: { increment: 1 },
+            },
           })
         : conversation;
       const latest = await tx.copilotMessage.findFirst({ where: { conversationId: id }, orderBy: { sequence: 'desc' } });
@@ -760,7 +767,8 @@ export class CopilotService {
       operation,
       key,
       hash,
-      userMessage: { text: input.answers },
+      // Marks the answers as Quick Start, so a conversation reopened from history still shows its draft as M1 (#68).
+      userMessage: { text: input.answers, attachments: [{ kind: 'quick_start' }] },
       capabilityCode,
       turns,
       currentFields,

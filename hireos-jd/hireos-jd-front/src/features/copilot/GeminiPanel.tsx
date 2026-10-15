@@ -41,15 +41,23 @@ import { safeRandomUUID } from "../../lib/uuid";
 /** Converts a fetched conversation's raw messages back into the panel's bubble shapes. There's no
  * per-message phase snapshot server-side, so a conversation that's currently ready to confirm gets its
  * trailing assistant reply swapped for the draft card — matching what a live turn would have shown. */
-function conversationToGeminiMsgs(dto: CopilotConversationDto): GeminiMsg[] {
+export function conversationToGeminiMsgs(dto: CopilotConversationDto): GeminiMsg[] {
   const msgs: GeminiMsg[] = dto.messages.map((m): GeminiMsg =>
     m.role === "user" ? { role: "user", text: m.text || "" } : { role: "ai", text: m.text || "" },
   );
   if (dto.phase === "ready_to_confirm") {
     if (msgs.length && msgs[msgs.length - 1].role === "ai") msgs.pop();
-    msgs.push({ role: "ai", draft: jdFieldsToGeminiDraft(dto.fields), titlePending: titlePendingIn(dto), fieldMeta: dto.fieldMeta });
+    msgs.push({ role: "ai", draft: jdFieldsToGeminiDraft(dto.fields), titlePending: titlePendingIn(dto), fieldMeta: dto.fieldMeta, origin: quickStartOrigin(dto) });
   }
   return msgs;
+}
+
+/** A reopened Quick Start conversation keeps its entry and answers, so its draft still shows per-field confirmation (#68). */
+function quickStartOrigin(dto: CopilotConversationDto): GeminiOrigin | undefined {
+  const answers = dto.messages.filter(
+    (m) => m.role === "user" && Array.isArray(m.attachments) && m.attachments.some((a) => (a as { kind?: unknown })?.kind === "quick_start"),
+  );
+  return answers.length ? { path: "questions", detail: answers.map((m) => m.text ?? "").join("\n") } : undefined;
 }
 
 function titlePendingIn(dto: Pick<CopilotConversationDto, "missingFields">): boolean {
