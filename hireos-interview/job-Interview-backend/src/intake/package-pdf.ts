@@ -51,7 +51,8 @@ export function buildPackagePdf(lines: PdfLine[]): Buffer {
 
 export function packagePdfLines(data: {
   candidateName: string; jobTitle: string; decision: string | null; decisionAt: Date | null;
-  evidence: { requirement: string; score: number | null; note: string; roundName: string | null; sourceRefs: { segmentId: string; quote: string }[] }[];
+  needsReview?: boolean; reviewReason?: string | null; invalidatedAt?: Date | null;
+  evidence: { requirement: string; score: number | null; note: string; roundId?: string | null; roundName: string | null; sourceRefs: { segmentId: string; quote: string }[] }[];
   hrConfirmedBy: string | null; hrConfirmedAt: Date | null; hmConfirmedBy: string | null; hmConfirmedAt: Date | null;
 }) {
   const lines: PdfLine[] = [
@@ -60,10 +61,16 @@ export function packagePdfLines(data: {
     { text: `Decision time: ${data.decisionAt?.toISOString() ?? 'Not recorded'}` }, { text: '' },
     { text: 'Rubric and interview evidence', bold: true },
   ];
+  if (data.needsReview) {
+    lines.splice(1, 0, { text: `REVIEW REQUIRED: ${data.reviewReason ?? 'Upstream data changed'}${data.invalidatedAt ? ` (${data.invalidatedAt.toISOString()})` : ''}`, bold: true });
+  }
   for (const item of data.evidence) {
     for (const line of wrap(`${item.requirement} | score: ${item.score == null ? 'Unknown' : `${item.score}/5`} | round: ${item.roundName ?? 'None'}`)) lines.push({ text: line });
     for (const line of wrap(`Reason: ${item.note}`)) lines.push({ text: line });
-    for (const ref of item.sourceRefs) for (const line of wrap(`Evidence ${ref.segmentId}: ${ref.quote}`)) lines.push({ text: line });
+    for (const ref of item.sourceRefs) {
+      for (const line of wrap(`Evidence ${ref.segmentId}: ${ref.quote}`)) lines.push({ text: line });
+      if (item.roundId) for (const line of wrap(`Evidence link: /api/rounds/${item.roundId}/transcript#${ref.segmentId}`)) lines.push({ text: line });
+    }
   }
   lines.push({ text: '' }, { text: 'Human review', bold: true });
   for (const line of wrap(`HR: ${data.hrConfirmedBy ?? 'Not confirmed'} | ${data.hrConfirmedAt?.toISOString() ?? 'No confirmation time'}`)) lines.push({ text: line });

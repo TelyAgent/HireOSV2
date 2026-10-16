@@ -397,7 +397,7 @@ export class TasksService {
       return {
         cardId: card.id, requirement: card.requirement, cardPriority: card.cardPriority, weight: card.weight,
         sourceRefs: s?.aiQuoteSegmentId && s.aiQuote ? [{ segmentId: s.aiQuoteSegmentId, quote: s.aiQuote }] : [],
-        roundName: s ? byRound.get(s.roundId) ?? s.roundId : null,
+        roundId: s?.roundId ?? null, roundName: s ? byRound.get(s.roundId) ?? s.roundId : null,
         score, note: s?.note ?? '', aiScore: s?.aiScore ?? null, aiRationale: s?.aiRationale ?? null, tag,
       };
     });

@@ -41,13 +41,17 @@ test('keeps a confirmed rubric flow healthy and preserves later-stage completion
 test('renders a downloadable PDF manifest with scores, evidence and confirmations', () => {
   const pdf = buildPackagePdf(packagePdfLines({
     candidateName: 'Candidate', jobTitle: 'Engineer', decision: 'recommend_offer', decisionAt: new Date('2026-01-01T00:00:00Z'),
-    evidence: [{ requirement: '设计 API', score: 4, note: 'Clear tradeoffs'.repeat(3), roundName: 'Technical', sourceRefs: [{ segmentId: 'line-1', quote: 'I designed the API' }] }],
+    needsReview: true, reviewReason: 'RUBRIC_UPDATED', invalidatedAt: new Date('2026-01-02T00:00:00Z'),
+    evidence: [{ requirement: '设计 API', score: 4, note: 'Clear tradeoffs'.repeat(3), roundId: 'round-1', roundName: 'Technical', sourceRefs: [{ segmentId: 'line-1', quote: 'I designed the API' }] }],
     hrConfirmedBy: 'hr-1', hrConfirmedAt: new Date('2026-01-01T01:00:00Z'), hmConfirmedBy: 'hm-1', hmConfirmedAt: new Date('2026-01-01T02:00:00Z'),
   }));
   assert.equal(pdf.subarray(0, 8).toString(), '%PDF-1.4');
   assert.match(pdf.toString('latin1'), /STSong-Light/);
   assert.match(pdf.toString('latin1'), /0049002000640065007300690067006e0065006400200074006800650020004100500049/);
   assert.match(pdf.toString('latin1'), /00480052003a002000680072002d0031/);
+  assert.match(pdf.toString('latin1'), /005200450056004900450057002000520045005100550049005200450044/);
+  assert.match(pdf.toString('latin1'), /00450076006900640065006e006300650020006c0069006e006b003a0020002f006100700069002f0072006f0075006e00640073002f0072006f0075006e0064002d0031/);
+  assert.match(pdf.toString('latin1'), /002d0031002f007400720061006e0073006300720069007000740023006c0069006e0065/);
 });
 
 test('paginates long package manifests instead of overflowing the printable page', () => {
