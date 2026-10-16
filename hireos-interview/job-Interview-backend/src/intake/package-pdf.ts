@@ -1,4 +1,4 @@
-type PdfLine = { text: string; bold?: boolean };
+type PdfLine = { text: string; bold?: boolean; href?: string };
 
 function pdfText(value: unknown) {
   return Buffer.from(String(value ?? ''), 'utf16le').swap16().toString('hex');
@@ -23,19 +23,29 @@ function pageContent(lines: PdfLine[]) {
   return ['BT', '/F1 10 Tf', '48 760 Td', ...lines.flatMap((line) => [`<${pdfText(line.text)}> Tj`, '0 -14 Td']), 'ET'].join('\n');
 }
 
+function escapePdfString(value: string) { return value.replaceAll('\\', '\\\\').replaceAll('(', '\\(').replaceAll(')', '\\)'); }
+
 /** Dependency-free PDF writer using the standard Simplified Chinese CID font. */
 export function buildPackagePdf(lines: PdfLine[]): Buffer {
-  const pages: string[] = [];
-  for (let i = 0; i < lines.length; i += 48) pages.push(pageContent(lines.slice(i, i + 48)));
-  if (!pages.length) pages.push(pageContent([{ text: 'Hiring Evaluation Package' }]));
+  const pageLines: PdfLine[][] = [];
+  for (let i = 0; i < lines.length; i += 48) pageLines.push(lines.slice(i, i + 48));
+  if (!pageLines.length) pageLines.push([{ text: 'Hiring Evaluation Package' }]);
+  const pages = pageLines.map((page) => ({ content: pageContent(page), links: page.flatMap((line, index) => line.href ? [{ href: line.href, index }] : []) }));
   const pageObjects = pages.map((_, i) => `${3 + i} 0 R`).join(' ');
   const firstContent = 3 + pages.length;
-  const fontObject = firstContent + pages.length;
+  const firstAnnotation = firstContent + pages.length;
+  const annotationCount = pages.reduce((count, page) => count + page.links.length, 0);
+  const fontObject = firstAnnotation + annotationCount;
+  let nextAnnotation = firstAnnotation;
   const objects = [
     '<< /Type /Catalog /Pages 2 0 R >>',
     `<< /Type /Pages /Kids [${pageObjects}] /Count ${pages.length} >>`,
-    ...pages.map((_, i) => `<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 ${fontObject} 0 R >> >> /Contents ${firstContent + i} 0 R >>`),
-    ...pages.map((content) => `<< /Length ${Buffer.byteLength(content, 'latin1')} >>\nstream\n${content}\nendstream`),
+    ...pages.map((page, i) => {
+      const annots = page.links.map(() => `${nextAnnotation++} 0 R`).join(' ');
+      return `<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 ${fontObject} 0 R >> >> /Contents ${firstContent + i} 0 R${annots ? ` /Annots [${annots}]` : ''} >>`;
+    }),
+    ...pages.map((page) => `<< /Length ${Buffer.byteLength(page.content, 'latin1')} >>\nstream\n${page.content}\nendstream`),
+    ...pages.flatMap((page) => page.links.map((link) => `<< /Type /Annot /Subtype /Link /Rect [48 ${760 - link.index * 14 - 2} 560 ${760 - link.index * 14 + 12}] /Border [0 0 0] /A << /S /URI /URI (${escapePdfString(link.href)}) >> >>`)),
     `<< /Type /Font /Subtype /Type0 /BaseFont /STSong-Light /Encoding /UniGB-UCS2-H /DescendantFonts [${fontObject + 1} 0 R] >>`,
     '<< /Type /Font /Subtype /CIDFontType0 /BaseFont /STSong-Light /CIDSystemInfo << /Registry (Adobe) /Ordering (GB1) /Supplement 4 >> >>',
   ];
@@ -72,7 +82,11 @@ export function packagePdfLines(data: {
     for (const line of wrap(`Reason: ${item.note}`)) lines.push({ text: line });
     for (const ref of item.sourceRefs) {
       for (const line of wrap(`Evidence ${ref.segmentId}: ${ref.quote}`)) lines.push({ text: line });
-      if (item.roundId) for (const line of wrap(`Evidence link: /hireos/interview/api/rounds/${item.roundId}/transcript/${ref.segmentId}`)) lines.push({ text: line });
+      if (item.roundId) {
+        const base = (process.env.INTERVIEW_PUBLIC_BASE_URL ?? 'http://localhost/interview/api').replace(/\/$/, '');
+        const href = `${base}/rounds/${item.roundId}/transcript/${ref.segmentId}`;
+        for (const line of wrap(`Evidence link: ${href}`)) lines.push({ text: line, href });
+      }
     }
   }
   lines.push({ text: '' }, { text: 'Human review', bold: true });
