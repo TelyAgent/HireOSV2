@@ -273,7 +273,8 @@ function evidenceAt(hit: ReturnType<typeof numberParagraphs>[number], probe: str
 
 function locate(needles: string[], paragraphs: ReturnType<typeof numberParagraphs>, source: Source): FieldEvidence | null {
   // The most specific text first: a project's description over its name, which may appear in other lines too.
-  for (const needle of needles.map(normalize).filter((n) => n.length >= 2).sort((a, b) => b.length - a.length)) {
+  // Any length, single-letter skills (C, R) included: whole-term matching keeps them from matching inside words.
+  for (const needle of needles.map(normalize).filter((n) => /[\p{L}\p{N}]/u.test(n)).sort((a, b) => b.length - a.length)) {
     // The whole text, however long: two projects that open alike must not share a paragraph (#155 review).
     const probe = needle;
     // A phone number is stored in E.164 but written with spaces or dashes: compare its digits.

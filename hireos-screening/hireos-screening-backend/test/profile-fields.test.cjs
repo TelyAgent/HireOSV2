@@ -390,6 +390,10 @@ test('#155 AC-2 (review): a skill is located as a whole term — Java is not Jav
   assert.equal(containsTerm('熟悉java开发和spring', 'java'), true, 'Chinese text around a term is not a join');
   assert.equal(containsTerm('react native', 'react'), true);
   assert.equal(containsTerm('preact', 'react'), false);
+  // Single-letter skills are found where they stand, and not inside other words.
+  const letters = byField(profileFields({ displayName: 'A', skills: ['C', 'R', 'Python'] }, { displayName: 'A', email: null, phone: null },
+    source([{ id: 'l0', text: 'Created reports for regional teams' }, { id: 'l1', text: 'Skills: C, R, Python' }]))).skills;
+  assert.deepEqual([letters.evidence.map((e) => e.segmentId), letters.unlocatedValues], [['l1'], []]);
   // The same for a job's company: "Acme" is not "Acmesoft".
   const jobs = byField(profileFields({ displayName: 'A', employmentHistory: [{ company: 'Acme', title: 'Engineer', start: '', end: '' }] }, { displayName: 'A', email: null, phone: null },
     source([{ id: 'w1', text: 'Engineer at Acmesoft' }, { id: 'w2', text: 'Engineer at Acme' }]))).employment_history;
