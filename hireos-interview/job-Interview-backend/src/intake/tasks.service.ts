@@ -374,7 +374,7 @@ export class TasksService {
   private async packageEvidence(workspaceId: string, taskId: string, jobId: string) {
     const rubric = await this.db.rubricVersion.findFirst({
       where: { workspaceId, jobId, status: 'confirmed' }, orderBy: { versionNumber: 'desc' },
-      select: { cards: { orderBy: { createdAt: 'asc' }, select: { id: true, requirement: true, cardPriority: true, weight: true } } },
+      select: { cards: { orderBy: { createdAt: 'asc' }, select: { id: true, requirement: true, expectedEvidence: true, levelAnchors: true, cardPriority: true, weight: true } } },
     });
     const cards = rubric?.cards ?? [];
     if (!cards.length) return [];
@@ -395,7 +395,7 @@ export class TasksService {
         : score >= 4 ? 'strong' as const
         : 'medium' as const;
       return {
-        cardId: card.id, requirement: card.requirement, cardPriority: card.cardPriority, weight: card.weight,
+        cardId: card.id, requirement: card.requirement, expectedEvidence: card.expectedEvidence, levelAnchors: card.levelAnchors, cardPriority: card.cardPriority, weight: card.weight,
         sourceRefs: s?.aiQuoteSegmentId && s.aiQuote ? [{ segmentId: s.aiQuoteSegmentId, quote: s.aiQuote }] : [],
         roundId: s?.roundId ?? null, roundName: s ? byRound.get(s.roundId) ?? s.roundId : null,
         score, note: s?.note ?? '', aiScore: s?.aiScore ?? null, aiRationale: s?.aiRationale ?? null, tag,

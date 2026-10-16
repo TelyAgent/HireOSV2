@@ -141,6 +141,7 @@ export type DebriefSummary = {
 // from CardScore, not a separately-authored list.
 export type PackageEvidenceItem = {
   cardId: string; requirement: string; cardPriority: CardPriority; weight: number;
+  expectedEvidence?: string; levelAnchors?: LevelAnchors;
   roundName: string | null; score: number | null; note: string;
   aiScore: number | null; aiRationale: string | null;
   sourceRefs: { segmentId: string; quote: string }[];

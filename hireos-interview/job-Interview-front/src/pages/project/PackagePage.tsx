@@ -52,8 +52,12 @@ export function PackagePage() {
   useEffect(() => {
     if (data?.offerState !== "pending") return;
     const timer = window.setInterval(() => setNow(Date.now()), 1000);
-    return () => window.clearInterval(timer);
-  }, [data?.offerState]);
+    const refresh = window.setInterval(() => {
+      if (!taskId) return;
+      api<PackageState>(`/tasks/${taskId}/package`).then(setData).catch(() => undefined);
+    }, 5000);
+    return () => { window.clearInterval(timer); window.clearInterval(refresh); };
+  }, [data?.offerState, taskId]);
 
   const toggleConfirm = async (role: "hr" | "hm") => {
     if (!taskId || !data) return;

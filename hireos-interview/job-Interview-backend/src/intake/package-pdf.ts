@@ -52,7 +52,7 @@ export function buildPackagePdf(lines: PdfLine[]): Buffer {
 export function packagePdfLines(data: {
   candidateName: string; jobTitle: string; decision: string | null; decisionAt: Date | null;
   needsReview?: boolean; reviewReason?: string | null; invalidatedAt?: Date | null;
-  evidence: { requirement: string; score: number | null; note: string; roundId?: string | null; roundName: string | null; sourceRefs: { segmentId: string; quote: string }[] }[];
+  evidence: { requirement: string; expectedEvidence?: string; levelAnchors?: unknown; score: number | null; note: string; roundId?: string | null; roundName: string | null; sourceRefs: { segmentId: string; quote: string }[] }[];
   hrConfirmedBy: string | null; hrConfirmedAt: Date | null; hmConfirmedBy: string | null; hmConfirmedAt: Date | null;
 }) {
   const lines: PdfLine[] = [
@@ -66,10 +66,12 @@ export function packagePdfLines(data: {
   }
   for (const item of data.evidence) {
     for (const line of wrap(`${item.requirement} | score: ${item.score == null ? 'Unknown' : `${item.score}/5`} | round: ${item.roundName ?? 'None'}`)) lines.push({ text: line });
+    if (item.expectedEvidence) for (const line of wrap(`Rubric evidence standard: ${item.expectedEvidence}`)) lines.push({ text: line });
+    if (item.levelAnchors) for (const line of wrap(`Rubric level anchors: ${JSON.stringify(item.levelAnchors)}`)) lines.push({ text: line });
     for (const line of wrap(`Reason: ${item.note}`)) lines.push({ text: line });
     for (const ref of item.sourceRefs) {
       for (const line of wrap(`Evidence ${ref.segmentId}: ${ref.quote}`)) lines.push({ text: line });
-      if (item.roundId) for (const line of wrap(`Evidence link: /api/rounds/${item.roundId}/transcript#${ref.segmentId}`)) lines.push({ text: line });
+      if (item.roundId) for (const line of wrap(`Evidence link: /interview/api/rounds/${item.roundId}/transcript#${ref.segmentId}`)) lines.push({ text: line });
     }
   }
   lines.push({ text: '' }, { text: 'Human review', bold: true });
