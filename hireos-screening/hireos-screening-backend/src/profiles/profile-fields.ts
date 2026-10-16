@@ -47,8 +47,9 @@ type Item = {
   value: string;
   needles: string[];
   together?: string[];
-  /** Ways the job's start month may be written; with them, company + title + month pins the paragraph. */
+  /** Ways the start (and end) may be written; company + title + a start followed by its end pins the paragraph. */
   dateForms?: string[];
+  endForms?: string[];
   /** Another item has the same company and title, so they alone can't tell which paragraph is this one. */
   ambiguous?: boolean;
   incomplete?: string[];
@@ -88,6 +89,7 @@ export function profileFields(
       const sameRole = all.filter((other) => normalize(text(record(other).company)) === normalize(company) && normalize(text(record(other).title)) === normalize(title)).length > 1;
       return {
         dateForms: monthForms(formatMonth(start)),
+        endForms: isPresent(end) ? PRESENT_FORMS : monthForms(formatMonth(end)),
         ambiguous: sameRole,
         value: [title, company].filter(Boolean).join(' · ') + (start || end ? ` (${start || '?'} – ${end || '?'})` : ''),
         // Company and title in the same paragraph: two jobs with the same title at different companies each find
@@ -107,7 +109,7 @@ export function profileFields(
       return {
         value: statement + (period ? ` (${period})` : ''),
         ...(school
-          ? { together: [school], dateForms: (period.match(/\d{4}/) ?? []).slice(0, 1), ambiguous: sameSchool, needles: [] }
+          ? { together: [school], dateForms: (period.match(/\d{4}/g) ?? []).slice(0, 1), endForms: (period.match(/\d{4}/g) ?? []).slice(1, 2), ambiguous: sameSchool, needles: [] }
           : { needles: [text(e.statement), major] }),
         // §4.1: school, degree, major and dates, each on its own.
         incomplete: [...(!school ? ['school'] : []), ...(!degree ? ['degree'] : []), ...(!major ? ['major'] : []), ...(!period ? ['dates'] : [])],
@@ -183,13 +185,38 @@ function locateItem(item: Item, paragraphs: ReturnType<typeof numberParagraphs>,
     const parts = item.together.map(normalize).filter(Boolean);
     const candidates = paragraphs.filter((p) => parts.every((part) => p.normalized.includes(part)));
     // The start month tells two stints of the same role apart (#155 review).
-    const dated = item.dateForms?.length ? candidates.find((p) => item.dateForms!.some((form) => p.normalized.includes(form))) : undefined;
+    // A start followed by its own end: the previous stint's end month ("Jan 2015 – Jan 2017") is not this one's start.
+    const dated = item.dateForms?.length ? candidates.find((p) => startsThenEnds(p.normalized, item.dateForms!, item.endForms ?? [])) : undefined;
     if (dated) return evidenceAt(dated, parts[0], source);
     // Without a matching month, company + title must point at one paragraph and one job; otherwise it isn't pinned.
     if (candidates.length === 1 && !item.ambiguous) return evidenceAt(candidates[0], parts[0], source);
     return null;
   }
   return locate(item.needles, paragraphs, source);
+}
+
+const PRESENT_FORMS = ['present', 'now', 'current', 'today', '至今', '现在', '目前'];
+
+/** Where a date form occurs as a whole: "2017-1" is not found inside "2017-10", nor "2017" inside "12017". */
+function dateAt(text: string, form: string, from = 0): number {
+  for (let at = text.indexOf(form, from); at !== -1; at = text.indexOf(form, at + 1)) {
+    const before = at > 0 ? text[at - 1] : '';
+    const after = text[at + form.length] ?? '';
+    if (!/\d/.test(before) && !/\d/.test(after)) return at;
+  }
+  return -1;
+}
+
+/** Whether the text has one of the start forms, followed — when an end is known — by one of the end forms. */
+function startsThenEnds(text: string, starts: string[], ends: string[]): boolean {
+  for (const start of starts) {
+    for (let at = dateAt(text, start); at !== -1; at = dateAt(text, start, at + 1)) {
+      if (!ends.length) return true;
+      const after = at + start.length;
+      if (ends.some((end) => dateAt(text, end, after) !== -1)) return true;
+    }
+  }
+  return false;
 }
 
 /** How a YYYY-MM month may be written in a résumé, lower-cased: 2015-01, 2015/01, 2015.01, 2015年1月, 01/2015, jan 2015… */

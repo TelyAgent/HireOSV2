@@ -235,6 +235,36 @@ test('#155 AC-2 (review): two degrees from the same school point at their own pa
   assert.deepEqual(f.unlocatedValues, []);
 });
 
+test('#155 AC-2 (review): back-to-back stints and consecutive degrees — the previous end is not the next start', () => {
+  const segments = [
+    { id: 'a1', text: 'Acme Analyst Jan 2015 – Jan 2017', page: 1 },
+    { id: 'a2', text: 'Acme Analyst Jan 2017 – Jan 2019', page: 2 },
+  ];
+  const stints = [
+    { company: 'Acme', title: 'Analyst', start: '2015-01', end: '2017-01' },
+    { company: 'Acme', title: 'Analyst', start: '2017-01', end: '2019-01' },
+  ];
+  const f = byField(profileFields({ displayName: 'A', employmentHistory: stints }, { displayName: 'A', email: null, phone: null }, source(segments))).employment_history;
+  assert.deepEqual(f.evidence.map((e) => e.segmentId), ['a1', 'a2']);
+  assert.deepEqual(f.unlocatedValues, []);
+  const current = [{ id: 'c1', text: 'Acme Analyst 2019-01 to 2021-10' }, { id: 'c2', text: 'Acme Analyst 2021-10 to present' }];
+  const g = byField(profileFields({ displayName: 'A', employmentHistory: [
+    { company: 'Acme', title: 'Analyst', start: '2019-01', end: '2021-10' }, { company: 'Acme', title: 'Analyst', start: '2021-10', end: 'present' },
+  ] }, { displayName: 'A', email: null, phone: null }, source(current))).employment_history;
+  assert.deepEqual(g.evidence.map((e) => e.segmentId), ['c1', 'c2'], 'an open-ended stint ends at "present"');
+  const degrees = [{ id: 'd1', text: 'Fudan University B.Sc. 2010 – 2014' }, { id: 'd2', text: 'Fudan University M.Sc. 2014 – 2016' }];
+  const h = byField(profileFields({ displayName: 'A', education: [
+    { school: 'Fudan University', degree: 'B.Sc.', major: 'Math', period: '2010 – 2014' }, { school: 'Fudan University', degree: 'M.Sc.', major: 'Statistics', period: '2014 – 2016' },
+  ] }, { displayName: 'A', email: null, phone: null }, source(degrees))).education;
+  assert.deepEqual(h.evidence.map((e) => e.segmentId), ['d1', 'd2']);
+  // "2017-1" is not found inside "2017-10".
+  const october = [{ id: 'o1', text: 'Acme Analyst 2017-10 to 2018-10' }, { id: 'o2', text: 'Acme Analyst 2017-1 to 2017-6' }];
+  const k = byField(profileFields({ displayName: 'A', employmentHistory: [
+    { company: 'Acme', title: 'Analyst', start: '2017-01', end: '2017-06' }, { company: 'Acme', title: 'Analyst', start: '2017-10', end: '2018-10' },
+  ] }, { displayName: 'A', email: null, phone: null }, source(october))).employment_history;
+  assert.deepEqual(k.evidence.map((e) => e.segmentId), ['o2', 'o1']);
+});
+
 test('#155 AC-1: a location confirmed unchanged on paste keeps its country and city; one the user typed is theirs', () => {
   const { withConfirmedIdentity } = require('../dist/profiles/profiles.service');
   const parsed = { displayName: 'A', email: null, location: { value: 'Ho Chi Minh City, Vietnam', status: 'known', country: 'Vietnam', city: 'Ho Chi Minh City' }, missingFields: [] };
