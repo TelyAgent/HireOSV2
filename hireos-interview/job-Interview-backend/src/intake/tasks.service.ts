@@ -462,12 +462,22 @@ export class TasksService {
     if (!task) throw new NotFoundException({ code: 'NOT_FOUND' });
     if (task.decision !== 'recommend_offer') throw new BadRequestException({ code: 'DECISION_NOT_RECOMMEND_OFFER' });
     if (!task.hrConfirmedAt || !task.hmConfirmedAt) throw new BadRequestException({ code: 'PACKAGE_NOT_CONFIRMED' });
-    if (task.offerState === 'acknowledged') throw new ConflictException({ code: 'ALREADY_SENT' });
-    if (task.offerState === 'sent') await this.db.interviewTask.update({ where: { id: taskId }, data: { offerState: 'failed', offerError: 'LEGACY_SENT_REQUIRES_RETRY' } });
-    if (task.offerState === 'pending' && task.offerSentAt && Date.now() - task.offerSentAt.getTime() < 5 * 60 * 1000) throw new ConflictException({ code: 'OFFER_PENDING' });
-    if (task.offerState === 'pending') await this.db.interviewTask.update({ where: { id: taskId }, data: { offerState: 'failed', offerError: 'OFFER_ACK_TIMEOUT' } });
     const attemptId = randomUUID();
-    await this.db.interviewTask.update({ where: { id: taskId }, data: { offerState: 'pending', offerSentAt: new Date(), offerAckAt: null, offerAttemptId: attemptId, offerPackageVersion: task.version, offerError: null } });
+    const now = new Date();
+    const timeoutBefore = new Date(now.getTime() - 5 * 60 * 1000);
+    const claimed = await this.db.interviewTask.updateMany({
+      where: { id: taskId, workspaceId: identity.workspaceId, OR: [
+        { offerState: { in: ['none', 'failed', 'sent'] } },
+        { offerState: 'pending', offerSentAt: { lt: timeoutBefore } },
+      ] },
+      data: { offerState: 'pending', offerSentAt: now, offerAckAt: null, offerAttemptId: attemptId, offerPackageVersion: task.version, offerError: null },
+    });
+    if (!claimed.count) {
+      const current = await this.db.interviewTask.findFirst({ where: { id: taskId, workspaceId: identity.workspaceId }, select: { offerState: true } });
+      if (current?.offerState === 'acknowledged') throw new ConflictException({ code: 'ALREADY_SENT' });
+      if (current?.offerState === 'pending') throw new ConflictException({ code: 'OFFER_PENDING' });
+      throw new ConflictException({ code: 'OFFER_STATE_CHANGED' });
+    }
     return { ...(await this.package(identity.workspaceId, taskId)), offerAttemptId: attemptId };
   }
 
