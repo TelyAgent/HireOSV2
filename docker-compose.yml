@@ -31,6 +31,13 @@ services:
       - ./hireos-interview/job-Interview-backend/.env.production
     depends_on:
       - postgres
+    volumes:
+      # Zoom OAuth accounts (AES-GCM encrypted), their encryption.key and the meeting mapping per round live in
+      # /app/.local/zoom (zoom-host.service.ts). Without a volume they sit in the container's own layer and every
+      # recreate drops them: hosts must reconnect Zoom and rounds lose their meetings (#117). The key and the
+      # accounts must stay together on this one volume. Moving an existing container's state onto it, backups and
+      # restore: docs/runbooks/interview-zoom-state.md.
+      - interview_zoom_state:/app/.local/zoom
 
   screening-backend:
     build: ./hireos-screening/hireos-screening-backend
@@ -156,6 +163,7 @@ services:
 volumes:
   postgres_data:
   core_record_materials:
+  interview_zoom_state:
 
 networks:
   # Only jd-backend and jd-renderer; `internal` gives it no route to the internet.
