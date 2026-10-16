@@ -1,0 +1,12 @@
+{
+  "name": "hireos-jd-renderer",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Isolated Chromium the JD backend uses to read job pages rendered by scripts (#64).",
+  "scripts": {
+    "start": "playwright-core run-server --port 3010 --host 0.0.0.0 --max-clients 2"
+  },
+  "dependencies": {
+    "playwright-core": "1.63.0"
+  }
+}

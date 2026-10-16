@@ -381,6 +381,8 @@ a:focus-visible, button:focus-visible, [tabindex]:focus-visible, input:focus-vis
 .jw-body{ flex:1; display:flex; min-height:0; }
 
 .jw-doc-wrap{ flex:1; overflow-y:auto; background:var(--bg); position:relative; }
+.jw-source{ display:flex; flex-wrap:wrap; align-items:center; gap:6px; max-width:720px; margin:0 auto; padding:10px 48px; background:var(--surface); border:1px solid var(--border); border-width:0 1px 1px; color:var(--text-secondary); }
+.jw-source a{ color:var(--accent-600); word-break:break-all; }
 .jw-doc{ max-width:720px; margin:0 auto; padding:40px 48px 120px; background:var(--surface); min-height:100%; border-left:1px solid var(--border); border-right:1px solid var(--border); }
 .jw-doc h2.docH{ font-size:22px; font-weight:600; margin:28px 0 10px; color:var(--text); }
 .jw-doc h2.docH:first-child{ margin-top:0; }

@@ -28,6 +28,14 @@ export interface CurrentDraftDto {
   publicCompensation: MoneyRange | null;
   hiringContext?: { businessProblem?: string; expectedOutcomes?: string[] } | null;
   successCriteria?: { period?: string; statement?: string }[] | null;
+  sourceRefs?: { kind?: string; url?: string }[];
+}
+
+/** Public job links the draft was read from (#64), for showing where its content came from. */
+export function sourceLinks(content: CurrentDraftDto | null): string[] {
+  return (content?.sourceRefs ?? [])
+    .filter((ref) => ref.kind === "link" && typeof ref.url === "string" && /^https?:\/\//i.test(ref.url))
+    .map((ref) => ref.url as string);
 }
 
 async function parseOrThrow<T>(response: Response): Promise<T> {

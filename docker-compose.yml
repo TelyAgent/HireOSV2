@@ -66,8 +66,29 @@ services:
     restart: unless-stopped
     env_file:
       - ./hireos-jd/hireos-jd-backend/.env.production
+    environment:
+      # Browser for job pages rendered by scripts (#64); see hireos-jd/jd-renderer.
+      JD_LINK_RENDERER_URL: ws://jd-renderer:3010/
+    networks:
+      - default
+      - jd-render
     depends_on:
       - postgres
+      - jd-renderer
+
+  # Isolated Chromium for #64: no env file, no secrets, runs as a non-root user, and only on the internal
+  # jd-render network — no internet and no other services. The JD backend does all network requests for it.
+  jd-renderer:
+    build: ./hireos-jd/jd-renderer
+    platform: linux/amd64
+    restart: unless-stopped
+    init: true
+    networks:
+      - jd-render
+    tmpfs:
+      - /tmp
+    shm_size: 256m
+    mem_limit: 1g
 
   written-backend:
     build: ./hireos-written/hireos-written-backend
@@ -135,3 +156,8 @@ services:
 volumes:
   postgres_data:
   core_record_materials:
+
+networks:
+  # Only jd-backend and jd-renderer; `internal` gives it no route to the internet.
+  jd-render:
+    internal: true

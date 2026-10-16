@@ -14,6 +14,17 @@ npm run start:dev
 
 The service listens on `http://127.0.0.1:3005/api`.
 
+### Reading job links rendered by scripts
+
+"Paste a Link or Text" first reads the page's HTML. When that HTML has no posting (the page loads it with
+scripts), the service renders the page in a browser, if one is configured:
+- `JD_LINK_RENDERER_URL`: the isolated `jd-renderer` container (`hireos-jd/jd-renderer`), as in docker-compose;
+- `JD_LINK_BROWSER_PATH`: a local Chromium, for development (e.g. one installed by `npx playwright install chromium`).
+
+With neither set, the user is told to paste the JD text. The browser never connects out by itself: every
+request it makes goes through the same public-address check as the HTML fetch. Request count, size and time
+are capped, and a hung page is stopped (`src/copilot/link-render.ts`).
+
 ## Current Phase
 
 The first backend slice supports:
