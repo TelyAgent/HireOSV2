@@ -55,6 +55,8 @@ type Item = {
   context?: RegExp;
   /** A test the paragraph must pass instead of needles: e.g. the whole expected salary range, not one of its amounts. */
   matches?: (paragraph: string) => boolean;
+  /** The salary's currency: a paragraph naming only other currencies is not where it is. */
+  currency?: string;
   /** Another item has the same company and title, so they alone can't tell which paragraph is this one. */
   ambiguous?: boolean;
   /** The rest of `together` may run on into this many following paragraphs (a project's description under its name). */
@@ -119,7 +121,7 @@ export function profileFields(
       return {
         value: statement + (period ? ` (${period})` : ''),
         ...(school
-          ? { together: [school], dateForms: (period.match(/\d{4}/g) ?? []).slice(0, 1), endForms: (period.match(/\d{4}/g) ?? []).slice(1, 2), ambiguous: sameSchool, needles: [] }
+          ? { together: [school], spans: 2, dateForms: (period.match(/\d{4}/g) ?? []).slice(0, 1), endForms: (period.match(/\d{4}/g) ?? []).slice(1, 2), ambiguous: sameSchool, needles: [] }
           : { needles: [text(e.statement), major] }),
         // §4.1: school, degree, major and dates, each on its own.
         incomplete: [...(!school ? ['school'] : []), ...(!degree ? ['degree'] : []), ...(!major ? ['major'] : []), ...(!period ? ['dates'] : [])],
@@ -146,6 +148,7 @@ export function profileFields(
           // The whole range — both amounts, or the range as written ("60-70k") — not whichever amount comes first:
           // "Current salary: 60,000" is not where an expected 60,000–70,000 is (#155 review).
           matches: salaryMatcher(compensation),
+          currency: text(compensation.currency),
           // An amount alone could be any number in the résumé ("cut costs by 60000 USD"): only a paragraph about pay counts.
           context: SALARY_CONTEXT,
           incomplete: [...(!text(compensation.currency) ? ['currency'] : []), ...(!compensation.period ? ['period'] : [])],
@@ -211,13 +214,14 @@ function locateItem(item: Item, paragraphs: ReturnType<typeof numberParagraphs>,
     if (dated) return evidenceAt(dated, parts[0], source);
     // Without a matching month, company + title must point at one paragraph and one job; otherwise it isn't pinned.
     if (candidates.length === 1 && !item.ambiguous) return evidenceAt(candidates[0], parts[0], source);
-    if (!candidates.length && item.spans) return locateSpanning(item, parts, paragraphs, source);
+    // Not pinned within one paragraph: the parts (and dates) may run on into the next few.
+    if (item.spans) return locateSpanning(item, parts, paragraphs, source);
     return null;
   }
   if (item.context) {
     const about = paragraphs.filter((p) => item.context!.test(p.segment.text));
     if (item.matches) {
-      const hit = about.find((p) => item.matches!(p.normalized));
+      const hit = expectedSalaryParagraph(about.filter((p) => item.matches!(p.normalized) && sameCurrency(p.segment.text, item.currency)));
       return hit ? evidenceAt(hit, '', source) : null;
     }
     return locate(item.needles, about, source);
@@ -248,7 +252,37 @@ function locateSpanning(item: Item, parts: string[], paragraphs: ReturnType<type
   return evidenceAt(at, parts.find((part) => containsTerm(at.normalized, part)) ?? parts[0], source);
 }
 
-const SALARY_CONTEXT =/salary|compensation|expected\s+(pay|package|income|ctc)|pay\s+expectation|\bctc\b|remuneration|薪资|薪酬|期望薪|月薪|年薪|待遇|薪水|工资/i;
+const EXPECTED_PAY = /expect|desired|target|asking|期望|希望|要求|目标/i;
+const CURRENT_PAY = /current|present|\bnow\b|last|previous|目前|当前|现[在有任]?(薪|工资|月薪|年薪)|上一份|最近/i;
+
+/**
+ * Where the expected salary is, among paragraphs stating the same amounts (#155 review): the one labelled as
+ * expected; failing that, the one not labelled as the current or last salary. More than one such paragraph, or
+ * only a current salary, and it isn't pinned.
+ */
+function expectedSalaryParagraph<P extends { segment: Segment }>(hits: P[]): P | null {
+  const expected = hits.filter((p) => EXPECTED_PAY.test(p.segment.text));
+  if (expected.length) return expected.length === 1 ? expected[0] : null;
+  const notCurrent = hits.filter((p) => !CURRENT_PAY.test(p.segment.text));
+  return notCurrent.length === 1 ? notCurrent[0] : null;
+}
+
+const CURRENCY_CODES = /\b(USD|VND|CNY|RMB|SGD|EUR|GBP|JPY|HKD|AUD|CAD|INR|KRW|THB|MYR|PHP|IDR|TWD)\b|[$€£¥₫]|美元|人民币|越南盾|新元|欧元|英镑|日元|港币/gi;
+const CURRENCY_ALIASES: Record<string, string[]> = {
+  USD: ['usd', '$', '美元'], CNY: ['cny', 'rmb', '¥', '人民币'], VND: ['vnd', '₫', '越南盾'], SGD: ['sgd', '新元'],
+  EUR: ['eur', '€', '欧元'], GBP: ['gbp', '£', '英镑'], JPY: ['jpy', '¥', '日元'], HKD: ['hkd', '港币'],
+};
+
+/** The paragraph's currency agrees: it names the salary's currency, or names none at all. */
+function sameCurrency(paragraph: string, currency: string | undefined): boolean {
+  if (!currency) return true;
+  const named = [...paragraph.matchAll(CURRENCY_CODES)].map((m) => m[0].toLowerCase());
+  if (!named.length) return true;
+  const aliases = CURRENCY_ALIASES[currency.toUpperCase()] ?? [currency.toLowerCase()];
+  return named.some((n) => aliases.includes(n));
+}
+
+const SALARY_CONTEXT = /salary|compensation|expected\s+(pay|package|income|ctc)|pay\s+expectation|\bctc\b|remuneration|薪资|薪酬|期望薪|月薪|年薪|待遇|薪水|工资/i;
 
 const PRESENT_FORMS = ['present', 'now', 'current', 'today', '至今', '现在', '目前'];
 
