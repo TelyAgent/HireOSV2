@@ -303,7 +303,7 @@ const SALARY_CONTEXT = /salary|compensation|expected\s+(pay|package|income|ctc)|
 const PRESENT_FORMS = ['present', 'now', 'current', 'today', '至今', '现在', '目前'];
 
 /** Where a date form occurs as a whole: "2017-1" is not found inside "2017-10", nor "2017" inside "12017". */
-function dateAt(text: string, form: string, from = 0): number {
+export function dateAt(text: string, form: string, from = 0): number {
   for (let at = text.indexOf(form, from); at !== -1; at = text.indexOf(form, at + 1)) {
     const before = at > 0 ? text[at - 1] : '';
     const after = text[at + form.length] ?? '';
@@ -325,7 +325,7 @@ function startsThenEnds(text: string, starts: string[], ends: string[]): boolean
 }
 
 /** How a YYYY-MM month may be written in a résumé, lower-cased: 2015-01, 2015/01, 2015.01, 2015年1月, 01/2015, jan 2015… */
-function monthForms(month: string | null): string[] {
+export function monthForms(month: string | null): string[] {
   if (!month) return [];
   const [year, mm] = month.split('-');
   const m = String(Number(mm));

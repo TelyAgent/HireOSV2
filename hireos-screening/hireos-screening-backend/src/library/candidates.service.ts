@@ -130,6 +130,7 @@ export class CandidatesService {
         profiles: { orderBy: { version: 'desc' }, take: 1 },
         recommendations: { orderBy: { createdAt: 'desc' } },
         applications: { orderBy: { linkedAt: 'desc' } },
+        sources: { orderBy: { receivedAt: 'desc' }, take: 50, include: { material: { select: { id: true, name: true } } } },
       },
     });
     if (!candidate) throw new NotFoundException({ code: 'NOT_FOUND' });
@@ -153,6 +154,14 @@ export class CandidatesService {
         profileFields: fields,
       },
       matching: matchingStatuses.get(id) ?? { isMatching: false, lastRun: null },
+      // Every way this candidate's material came in, including re-uploads of a file already on record (#153).
+      sources: candidate.sources.map((source) => ({
+        id: source.id,
+        channel: source.channel,
+        receivedAt: source.receivedAt.toISOString(),
+        materialId: source.materialId ?? undefined,
+        fileName: source.material?.name,
+      })),
       resumeVersions: candidate.resumeVersions.map((version) => ({
         id: version.id,
         version: version.version,

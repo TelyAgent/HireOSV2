@@ -548,11 +548,7 @@ export const ZH: Record<string, string> = {
   "File content is byte-identical to a file already on record. It can be reused; this upload is still kept as a new source in history.":
     "该文件内容与已存档文件逐字节一致。可以直接复用；本次上传仍会作为一个新来源保留在历史记录中。",
   "Possible duplicate candidate": "疑似重复候选人",
-  "Name and some details match an existing candidate, but contact information differs. Identity is not merged automatically.":
-    "姓名及部分信息与已有候选人匹配，但联系方式不同。系统不会自动合并身份。",
   "A newer resume may be available": "可能存在更新的简历版本",
-  "Contact details match an existing candidate and the content looks newer. Confirm before it becomes the current version.":
-    "联系方式与已有候选人匹配，且内容看起来更新。请确认后再将其设为当前版本。",
   "The file could not be parsed, so a text-similarity check could not run. This is shown as incomplete — not as “no duplicate found.”":
     '该文件无法解析，因此无法运行文本相似度检测。此状态显示为"未完成"，而非"未发现重复"。',
   "Review needed": "需要复核",

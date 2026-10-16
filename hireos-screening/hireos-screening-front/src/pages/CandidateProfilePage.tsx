@@ -18,7 +18,7 @@ import { ApiError } from "../data/api/shared";
 import { db, getJob, getPerson } from "../data/db";
 import type { Candidate } from "../data/fixtures/candidates";
 import type { JobDiscoveryRun } from "../data/fixtures/jobDiscovery";
-import { fmtDate, fmtMoney, relTime } from "../lib/format";
+import { fmtDate, fmtDateTime, fmtMoney, relTime } from "../lib/format";
 import { Icon } from "../components/ui/Icons";
 import { Button, CandidateAvatar, EmptyState, PageHeader } from "../components/ui/Primitives";
 import { Modal } from "../components/ui/Overlays";
@@ -604,6 +604,18 @@ export function CandidateProfilePage() {
               ))
             ) : (
               <p className="tiny">{t("No resume file — structured entry only.")}</p>
+            )}
+            {(detail.sources?.length ?? 0) > 0 && (
+              <div style={{ marginTop: 12 }} data-testid="source-records">
+                <div className="tiny muted" style={{ marginBottom: 4 }}>
+                  {t("Source records")}
+                </div>
+                {detail.sources!.map((source) => (
+                  <div className="tiny" key={source.id}>
+                    {t(sourceLabel(source.channel))} · {fmtDateTime(source.receivedAt, state.lang)}
+                  </div>
+                ))}
+              </div>
             )}
           </div>
         </div>

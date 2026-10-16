@@ -1,0 +1,104 @@
+{
+  "id": "d-1",
+  "kind": "new_resume_version",
+  "status": "open",
+  "confidence": 1,
+  "uploaded": {
+    "fileName": "nina-2026.txt",
+    "uploadedAt": "2026-10-16T09:30:00.000Z",
+    "source": "manual_upload",
+    "uploadedBy": "emma",
+    "name": "Nina Torres",
+    "email": "nina.torres@example.com",
+    "phone": "+14155550134",
+    "version": 2
+  },
+  "existing": {
+    "candidateId": "c-1",
+    "name": "Nina Torres",
+    "email": "nina.torres@example.com",
+    "phone": "+14155550134",
+    "fileName": "nina.txt",
+    "uploadedAt": "2026-10-01T08:00:00.000Z",
+    "source": "manual_upload",
+    "version": 1,
+    "employment": [
+      {
+        "company": "Example Retail",
+        "title": "Senior Data Analyst",
+        "start": "2021-03"
+      },
+      {
+        "company": "Sample Bank",
+        "title": "Data Analyst",
+        "start": "2018-07"
+      }
+    ],
+    "education": [
+      {
+        "school": "Vietnam National University",
+        "major": "Statistics",
+        "period": "2014 – 2018"
+      }
+    ]
+  },
+  "basis": [
+    "Same email: nina.torres@example.com",
+    "Same phone number: +1 415 555 0134",
+    "2 jobs with the same company, title and start month: Senior Data Analyst · Example Retail; Data Analyst · Sample Bank",
+    "Same name: Nina Torres",
+    "Résumé text 94% similar",
+    "Same education: Vietnam National University"
+  ],
+  "scoring": {
+    "policyVersion": "f03-identity-2026-10-16",
+    "total": 100,
+    "band": "new_resume_version",
+    "signals": [
+      {
+        "key": "email",
+        "points": 40,
+        "detail": "Same email: nina.torres@example.com"
+      },
+      {
+        "key": "phone",
+        "points": 30,
+        "detail": "Same phone number: +1 415 555 0134"
+      },
+      {
+        "key": "employment",
+        "points": 20,
+        "detail": "2 jobs with the same company, title and start month: Senior Data Analyst · Example Retail; Data Analyst · Sample Bank"
+      },
+      {
+        "key": "name_exact",
+        "points": 15,
+        "detail": "Same name: Nina Torres"
+      },
+      {
+        "key": "content",
+        "points": 15,
+        "detail": "Résumé text 94% similar"
+      },
+      {
+        "key": "education",
+        "points": 10,
+        "detail": "Same education: Vietnam National University"
+      }
+    ],
+    "contentSimilarity": 0.9494047619047619,
+    "contact": {
+      "email": "same",
+      "phone": "same"
+    }
+  },
+  "differences": {
+    "added": [
+      "New: Led the pricing guild."
+    ],
+    "removed": [
+      "Old summary line."
+    ],
+    "unchanged": 2
+  }
+}

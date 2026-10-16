@@ -49,3 +49,35 @@ test("every file-error text has its Chinese translation", () => {
   }
   for (const text of ["Choose another file", "Import failed", "This file could not be imported. Try again, or choose another file."]) assert.ok(ZH[text], text);
 });
+
+// #154 -- a flagged duplicate says how the email and phone actually compare; one side missing is never "differs".
+import { contactFacts, compareContacts } from "../../src/features/imports/importOutcome.ts";
+
+const flagged = (duplicateContact) => ({ id: "i", fileName: "f", sizeKB: 1, status: "needs_review", outcome: "possible_same_person", duplicateReviewId: "d", duplicateContact });
+
+test("#154 AC-1: same email and same phone never read as different contact details", () => {
+  const d = describeItem(flagged({ email: "same", phone: "same" }));
+  assert.deepEqual(d.facts, ["Same email", "Same phone number"]);
+  assert.doesNotMatch(`${d.detail} ${d.facts.join(" ")}`, /differ/i);
+});
+
+test("#154 AC-2: only the field that differs is called different; a missing value is called missing", () => {
+  assert.deepEqual(contactFacts({ email: "same", phone: "different" }), ["Same email", "Phone number differs"]);
+  assert.deepEqual(contactFacts({ email: "different", phone: "same" }), ["Email differs", "Same phone number"]);
+  assert.deepEqual(contactFacts({ email: "different", phone: "different" }), ["Email differs", "Phone number differs"]);
+  assert.deepEqual(contactFacts({ email: "same", phone: "missing_uploaded" }), ["Same email", "No phone number in this upload"]);
+  assert.deepEqual(contactFacts({ email: "missing_existing", phone: "missing_both" }), ["No email on the existing candidate"]);
+  // The page's own comparison for older checks agrees: case and phone formatting don't make a difference.
+  assert.deepEqual(compareContacts({ email: "Nina@Example.com", phone: "+1 (415) 555-0134" }, { email: "nina@example.com", phone: "+14155550134" }), { email: "same", phone: "same" });
+  assert.deepEqual(compareContacts({ email: "nina@example.com" }, { email: "nina@example.com", phone: "+14155550134" }), { email: "same", phone: "missing_uploaded" });
+});
+
+test("#154 AC-3: every phrase, and the reworded duplicate copy, has its Chinese text", () => {
+  const phrases = [
+    ...contactFacts({ email: "same", phone: "different" }), ...contactFacts({ email: "missing_uploaded", phone: "missing_existing" }),
+    ...contactFacts({ email: "different", phone: "same" }), ...contactFacts({ email: "missing_existing", phone: "missing_uploaded" }),
+    describeItem(flagged()).detail, describeItem({ ...flagged(), outcome: "new_resume_version" }).detail,
+  ];
+  for (const phrase of phrases) assert.ok(ZH[phrase], phrase);
+  assert.ok(!Object.keys(ZH).some((key) => /contact details differ|contact information differs/.test(key)), "the fixed claim is gone");
+});
