@@ -6,25 +6,7 @@ const assert = require('node:assert/strict');
 const { scoreIdentity, contentSimilarity, normalizeContent, IDENTITY_POLICY } = require('../dist/duplicates/identity-scoring');
 const { DuplicatesService } = require('../dist/duplicates/duplicates.service');
 
-const resume = (extra = '') => `Nina Torres
-nina.torres@example.com | +1 415 555 0134
-Experience
-Senior Data Analyst, Example Retail — 2021-03 to present
-Built pricing dashboards in SQL and Python for 120 stores and cut weekly reporting time by half.
-Data Analyst, Sample Bank — 2018-07 to 2021-02
-Maintained credit risk reports and automated the monthly reconciliation of 40 branch ledgers.
-Education
-Vietnam National University — B.Sc. Statistics (2014 – 2018)
-${extra}`;
-const existing = (over = {}) => ({
-  name: 'Nina Torres', email: 'nina.torres@example.com', phone: '+1 415 555 0134', text: resume(),
-  employment: [
-    { company: 'Example Retail', title: 'Senior Data Analyst', start: '2021-03' },
-    { company: 'Sample Bank', title: 'Data Analyst', start: '2018-07' },
-  ],
-  education: [{ school: 'Vietnam National University', major: 'Statistics', period: '2014 – 2018' }],
-  ...over,
-});
+const { resume, existing, reviewCheck, reviewResponse } = require('./fixtures/f03/review-check.cjs');
 const keys = (score) => score.signals.map((s) => `${s.key}:${s.points}`);
 
 test('#151 AC-1/AC-2: same email, phone, jobs, name and education — ≥ 70, a likely new version, all signals recorded', () => {
@@ -86,23 +68,13 @@ test('#151: normalization drops full-width forms, page numbers and repeated head
 });
 
 test('#151 AC-3: the review returns every signal, points, total, policy version, both versions and the paragraph diff', async () => {
-  const score = scoreIdentity({ name: 'Nina Torres', email: 'nina.torres@example.com', phone: '+1 415 555 0134', text: resume('New: Led the pricing guild.') }, existing());
-  const check = {
-    id: 'd-1', kind: 'new_resume_version', status: 'open', confidence: score.total / 100,
-    basis: { ...score, kind: 'new_resume_version', lines: score.signals.map((s) => s.detail) },
-    resolutionOutcome: null, resolutionNote: null, resolvedBy: null, resolvedAt: null,
-    material: { id: 'm-2', name: 'nina-2026.txt', createdAt: new Date('2026-10-16'), readStatus: 'available', errorCode: null, confirmedIdentity: null, sourceType: 'manual_upload',
-      segments: [{ id: 's1', text: 'Nina Torres' }, { id: 's2', text: 'Senior Data Analyst, Example Retail' }, { id: 's3', text: 'New: Led the pricing guild.' }] },
-    existingCandidate: {
-      id: 'c-1', displayName: 'Nina Torres', email: 'nina.torres@example.com', phone: '+14155550134', createdAt: new Date('2026-10-01'),
-      resumeVersions: [{ version: 1, source: 'manual_upload', material: { name: 'nina.txt', createdAt: new Date('2026-10-01'),
-        segments: [{ id: 's1', text: 'Nina Torres' }, { id: 's2', text: 'Senior Data Analyst,  Example Retail' }, { id: 's3', text: 'Old summary line.' }] } }],
-      profiles: [{ employmentHistory: existing().employment, education: existing().education }],
-    },
-  };
+  const { score, check } = reviewCheck();
   const db = { duplicateCheck: { findFirst: async () => check } };
   const profiles = { extractIdentitySignals: () => ({ displayName: 'Nina Torres', email: 'nina.torres@example.com', phone: '+14155550134', location: null }) };
-  const review = await new DuplicatesService(db, profiles, {}).get({ workspaceId: 'ws-1', actorId: 'hr-1', roles: [] }, 'd-1');
+  const review = await reviewResponse(check);
+  // The frontend renders exactly this answer in its test: the file it reads must be the API's current output.
+  const fixture = JSON.parse(require('node:fs').readFileSync(require('node:path').join(__dirname, '../../hireos-screening-front/test/unit/fixtures/duplicate-review.json'), 'utf8'));
+  assert.deepEqual(fixture, JSON.parse(JSON.stringify(review)), 'regenerate it: node scripts/gen-duplicate-review-fixture.cjs');
   assert.equal(review.scoring.policyVersion, IDENTITY_POLICY.version);
   assert.equal(review.scoring.total, score.total);
   assert.deepEqual(review.scoring.signals.map((s) => s.key), score.signals.map((s) => s.key));
@@ -132,4 +104,61 @@ test('#154: the import batch returns, per flagged item, how its email and phone 
   const batch = await new ImportsService(db, {}, {}, {}).getBatch('ws-1', 'b-1');
   assert.deepEqual(batch.items[0].duplicateContact, { email: 'same', phone: 'missing_uploaded' });
   assert.equal(batch.items[1].duplicateContact, undefined);
+});
+
+test('#151 AC-1 (review): jobs count as shared only entry by entry — swapped start months are not the same jobs', () => {
+  const swapped = `Nina Torres
+nina.torres@example.com
+Experience
+Senior Data Analyst, Example Retail — 2018-07 to 2021-02
+Built pricing dashboards in SQL and Python for 120 stores.
+Data Analyst, Sample Bank — 2021-03 to present
+Maintained credit risk reports.`;
+  const score = scoreIdentity({ name: 'Nina Torres', email: 'nina.torres@example.com', phone: null, text: swapped }, existing());
+  assert.ok(!keys(score).includes('employment:20'), keys(score).join(','));
+  // The same jobs written company on one line, title and dates below, and with month names, still count.
+  const splitLines = `Nina Torres
+Example Retail
+Senior Data Analyst · Mar 2021 – present
+Sample Bank
+Data Analyst · Jul 2018 – Feb 2021`;
+  const again = scoreIdentity({ name: 'Nina Torres', email: null, phone: null, text: splitLines }, existing());
+  assert.ok(keys(again).includes('employment:20'), keys(again).join(','));
+});
+
+test('#151 AC-1/AC-2 (review): every candidate is scored — the best match is found past 50 same-name records, and without any contact or name hit', async () => {
+  const { ImportsService } = require('../dist/intake/imports.service');
+  const record = (id, over = {}) => ({
+    id, displayName: 'Nina Torres', email: null, phone: null,
+    profiles: [{ employmentHistory: [], education: [] }],
+    resumeVersions: [{ material: { id: `m-${id}`, text: 'An unrelated résumé about warehouse logistics and forklift safety training.' } }],
+    ...over,
+  });
+  const scan = async (rows, signals, text) => {
+    const db = {
+      candidate: {
+        findMany: async ({ take, cursor }) => {
+          const from = cursor ? rows.findIndex((r) => r.id === cursor.id) + 1 : 0;
+          return rows.slice(from, from + take);
+        },
+      },
+    };
+    const service = new ImportsService(db, {}, {}, {});
+    return service['findPossibleDuplicate']('ws-1', { id: 'm-new', name: 'new.pdf', normalizedTextHash: null, text }, signals);
+  };
+  // 60 people of the same name first, then the real one with the same phone: 15 each vs 45.
+  const crowd = Array.from({ length: 60 }, (_, i) => record(`c${String(i).padStart(3, '0')}`));
+  const real = record('c999', { phone: '+1 415 555 0134' });
+  const found = await scan([...crowd, real], { displayName: 'Nina Torres', email: null, phone: '+1 415 555 0134' }, resume());
+  assert.equal(found?.candidate.id, 'c999');
+  assert.equal(found.kind, 'possible_same_person');
+  // A different name and no contact at all, but similar content, both jobs and the same education: 45, a review.
+  const quiet = record('c500', {
+    displayName: 'N. Torres-Lee',
+    profiles: [{ employmentHistory: existing().employment, education: existing().education }],
+    resumeVersions: [{ material: { id: 'm-c500', text: resume('Hobbies: chess.') } }],
+  });
+  const byContent = await scan([...crowd.slice(0, 5), quiet], { displayName: 'Nina Torres-Lee', email: null, phone: null }, resume('Hobbies: tennis and hiking.'));
+  assert.equal(byContent?.candidate.id, 'c500');
+  assert.ok(byContent.basis.signals.some((s) => s.key === 'content') && byContent.basis.signals.some((s) => s.key === 'employment'), JSON.stringify(byContent.basis.signals));
 });
