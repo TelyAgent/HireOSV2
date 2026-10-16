@@ -7,4 +7,6 @@ export interface ResumeVersion {
   parseStatus: "succeeded" | "failed" | "pending";
   isLatest: boolean;
   changeNote?: string;
+  /** The stored source material; absent on fixtures. */
+  materialId?: string;
 }

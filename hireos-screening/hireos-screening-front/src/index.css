@@ -558,6 +558,9 @@ a:focus-visible,button:focus-visible,[tabindex]:focus-visible,input:focus-visibl
 .withdrawn-decision:first-of-type { border-top: 0; padding-top: 0; }
 /* Field-level validation (#26) */
 .field-error { margin: 4px 0 0; font-size: var(--fs-xs); color: var(--danger-text); line-height: 1.4; }
+/* #160: a required field left empty. */
+.field-invalid input { border-color: var(--danger-text); }
+.field .req { color: var(--danger-text); }
 .field input[aria-invalid="true"], .field textarea[aria-invalid="true"], .field select[aria-invalid="true"] { border-color: var(--danger-text); }
 .required-mark { color: var(--danger-text); margin-left: 2px; }
 /* Decision page: open concerns one per line (#27) */
@@ -573,3 +576,24 @@ a:focus-visible,button:focus-visible,[tabindex]:focus-visible,input:focus-visibl
 .secondary-copy { font-size: var(--fs-xs); color: var(--text-tertiary); line-height: 1.45; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; max-width: 520px; }
 .confidence-chip { display: inline-block; font-size: var(--fs-xs); color: var(--text-secondary); background: var(--surface-alt); border-radius: 999px; padding: 2px 8px; white-space: nowrap; }
 .linked-candidates-table .secondary-col { opacity: .85; }
+
+/* Parsed profile fields and source paragraphs (#155) */
+.parsed-fields td{ vertical-align:top; }
+.parsed-fields td:first-child, .evidence-link{ white-space:nowrap; }
+.parsed-values{ margin:0; padding-left:16px; }
+.evidence-link{ display:block; font-size:var(--fs-xs, 12px); text-align:left; }
+.source-text{ max-height:480px; overflow:auto; font-size:var(--fs-sm); }
+.source-page{ margin:12px 0 6px; font-size:12px; font-weight:600; color:var(--text-secondary); }
+.source-paragraph{ white-space:pre-wrap; padding:6px 8px; border-radius:8px; margin-bottom:4px; }
+.source-paragraph.is-hit{ background:var(--accent-50, rgba(13,148,136,.12)); outline:2px solid var(--accent-600); }
+
+/* Résumé differences on the duplicate review (#151) */
+.diff-added, .diff-removed{ white-space:pre-wrap; font-size:var(--fs-sm); padding:6px 8px; border-radius:8px; margin-bottom:4px; }
+.diff-added{ background:rgba(16,185,129,.10); border-left:3px solid #10b981; }
+.diff-removed{ background:rgba(239,68,68,.08); border-left:3px solid #ef4444; }
+
+/* Resume Library filters (#172) */
+.library-filters select, .library-filters input[type=date]{ height:32px; padding:4px 10px; border:1px solid var(--border); border-radius:8px; background:var(--surface); color:var(--text-primary); font:inherit; font-size:var(--fs-sm); max-width:190px; }
+.library-filters label{ white-space:nowrap; }
+.info-inline{ display:flex; align-items:center; gap:8px; flex-wrap:wrap; color:var(--info-text); font-size:var(--fs-sm); background:var(--info-bg); border:1px solid var(--info-border); padding:10px 14px; border-radius:6px; }
+.input-invalid, input[aria-invalid="true"].input-invalid{ border-color: var(--danger-text) !important; }

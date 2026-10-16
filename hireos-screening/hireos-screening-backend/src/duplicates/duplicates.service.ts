@@ -1,6 +1,7 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../persistence/prisma.service';
 import { displayNameFromFileName, ImportsService } from '../intake/imports.service';
+import { confirmedIdentityOf } from '../intake/confirmed-identity';
 import type { Identity } from '../auth/workspace.guard';
 import type { DuplicateResolutionOutcome } from './duplicates.types';
 import { ProfilesService } from '../profiles/profiles.service';
@@ -17,7 +18,7 @@ export class DuplicatesService {
     const check = await this.db.duplicateCheck.findFirst({
       where: { id, workspaceId: identity.workspaceId },
       include: {
-        material: { select: { id: true, name: true, segments: true, createdAt: true, readStatus: true, errorCode: true } },
+        material: { select: { id: true, name: true, segments: true, createdAt: true, readStatus: true, errorCode: true, confirmedIdentity: true, sourceType: true } },
         existingCandidate: {
           select: {
             id: true, displayName: true, email: true, phone: true, createdAt: true,
@@ -35,7 +36,7 @@ export class DuplicatesService {
     // The uploaded side has no Candidate yet (that's the whole question this review is
     // answering), so its email/phone/location can only come from re-reading the material.
     const uploadedSignals = check.material.readStatus === 'available'
-      ? this.profiles.extractIdentitySignals(check.material.id, check.material.segments, displayNameFromFileName(check.material.name))
+      ? this.profiles.extractIdentitySignals(check.material.id, check.material.segments, (confirmedIdentityOf(check.material)?.displayName || displayNameFromFileName(check.material.name)))
       : null;
     return {
       id: check.id,
@@ -45,9 +46,10 @@ export class DuplicatesService {
       uploaded: {
         fileName: check.material.name,
         uploadedAt: check.material.createdAt.toISOString(),
-        source: 'Manual upload',
+        source: check.material.sourceType,
         uploadedBy: 'emma',
-        name: uploadedSignals?.displayName || displayNameFromFileName(check.material.name),
+        // A name confirmed on paste is the upload's name; otherwise what the text gives, then the file name.
+        name: confirmedIdentityOf(check.material)?.displayName || uploadedSignals?.displayName || displayNameFromFileName(check.material.name),
         email: uploadedSignals?.email || undefined,
         phone: uploadedSignals?.phone || undefined,
         location: uploadedSignals?.location || undefined,
@@ -128,7 +130,8 @@ export class DuplicatesService {
             candidateId: check.existingCandidateId,
             materialId: check.materialId,
             version: (latest?.version || 0) + 1,
-            source: 'manual_upload',
+            // The channel the file actually came in through, e.g. a paste (#161).
+            source: check.material.sourceType,
             parseStatus: 'pending',
           },
         });
@@ -151,7 +154,7 @@ export class DuplicatesService {
         const candidate = await tx.candidate.create({
           data: {
             workspaceId: identity.workspaceId,
-            displayName: displayNameFromFileName(check.material.name),
+            displayName: (confirmedIdentityOf(check.material)?.displayName || displayNameFromFileName(check.material.name)),
             ownerId: identity.actorId,
           },
         });
@@ -168,7 +171,8 @@ export class DuplicatesService {
             candidateId: candidate.id,
             materialId: check.materialId,
             version: 1,
-            source: 'manual_upload',
+            // The channel the file actually came in through, e.g. a paste (#161).
+            source: check.material.sourceType,
             parseStatus: 'pending',
           },
         });
