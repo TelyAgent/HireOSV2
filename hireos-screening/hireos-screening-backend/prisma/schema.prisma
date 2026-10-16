@@ -37,6 +37,9 @@ model Material {
   sourceType       String            @default("manual_upload")
   sourceRef        String?
   sourceVersion    Int               @default(1)
+  /// What the user confirmed when pasting this material (#160 #167): { displayName, email?, location? }. It wins
+  /// over what parsing reads from the text, for the candidate and the profile.
+  confirmedIdentity Json?
   errorCode        String?
   // Hash of the lowercased, whitespace-collapsed extracted text. Two uploads with
   // different bytes (a PDF and a DOCX of the same resume) land on the same value here,
@@ -365,6 +368,8 @@ model CandidateProfile {
   location                Json
   workAuthorization       Json
   languages               Json
+  // When the candidate can start, as the résumé states it (#155); null when it doesn't.
+  availability            Json?
   compensationExpectation Json?
   missingFields           Json
   corrections             Json
@@ -411,6 +416,10 @@ model PreLinkMatchEvaluation {
   rationale       String
   gaps            Json
   evidence        Json
+  // F06 FR-5 (#181): "not_eligible" only when the résumé explicitly rules the role out; null on older rows.
+  eligibility     String?
+  // The explicit statements that rule it out, each quoted from the résumé.
+  conflicts       Json?
   createdAt       DateTime                     @default(now())
   candidate       Candidate                    @relation(fields: [candidateId], references: [id], onDelete: Cascade)
   job             Job                          @relation(fields: [jobId], references: [id], onDelete: Cascade)
@@ -647,6 +656,9 @@ model ScreeningConcern {
   verificationItemIds Json
   restricted          Boolean             @default(false)
   resolution          String?
+  // Every handling and reopening, oldest first: action, status before and after, note, material references,
+  // who and when (#193). The concern's own text and AI basis are never changed.
+  resolutionHistory   Json                @default("[]")
   application         Application         @relation(fields: [applicationId], references: [id], onDelete: Cascade)
   evaluation          ScreeningEvaluation @relation(fields: [evaluationId], references: [id], onDelete: Cascade)
 
