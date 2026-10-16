@@ -81,3 +81,24 @@ test('#161 AC-2: a TXT through the file upload stays a manual upload', async () 
   assert.equal(calls[0][5], 'manual_upload');
   assert.equal(calls[0][6], undefined, 'no confirmed identity on an upload');
 });
+
+test('#167 (review): an email or location the user cleared stays empty — what the text says does not come back', async () => {
+  const calls = [];
+  const s = service({ createBatch: async (...args) => { calls.push(args); return { id: 'batch-1' }; } });
+  await s.importPaste(identity, { text: WITH_NAME, displayName: 'Linh Pham', email: '', location: '' });
+  const confirmed = calls[0][5];
+  assert.deepEqual(confirmed, { displayName: 'Linh Pham', email: null, location: null });
+  // Stored and read back, then applied over what parsing found in the text.
+  const stored = confirmedIdentityOf({ confirmedIdentity: JSON.parse(JSON.stringify(confirmed)) });
+  const parsed = withConfirmedIdentity(
+    { displayName: 'Linh Pham', email: 'pia.noname@example.test', location: { value: 'Ho Chi Minh City, Vietnam', status: 'known' }, missingFields: [] },
+    stored,
+  );
+  assert.equal(parsed.email, null);
+  assert.deepEqual([parsed.location.value, parsed.location.status, parsed.missingFields], ['', 'unknown', ['location']]);
+  // A client that doesn't send them at all leaves them to parsing, as before.
+  await s.importPaste(identity, { text: WITH_NAME, displayName: 'Linh Pham' });
+  const notSent = confirmedIdentityOf({ confirmedIdentity: JSON.parse(JSON.stringify(calls[1][5])) });
+  const read = withConfirmedIdentity({ displayName: 'x', email: 'pia.noname@example.test', location: { value: 'Ho Chi Minh City, Vietnam', status: 'known' }, missingFields: [] }, notSent);
+  assert.deepEqual([read.email, read.location.value], ['pia.noname@example.test', 'Ho Chi Minh City, Vietnam']);
+});
