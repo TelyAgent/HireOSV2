@@ -58,6 +58,6 @@ Estimate: <1 / 2 / 3 / 5 / 8 / TBD 中的一个值>
 
 提交 Issue 的调用者将结果写入正文唯一的 `### Estimate` 下，字段内容仅为值；分析依据放在已授权的 `[AI-PLAN]` 评论草稿或 Scope 下四级标题 `#### Estimate analysis`，不创建额外三级字段。Owner 未确认建议点数或结果为 TBD 时，保持 AI Ready=No。评估完成后仍按原有 Issue 模板检查完整契约。
 
-调用者创建或更新 Issue 正文前，将完整的最终正文保存到文件，运行 `node .github/scripts/issue-contract.cjs <正文文件> submission`，退出码 0 后提交；只更新 Estimate 也执行同一检查。校验失败时修正可确定的格式/枚举，并记录无法补齐的需求/Owner/环境，不伪造字段后声称契约通过。机器校验和自动待分诊例外见仓库根 `.github/issue-contract.md`；实施前另用 `execution` 模式并核对批准证据。
+调用者创建或更新 Issue 正文时，将完整最终正文保存到文件，使用 `node .github/scripts/issue-submit.cjs create --title <标题> --body-file <正文文件>` 或 `edit --issue <编号> --body-file <正文文件>`；可指定 `--repo OWNER/REPO`。统一入口对同一份正文执行 submission 校验并仅在成功后写入，禁止另用直接 gh/API 正文写入；只更新 Estimate 也须提供完整正文。校验失败时修正可确定的格式/枚举，缺失需求/Owner/环境保留未知，不伪造数据。机器校验、自动检查及可信 Ledger 例外见仓库根 `.github/issue-contract.md`；实施前另用 `issue-contract.cjs <正文文件> execution` 并核对批准证据。
 
 技能本身只读分析，不创建或修改 GitHub Issue、不发表评论、不实施、不设置 AI Ready。用户已授权提交 Issue 时，由调用者执行提交并保留估算依据；技能不扩大该授权。其他 Agent 不支持技能发现时，可由调用者直接读取本文件并按相同流程执行。
