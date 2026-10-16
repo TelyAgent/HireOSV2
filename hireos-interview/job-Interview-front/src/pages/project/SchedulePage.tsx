@@ -8,6 +8,7 @@ import { api, type ApiError, type Round } from "../../features/project-intake/ap
 import { errorText } from "../../features/project-intake/i18n";
 import { API_BASE_URL } from "../../utils/apiBase";
 import { authFetch } from "../../lib/session";
+import { SCHEDULE_TIME_ZONES, formatInZone, instantToWallTime, isIanaZone, wallTimeToInstant } from "../../lib/zonedTime";
 
 const meetingLabel = (format: string, zh: boolean) => {
   if (format === "Work sample") return zh ? "作品评审（模拟）" : "Work sample review (simulated)";
@@ -20,15 +21,11 @@ const meetingLabel = (format: string, zh: boolean) => {
 // Google Meet link, etc.) has no in-app join path, so it just opens externally as before.
 const isZoomLink = (url: string) => { try { return new URL(url).hostname.endsWith("zoom.us"); } catch { return false; } };
 
-// The datetime-local input is parsed in the browser's own local time zone to produce the
-// stored instant; the separate `timezone` field is only a display label typed by the
-// scheduler (matches the "simulated, clearly labeled" scheduling scope — no real calendar
-// integration or time-zone math, same boundary the Project Intake plan set for this stage).
-const toDatetimeLocal = (iso: string) => {
-  const d = new Date(iso);
-  const pad = (n: number) => String(n).padStart(2, "0");
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
-};
+// The datetime-local input is read in the round's chosen IANA time zone, not the browser's (#231): "10:00
+// Asia/Shanghai" is the same instant from any browser, and is shown back the same way. Rounds scheduled before
+// zones were chosen have a free-text label instead; they are shown in the browser's zone with that label, as before.
+const DEFAULT_ZONE = "Asia/Shanghai";
+const browserZone = () => Intl.DateTimeFormat().resolvedOptions().timeZone || DEFAULT_ZONE;
 
 export function SchedulePage() {
   const { state, set, say, t } = useStore();
@@ -124,8 +121,9 @@ export function SchedulePage() {
 
   const openSchedule = (r: Round) => {
     setOpenRoundId(r.id);
-    setDraftAt(r.scheduledAt ? toDatetimeLocal(r.scheduledAt) : "");
-    setDraftTz(r.timezone || "UTC+8");
+    const zone = isIanaZone(r.timezone) ? r.timezone : DEFAULT_ZONE;
+    setDraftTz(zone);
+    setDraftAt(r.scheduledAt ? instantToWallTime(r.scheduledAt, zone) : "");
     setDraftLink(r.meetingLink || "");
     setDraftLanguage(r.interviewLanguage ?? "zh");
   };
@@ -169,10 +167,15 @@ export function SchedulePage() {
   const saveSchedule = async () => {
     const round = rounds.find((r) => r.id === openRoundId);
     if (!round || !draftAt) return;
+    const at = wallTimeToInstant(draftAt, draftTz);
+    if (at.kind !== "ok") {
+      say(at.kind === "gap" ? t.scheduleTimeSkipped : at.kind === "overlap" ? t.scheduleTimeRepeated : t.scheduleTimeInvalid);
+      return;
+    }
     setSaving(true);
     try {
       await api(`/rounds/${round.id}/schedule`, { method: "POST", body: JSON.stringify({
-        version: round.version, scheduledAt: new Date(draftAt).toISOString(), timezone: draftTz.trim() || "UTC", meetingLink: draftLink.trim(),
+        version: round.version, scheduledAt: at.iso, timezone: draftTz, meetingLink: draftLink.trim(),
         interviewLanguage: draftLanguage,
       }) });
       say(zh ? `${round.name} 已排期。` : `${round.name} scheduled.`);
@@ -275,9 +278,11 @@ export function SchedulePage() {
             const overdue = isOverdue(r);
             const isScheduled = !!r.scheduledAt && r.status !== "completed";
             const statusLabel = r.status === "completed" ? t.scheduleStatusCompleted : overdue ? (zh ? "已逾期" : "Overdue") : isScheduled ? t.scheduleStatusScheduled : t.scheduleStatusPlanned;
-            const when = r.scheduledAt
-              ? `${new Date(r.scheduledAt).toLocaleString(zh ? "zh-CN" : "en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })} ${r.timezone || ""}`
-              : t.notScheduledLabel;
+            const when = !r.scheduledAt
+              ? t.notScheduledLabel
+              : isIanaZone(r.timezone)
+                ? formatInZone(r.scheduledAt, r.timezone, zh ? "zh" : "en")
+                : `${formatInZone(r.scheduledAt, browserZone(), zh ? "zh" : "en")}${r.timezone ? ` · ${r.timezone}` : ""}`;
             const ownerName = r.interviewer ? r.interviewer.name : (zh ? "待指定" : "Unassigned");
             const initials = r.interviewer ? r.interviewer.name.split(/\s+/).map((s) => s[0]).join("").slice(0, 2).toUpperCase() : "—";
             const actionLabel = r.status === "completed" ? t.scheduleActionViewRecord : r.scheduledAt ? t.scheduleActionReschedule : t.scheduleActionSchedule;
@@ -415,11 +420,20 @@ export function SchedulePage() {
           </label>
           <label className="block">
             <div className="mb-1.5 text-[11.5px] font-semibold text-[var(--ink-2)]">{t.scheduleTimezoneLabel}</div>
-            <input
+            <select
               value={draftTz}
               onChange={(e) => setDraftTz(e.target.value)}
               className="h-10 w-full rounded-[9px] border border-[var(--line-strong)] bg-[var(--surface)] px-[11px] text-[13px] text-[var(--ink)]"
-            />
+            >
+              {[...new Set([draftTz, ...SCHEDULE_TIME_ZONES])].map((zone) => (
+                <option key={zone} value={zone}>{zone}</option>
+              ))}
+            </select>
+            {draftAt && wallTimeToInstant(draftAt, draftTz).kind === "ok" && (
+              <div className="mt-[5px] text-[11px] text-[var(--ink-2)]" data-testid="schedule-instant">
+                {formatInZone((wallTimeToInstant(draftAt, draftTz) as { iso: string }).iso, draftTz, zh ? "zh" : "en")}
+              </div>
+            )}
             <div className="mt-[5px] text-[11px] text-[var(--ink-3)]">{t.scheduleTimezoneHint}</div>
           </label>
           <label className="block">

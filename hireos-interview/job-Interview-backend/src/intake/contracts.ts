@@ -72,12 +72,22 @@ const roundFieldsShape = {
 export const createRoundSchema = z.object(roundFieldsShape).partial().strict();
 export const updateRoundSchema = z.object({ version: z.number().int().positive(), status: roundStatusSchema, ...roundFieldsShape }).strict();
 // Setting the meeting time is a distinct action from editing round content (Plan vs
-// Schedule in the product flow); scheduledAt is an ISO datetime, always paired with the
-// timezone label it was picked in (display-only — no timezone math happens server-side).
+// Schedule in the product flow); scheduledAt is the instant (UTC), and timezone the IANA zone
+// it was picked in (#231) — the client reads the wall time in that zone, and shows it back in it.
+// Rounds scheduled earlier may still carry a free-text label; only new schedules must name a zone.
+const isIanaZone = (zone: string) => {
+  if (!/^[A-Za-z_]+(\/[A-Za-z0-9_+-]+)*$/.test(zone)) return false;
+  try {
+    new Intl.DateTimeFormat('en-US', { timeZone: zone });
+    return true;
+  } catch {
+    return false;
+  }
+};
 export const scheduleRoundSchema = z.object({
   version: z.number().int().positive(),
   scheduledAt: z.string().datetime(),
-  timezone: z.string().trim().min(1).max(64),
+  timezone: z.string().trim().min(1).max(64).refine(isIanaZone, { message: 'Choose a time zone such as Asia/Shanghai.' }),
   // Pasted by the scheduler (Google Meet/Zoom/etc.) — an empty string clears it. No real
   // calendar or meeting-provider integration is wired to this field; that's out of scope
   // for the scheduling step itself (see meetings/ for the separate, real Zoom host flow).
