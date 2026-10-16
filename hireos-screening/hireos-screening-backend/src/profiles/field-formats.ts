@@ -23,7 +23,12 @@ export type Availability = { value: string; status: 'known'; days?: number; date
 // Every stated amount, decimals included and added up: "1.5 months" is 45 days, "1 month and 2 weeks" 44.
 // A bare 月 or 日 is a date ("3月到岗"), not a duration, so only 个月 and 天 count.
 const DURATION = /(\d+(?:\.\d+)?)\s*(days?|天|weeks?|周|个?星期|months?|个月)/gi;
-const UNIT_DAYS = (unit: string) => (/^(day|天)/i.test(unit) ? 1 : /^(week|周|个?星期)/i.test(unit) ? 7 : 30);
+const UNIT = String.raw`(?:days?|天|weeks?|周|个?星期|months?|个月)`;
+// An amount on either side of a range, in digits or still in words ("two to three weeks", "两到三周").
+const NUM = String.raw`(?:\d+(?:\.\d+)?|[一二两三四五六七八九十]+|\b(?:a|an|one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve)\b)`;
+const RANGE = new RegExp(String.raw`${NUM}\s*${UNIT}?\s*(?:-|–|—|~|～|\bto\b|\bor\b|至|到|或)\s*${NUM}\s*${UNIT}|\bbetween\s+${NUM}\s*${UNIT}?\s*and\s+${NUM}`, 'i');
+const BOUND = new RegExp(String.raw`\b(at\s+(least|most)|more\s+than|less\s+than|over|under|up\s+to|within|no\s+(more|less)\s+than|minimum|maximum|max|min)\b\s*\d|\d+(?:\.\d+)?\s*${UNIT}\s*(以上|以内|之内|内|以下|起)|(至少|最少|最多|不超过|超过|不少于|多于|少于)\s*\d`, 'i');
+const UNIT_DAYS =(unit: string) => (/^(day|天)/i.test(unit) ? 1 : /^(week|周|个?星期)/i.test(unit) ? 7 : 30);
 
 /** "1 month notice" → 30 days, "随时到岗" → 0, "available from 2026-11-01" → that date; otherwise the text alone. */
 export function readAvailability(value: string): Availability {
@@ -41,7 +46,11 @@ export function readAvailability(value: string): Availability {
   if (/\b(a\s+)?(few|couple|several|some)\s+(days?|weeks?|months?)\b|几(天|周|个月)/i.test(text)) return { value: text, status: 'known' };
   // An amount in words this can't read whole ("a hundred days", "a dozen weeks") keeps only the text too.
   if (/\b(hundred|thousand|dozen|half)\b/i.test(text)) return { value: text, status: 'known' };
-  const amounts = [...numbersAsDigits(text).matchAll(DURATION)];
+  const digits = numbersAsDigits(text);
+  // A range or a bound ("2-3 weeks", "1 to 2 months", "两到三周", "at least 1 month", "within 2 weeks") is not one
+  // number of days: turning it into one would change what the résumé says, so only the text is kept (#155 review).
+  if (RANGE.test(digits) || BOUND.test(digits)) return { value: text, status: 'known' };
+  const amounts = [...digits.matchAll(DURATION)];
   if (amounts.length) {
     return { value: text, status: 'known', days: Math.round(amounts.reduce((sum, m) => sum + Number(m[1]) * UNIT_DAYS(m[2]), 0)) };
   }

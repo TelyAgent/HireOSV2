@@ -506,3 +506,45 @@ test('#155 AC-2 (review): a company on one line with the title and dates below i
     { displayName: 'A', email: null, phone: null }, source(segments))).employment_history;
   assert.deepEqual(g.evidence, []);
 });
+
+test('#155 AC-2 (review): with the same range as current and expected salary, the expected one is located', () => {
+  const comp = { min: 60000, max: 70000, currency: 'USD', period: 'year', basis: 'gross' };
+  const at = (segments) => byField(profileFields({ displayName: 'A', compensationExpectation: comp }, { displayName: 'A', email: null, phone: null }, source(segments))).compensation_expectation;
+  const both = [
+    { id: 'cur', text: 'Current salary: USD 60,000–70,000 / year gross' },
+    { id: 'exp', text: 'Expected salary: USD 60,000–70,000 / year gross' },
+  ];
+  assert.deepEqual(at(both).evidence.map((e) => e.segmentId), ['exp']);
+  assert.deepEqual(at([...both].reverse()).evidence.map((e) => e.segmentId), ['exp'], 'whichever comes first');
+  // Only a current salary: not where the expectation is.
+  assert.deepEqual(at([both[0]]).evidence, []);
+  // The amounts in another currency are not it.
+  assert.deepEqual(at([{ id: 'vnd', text: 'Expected salary: 60,000–70,000 VND per year' }]).evidence, []);
+  // Two paragraphs both labelled as expected can't be told apart.
+  assert.deepEqual(at([{ id: 'e1', text: 'Expected salary: 60,000–70,000 USD' }, { id: 'e2', text: 'Salary expectation (2025): 60,000–70,000 USD' }]).evidence, []);
+});
+
+test('#155 AC-1 (review): an availability range or bound keeps the text, never one made-up number of days', () => {
+  const { readAvailability } = require('../dist/profiles/field-formats');
+  for (const text of ['2-3 weeks notice', '2 to 3 weeks notice', '1–2 months notice', 'two to three weeks', '两到三周', '2~3周', 'between 2 and 3 weeks', 'at least 1 month', 'within two weeks', '1个月以内']) {
+    assert.deepEqual(readAvailability(text), { value: text, status: 'known' }, text);
+  }
+  assert.equal(readAvailability('1 month notice').days, 30);
+  assert.equal(readAvailability('one month and two weeks').days, 44);
+});
+
+test('#155 AC-2 (review): two degrees from one school, the years on the line below the school, each find their own', () => {
+  const segments = [
+    { id: 'u1', text: 'Hanoi University of Science' },
+    { id: 'u2', text: 'Bachelor of Computer Science, 2010 – 2014' },
+    { id: 'u3', text: 'Hanoi University of Science' },
+    { id: 'u4', text: 'Master of Data Science, 2015 – 2017' },
+  ];
+  const education = [
+    { school: 'Hanoi University of Science', degree: 'Bachelor', major: 'Computer Science', period: '2010 – 2014' },
+    { school: 'Hanoi University of Science', degree: 'Master', major: 'Data Science', period: '2015 – 2017' },
+  ];
+  const f = byField(profileFields({ displayName: 'A', education }, { displayName: 'A', email: null, phone: null }, source(segments))).education;
+  assert.deepEqual(f.evidence.map((e) => e.segmentId), ['u1', 'u3']);
+  assert.deepEqual(f.unlocatedValues, []);
+});
