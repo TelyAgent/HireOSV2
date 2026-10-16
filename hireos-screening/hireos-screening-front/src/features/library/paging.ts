@@ -34,3 +34,17 @@ export function requestGate() {
 export function canLoadMore(state: { hasList: boolean; loadingMore: boolean; refreshing: boolean; listKey: string | null; filtersKey: string }): boolean {
   return state.hasList && !state.loadingMore && !state.refreshing && state.listKey === state.filtersKey;
 }
+
+/** The largest page the server returns. */
+export const MAX_PAGE = 500;
+
+/**
+ * The requests that bring back what was on screen before opening a candidate: as many candidates as were
+ * loaded, in pages the server accepts, so the scroll position lands on the same row (#173, review on PR #345).
+ */
+export function pagesToRestore(loaded: number): Array<{ offset: number; limit: number }> {
+  const want = Math.max(PAGE_SIZE, loaded);
+  const pages = [];
+  for (let offset = 0; offset < want; offset += MAX_PAGE) pages.push({ offset, limit: Math.min(MAX_PAGE, want - offset) });
+  return pages;
+}

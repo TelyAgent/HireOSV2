@@ -53,6 +53,8 @@ type Item = {
   endForms?: string[];
   /** Words one of which must be in the paragraph too: a salary is where the résumé talks about pay (#155 review). */
   context?: RegExp;
+  /** A test the paragraph must pass instead of needles: e.g. the whole expected salary range, not one of its amounts. */
+  matches?: (paragraph: string) => boolean;
   /** Another item has the same company and title, so they alone can't tell which paragraph is this one. */
   ambiguous?: boolean;
   incomplete?: string[];
@@ -136,7 +138,10 @@ export function profileFields(
     compensation_expectation: compensation.min != null || compensation.max != null
       ? [{
           value: `${salaryRange(compensation)} ${text(compensation.currency)}${compensation.period ? ` / ${compensation.period}` : ''}${compensation.basis === 'gross' || compensation.basis === 'net' ? `, ${compensation.basis}` : ''}`.trim(),
-          needles: salaryNeedles(compensation),
+          needles: [],
+          // The whole range — both amounts, or the range as written ("60-70k") — not whichever amount comes first:
+          // "Current salary: 60,000" is not where an expected 60,000–70,000 is (#155 review).
+          matches: salaryMatcher(compensation),
           // An amount alone could be any number in the résumé ("cut costs by 60000 USD"): only a paragraph about pay counts.
           context: SALARY_CONTEXT,
           incomplete: [...(!text(compensation.currency) ? ['currency'] : []), ...(!compensation.period ? ['period'] : [])],
@@ -206,6 +211,10 @@ function locateItem(item: Item, paragraphs: ReturnType<typeof numberParagraphs>,
   }
   if (item.context) {
     const about = paragraphs.filter((p) => item.context!.test(p.segment.text));
+    if (item.matches) {
+      const hit = about.find((p) => item.matches!(p.normalized));
+      return hit ? evidenceAt(hit, '', source) : null;
+    }
     return locate(item.needles, about, source);
   }
   return locate(item.needles, paragraphs, source);
@@ -282,10 +291,26 @@ function salaryRange(c: Record<string, unknown>) {
 }
 
 /** How a salary figure may be written: 35000, 35,000, 35K, 35k, 3.5万. */
-function salaryNeedles(c: Record<string, unknown>) {
-  return [c.min, c.max].filter((n): n is number => typeof n === 'number' && n > 0).flatMap((n) => [
-    `${n}`, n.toLocaleString('en-US'), ...(n % 1000 === 0 ? [`${n / 1000}k`] : []), ...(n % 1000 === 0 ? [`${n / 10000}万`] : []),
-  ]);
+/** How one amount may be written: 60000, 60,000, 60k, 6万. */
+function amountForms(n: number): string[] {
+  return [`${n}`, n.toLocaleString('en-US'), ...(n % 1000 === 0 ? [`${n / 1000}k`] : []), ...(n % 1000 === 0 ? [`${n / 10000}万`] : [])];
+}
+
+/** The paragraph states the whole salary: both amounts as amounts, or the range in short ("60-70k", "35~45k"). */
+function salaryMatcher(c: Record<string, unknown>): ((paragraph: string) => boolean) | undefined {
+  const [min, max] = [c.min, c.max].map((n) => (typeof n === 'number' && n > 0 ? n : null));
+  const amounts = [...new Set([min, max].filter((n): n is number => n !== null))];
+  if (!amounts.length) return undefined;
+  const has = (text: string, form: string) => {
+    for (let at = text.indexOf(form); at !== -1; at = text.indexOf(form, at + 1)) {
+      if (!/[\d.,]/.test(text[at - 1] ?? '') && !/\d/.test(text[at + form.length] ?? '')) return true;
+    }
+    return false;
+  };
+  const ranges = min && max && min !== max && min % 1000 === 0 && max % 1000 === 0
+    ? ['-', '–', '—', '~', ' - ', ' – ', ' to '].flatMap((sep) => [`${min / 1000}${sep}${max / 1000}k`, `${min / 1000}k${sep}${max / 1000}k`])
+    : [];
+  return (text) => ranges.some((form) => has(text, form)) || amounts.every((n) => amountForms(n).some((form) => has(text, form)));
 }
 
 function normalize(value: string) {

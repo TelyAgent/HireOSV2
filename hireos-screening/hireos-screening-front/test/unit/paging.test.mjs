@@ -1,7 +1,7 @@
 // #172 (review on PR #345) -- "Show more" pages by offset, one bounded page at a time, and appends without repeats.
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { PAGE_SIZE, appendPage, canLoadMore, nextPage, requestGate } from "../../src/features/library/paging.ts";
+import { MAX_PAGE, PAGE_SIZE, appendPage, canLoadMore, nextPage, pagesToRestore, requestGate } from "../../src/features/library/paging.ts";
 
 test("every page request stays within the server's limit, however far the user scrolls", () => {
   for (const shown of [0, 100, 500, 900, 1100]) {
@@ -38,4 +38,11 @@ test("\"Show more\" waits for the new search's first page and never extends a li
   assert.equal(canLoadMore({ ...base, filtersKey: '{"q":"java"}' }), false, "the list on screen is for the old search");
   assert.equal(canLoadMore({ ...base, loadingMore: true }), false);
   assert.equal(canLoadMore({ ...base, hasList: false }), false);
+});
+
+test("coming back from a candidate brings back as many as were loaded, in pages the server accepts", () => {
+  assert.deepEqual(pagesToRestore(0), [{ offset: 0, limit: PAGE_SIZE }]);
+  assert.deepEqual(pagesToRestore(150), [{ offset: 0, limit: 150 }], "the 150th row is there again to scroll to");
+  assert.deepEqual(pagesToRestore(1200), [{ offset: 0, limit: 500 }, { offset: 500, limit: 500 }, { offset: 1000, limit: 200 }]);
+  for (const page of pagesToRestore(1200)) assert.ok(page.limit <= MAX_PAGE);
 });

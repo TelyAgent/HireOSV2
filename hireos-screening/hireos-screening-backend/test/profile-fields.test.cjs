@@ -368,6 +368,17 @@ test('#192 (review): an evidence quote is located only if all of it is in the so
   assert.equal(locateQuote(segs, 'built pricing dashboards in SQL and Python for 120 stores')?.segmentId, 's1');
 });
 
+test('#155 AC-2 (review): an expected salary range is located where the whole range is, not at a current salary', () => {
+  const pay = { min: 60000, max: 70000, currency: 'USD', period: 'year', basis: 'gross' };
+  const at = (segments) => byField(profileFields({ displayName: 'A', compensationExpectation: pay }, { displayName: 'A', email: null, phone: null }, source(segments))).compensation_expectation;
+  const both = at([{ id: 'c1', text: 'Current salary: 60,000 USD per year, gross.' }, { id: 'c2', text: 'Expected salary: 60,000–70,000 USD per year, gross.' }]);
+  assert.deepEqual(both.evidence.map((e) => e.segmentId), ['c2']);
+  assert.deepEqual(at([{ id: 'k1', text: 'Salary expectation: USD 60-70k/yr gross' }]).evidence.map((e) => e.segmentId), ['k1'], 'the range written short');
+  const currentOnly = at([{ id: 'n1', text: 'Current salary: 60,000 USD per year, gross.' }]);
+  assert.deepEqual([currentOnly.evidence, currentOnly.evidenceUnavailable], [[], 'not_located']);
+  assert.equal(at([{ id: 'z1', text: 'Salary: 160,000 – 170,000 USD' }]).evidence.length, 0, '60,000 inside 160,000 is not it');
+});
+
 test('#155 AC-1: a location confirmed unchanged on paste keeps its country and city; one the user typed is theirs', () => {
   const { withConfirmedIdentity } = require('../dist/profiles/profiles.service');
   const parsed = { displayName: 'A', email: null, location: { value: 'Ho Chi Minh City, Vietnam', status: 'known', country: 'Vietnam', city: 'Ho Chi Minh City' }, missingFields: [] };

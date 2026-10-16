@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { sourceLabel } from "../features/imports/sources";
 import { MATCH_STATUS_BADGE } from "../features/library/matchStatus";
-import { PAGE_SIZE, appendPage, canLoadMore, nextPage, requestGate } from "../features/library/paging";
+import { PAGE_SIZE, appendPage, canLoadMore, nextPage, pagesToRestore, requestGate } from "../features/library/paging";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { useStore } from "../store/StoreContext";
 import { deleteCandidate, listLibraryEntries, MATCH_STATUSES, runMatchAgain, type LibraryEntry, type LibraryFilters, type LibraryList } from "../data/api/library";
@@ -28,6 +28,16 @@ function MatchStatusBadge({ entry }: { entry: LibraryEntry }) {
 
 const FILTER_KEYS = ["q", "tag", "source", "owner", "matchStatus", "addedFrom", "addedTo"] as const;
 const SCROLL_KEY = "screening.library.scroll";
+
+/** The position saved when a candidate was opened from this search: scroll offset and how many were loaded. */
+function savedScroll(search: string): { top: number; count: number } | null {
+  try {
+    const saved = JSON.parse(sessionStorage.getItem(SCROLL_KEY) ?? "null") as { search: string; top: number; count?: number } | null;
+    return saved && saved.search === search ? { top: saved.top, count: saved.count ?? PAGE_SIZE } : null;
+  } catch {
+    return null;
+  }
+}
 const SEARCH_KEY = "screening.library.search";
 
 function savedSearch(): string {
@@ -116,8 +126,18 @@ export function LibraryPage() {
     const id = gate.start();
     const key = JSON.stringify(filters);
     setRefreshing(true);
-    listLibraryEntries(filters, 0, PAGE_SIZE)
+    // Coming back from a candidate: bring back as many as were loaded then, so the saved position is there (#173).
+    const pages = pagesToRestore(savedScroll(params.toString())?.count ?? PAGE_SIZE);
+    pages
+      .reduce<Promise<LibraryList | null>>(
+        (acc, page) => acc.then(async (sofar) => {
+          const next = await listLibraryEntries(filters, page.offset, page.limit);
+          return sofar ? appendPage<LibraryEntry, LibraryList>(sofar, next, (entry) => entry.candidate.id) : next;
+        }),
+        Promise.resolve(null),
+      )
       .then((result) => {
+        if (!result) return;
         if (!gate.isLatest(id)) return;
         setList(result);
         setListKey(key);
@@ -129,6 +149,7 @@ export function LibraryPage() {
       .finally(() => {
         if (gate.isLatest(id)) setRefreshing(false);
       });
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- the saved position is read once per load, by search
   }, [filters, gate]);
 
   /** The next page, appended to what is shown; a failure leaves the list as it was (#172 review). */
@@ -157,8 +178,8 @@ export function LibraryPage() {
     if (loadState !== "ready" || restoredScroll.current) return;
     restoredScroll.current = true;
     try {
-      const saved = JSON.parse(sessionStorage.getItem(SCROLL_KEY) ?? "null") as { search: string; top: number } | null;
-      if (saved && saved.search === params.toString()) scroller()?.scrollTo({ top: saved.top });
+      const saved = savedScroll(params.toString());
+      if (saved) scroller()?.scrollTo({ top: saved.top });
       sessionStorage.removeItem(SCROLL_KEY);
     } catch {
       /* storage unavailable: start at the top */
@@ -167,7 +188,7 @@ export function LibraryPage() {
 
   const openCandidate = (id: string) => {
     try {
-      sessionStorage.setItem(SCROLL_KEY, JSON.stringify({ search: params.toString(), top: scroller()?.scrollTop ?? 0 }));
+      sessionStorage.setItem(SCROLL_KEY, JSON.stringify({ search: params.toString(), top: scroller()?.scrollTop ?? 0, count: list?.items.length ?? 0 }));
     } catch {
       /* storage unavailable: nothing to restore later */
     }
