@@ -1,5 +1,6 @@
 import { lookup } from 'node:dns/promises';
 import { BlockList, isIP } from 'node:net';
+import { env } from 'node:process';
 
 /**
  * Where a mail connection may go (#128). A user-entered IMAP/SMTP host is resolved once, every address it resolves
@@ -31,7 +32,7 @@ export function isBlockedAddress(address: string): boolean {
 }
 
 function allowlisted(host: string): boolean {
-  const list = (process.env.MAIL_PRIVATE_HOST_ALLOWLIST ?? '').split(',').map((h) => h.trim().toLowerCase()).filter(Boolean);
+  const list = (env.MAIL_PRIVATE_HOST_ALLOWLIST ?? '').split(',').map((h) => h.trim().toLowerCase()).filter(Boolean);
   return list.includes(host.trim().toLowerCase());
 }
 
