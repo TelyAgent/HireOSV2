@@ -34,6 +34,8 @@ export type IntakePreview = {
 
 /** A reading kept briefly so "create" right after "preview" doesn't ask the model again. */
 const PREVIEW_TTL_MS = 30 * 60 * 1000;
+/** Readings kept at most; the oldest go first. */
+const PREVIEW_MAX_ENTRIES = 500;
 
 export type IntakeJobResult = { coreJobId: string; title: string; jdText: string; duplicate: boolean };
 
@@ -62,6 +64,18 @@ export class IntakeService {
   private readonly readings = new Map<string, { fields: JdFields; at: number }>();
 
   /**
+   * Keeps a preview's reading for the create that follows. A preview that is never created from would otherwise
+   * stay: expired readings are dropped on every new one, and there are never more than PREVIEW_MAX_ENTRIES.
+   */
+  private rememberReading(key: string, fields: JdFields) {
+    const now = Date.now();
+    for (const [k, v] of this.readings) if (now - v.at >= PREVIEW_TTL_MS) this.readings.delete(k);
+    this.readings.delete(key);
+    this.readings.set(key, { fields, at: now });
+    while (this.readings.size > PREVIEW_MAX_ENTRIES) this.readings.delete(this.readings.keys().next().value as string);
+  }
+
+  /**
    * Read a JD without creating anything (#178): the model's title, team and location for the recruiter to
    * check, or the job this same JD already created. Failures are the same as for createJob.
    */
@@ -71,7 +85,7 @@ export class IntakeService {
     const existing = await this.findExisting(identity, contentHash);
     if (existing) return { title: existing.title, team: null, location: null, duplicateOf: { coreJobId: existing.coreJobId, title: existing.title } };
     const fields = await this.extract(identity, input.text);
-    this.readings.set(`${identity.workspaceId}:${contentHash}`, { fields, at: Date.now() });
+    this.rememberReading(`${identity.workspaceId}:${contentHash}`, fields);
     return { title: fields.title!, team: fields.department?.trim() || null, location: fields.location?.trim() || null, duplicateOf: null };
   }
 

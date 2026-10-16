@@ -50,12 +50,14 @@ export function NewJobModal({ open, onClose, onCreated }: { open: boolean; onClo
   const [team, setTeam] = useState("");
   const [fieldErrors, setFieldErrors] = useState<{ title?: boolean; team?: boolean }>({});
   const fileGeneration = useRef(0);
+  // Bumped by every read and every reset: a preview that comes back after the modal was closed or cleared is dropped.
+  const readGeneration = useRef(0);
   const key = useRef(newKey());
   const errorText = (code: string) => (ERRORS[code] || ERRORS.REQUEST_FAILED)[zh ? 1 : 0];
   const busy = creating || fileBusy || reading;
 
   function reset() {
-    fileGeneration.current++; setText(""); setFileName(""); setFileBusy(false); setError("");
+    fileGeneration.current++; readGeneration.current++; setText(""); setFileName(""); setFileBusy(false); setReading(false); setError("");
     setPreview(null); setTitle(""); setTeam(""); setFieldErrors({}); key.current = newKey();
   }
   function close() { if (creating) return; reset(); onClose(); }
@@ -77,15 +79,17 @@ export function NewJobModal({ open, onClose, onCreated }: { open: boolean; onClo
 
   async function read() {
     if (!text.trim()) { setError("JD_REQUIRED"); return; }
+    const g = ++readGeneration.current;
     setReading(true); setError("");
     try {
       const found = await previewJobFromJd(text);
+      if (g !== readGeneration.current) return;
       setPreview(found);
       setTitle(found.title ?? "");
       setTeam(found.team ?? "");
       setFieldErrors({});
-    } catch (e) { setError(e instanceof ApiError ? e.code : "REQUEST_FAILED"); }
-    finally { setReading(false); }
+    } catch (e) { if (g === readGeneration.current) setError(e instanceof ApiError ? e.code : "REQUEST_FAILED"); }
+    finally { if (g === readGeneration.current) setReading(false); }
   }
 
   async function create() {
