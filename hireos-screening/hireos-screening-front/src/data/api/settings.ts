@@ -66,6 +66,10 @@ export interface MailboxImportResult {
   messagesScanned: number;
   attachmentsImported: number;
   batchId?: string;
+  /** Messages left unread because an attachment, the message or the import is over a size limit (#135). */
+  skipped?: { subject: string; from: string; reason: "attachment_too_large" | "message_too_large" | "too_many_attachments"; detail: string }[];
+  /** Unread messages left for the next import once this one's budget was used. */
+  deferred?: number;
 }
 
 /** Pulls resume-looking attachments out of unseen mail into the Resume Library

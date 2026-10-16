@@ -516,6 +516,8 @@ export const ZH: Record<string, string> = {
   "found": "发现",
   "resume attachment(s) — added to the Resume Library": "份简历附件 —— 已加入简历库",
   "no new resume attachments found": "没有发现新的简历附件",
+  "%n message(s) were not imported — an attachment or the message is over the size limit. They stay unread:": "%n 封邮件未导入：附件或邮件超过大小上限，已保留为未读：",
+  "%n more message(s) will be read on the next import.": "还有 %n 封邮件将在下次导入时读取。",
   "Could not read this mailbox.": "无法读取该邮箱。",
   "Reads unseen mail in the configured corporate mailbox and adds resume-looking attachments (.pdf/.doc/.docx) to the Resume Library. A message already read from is never imported again.":
     "读取配置的企业邮箱中未读邮件，把看起来像简历的附件（.pdf/.doc/.docx）加入简历库。已经读取过的邮件不会重复导入。",

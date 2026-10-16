@@ -25,8 +25,16 @@ export function EmailTab({ onChanged, jobId }: { onChanged?: () => void; jobId?:
       if (result.attachmentsImported > 0) {
         say(`${mailbox.name || mailbox.email}: ${t("found")} ${result.attachmentsImported} ${t("resume attachment(s) — added to the Resume Library")}`, { type: "success" });
         onChanged?.();
-      } else {
+      } else if (!result.skipped?.length) {
         say(`${mailbox.name || mailbox.email}: ${t("no new resume attachments found")}`, { type: "info" });
+      }
+      // Over a size limit: not imported, left unread, and said so (#135).
+      if (result.skipped?.length) {
+        const subjects = result.skipped.slice(0, 3).map((m) => `“${m.subject}”`).join(", ");
+        say(`${t("%n message(s) were not imported — an attachment or the message is over the size limit. They stay unread:").replace("%n", String(result.skipped.length))} ${subjects}`, { type: "error" });
+      }
+      if (result.deferred) {
+        say(t("%n more message(s) will be read on the next import.").replace("%n", String(result.deferred)), { type: "info" });
       }
     } catch (error) {
       say(error instanceof ApiError ? error.message : t("Could not read this mailbox."), { type: "error" });

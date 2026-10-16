@@ -6,7 +6,7 @@ import { Prisma } from '@prisma/client';
 import { z } from 'zod';
 import { PrismaService } from '../persistence/prisma.service';
 import type { Identity } from '../auth/workspace.guard';
-import { MailService, MailApiError, type MailInboxMessage, type MailAttachmentMessage, type MailboxCredentials } from './mail.service';
+import { MailService, MailApiError, type MailInboxMessage, type MailAttachmentScan, type MailboxCredentials } from './mail.service';
 import { ImportsService } from '../intake/imports.service';
 import { invalidSchema, invalidSchemaFromZod } from '../http/invalid-schema';
 
@@ -306,9 +306,9 @@ export class SettingsService {
       throw new BadRequestException({ code: 'INBOUND_NOT_ENABLED', message: '请先为该邮箱启用"用于收件 / Recruiting Inbox"。' });
     }
     const creds: MailboxCredentials = { email: payload.email, password: payload.password, imapHost: payload.imapHost, imapPort: payload.imapPort, imapTls: payload.imapTls, smtpHost: payload.smtpHost, smtpPort: payload.smtpPort, smtpSecure: payload.smtpSecure };
-    let messages: MailAttachmentMessage[];
+    let scan: MailAttachmentScan;
     try {
-      messages = await this.mail.listUnseenResumeAttachments(creds, 20);
+      scan = await this.mail.listUnseenResumeAttachments(creds, 20);
     } catch (error) {
       const message = error instanceof MailApiError ? error.message : '无法连接邮箱读取新邮件。';
       throw new BadRequestException({ code: 'MAILBOX_IMPORT_FAILED', message });
@@ -321,6 +321,9 @@ export class SettingsService {
     // Chinese filename can come out containing an embedded NUL byte, which Postgres
     // rejects outright. Pre-encoding into the same raw latin1 representation here keeps
     // the single decode step consistent for every caller instead of special-casing channels.
+    // Only messages whose attachments were all read are imported and then marked read; a message over a limit,
+    // or past this import's budget, stays unread with the reason reported (#135).
+    const messages = scan.messages;
     const files = messages.flatMap((m) =>
       m.attachments.map(
         (a) =>
@@ -338,13 +341,16 @@ export class SettingsService {
       batchId = batch.id;
       await this.mail.markSeen(creds, messages.map((m) => m.uid)).catch(() => undefined);
     }
+    const skipped = scan.skipped.map(({ subject, from, reason, detail }) => ({ subject, from, reason, detail }));
     const updatedPayload = { ...payload, lastSyncedAt: new Date().toISOString(), lastSyncMessageCount: messages.length };
     await this.db.workspaceSetting.update({
       where: { id: existing.id },
       data: { payload: updatedPayload as Prisma.InputJsonValue, version: existing.version + 1, updatedBy: identity.actorId },
     });
-    await this.audit(identity, 'corporate_mailbox_email_import', 'WorkspaceSetting', existing.id, { messagesScanned: messages.length, attachmentsImported: files.length });
-    return { mailbox: serializeMailbox(id, updatedPayload), messagesScanned: messages.length, attachmentsImported: files.length, batchId };
+    await this.audit(identity, 'corporate_mailbox_email_import', 'WorkspaceSetting', existing.id, {
+      messagesScanned: messages.length, attachmentsImported: files.length, messagesSkipped: skipped.length, messagesDeferred: scan.deferred,
+    });
+    return { mailbox: serializeMailbox(id, updatedPayload), messagesScanned: messages.length, attachmentsImported: files.length, batchId, skipped, deferred: scan.deferred };
   }
 
   private getMailboxSetting(workspaceId: string, id: string) {
