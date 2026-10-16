@@ -2,7 +2,7 @@
 
 | 属性 | 内容 |
 |---|---|
-| 依据 | [Resume_Screening_PRD_v1.3.md](Resume_Screening_PRD_v1.3.md)、[原型 v2](../../docs/design/Resume_Screening/HireOS-Resume-Screening-Prototype-v2.html) |
+| 依据 | [Resume_Screening_PRD_v1.3.md](../../../hireos-screening/docs/Resume_Screening_PRD_v1.3.md)、[原型 v2](../../design/Resume_Screening/HireOS-Resume-Screening-Prototype-v2.html) |
 | 日期 | 2026-10-14 |
 | 用途 | 把简历筛选模块拆成可独立立项、实现和验收的功能单元，作为后续创建 Issue 的底稿 |
 

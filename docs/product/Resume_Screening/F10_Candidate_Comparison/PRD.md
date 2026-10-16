@@ -6,6 +6,7 @@
 | 版本 / 日期 | v1.0 / 2026-10-14（草稿，待评审） |
 | 主角色 | Recruiter / HR、Hiring Manager |
 | 原型路由 | `#/comparisons/:id`（[原型 v2](../../../design/Resume_Screening/HireOS-Resume-Screening-Prototype-v2.html)） |
+| 同目录文档 | [输入输出闭环](Loop_IO.md) · [User Journey](User_Journey.md) · [User Cases](User_Cases.md) |
 | 实现现状 | 🟡 后端 `comparisons`：对比集合、快照、批注、导出（PNG / PDF，本地结构化导出）；**快照创建时只见 `current_summary` 模式**。前端 `ComparePage`。#27 反馈解决顾虑后对比数据陈旧，#26 反馈对比页中英切换残留英文。未逐项验证 AC |
 | 依据 | [PRD v1.3 §5.6～5.10、§8.5](../../../../hireos-screening/docs/Resume_Screening_PRD_v1.3.md)、[用户旅程 v0.2 J8](../../user-journeys/Resume_Screening_User_Journeys_v0.2.md) |
 

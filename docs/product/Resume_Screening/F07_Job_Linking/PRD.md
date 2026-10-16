@@ -6,6 +6,7 @@
 | 版本 / 日期 | v1.0 / 2026-10-14（草稿，待评审） |
 | 主角色 | Recruiter / HR、Hiring Manager（按岗位配置） |
 | 原型路由 | `#/candidates/:id/jobs`、`#/tasks` 中的关联确认任务（[原型 v2](../../../design/Resume_Screening/HireOS-Resume-Screening-Prototype-v2.html)） |
+| 同目录文档 | [输入输出闭环](Loop_IO.md) · [User Journey](User_Journey.md) · [User Cases](User_Cases.md) |
 | 实现现状 | 🟡 后端 `linking`：可确认 proposed / deferred 状态的推荐；Application 按（workspace、候选人、岗位、招聘周期）唯一；确认后关闭关联确认任务、生成筛选复核任务并自动发起筛选。前端在 `JobRecommendationsPage`。未逐项验证 AC |
 | 依据 | [PRD v1.3 §4.3、§4.4](../../../../hireos-screening/docs/Resume_Screening_PRD_v1.3.md)、[用户旅程 v0.2 J5](../../user-journeys/Resume_Screening_User_Journeys_v0.2.md) |
 
@@ -64,7 +65,7 @@ AI 推荐的岗位不一定对。把候选人正式纳入某个岗位的考虑�
 
 ## 6. 权限
 
-- 由岗位配置的负责人确认；HR 和 HM 都可以，不默认只给 HR。
+- 由岗位配置的负责人确认；Recruiter / TA 和 Hiring Manager 担任岗位负责人时都可以，不默认只给 Recruiter。HR Approver、Viewer 不能确认关联。
 - 无权限的用户看不到确认按钮，或按钮不可点并说明原因。
 
 ## 7. 非功能要求

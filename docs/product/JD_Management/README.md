@@ -1,5 +1,7 @@
 # HireOS Command — JD Management 交接包（2026-10-09）
 
+> **产品规则更新（2026-10-15）**：本文件下方“当前功能”记录 2026-10-09 原型快照，不代表 M6 最新验收口径。M6 以 [v1.2 PRD](M6_Analyze_AI_Fix/PRD.md) 和[完整性标准 v0.3](HireOS_Command_JD_Completeness_Standard_v0.1.md)为准：Level 允许 Not set，现为 10 项必填；职位概述无句数提示；Keep 后自动重查；X1–X8/V1–V5/R1–R3 纳入门禁；Ready 后提交审批，审批前不能直接发布。此前同日的 11 项必填决定已被 Level 新规则覆盖。
+
 ## 包含内容
 | 文件 | 说明 |
 | --- | --- |

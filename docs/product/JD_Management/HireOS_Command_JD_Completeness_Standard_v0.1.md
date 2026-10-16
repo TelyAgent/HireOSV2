@@ -1,9 +1,11 @@
 # HireOS Command — JD 完整性标准（AI 检查依据）
 
 Doc ID: CMD-JD-CHK-001  
-Version: v0.1  
+Version: v0.3（2026-10-15 Level 规则更新）
 Scope: JD Management · 创建 / 编辑 / 提交审批 / 发布前的完整性与质量检查  
 用途: AI 逐项核对一份 JD 是否完整，并给出缺失项、质量问题和修改建议。
+
+> 2026-10-15 后续产品决定：Level 允许设为 Not set。A4 改为选填，必填总数由 11 项调整为 10 项；本决定覆盖同日较早的“11 项必填”口径，其他门禁规则保持有效。
 
 ---
 
@@ -13,7 +15,7 @@ Scope: JD Management · 创建 / 编辑 / 提交审批 / 发布前的完整性�
 
 | 级别 | 含义 | 缺失时的处理 |
 | --- | --- | --- |
-| **必填 Required** | 没有它 JD 就无法用于招聘、筛选或评估 | 判定为"不完整"，阻止提交审批 / 发布 |
+| **必填 Required** | 10 项；没有它 JD 就无法用于招聘、筛选或评估 | 判定为"不完整"，阻止提交审批；审批通过前不得发布 |
 | **选填 Optional** | 能提升 JD 质量，但缺失不影响使用 | 只给出"建议补充"，不阻止流程 |
 
 ### 1.2 单项判定结果
@@ -38,9 +40,11 @@ Scope: JD Management · 创建 / 编辑 / 提交审批 / 发布前的完整性�
 
 | 结论 | 条件 |
 | --- | --- |
-| **Ready 可提交** | 所有必填项 Pass，没有合规阻断项 |
-| **Needs work 待完善** | 无 Missing，但存在 Weak，或选填项缺失较多 |
-| **Blocked 阻断** | 存在必填的 Missing，或存在合规阻断项（见第 4 节） |
+| **Ready 可提交审批** | 10 项必填全 Pass；第 3、4 节无阻断或 Weak/待修改；当前 revision 已保存、无待确认 AI 提案，检查结果有效 |
+| **Needs work 待完善** | 无 Missing 和阻断，但必填内容或跨项/合规检查存在 Weak/待修改；选填项缺失只给建议 |
+| **Blocked 阻断** | 存在必填 Missing，或第 3、4 节的阻断级规则未满足 |
+
+Ready 后下一步是**提交审批**；审批决策属于 M7，发布属于 M8。Keep 后对当前 revision 自动重查；检查运行中、失败或旧结果过期时不得沿用旧 Ready 放行提交。
 
 ---
 
@@ -55,7 +59,7 @@ Scope: JD Management · 创建 / 编辑 / 提交审批 / 发布前的完整性�
 | A1 | 职位名称 Job title | 必填 | Public | 具体、可搜索，包含职能 + 资历（如 Senior Backend Engineer），不超过 60 字 | 含内部编号 / 代号；只有资历没有职能；"Ninja""Rockstar"等营销词 |
 | A2 | 部门 Department | 选填 | Internal | 对应组织架构里存在的部门 | 与职位名明显不符 |
 | A3 | 团队 Team | 选填 | Internal | 说明所在小组 | — |
-| A4 | 资历级别 Level | 必填 | Public | 与职位名、经验年限一致（Junior / Mid / Senior / Lead / Manager / Director） | 级别与经验要求矛盾（如 Junior 要求 8 年经验） |
+| A4 | 资历级别 Level | 选填（可设为 Not set） | Public | 设置时与职位名、经验年限一致（Junior / Mid / Senior / Lead / Manager / Director）；Not set 不计 Missing、不阻断 Ready | 已设置的级别与经验要求矛盾（如 Junior 要求 8 年经验） |
 | A5 | 雇佣类型 Employment type | 选填 | Public | Full-time / Part-time / Contract / Intern 之一 | — |
 | A6 | 工作方式 Workplace type | 选填 | Public | On-site / Hybrid / Remote 之一 | 与地点描述冲突（标 Remote 却要求每天到岗） |
 | A7 | 工作地点 Location | 必填 | Public | 城市 + 国家；Remote 需写明可接受的地区 / 时区 | 只写国家；Remote 没有地区限制说明 |
@@ -73,7 +77,7 @@ Scope: JD Management · 创建 / 编辑 / 提交审批 / 发布前的完整性�
 
 | ID | 内容 | 级别 | 建议分级 | 完整标准 | 常见缺陷 |
 | --- | --- | --- | --- | --- | --- |
-| B1 | 职位概述 Role summary | 必填 | Public | 2–4 句，说明这个职位做什么、为谁做、价值是什么 | 只有一句空话；把职责清单重复一遍；出现内部敏感信息 |
+| B1 | 职位概述 Role summary | 必填 | Public | 有非空内容；不设句数要求或句数提示 | 缺失时阻断；已填写内容不因句数、措辞或重复职责而判 Weak，仍适用第 4 节分级与合规规则 |
 | B2 | 业务背景 Business problem | 选填 | Internal | 说明这个职位要解决什么业务问题、为什么现在招 | 缺失；只写"扩大团队" |
 | B3 | 公司 / 团队介绍 About us | 选填 | Public | 1–3 句公司或团队介绍 | 与官网口径不一致 |
 | B4 | 协作关系 Collaborators | 选填 | Internal | 主要协作的团队与角色 | — |
@@ -120,20 +124,20 @@ Scope: JD Management · 创建 / 编辑 / 提交审批 / 发布前的完整性�
 
 ---
 
-## 3. 跨项一致性检查（AI 必须做）
+## 3. 跨项一致性检查（本期门禁必须做）
 
 | 编号 | 检查 | 不通过时的处理 |
 | --- | --- | --- |
-| X1 | 级别与经验年限一致（A4 与 D3） | Weak，指出矛盾 |
+| X1 | 已设置级别时，与经验年限一致（A4 与 D3） | Weak，指出矛盾；A4 为 Not set 时跳过级别比较 |
 | X2 | 工作方式与地点、工作安排一致（A6、A7、D9） | Weak |
 | X3 | 每条必备要求（D1）能在职责（C1）里找到对应工作内容 | Weak，列出没有对应职责的要求 |
 | X4 | 每条职责（C1）至少被一条要求或加分项覆盖 | 建议补充 |
 | X5 | 内部预算上限不低于对外薪资范围上限（F1、F2） | Weak |
-| X6 | 对外薪资范围与级别匹配（F1、A4） | 建议复核 |
-| X7 | 同一份 JD 内，职位名、级别、地点、薪资在各处写法一致 | Weak |
+| X6 | 已设置级别时，对外薪资范围与级别匹配（F1、A4） | 建议复核；A4 为 Not set 时跳过级别比较 |
+| X7 | 同一份 JD 内，职位名、已设置的级别、地点、薪资在各处写法一致 | Weak；A4 为 Not set 时不因缺少级别判 Weak |
 | X8 | 多语言版本的关键事实一致（I7） | Weak |
 
-## 4. 分级与合规检查（AI 必须做）
+## 4. 分级与合规检查（本期门禁必须做）
 
 ### 4.1 分级匹配
 
@@ -194,6 +198,7 @@ Scope: JD Management · 创建 / 编辑 / 提交审批 / 发布前的完整性�
 - `severity`：blocker（阻断）/ warning（待修改）/ suggestion（建议）。
 - `blockId`：指向编辑器里的内容块，方便前端定位到具体位置。
 - AI 不得读取、总结或改写被标为 Confidential 的块的正文，只能检查"它是否存在、是否被正确分级"。
+- 第 3、4 节的阻断与 Weak/待修改纳入提交审批门禁；“建议”只显示在 Suggestions，不阻断。
 
 ---
 

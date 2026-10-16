@@ -6,6 +6,7 @@
 | 版本 / 日期 | v1.0 / 2026-10-14（草稿，待评审） |
 | 主角色 | Recruiter / HR、Hiring Manager |
 | 原型路由 | `#/applications/:id`（[原型 v2](../../../design/Resume_Screening/HireOS-Resume-Screening-Prototype-v2.html)） |
+| 同目录文档 | [输入输出闭环](Loop_IO.md) · [User Journey](User_Journey.md) · [User Cases](User_Cases.md) |
 | 实现现状 | 🟡 后端 `screening`：AI 评估 + 本地规则兜底，覆盖率 < 0.7 时总分为空；支持改分（`PATCH evaluations/:id`）、处理 concern 和待核实项。#19 反馈「运行初筛不调用 AI、分数随机」；本地规则中仍出现 work-authorization 文案。前端 `ScreeningDetailPage`。未逐项验证 AC |
 | 依据 | [PRD v1.3 §5.1～5.5、§8.2](../../../../hireos-screening/docs/Resume_Screening_PRD_v1.3.md)、[用户旅程 v0.2 J6、§8](../../user-journeys/Resume_Screening_User_Journeys_v0.2.md) |
 

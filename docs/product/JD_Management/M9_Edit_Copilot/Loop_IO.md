@@ -3,7 +3,7 @@
 | 项 | 内容 |
 |---|---|
 | 模块 | M9（P1） |
-| 版本 / 日期 | v1.0 / 2026-10-14（草稿，结构待确认） |
+| 版本 / 日期 | v1.1 / 2026-10-15（产品决定同步；实现待验收） |
 | 同目录文档 | [产品文档](PRD.md) · [User Journey](User_Journey.md) |
 | 格式说明 | 见 [模块索引 README](../README_Modules.md#闭环文档格式) |
 
@@ -40,7 +40,7 @@ nodes:
   - {id: M9b.N4, type: action, do: "点击 Recruiter 字段的 ×"}
   - {id: M9b.C4, type: check, expect: {ui: "字段隐藏；可从 Add field 加回"}}
   - {id: M9b.N5, type: action, do: "Level 设为 Not set"}
-  - {id: M9b.C5, type: check, expect: {ui: "Level 不显示；不影响必填检查"}}
+  - {id: M9b.C5, type: check, expect: {ui: "Level 不显示；A4 不计 Missing，Ready 不因此受阻"}}
   - {id: M9b.N6, type: action, do: "拖动右侧面板边缘到 200px、到 80% 宽度；刷新"}
   - {id: M9b.C6, type: check, expect: {ui: "宽度被限制在 300px 到窗口宽度 60% 之间；刷新后保持"}}
 edges:
@@ -88,7 +88,7 @@ nodes:
   - {id: M9s.N1, type: action, do: "编辑正文，期间断网或让保存接口返回 500", inject: [network_down, http_500]}
   - {id: M9s.C1, type: check, expect: {ui: "显示 Offline / Save failed，不显示 Saved；内容不丢；恢复后重试成功"}}
   - {id: M9s.N2, type: action, do: "两个标签页基于同一版本修改同一段并先后保存"}
-  - {id: M9s.C2, type: check, expect: {ui: "后保存者看到冲突提示或对方的修改", db: "先保存的内容没有被静默覆盖"}}
+  - {id: M9s.C2, type: check, expect: {ui: "过期保存显示冲突；点击查看双方差异；人工处理重叠内容并预览；确认合并后才保存，取消保留本地草稿", db: "确认前远端保持先保存版本；确认后产生合并后的新 revision"}}
 edges:
   - [M9s.N1, M9s.C1]
   - [M9s.N2, M9s.C2]
@@ -115,7 +115,7 @@ edges:
 | M9b-P2 | N2 → C2 | `Remote` | To revise |
 | M9b-P3 | N3 → C3 | Recruiter | 字段显示 |
 | M9b-P4 | N3 → C3 → N4 → C4 | — | 字段隐藏 |
-| M9b-P5 | N5 → C5 | Not set | Level 不显示 |
+| M9b-P5 | N5 → C5 | Not set | Level 不显示，A4 不计 Missing |
 | M9b-P6 | N6 → C6 | 200px、80% | 宽度受限且持久 |
 | M9c-P1 | N1 → G1 → C2 → G2 → C3 | public_block，Accept | doc.updated |
 | M9c-P2 | N1 → G1 → C2 → G2 → C4 | public_block，Reject | no_change |
@@ -123,8 +123,8 @@ edges:
 | M9c-P4 | N1 注入 stop_generation | public_block | 半截建议不能接受 |
 | M9c-P5 | N1 注入 llm_fail | public_block | 错误可恢复，正文不变 |
 | 公共-P1 | M9s.N1 → C1 | network_down、http_500 | 内容不丢 |
-| 公共-P2 | M9s.N2 → C2 | 两个标签页 | 不静默覆盖 |
-| P-中文 | M9a、M9b 在中文界面重跑 | — | 无残留英文 |
+| 公共-P2 | M9s.N2 → C2 | 两个标签页 | 查看冲突、人工确认合并，确认前不覆盖 |
+| P-中文 | M9a、M9b 在中文界面重跑 | — | 系统 UI 与新模板标题中文；已有内容保持原语言 |
 
 ## 4. 流程图（由规格生成）
 
@@ -156,6 +156,5 @@ flowchart TD
 
 ## 5. 待确认
 
-- 并发编辑的预期（公共-P2 的断言取决于此）。
-- documents 接口是否有版本校验。
-- HR Approver 能否编辑（是否补一条角色路径）。
+- 并发合并的产品预期已在 2026-10-15 确认；documents 接口版本校验、冲突预览与确认合并仍需工程实现/复测。
+- HR Approver 能否编辑仍待 M7 确认；当前 M9 不执行多角色权限路径。

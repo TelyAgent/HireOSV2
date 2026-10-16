@@ -3,7 +3,7 @@
 | 项 | 内容 |
 |---|---|
 | 模块 | M7（P0） |
-| 版本 / 日期 | v1.0 / 2026-10-14（草稿，结构待确认） |
+| 版本 / 日期 | v1.1 / 2026-10-15（纳入邮件审批决定） |
 | 同目录文档 | [产品文档](PRD.md) · [User Journey](User_Journey.md) |
 | 格式说明 | 见 [模块索引 README](../README_Modules.md#闭环文档格式) |
 | 实现现状 | ❌ 审批和服务端角色权限未实现；本文件的路径在实现前全部标记 known gap |
@@ -25,6 +25,11 @@ nodes:
   - {id: M7a.G1, type: decision, on: "文档是否 Ready"}
   - {id: M7a.C1, type: check, expect: {ui: "提交审批不可用并说明原因", api: "直接调用返回 422", db: "无审批请求"}}
   - {id: M7a.C2, type: check, expect: {ui: "显示审批人和冻结的版本", db: "审批请求 status=pending，记录候选版本哈希、提交人、时间"}}
+  - {id: M7a.C9, type: check, expect: {ext: "发送的审批邮件含对应请求的审批按钮", db: "邮件引用冻结的候选版本"}}
+  - {id: M7a.N6, type: action, actor: approver_a, do: "从邮件审批按钮进入对应请求，登录后确认批准、退回或拒绝"}
+  - {id: M7a.C10, type: check, expect: {ui: "未登录不能提交决定", api: "决定回传到对应审批请求", db: "记录人工审批人、决定、冻结版本、时间及必要理由；M8 门禁读取同一结果"}}
+  - {id: M7a.N7, type: action, do: "对仍 pending 的冻结请求推进时钟至提交后 24 小时"}
+  - {id: M7a.C11, type: check, expect: {db: "系统把该冻结版本标记 approved，决定来源=系统超时；不自动 Publish", record: "发送邮件通知"}}
   - {id: M7a.N2, type: action, actor: recruiter_a, do: "尝试批准自己提交的请求（调用决定接口）"}
   - {id: M7a.C3, type: check, expect: {api: "403", db: "请求仍为 pending"}}
   - {id: M7a.N3, type: action, actor: approver_a, do: "从待我审批进入候选版本"}
@@ -46,6 +51,12 @@ edges:
   - [M7a.G1, M7a.C1, {when: "seed 改为 S_job_incomplete"}]
   - [M7a.C1, M7a.T4]
   - [M7a.G1, M7a.C2, {when: "Ready"}]
+  - [M7a.C2, M7a.C9, {when: "测邮件审批"}]
+  - [M7a.C9, M7a.N6]
+  - [M7a.N6, M7a.C10]
+  - [M7a.C2, M7a.N7, {when: "24 小时内无人决定"}]
+  - [M7a.N7, M7a.C11]
+  - [M7a.C11, M7a.T1]
   - [M7a.C2, M7a.N2, {when: "测自审批"}]
   - [M7a.N2, M7a.C3]
   - [M7a.C2, M7a.N3]
@@ -133,6 +144,8 @@ edges:
 | P12 角色变更立即生效 | M7b: N5 → C6 | — | 按新角色生效 |
 | P13 审批人无 restricted 权限 | M7b: G0 → N4 → C5 | — | restricted 不可见 |
 | P14 双击提交 | P2 在 N1 注入 double_click | — | 只有 1 个 pending 请求 |
+| P15 24 小时无人处理 | M7a: N1 → C2 → N7 → C11 | 时钟快进；仍 pending 的冻结版本 | 系统批准，来源可辨，发邮件，不自动发布 |
+| P16 邮件审批回传 | M7a: N1 → C2 → C9 → N6 → C10 | 已登录 approver_a、冻结版本 | 批准、退回或拒绝回传到对应请求；未登录不能决定 |
 
 ## 4. 流程图（由规格生成）
 
@@ -142,6 +155,8 @@ flowchart TD
     a1["M7a.N1 Recruiter 提交审批<br/>注入：双击"] --> ag1{"M7a.G1 Ready?"}
     ag1 -->|"否"| ac1["M7a.C1 ✔ 不可提交，422"]
     ag1 -->|"是"| ac2["M7a.C2 ✔ pending，冻结版本"]
+    ac2 --> em["M7a.C9 ✔ 发送含审批按钮的邮件"] --> em2["M7a.N6 邮件入口作出决定"] --> em3["M7a.C10 ✔ 决定回传到对应请求"]
+    ac2 --> t24["M7a.N7 24 小时仍 pending"] --> tc["M7a.C11 ✔ 系统批准、标明来源并发邮件"]
     ac2 --> a2["M7a.N2 Recruiter 自审批"] --> ac3["M7a.C3 ✔ 403"]
     ac2 --> a3["M7a.N3 Approver 打开候选版本"] --> ac4["M7a.C4 ✔ 内容、差异、风险"]
     ac4 --> a4["M7a.N4 作出决定"] --> ag2{"M7a.G2 决定 / 理由"}
@@ -163,7 +178,7 @@ flowchart TD
 
 ## 5. 待确认
 
-- 审批步骤数（一步还是 HM → HR 两步）；若两步，M7a 需要加一个 HM 审批节点。
-- 审批超时时长和超时行为（确定后补路径 P15：时钟快进 → 提醒）。
+- 审批已确定仅 HR Approver 一步；24 小时未决由系统批准并发邮件。自动批准邮件的收件人、模板、发送失败处理仍待确认。
 - Hiring Manager 授权字段清单。
-- 角色分配入口（影响 M7b.N5 的操作方式）。
+- 角色由超级管理员在系统设置分配，每人仅一个；作用范围及超级管理员与业务角色关系仍待确认（影响 M7b.N5）。
+- 邮件审批已确定支持批准、退回、拒绝，须登录的 HR Approver 确认；理由填写、回传失败/重复/过期反馈仍待确认。

@@ -4,8 +4,9 @@
 |---|---|
 | 模块 | F11 / 主流程第 11 步 |
 | 版本 / 日期 | v1.0 / 2026-10-14（草稿，待评审） |
-| 主角色 | 岗位配置的筛选负责人（HR 或 HM）；例外审批需 HR + HM |
+| 主角色 | 岗位配置的筛选负责人（Recruiter / TA 或 Hiring Manager）；例外审批需 Hiring Manager + HR Approver |
 | 原型路由 | `#/applications/:id/decision`（[原型 v2](../../../design/Resume_Screening/HireOS-Resume-Screening-Prototype-v2.html)） |
+| 同目录文档 | [输入输出闭环](Loop_IO.md) · [User Journey](User_Journey.md) · [User Cases](User_Cases.md) |
 | 实现现状 | 🟡 后端 `decisions`：决定结果 strong_advance / advance / hold / do_not_advance / request_information，下一步 record_only / send_assessment / move_to_interview；**例外审批把 HR 和 HM 两条批准写成同一操作人**（见 #20）；**未见 Assign Review 和批量决定**。前端 `DecisionPage`。#27 反馈决策页把顾虑压缩为数字。未逐项验证 AC |
 | 依据 | [PRD v1.3 §2、§4.3、§6.1、§7](../../../../hireos-screening/docs/Resume_Screening_PRD_v1.3.md)、[用户旅程 v0.2 J6](../../user-journeys/Resume_Screening_User_Journeys_v0.2.md) |
 
@@ -36,7 +37,7 @@
 | FR-4 | 提交时必须填写理由；表单有字段级校验，错误提示在对应字段旁 |
 | FR-5 | 提交后记录决定人与时间；同岗位的其他负责人能看到同样的记录 |
 | FR-6 | 评估已过期（资料 / 岗位 / 策略更新）时提示 stale，阻止直接推进，要求重评后再确认，或按策略批准使用旧依据 |
-| FR-7 | 越过岗位明确底线的推进（例如 not_eligible 仍要推进）进入例外审批，需要 HR 和 HM 两个不同的人批准 |
+| FR-7 | 越过岗位明确底线的推进（例如 not_eligible 仍要推进）进入例外审批，由负责人发起，需要 Hiring Manager（HM 方）和 HR Approver（HR 方）两个不同的人批准；发起人不能批准自己发起的例外 |
 | FR-8 | 岗位可配置普通决定也需要双人确认；所有批准绑定同一决定版本 |
 | FR-9 | Reject 提交后出现 **Send candidate decline notice**，不会自动发送；点击后先预览、再确认 |
 | FR-10 | 批量决定：先列出精确的候选人清单、当前版本、动作、理由和例外，确认后逐项提交，显示逐项结果；部分失败可以重试 |
@@ -52,7 +53,7 @@
 | BR-2 | 决定绑定 evaluation 和输入版本 |
 | BR-3 | 并发修改使用版本前置条件，冲突时显示已有决定，不采用最后写入覆盖 |
 | BR-4 | HR 或 HM 都可以作为主筛选人，权限由岗位配置决定，不按角色名称默认 |
-| BR-5 | 例外推进默认需要 HR 和 HM 两个不同人员的有效批准；同一人不能同时充当两个批准人 |
+| BR-5 | 例外推进默认需要 Hiring Manager 与 HR Approver 两个不同人员的有效批准；同一人不能同时充当两个批准人，发起人不能批准 |
 | BR-6 | Hold 不关闭补资料任务；Reject 后取消未执行的推进和提醒 |
 | BR-7 | 撤销已交接的决定只向下游发更正通知，不直接取消下游已执行的笔试或面试 |
 | BR-8 | Hold / Reject 也可以形成筛选报告 |
@@ -73,7 +74,7 @@
 ## 6. 权限
 
 - 只有岗位配置的负责人能提交决定；操作时重新校验权限。
-- 例外审批的两个批准人必须分别具备 HR 和 HM 身份。
+- 例外审批的两个批准人必须分别是 Hiring Manager 和 HR Approver；Viewer 不能提交决定。
 
 ## 7. 非功能要求
 
@@ -88,7 +89,7 @@
 | AC-2 | JD 更新后旧评估标 stale，不能直接推进；新评估经人工确认后才能交接 | SCR-07 |
 | AC-3 | 跳过明确要求的笔试需要有效例外；optional / not_required 时不虚造测评结果 | SCR-18 |
 | AC-4 | 决定页不预选 AI 建议；Reject 与发拒绝通知分开，都需要人工确认 | J6-8～11 |
-| AC-5 | 例外审批需要 HR 和 HM 两个不同的人批准；同一人重复批准被拒绝 | PRD §2、#20 |
+| AC-5 | 例外审批需要 Hiring Manager 和 HR Approver 两个不同的人批准；发起人批准、同一人重复批准都被拒绝 | PRD §2、#20 |
 | AC-6 | 并发提交时第二个人看到已有决定，不覆盖 | PRD §6.1 |
 | AC-7 | 批量决定先展示精确清单，逐项提交，部分失败可恢复 | PRD §7 |
 | AC-8 | 决定页完整展示未解决的顾虑 | #27 |

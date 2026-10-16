@@ -4,8 +4,9 @@
 |---|---|
 | 模块 | F05 / 主流程第 5 步（与 F01～F04 可并行） |
 | 版本 / 日期 | v1.0 / 2026-10-14（草稿，待评审） |
-| 主角色 | Recruiter / HR、Hiring Manager；Admin 可编辑任意岗位标准 |
+| 主角色 | 岗位标准负责人（Recruiter / TA 或 Hiring Manager，按岗位配置）；HR Approver、Viewer 只读 |
 | 原型路由 | `#/jobs`、`#/jobs/:id/criteria`（[原型 v2](../../../design/Resume_Screening/HireOS-Resume-Screening-Prototype-v2.html)） |
+| 同目录文档 | [输入输出闭环](Loop_IO.md) · [User Journey](User_Journey.md) · [User Cases](User_Cases.md) |
 | 实现现状 | 🟡 后端 `jobs`（确认标准时校验权重合计 100%，`WEIGHTS_NOT_100`；默认 4 个维度各 25%；可通过 `job-criteria.facade` 对接 JD）；前端 `JobsListPage`、`JobCriteriaPage`。#17 按新设计重做标准页，#12 已关闭。未逐项验证 AC |
 | 依据 | [PRD v1.3 §3.2、§5.2、§5.3](../../../../hireos-screening/docs/Resume_Screening_PRD_v1.3.md)、[用户旅程 v0.2 J1、J2、J7 与 §8、§9 已确认的产品决定](../../user-journeys/Resume_Screening_User_Journeys_v0.2.md) |
 
@@ -68,7 +69,7 @@
 
 ## 6. 权限
 
-- 只有岗位标准负责人和 Admin 可以编辑和确认标准（Patch 1 P3）。
+- 只有岗位标准负责人可以编辑和确认标准；HR Approver、Viewer 不可编辑。Patch 1 P3 中「Admin 可编辑任意岗位」在四类角色下暂无对应角色（见 [README 权限矩阵](../README.md#角色与权限)）。
 - 薪酬范围和内部自定义条件只对内部可见，不出现在对外材料中。
 
 ## 7. 非功能要求
@@ -87,7 +88,7 @@
 | AC-5 | 确认前没有候选人被匹配；首次确认后才触发匹配，结果只进入待确认 | J1-10、J2-17～18 |
 | AC-6 | 修改已确认标准生成新版本；旧结果标过期但保留，可追溯到旧版本 | SCR-07、J7 |
 | AC-7 | 标准未确认的岗位不显示为可匹配的开放岗位 | #12 |
-| AC-8 | 非标准负责人、非 Admin 不能编辑标准 | Patch 1 P3 |
+| AC-8 | 非标准负责人（含 HR Approver、Viewer）不能编辑或确认标准，接口返回 403 | Patch 1 P3 |
 
 ## 9. 依赖与实现
 

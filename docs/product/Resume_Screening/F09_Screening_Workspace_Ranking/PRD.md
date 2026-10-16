@@ -6,6 +6,7 @@
 | 版本 / 日期 | v1.0 / 2026-10-14（草稿，待评审） |
 | 主角色 | Recruiter / HR、Hiring Manager |
 | 原型路由 | `#/jobs/:id/screening`（[原型 v2](../../../design/Resume_Screening/HireOS-Resume-Screening-Prototype-v2.html)） |
+| 同目录文档 | [输入输出闭环](Loop_IO.md) · [User Journey](User_Journey.md) · [User Cases](User_Cases.md) |
 | 实现现状 | 🟡 前端 `ScreeningWorkspacePage`；后端 RankingSnapshot 目前挂在对比快照下生成，**未见独立的岗位排序和批量筛选接口**。#27 反馈初筛列表各项信息权重平均。未逐项验证 AC |
 | 依据 | [PRD v1.3 §5.5、§7、§8.1、§8.2](../../../../hireos-screening/docs/Resume_Screening_PRD_v1.3.md)、[用户旅程 v0.2 J5、J6](../../user-journeys/Resume_Screening_User_Journeys_v0.2.md) |
 

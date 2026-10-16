@@ -3,7 +3,7 @@
 | 项 | 内容 |
 |---|---|
 | 模块 | M4（P1） |
-| 版本 / 日期 | v1.0 / 2026-10-14（草稿，结构待确认） |
+| 版本 / 日期 | v1.1 / 2026-10-15（草稿，M4-LIVE-06 产品决定已同步） |
 | 同目录文档 | [产品文档](PRD.md) · [User Journey](User_Journey.md) |
 | 格式说明 | 见 [模块索引 README](../README_Modules.md#闭环文档格式) |
 
@@ -27,8 +27,8 @@ nodes:
   - {id: M4.CE1, type: check, expect: {ui: "拒绝该地址", api: "未发起对该地址的请求", db: "无草稿"}}
   - {id: M4.G3, type: decision, on: "页面是否可访问且是职位页"}
   - {id: M4.CE2, type: check, expect: {ui: "分别提示：无法访问 / 页面不存在 / 看起来不是职位；提供手动入口", db: "无草稿"}}
-  - {id: M4.C3, type: check, expect: {ui: "链接只显示一次；职位名、职责与页面一致；来源标签标明链接；无大段照搬"}}
-  - {id: M4.C4, type: check, expect: {ui: "识别为正文；字段提取正确；无大段照搬"}}
+  - {id: M4.C3, type: check, expect: {ui: "链接只显示一次；职位名、职责与页面一致；来源标签标明链接；不自动改写；建议与草稿分开"}}
+  - {id: M4.C4, type: check, expect: {ui: "识别为正文；字段和原有条件提取正确；不自动改写或增写；建议与草稿分开"}}
   - {id: M4.N3, type: action, do: "点击 Create job"}
   - {id: M4.C5, type: check, expect: {db: "Core Job status=draft，owner=actor；internal 文档", record: "链接读取记录（如有）+ AiRun"}}
   - {id: M4.T1, type: terminal, state: job.draft}
@@ -103,5 +103,5 @@ flowchart TD
 ## 5. 待确认
 
 - “太短 / 不可识别”的阈值（影响 G1 的判定数据）。
-- “大段照搬”的判定阈值（影响 C3、C4 的断言）。
+- 2026-10-15 已确认：M4 导入不自动改写；如有修改建议，用户确认前不应用到草稿（C3、C4）。
 - 当前实现是否已拦截内网地址（P6 可能直接失败，属于有效发现）。

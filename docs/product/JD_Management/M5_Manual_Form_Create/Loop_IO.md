@@ -26,7 +26,7 @@ nodes:
   - {id: M5.N3, type: action, do: "绕过前端，直接调用创建接口提交 D"}
   - {id: M5.G2, type: decision, on: "服务端校验结果"}
   - {id: M5.C2, type: check, expect: {api: "返回 4xx 和明确错误码", db: "职位总数不变"}}
-  - {id: M5.C3, type: check, expect: {ui: "直接跳转编辑页，不经过 Workspace；未填的选填项不显示；薪资显示 USD 25–40 per hour", db: "Core Job status=draft，owner=actor；文档章节内容与表单一致", record: "没有 AiRun"}}
+  - {id: M5.C3, type: check, expect: {ui: "直接跳转编辑页，不经过 Workspace；逐项回显已填必要项和选填项，未填选填项不显示为已确认事实；长 JD 保留三级结构", db: "Core Job status=draft，owner=actor；草稿文档内容与表单一致", record: "没有 AiRun"}}
   - {id: M5.T1, type: terminal, state: job.draft}
   - {id: M5.T2, type: terminal, state: no_change}
 
@@ -47,7 +47,8 @@ edges:
 
 | 名称 | 内容 |
 |---|---|
-| valid_full | title `[UJ-TEST] Content Creator`、location `Singapore`、headcount `2`、responsibilities `Write weekly posts`、requirements `3+ years in sales`、salary 25–40 / Hour |
+| valid_full | title `[UJ-TEST] Content Creator`、location `Singapore`、headcount `2`、responsibilities `Write weekly posts`、requirements `3+ years in sales`；薪资等选填项可分别以填写/留空两组验证 |
+| valid_structured | 一级 `基础信息` / `职位描述` / `职位要求`，二级 `1.基础条件` / `2.专业能力`，每个二级标题下有独立描述/列表项 |
 | invalid_empty | 空表单 |
 | invalid_hc_zero / invalid_hc_decimal / invalid_hc_negative | headcount `0` / `1.5` / `-1` |
 | invalid_resp_blank | responsibilities 只填 `1.` 或空行 |
@@ -63,6 +64,7 @@ edges:
 | P9–P15 服务端拦截 | N3 → G2 → C2 | invalid_*（每组一条，共 7 条） | no_change |
 | P16 双击 Save | P1，在 N2 注入 double_click | valid_full | 只有 1 个 job.draft |
 | P17 保存时断网 | P1，在 N2 注入 network_down | valid_full | no_change；输入不丢；**不生成本地假职位**（#34） |
+| P18 分层长 JD | N1 → C0 → N2 → G1 → C3 | valid_structured | 草稿保留一级章节、二级标题、三级内容 |
 
 ## 4. 流程图（由规格生成）
 
@@ -83,6 +85,6 @@ flowchart TD
 
 ## 5. 待确认
 
-- 必填项口径（5 / 9 / 11 项）决定 invalid_* 有哪几组。
+- 用户已确认创建草稿前必须填齐必要项；当前沿用 PRD 的五项，逐字段清单若调整须另行确认。发布必填项清单仍需与完整性标准统一，完善建议不计入发布阻断。
 - 手动创建实际调用的接口（填入 N3）。
 - Viewer 打开入口的预期（是否补一条无权路径 P18）。

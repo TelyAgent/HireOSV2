@@ -22,8 +22,8 @@ JD Management 按独立小闭环拆成 10 个模块（M1–M9 为业务闭环，
 | M5 手动表单创建 | [M5_Manual_Form_Create](M5_Manual_Form_Create/) | P0 | Recruiter / TA | ✅（#34 已由 #38 修复，需回归） |
 | M6 Analyze 与 AI 修复 | [M6_Analyze_AI_Fix](M6_Analyze_AI_Fix/) | P0 | Recruiter / TA | ✅ |
 | M7 角色权限与审批 | [M7_Roles_Approval](M7_Roles_Approval/) | P0 | 四个角色 | ❌ 审批和服务端角色权限未实现 |
-| M8 发布与版本 | [M8_Publish_Versions](M8_Publish_Versions/) | P0 | Recruiter / TA、HR Approver | 🟡 无发布渠道、审批未实现 |
-| M9 编辑与 Copilot 改写 | [M9_Edit_Copilot](M9_Edit_Copilot/) | P1 | Recruiter / TA、Hiring Manager | 🟡 并发控制未确认 |
+| M8 发布与版本 | [M8_Publish_Versions](M8_Publish_Versions/) | P0 | Recruiter / TA、HR Approver | 🟡 当前 Publish 仅生成内部版本；审批未实现，渠道后续接入 |
+| M9 编辑与 Copilot 改写 | [M9_Edit_Copilot](M9_Edit_Copilot/) | P1 | Recruiter / TA、Hiring Manager | 🟡 冲突提示已验证；查看差异、人工确认合并待实现，编辑权限本轮不测 |
 | M10 JD Copilot Agent | [M10_Agent](M10_Agent/) | P0（问答与边界）；薪资调研优先级待定 | 四个角色 | 🟡 会话与改写已有；意图识别、薪资数据源、对标检索未实现 |
 
 模块之间的业务顺序：M1–M5 创建 → M9 编辑 ⇄ M6 检查 → M7 审批 → M8 发布。M10 定义 Agent 的问答、调研和行为边界，被 M1–M6、M9 共用。测试时每个模块用 seed 直接造出前置数据，**不依赖**前一个模块真跑。全景图和状态图见 [流程图总览](HireOS_Command_JD_Management_Flowcharts_v1.0.md)。
@@ -126,7 +126,7 @@ Recruiter / TA、Hiring Manager、HR Approver、Viewer，定义见 [M7 产品文
 | M3 | 11 | 11 | 0 | 0 |
 | M4 | 11 | 11 | 0 | 0 |
 | M5 | 12 | 12 | 0 | 0 |
-| M6 | 14 | 11 | 1 | 2 |
+| M6 | 17 | 12 | 3 | 2 |
 | M7 | 15 | 0 | 0 | 15 |
 | M8 | 12 | 0 | 9 | 3 |
 | M9 | 17 | 15 | 1 | 1 |

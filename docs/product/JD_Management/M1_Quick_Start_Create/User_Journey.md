@@ -114,7 +114,7 @@ flowchart TD
 | 用户可见 | 职位编辑页，字段行符合 0.4 第 7 条 |
 | 持久化 | CopilotConversation + Messages；Core Job（draft，Owner=当前用户）；internal JobDocument |
 | 记录 | AiRun（模型、prompt 版本、耗时） |
-| 交接 | → M6：一份可能缺 Level、对外薪资等必填项的 draft 职位 |
+| 交接 | → M6：一份可能缺对外薪资等必填项的 draft 职位；Level 可为 Not set |
 
 **禁止副作用**：点 Create 之前就生成职位；生成 3 份草稿；三个问题拆成三条消息逐个问；编造回答里没有的数字或事实。
 

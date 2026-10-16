@@ -6,6 +6,7 @@
 | 版本 / 日期 | v1.0 / 2026-10-14（草稿，待评审） |
 | 主角色 | 系统自动运行；Recruiter / HR、Hiring Manager 查看结果 |
 | 原型路由 | `#/candidates/:id/jobs`、岗位详情中的 AI Suggested candidates（[原型 v2](../../../design/Resume_Screening/HireOS-Resume-Screening-Prototype-v2.html)） |
+| 同目录文档 | [输入输出闭环](Loop_IO.md) · [User Journey](User_Journey.md) · [User Cases](User_Cases.md) |
 | 实现现状 | 🟡 后端 `discovery`（AI 匹配 + 规则兜底；代码中出现的运行状态有 running / completed / failed / insufficient_data / no_match，**未见 `recommendations_ready`、`no_open_jobs`**）；前端 `JobRecommendationsPage`。未逐项验证 AC |
 | 依据 | [PRD v1.3 §4.2、§4.4、§5.1](../../../../hireos-screening/docs/Resume_Screening_PRD_v1.3.md)、[用户旅程 v0.2 J2、J5、§8](../../user-journeys/Resume_Screening_User_Journeys_v0.2.md) |
 
