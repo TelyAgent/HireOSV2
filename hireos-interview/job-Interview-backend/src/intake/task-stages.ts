@@ -40,7 +40,9 @@ export async function taskStages(db: PrismaService, workspaceId: string, taskId:
     overview: true,
     rubric: rubricConfirmed,
     plan: rubricConfirmed && task.planConfirmedAt != null,
-    schedule: rubricConfirmed && task.planConfirmedAt != null && hasScheduledRound,
+    // A completed round is evidence that scheduling happened even for older records
+    // whose meeting timestamp was not backfilled. Brief questions alone are not.
+    schedule: rubricConfirmed && task.planConfirmedAt != null && (hasScheduledRound || hasCompletedRound),
     brief: briefReady,
     live: rubricConfirmed && task.planConfirmedAt != null && hasCompletedRound,
     review: task.reviewConfirmedAt != null,
@@ -50,7 +52,12 @@ export async function taskStages(db: PrismaService, workspaceId: string, taskId:
   };
   const done = STAGE_ORDER.map((s) => own[s]);
   if (!needsRepair) {
-    for (let i = done.length - 2; i >= 0; i--) done[i] = done[i] || done[i + 1];
+    for (let i = done.length - 2; i >= 0; i--) {
+      // Do not infer that a round was scheduled merely because brief questions
+      // exist. Live must remain locked until an actual round is scheduled.
+      if (STAGE_ORDER[i] === 'schedule') continue;
+      done[i] = done[i] || done[i + 1];
+    }
   }
   return STAGE_ORDER.map((stage, i) => ({
     stage,

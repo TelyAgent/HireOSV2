@@ -38,6 +38,21 @@ test('keeps a confirmed rubric flow healthy and preserves later-stage completion
   assert.equal(byName.plan.needsRepair, undefined);
 });
 
+test('does not unlock live when brief questions exist but no round is scheduled', async () => {
+  const stages = await taskStages(dbFor({
+    rubric: { id: 'rubric-1', versionNumber: 2 },
+    questions: 1,
+    planConfirmedAt: new Date(),
+    rounds: [{ scheduledAt: null, status: 'Planned' }],
+  }), 'ws-1', 'task-1');
+  const byName = Object.fromEntries(stages.map((stage) => [stage.stage, stage]));
+  assert.equal(byName.schedule.done, false);
+  assert.equal(byName.brief.done, true);
+  assert.equal(byName.brief.unlocked, false);
+  assert.equal(byName.live.done, false);
+  assert.equal(byName.live.unlocked, false);
+});
+
 test('renders a downloadable PDF manifest with scores, evidence and confirmations', () => {
   const pdf = buildPackagePdf(packagePdfLines({
     candidateName: 'Candidate', jobTitle: 'Engineer', decision: 'recommend_offer', decisionAt: new Date('2026-01-01T00:00:00Z'),
