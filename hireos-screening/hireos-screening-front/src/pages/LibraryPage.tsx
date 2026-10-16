@@ -1,7 +1,9 @@
-import { useCallback, useEffect, useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { sourceLabel } from "../features/imports/sources";
+import { MATCH_STATUS_BADGE } from "../features/library/matchStatus";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { useStore } from "../store/StoreContext";
-import { deleteCandidate, listLibraryEntries, runMatchAgain, type LibraryEntry } from "../data/api/library";
+import { deleteCandidate, listLibraryEntries, MATCH_STATUSES, runMatchAgain, type LibraryEntry, type LibraryFilters, type LibraryList } from "../data/api/library";
 import { ApiError } from "../data/api/shared";
 import { getPerson } from "../data/db";
 import { relTime } from "../lib/format";
@@ -12,47 +14,137 @@ import { ResumeImportModal, type ImportTab } from "../features/imports/ResumeImp
 
 function MatchStatusBadge({ entry }: { entry: LibraryEntry }) {
   const { t } = useStore();
-  if (entry.linkedRoleCount > 0)
-    return (
-      <Badge tone="success">
-        {entry.linkedRoleCount} {t("linked role")}
-        {entry.linkedRoleCount > 1 ? "s" : ""}
+  const badge = MATCH_STATUS_BADGE[entry.matchStatus] ?? MATCH_STATUS_BADGE.not_started;
+  return (
+    <span title={entry.matchReason ? t(entry.matchReason) : undefined}>
+      <Badge tone={badge.tone}>
+        {t(badge.label)}
+        {entry.matchStatus === "recommendations" && entry.pendingRecommendationCount > 0 ? ` · ${entry.pendingRecommendationCount}` : ""}
       </Badge>
-    );
-  if (entry.pendingRecommendationCount > 0)
-    return (
-      <Badge tone="info">
-        {entry.pendingRecommendationCount} {t("pending recommendation")}
-        {entry.pendingRecommendationCount > 1 ? "s" : ""}
-      </Badge>
-    );
-  if (entry.matchStatus === "running") return <Badge tone="info">{t("Checking…")}</Badge>;
-  if (entry.matchStatus === "no_match") return <Badge tone="neutral">{t("No matching roles")}</Badge>;
-  if (entry.matchStatus === "failed") return <Badge tone="danger">{t("Matching failed")}</Badge>;
-  return <Badge tone="outline">{t("Not matched yet")}</Badge>;
+    </span>
+  );
+}
+
+const FILTER_KEYS = ["q", "tag", "source", "owner", "matchStatus", "addedFrom", "addedTo"] as const;
+const SCROLL_KEY = "screening.library.scroll";
+const SEARCH_KEY = "screening.library.search";
+
+function savedSearch(): string {
+  try {
+    return sessionStorage.getItem(SEARCH_KEY) ?? "";
+  } catch {
+    return "";
+  }
+}
+
+/** The page's scroll container (the app shell's main area). */
+function scroller() {
+  return document.querySelector<HTMLElement>("main.main");
 }
 
 export function LibraryPage() {
   const { t, state, say } = useStore();
   const navigate = useNavigate();
-  const [query, setQuery] = useState("");
-  const [entries, setEntries] = useState<LibraryEntry[]>([]);
-  const [total, setTotal] = useState(0);
+  // Search and filters live in the URL, so coming back from a candidate restores them (#173).
+  const [params, setParams] = useSearchParams();
+  const filters = useMemo(
+    () => Object.fromEntries(FILTER_KEYS.map((key) => [key, params.get(key) ?? ""])) as Required<LibraryFilters>,
+    [params],
+  );
+  const [query, setQuery] = useState(filters.q);
+  // Opened without a search (the detail page's Back, the sidebar): pick up the last one first, so the list
+  // and the scroll position come back as they were (#173). Clear filters empties it.
+  const [restoring, setRestoring] = useState(() => !params.toString() && !!savedSearch());
+  useEffect(() => {
+    if (restoring) {
+      if (params.toString()) setRestoring(false);
+      else setParams(new URLSearchParams(savedSearch()), { replace: true });
+      return;
+    }
+    try {
+      sessionStorage.setItem(SEARCH_KEY, params.toString());
+    } catch {
+      /* storage unavailable: the URL still carries the search */
+    }
+  }, [params, restoring, setParams]);
+  // The box follows the URL when it changes from outside (restored, cleared).
+  useEffect(() => {
+    setQuery((current) => (current.trim() === filters.q ? current : filters.q));
+  }, [filters.q]);
+  // Loading, failed or loaded: an empty library is only shown once the request has come back empty (#168).
+  const [list, setList] = useState<LibraryList | null>(null);
+  const [loadState, setLoadState] = useState<"loading" | "error" | "ready">("loading");
   const [matching, setMatching] = useState<string | null>(null);
   const [deleting, setDeleting] = useState<string | null>(null);
   const [confirmingDeleteId, setConfirmingDeleteId] = useState<string | null>(null);
   const [importTab, setImportTab] = useState<ImportTab | null>(null);
+  const restoredScroll = useRef(false);
 
-  const load = useCallback((q: string) => {
-    listLibraryEntries(q).then((rows) => {
-      setEntries(rows);
-      if (!q) setTotal(rows.length);
-    });
-  }, []);
+  const setFilter = useCallback(
+    (key: (typeof FILTER_KEYS)[number], value: string) => {
+      setParams(
+        (current) => {
+          const next = new URLSearchParams(current);
+          if (value) next.set(key, value);
+          else next.delete(key);
+          return next;
+        },
+        { replace: true },
+      );
+    },
+    [setParams],
+  );
+
+  // Typing updates the URL after a short pause, not on every key.
+  useEffect(() => {
+    if (query === filters.q) return;
+    const timer = setTimeout(() => setFilter("q", query.trim()), 250);
+    return () => clearTimeout(timer);
+  }, [query, filters.q, setFilter]);
+
+  const load = useCallback(() => {
+    setLoadState((current) => (current === "ready" ? "ready" : "loading"));
+    listLibraryEntries(filters)
+      .then((result) => {
+        setList(result);
+        setLoadState("ready");
+      })
+      .catch(() => setLoadState("error"));
+  }, [filters]);
 
   useEffect(() => {
-    load(query);
-  }, [query, load]);
+    if (!restoring) load();
+  }, [load, restoring]);
+
+  // Back from a candidate: put the list where it was once its rows are there again (#173).
+  useLayoutEffect(() => {
+    if (loadState !== "ready" || restoredScroll.current) return;
+    restoredScroll.current = true;
+    try {
+      const saved = JSON.parse(sessionStorage.getItem(SCROLL_KEY) ?? "null") as { search: string; top: number } | null;
+      if (saved && saved.search === params.toString()) scroller()?.scrollTo({ top: saved.top });
+      sessionStorage.removeItem(SCROLL_KEY);
+    } catch {
+      /* storage unavailable: start at the top */
+    }
+  }, [loadState, params]);
+
+  const openCandidate = (id: string) => {
+    try {
+      sessionStorage.setItem(SCROLL_KEY, JSON.stringify({ search: params.toString(), top: scroller()?.scrollTop ?? 0 }));
+    } catch {
+      /* storage unavailable: nothing to restore later */
+    }
+    navigate(`/candidates/${id}`);
+  };
+
+  const entries = list?.items ?? [];
+  const total = list?.total ?? 0;
+  const filtered = FILTER_KEYS.some((key) => filters[key]);
+  const ownerName = (ownerId: string) => {
+    const row = list?.items.find((entry) => entry.candidate.ownerId === ownerId);
+    return (row && getPerson(row.candidate.owner)?.name) || ownerId;
+  };
 
   const handleMatchAgain = async (candidateId: string) => {
     setMatching(candidateId);
@@ -66,7 +158,7 @@ export function LibraryPage() {
       }
     }
     setMatching(null);
-    load(query);
+    load();
   };
 
   const handleDelete = async (candidateId: string) => {
@@ -74,7 +166,7 @@ export function LibraryPage() {
     try {
       await deleteCandidate(candidateId);
       say(t("Candidate removed from the library"), { type: "success" });
-      load(query);
+      load();
     } catch {
       say(t("Could not remove this candidate."), { type: "error" });
     }
@@ -100,14 +192,62 @@ export function LibraryPage() {
           </>
         }
       />
-      <div className="flex items-center gap-12 flex-wrap" style={{ marginBottom: 16 }}>
+      <div className="flex items-center gap-12 flex-wrap" style={{ marginBottom: 10 }}>
         <div className="topbar-search" style={{ maxWidth: 360, padding: "7px 14px" }}>
           <Icon name="search" size={17} />
-          <input type="text" placeholder={t("Search name, email, tag...")} value={query} onChange={(e) => setQuery(e.target.value)} />
+          <input type="text" placeholder={t("Search name, email, tag...")} value={query} onChange={(e) => setQuery(e.target.value)} aria-label={t("Search name, email, tag...")} />
         </div>
-        <span className="tiny muted">
-          {state.lang === "zh" ? `共 ${total} 位候选人中的 ${entries.length} 位` : `${entries.length} of ${total} candidates`}
-        </span>
+        {loadState === "ready" && (
+          <span className="tiny muted" data-testid="library-count">
+            {state.lang === "zh" ? `共 ${total} 位候选人中的 ${entries.length} 位` : `${entries.length} of ${total} candidates`}
+          </span>
+        )}
+      </div>
+      <div className="library-filters flex items-center gap-8 flex-wrap" style={{ marginBottom: 16 }} data-testid="library-filters">
+        <select aria-label={t("Tag")} value={filters.tag} onChange={(e) => setFilter("tag", e.target.value)}>
+          <option value="">{t("All tags")}</option>
+          {list?.facets.tags.map((f) => (
+            <option key={f.value} value={f.value}>{`${f.value} (${f.count})`}</option>
+          ))}
+        </select>
+        <select aria-label={t("Source")} value={filters.source} onChange={(e) => setFilter("source", e.target.value)}>
+          <option value="">{t("All sources")}</option>
+          {list?.facets.sources.map((f) => (
+            <option key={f.value} value={f.value}>{`${t(sourceLabel(f.value))} (${f.count})`}</option>
+          ))}
+        </select>
+        <select aria-label={t("Owner")} value={filters.owner} onChange={(e) => setFilter("owner", e.target.value)}>
+          <option value="">{t("All owners")}</option>
+          {list?.facets.owners.map((f) => (
+            <option key={f.value} value={f.value}>{`${ownerName(f.value)} (${f.count})`}</option>
+          ))}
+        </select>
+        <select aria-label={t("Match status")} value={filters.matchStatus} onChange={(e) => setFilter("matchStatus", e.target.value)}>
+          <option value="">{t("All match statuses")}</option>
+          {MATCH_STATUSES.map((status) => (
+            <option key={status} value={status}>{t(MATCH_STATUS_BADGE[status].label)}</option>
+          ))}
+        </select>
+        <label className="tiny muted flex items-center gap-4">
+          {t("Added from")}
+          <input type="date" value={filters.addedFrom} max={filters.addedTo || undefined} onChange={(e) => setFilter("addedFrom", e.target.value)} />
+        </label>
+        <label className="tiny muted flex items-center gap-4">
+          {t("to")}
+          <input type="date" value={filters.addedTo} min={filters.addedFrom || undefined} onChange={(e) => setFilter("addedTo", e.target.value)} />
+        </label>
+        {filtered && (
+          <Button
+            variant="text"
+            size="sm"
+            onClick={() => {
+              setQuery("");
+              setParams(new URLSearchParams(), { replace: true });
+            }}
+          >
+            {t("Clear filters")}
+          </Button>
+        )}
       </div>
       <div className="card">
         <table className="data-table">
@@ -118,24 +258,68 @@ export function LibraryPage() {
               <th>{t("Latest source")}</th>
               <th>{t("Owner")}</th>
               <th>{t("Match status")}</th>
+              <th style={{ textAlign: "right" }}>{t("Linked roles")}</th>
               <th>{t("Last matched")}</th>
               <th></th>
             </tr>
           </thead>
           <tbody>
-            {entries.length === 0 ? (
+            {loadState === "loading" ? (
               <tr>
-                <td colSpan={7}>
-                  <EmptyState icon="search_off" title={t("No candidates match your search")} body={t("Try a different name, email or tag.")} />
+                <td colSpan={8} className="tiny muted" style={{ padding: 24, textAlign: "center" }} data-testid="library-loading" aria-busy="true">
+                  {t("Loading candidates…")}
+                </td>
+              </tr>
+            ) : loadState === "error" ? (
+              <tr>
+                <td colSpan={8}>
+                  <EmptyState
+                    icon="error"
+                    title={t("Couldn't load the library")}
+                    body={t("Your candidates are still there — the list just didn't load.")}
+                    actions={
+                      <Button variant="primary" onClick={load}>
+                        {t("Try again")}
+                      </Button>
+                    }
+                  />
+                </td>
+              </tr>
+            ) : entries.length === 0 ? (
+              <tr>
+                <td colSpan={8}>
+                  {total === 0 ? (
+                    <EmptyState
+                      icon="folder_open"
+                      title={t("The library is empty")}
+                      body={t("Upload or paste résumés to add candidates — no job is needed.")}
+                      actions={
+                        <Button variant="primary" onClick={() => setImportTab("upload")}>
+                          {t("Upload resumes")}
+                        </Button>
+                      }
+                    />
+                  ) : (
+                    <EmptyState icon="search_off" title={t("No candidates match your search")} body={t("Try a different name, email or tag.")} />
+                  )}
                 </td>
               </tr>
             ) : (
               entries.map((entry) => {
                 const { candidate, latestSource } = entry;
                 return (
-                <tr key={candidate.id} className="clickable" onClick={() => navigate(`/candidates/${candidate.id}`)}>
+                <tr key={candidate.id} className="clickable" data-candidate-id={candidate.id} onClick={() => openCandidate(candidate.id)}>
                   <td>
-                    <Link to={`/candidates/${candidate.id}`} className="flex items-center gap-10" style={{ color: "inherit", textDecoration: "none" }}>
+                    <Link
+                      to={`/candidates/${candidate.id}`}
+                      onClick={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        openCandidate(candidate.id);
+                      }}
+                      className="flex items-center gap-10"
+                      style={{ color: "inherit", textDecoration: "none" }}
+                    >
                       <CandidateAvatar id={candidate.id} name={candidate.displayName} />
                       <div>
                         <div style={{ fontWeight: 500 }}>{candidate.displayName}</div>
@@ -150,7 +334,7 @@ export function LibraryPage() {
                       </span>
                     ))}
                   </td>
-                  <td className="tiny">{latestSource}</td>
+                  <td className="tiny">{t(sourceLabel(latestSource))}</td>
                   <td>
                     <span className="flex items-center gap-8">
                       <PersonAvatar person={getPerson(candidate.owner)} size="sm" /> {getPerson(candidate.owner)?.name}
@@ -158,6 +342,9 @@ export function LibraryPage() {
                   </td>
                   <td>
                     <MatchStatusBadge entry={entry} />
+                  </td>
+                  <td style={{ textAlign: "right" }} data-testid="linked-roles">
+                    {entry.linkedRoleCount}
                   </td>
                   <td className="tiny">{relTime(candidate.lastMatchedAt, state.lang)}</td>
                   <td className="text-right">
@@ -209,7 +396,7 @@ export function LibraryPage() {
           initialTab={importTab}
           onClose={() => {
             setImportTab(null);
-            load(query);
+            load();
           }}
         />
       )}
