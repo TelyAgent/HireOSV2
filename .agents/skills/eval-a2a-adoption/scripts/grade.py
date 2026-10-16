@@ -10,6 +10,8 @@ from zoneinfo import ZoneInfo
 
 
 SIZES = {"1", "2", "3", "5", "8"}
+ISSUE_SAMPLE_SIZE = 50
+ISSUE_REQUIRED_PASSES = 40
 THRESHOLDS = {
     "good": {"feature": 25, "bug": 50, "estimate": 200},
     "excellent": {"feature": 50, "bug": 100, "estimate": 500},
@@ -37,9 +39,10 @@ def full_weeks(evaluated_at, tz_name="Asia/Shanghai"):
             for n in range(4, 0, -1)]
 
 
-def latest_samples(records, kind, evaluated_at, limit=10):
+def latest_samples(records, kind, evaluated_at, limit=None):
     """Select from a fully acquired candidate list, not proof of pagination."""
     require(kind in {"issues", "prs"}, "Unknown sample kind")
+    limit = (ISSUE_SAMPLE_SIZE if kind == "issues" else 10) if limit is None else limit
     cutoff = timestamp(evaluated_at)
     selected = [record for record in records
                 if (kind != "issues" or "pull_request" not in record)
@@ -99,10 +102,30 @@ def file_integrity(record):
     return record
 
 
+def sample_records(records, kind, as_of):
+    limit = ISSUE_SAMPLE_SIZE if kind == "issues" else 10
+    require(isinstance(records, list) and len(records) <= limit,
+            f"samples.{kind} must contain at most {limit} records")
+    keys, seen = [], set()
+    for record in records:
+        identifier = number(record, kind)
+        require(identifier not in seen, "Duplicate sample number")
+        seen.add(identifier)
+        created = timestamp(record["created_at"])
+        require(created <= as_of, "Sample created after frozen evaluation time")
+        keys.append((created, identifier))
+        require(record.get("result") in {"pass", "fail", "unknown"}, "Invalid sample result")
+        sources = evidence(record, kind)
+        if record["result"] != "unknown":
+            require(sources, "Known sample result requires evidence")
+    require(keys == sorted(keys, reverse=True), "Samples must be newest-created first")
+    return records
+
+
 def grade(data):
     require(isinstance(data, dict), "Assessment must be an object")
-    require(type(data.get("schema_version")) is int and data["schema_version"] == 2,
-            "Unsupported schema_version")
+    require(type(data.get("schema_version")) is int and data["schema_version"] == 4,
+            "Unsupported schema_version; reassess v2/v3 evidence under v4 rules")
     repo = data.get("repository")
     require(isinstance(repo, str) and repo.count("/") == 1 and all(repo.split("/")),
             "repository must be OWNER/REPO")
@@ -110,85 +133,60 @@ def grade(data):
     tz_name = data.get("timezone", "Asia/Shanghai")
     bounds = full_weeks(data["evaluated_at"], tz_name)
     integrity = file_integrity(data.get("file_integrity"))
-    # A confirmed missing required file is sufficient: no GitHub sampling prerequisite.
-    if integrity["result"] == "fail":
-        return {"schema_version": 2, "repository": repo,
-                "evaluated_at": data["evaluated_at"], "timezone": tz_name,
-                "status": "incomplete", "rating": "不合格", "rating_basis": "file_integrity",
-                "file_integrity": integrity, "baseline": "unknown",
-                "sample_counts": {"issues": 0, "prs": 0}, "weeks": [],
-                "metrics_complete": False, "excluded": [], "outside_window": [],
-                "unknown_eligibility": [], "stages_not_evaluated": ["samples", "metrics"],
-                "limitations": ["Confirmed missing process reference; subsequent stages not evaluated."]}
     collection = data.get("collection", {})
-    for key in ("selection_complete", "samples_complete", "metrics_complete"):
+    for key in ("issue_selection_complete", "pr_selection_complete", "excellence_complete", "metrics_complete"):
         require(type(collection.get(key)) is bool, f"collection.{key} must be boolean")
-    baseline = data.get("baseline", {})
-    result = baseline.get("result")
-    require(result in {"pass", "fail", "unknown"}, "Invalid baseline result")
-    base_evidence = evidence(baseline, "baseline")
-    require(isinstance(baseline.get("reason"), str) and baseline["reason"].strip(),
-            "baseline.reason required")
-    if result in {"pass", "fail"}:
-        require(base_evidence, "Known baseline requires evidence")
     samples = data.get("samples", {})
-    counts, sample_results, all_ids = {}, [], set()
-    for kind in ("issues", "prs"):
-        records = samples.get(kind)
-        require(isinstance(records, list) and len(records) <= 10,
-                f"samples.{kind} must contain at most 10 records")
-        counts[kind] = len(records)
-        keys = []
-        for record in records:
-            identifier = number(record, kind)
-            require(identifier not in all_ids, "Duplicate sample number")
-            all_ids.add(identifier)
-            created = timestamp(record["created_at"])
-            require(created <= as_of, "Sample created after frozen evaluation time")
-            keys.append((created, identifier))
-            state = record.get("result")
-            require(state in {"pass", "fail", "unknown"}, "Invalid sample result")
-            sources = evidence(record, kind)
-            if state in {"pass", "fail"}:
-                require(sources, "Known sample result requires evidence")
-            sample_results.append(state)
-        require(keys == sorted(keys, reverse=True), "Samples must be newest-created first")
-    require(not (result == "pass" and any(r != "pass" for r in sample_results)),
-            "Baseline pass contradicts sample results")
-    require(not (result == "unknown" and "fail" in sample_results),
-            "Known sample failure must make baseline fail")
-    require(result != "fail" or "fail" in sample_results,
-            "Baseline fail requires a confirmed sample failure")
-
+    issues = sample_records(samples.get("issues"), "issues", as_of)
+    prs = sample_records(samples.get("prs"), "prs", as_of)
+    require(not ({r["number"] for r in issues} & {r["number"] for r in prs}),
+            "Issue and PR samples must not overlap")
+    passed = sum(r["result"] == "pass" for r in issues)
+    failed = sum(r["result"] == "fail" for r in issues)
+    unknown = sum(r["result"] == "unknown" for r in issues)
+    # Complete selection with fewer than 50 records proves the repository is too small.
+    # Partial pagination must keep selection_complete false, not imply a small repository.
+    format_result = ("unknown" if not collection["issue_selection_complete"] else
+                     "fail" if len(issues) < ISSUE_SAMPLE_SIZE else
+                     "pass" if passed >= ISSUE_REQUIRED_PASSES else
+                     "fail" if failed > ISSUE_SAMPLE_SIZE - ISSUE_REQUIRED_PASSES else "unknown")
+    excellence = data.get("excellence", {})
+    state = excellence.get("result")
+    require(state in {"pass", "fail", "unknown"}, "Invalid excellence result")
+    sources = evidence(excellence, "excellence")
+    require(isinstance(excellence.get("reason"), str) and excellence["reason"].strip(),
+            "excellence.reason required")
+    if state != "unknown":
+        require(sources, "Known excellence result requires evidence")
+    if state == "pass":
+        require(collection["pr_selection_complete"] and collection["excellence_complete"]
+                and len(prs) == 10 and all(r["result"] == "pass" for r in prs),
+                "Excellence pass requires 10 fully checked latest PRs")
+    if any(r["result"] == "fail" for r in prs) and collection["pr_selection_complete"]:
+        require(state == "fail", "Confirmed PR failure contradicts excellence result")
+    excellent_gate = ("fail" if integrity["result"] == "fail" or
+                      (state == "fail" and collection["pr_selection_complete"]) else
+                      "pass" if integrity["result"] == "pass" and state == "pass" else "unknown")
     limitations = data.get("limitations", [])
     require(isinstance(limitations, list) and all(isinstance(v, str) for v in limitations),
             "limitations must be strings")
     limitations = list(limitations)
-    if integrity["result"] == "unknown":
-        limitations.append("Process file inventory incomplete/unknown; cannot grant a passing rating.")
-    baseline_complete = (collection["selection_complete"] and collection["samples_complete"] and result != "unknown"
-                         and "unknown" not in sample_results)
-    if any(count == 0 for count in counts.values()):
-        baseline_complete = False
-        limitations.append("No Issue or PR sample; basic adoption cannot be demonstrated.")
-    elif any(count < 10 for count in counts.values()):
-        limitations.append("Fewer than 10 Issues or PRs; rating covers all available samples only.")
-    if not collection["samples_complete"]:
-        limitations.append("Sample collection/evidence incomplete.")
-    if not collection["selection_complete"]:
-        limitations.append("Latest sample membership not established; sample-based rating unavailable.")
-
+    if len(issues) < ISSUE_SAMPLE_SIZE:
+        limitations.append("Confirmed fewer than 50 repository Issues: not qualified."
+                           if collection["issue_selection_complete"] else
+                           "Fewer than 50 visible Issues; repository total remains unconfirmed.")
+    if unknown:
+        limitations.append("Some Issue formats remain unknown; only confirmed passes count toward 40.")
     weeks = [{"start": start.isoformat(), "end": end.isoformat(),
               "start_utc": start.astimezone(timezone.utc).isoformat(),
               "end_utc": end.astimezone(timezone.utc).isoformat(),
               "feature": 0, "bug": 0, "estimate": 0,
-              "unknown_estimates": [], "included": []}
+              "unknown_estimates": [], "tbd_zero_estimates": [], "included": []}
              for start, end in bounds]
     metrics_complete = collection["metrics_complete"]
     deliveries = data.get("deliveries")
     require(isinstance(deliveries, list), "deliveries must be a list")
-    seen = {}
-    excluded, outside, unknown_eligibility = [], [], []
+    seen, excluded, outside, unknown_eligibility = {}, [], [], []
     for record in deliveries:
         identifier = number(record, "delivery")
         if identifier in seen:
@@ -221,37 +219,43 @@ def grade(data):
         week["feature" if record["type"] == "Feature" else "bug"] += 1
         week["included"].append(identifier)
         estimate = record.get("estimate")
-        if isinstance(estimate, str) and estimate in SIZES and record["estimate_confirmed"]:
+        if estimate == "TBD":
+            week["tbd_zero_estimates"].append(identifier)
+        elif isinstance(estimate, str) and estimate in SIZES and record["estimate_confirmed"]:
             week["estimate"] += int(estimate)
         else:
             week["unknown_estimates"].append(identifier)
             metrics_complete = False
     if not metrics_complete:
-        limitations.append("Weekly metrics incomplete; unknown values are not zero estimates.")
+        limitations.append("Weekly metrics incomplete; only literal TBD counts as zero, other unknowns do not.")
     for week in weeks:
         for level, thresholds in THRESHOLDS.items():
             gap = {key: max(0, minimum - week[key]) for key, minimum in thresholds.items()}
             week[level] = {"gap": gap,
                            "met": all(value == 0 for value in gap.values()) if metrics_complete else None}
-
-    complete = integrity["result"] == "pass" and baseline_complete and metrics_complete
-    if not collection["selection_complete"]:
-        rating = None
-    elif result == "fail":
-        rating = "不合格"
-    elif not complete:
-        rating = None
-    elif all(week["excellent"]["met"] for week in weeks):
-        rating = "优秀"
-    elif all(week["good"]["met"] for week in weeks):
+    good_volume = metrics_complete and all(w["good"]["met"] for w in weeks)
+    excellent_volume = metrics_complete and all(w["excellent"]["met"] for w in weeks)
+    if format_result == "fail":
+        rating, complete = "不合格", True
+    elif format_result == "unknown":
+        rating, complete = None, False
+    elif excellent_volume and excellent_gate == "pass":
+        rating, complete = "优秀", True
+    elif good_volume:
         rating = "良好"
+        complete = not excellent_volume or excellent_gate == "fail"
     else:
-        rating = "合格"
-    return {"schema_version": 2, "repository": repo,
+        rating, complete = "合格", metrics_complete
+    return {"schema_version": 4, "repository": repo,
             "evaluated_at": data["evaluated_at"], "timezone": tz_name,
             "status": "complete" if complete else "incomplete", "rating": rating,
+            "rating_basis": "issue_format" if rating in {None, "不合格", "合格"} else "weekly_volume",
             "file_integrity": integrity,
-            "baseline": result, "sample_counts": counts, "weeks": weeks,
+            "issue_format": {"result": format_result, "required_sample": ISSUE_SAMPLE_SIZE,
+                             "required_passes": ISSUE_REQUIRED_PASSES,
+                             "pass": passed, "fail": failed, "unknown": unknown},
+            "excellent_gate": excellent_gate,
+            "sample_counts": {"issues": len(issues), "prs": len(prs)}, "weeks": weeks,
             "metrics_complete": metrics_complete, "excluded": excluded,
             "outside_window": outside, "unknown_eligibility": unknown_eligibility,
             "limitations": limitations}
