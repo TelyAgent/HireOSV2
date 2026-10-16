@@ -110,14 +110,17 @@ function ImportItemRow({
   onRetry,
   retrying,
   jobScoped,
+  onReselect,
 }: {
   item: ImportItemResult;
   onRetry: () => void;
   retrying: boolean;
   jobScoped: boolean;
+  /** Opens the file picker again, for a file that has to be replaced (#165 #166). */
+  onReselect?: () => void;
 }) {
   const { t } = useStore();
-  const { tone, label, detail } = describeItem(item);
+  const { tone, label, detail, reselect } = describeItem(item);
   let action: React.ReactNode = null;
   if (item.status === "needs_review" && item.duplicateReviewId) {
     action = (
@@ -131,12 +134,20 @@ function ImportItemRow({
         {t("Open profile")}
       </Link>
     );
+  } else if (reselect && onReselect) {
+    action = (
+      <Button variant="secondary" size="sm" onClick={onReselect}>
+        {t("Choose another file")}
+      </Button>
+    );
   } else if (item.status === "failed" && item.retryable) {
     action = (
       <Button variant="secondary" size="sm" onClick={onRetry} disabled={retrying}>
         {t("Retry")}
       </Button>
     );
+  } else if (reselect) {
+    action = <span className="tiny muted">{t("Replace this file")}</span>;
   } else if (item.outcome === "quarantined") {
     action = <span className="tiny muted">{t("File isolated — not sent to AI")}</span>;
   } else if (item.outcome === "too_large" || item.outcome === "unsupported_type") {
@@ -170,6 +181,7 @@ function BatchCard({
   onCancel,
   cancelling,
   onResume,
+  onReselect,
 }: {
   run: Run;
   onRetryItem: (itemId: string) => void;
@@ -177,6 +189,7 @@ function BatchCard({
   onCancel: (batchId: string) => void;
   cancelling: boolean;
   onResume: () => void;
+  onReselect?: () => void;
 }) {
   const { t } = useStore();
   if (run.error) {
@@ -249,7 +262,14 @@ function BatchCard({
         <div className="progress-fill" style={{ width: `${batch.items.length ? Math.round((doneCount / batch.items.length) * 100) : 100}%` }} />
       </div>
       {batch.items.map((item) => (
-        <ImportItemRow key={item.id} item={item} jobScoped={jobScoped} onRetry={() => onRetryItem(item.id)} retrying={retryingId === item.id} />
+        <ImportItemRow
+          key={item.id}
+          item={item}
+          jobScoped={jobScoped}
+          onRetry={() => onRetryItem(item.id)}
+          retrying={retryingId === item.id}
+          onReselect={onReselect}
+        />
       ))}
     </div>
   );
@@ -257,7 +277,7 @@ function BatchCard({
 
 /** Import batches started from one tab: upload, poll to settled, retry/cancel, and the
  * batch cards that show their progress. Shared by the file upload and paste tabs. */
-export function useImportRuns({ jobId, onChanged }: { jobId?: string; onChanged?: () => void }) {
+export function useImportRuns({ jobId, onChanged, onReselect }: { jobId?: string; onChanged?: () => void; onReselect?: () => void }) {
   const { t, say } = useStore();
   const [runs, setRuns] = useState<Run[]>([]);
   const [retryingId, setRetryingId] = useState<string | null>(null);
@@ -284,12 +304,13 @@ export function useImportRuns({ jobId, onChanged }: { jobId?: string; onChanged?
     await finishRun(id, await getImportBatch(run.batch.id));
   };
 
-  const startRun = async (files: File[]) => {
+  /** Runs one import request and follows its batch; `fileCount` sizes the card while it's in flight. */
+  const startBatch = async (create: () => Promise<ImportBatch>, fileCount: number) => {
     const id = `run-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
-    setRuns((prev) => [{ id, fileCount: files.length }, ...prev]);
+    setRuns((prev) => [{ id, fileCount }, ...prev]);
     let batch: ImportBatch;
     try {
-      batch = await runImportBatch(files, { jobId });
+      batch = await create();
     } catch (error) {
       // Without this the card would sit at "Processing…" forever.
       const message = error instanceof Error ? error.message : String(error);
@@ -298,6 +319,8 @@ export function useImportRuns({ jobId, onChanged }: { jobId?: string; onChanged?
     }
     await finishRun(id, batch);
   };
+
+  const startRun = (files: File[]) => startBatch(() => runImportBatch(files, { jobId }), files.length);
 
   const handleRetryItem = async (runId: string, itemId: string) => {
     setRetryingId(itemId);
@@ -334,16 +357,21 @@ export function useImportRuns({ jobId, onChanged }: { jobId?: string; onChanged?
       onCancel={(batchId) => handleCancel(run.id, batchId)}
       cancelling={cancellingId === run.batch?.id}
       onResume={() => void resumeRun(run.id)}
+      onReselect={onReselect}
     />
   ));
 
-  return { startRun, runCards };
+  return { startRun, startBatch, runCards };
 }
 
 export function UploadTab({ onChanged, jobId }: { onChanged?: () => void; jobId?: string }) {
   const { t, say } = useStore();
   const [dragOver, setDragOver] = useState(false);
-  const { startRun, runCards } = useImportRuns({ jobId, onChanged });
+  const { startRun, runCards } = useImportRuns({
+    jobId,
+    onChanged,
+    onReselect: () => document.getElementById("upload-file-input")?.click(),
+  });
 
   const handleFiles = (fileList: FileList | File[]) => {
     const files = Array.from(fileList);

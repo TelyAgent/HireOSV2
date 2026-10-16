@@ -37,6 +37,9 @@ model Material {
   sourceType       String            @default("manual_upload")
   sourceRef        String?
   sourceVersion    Int               @default(1)
+  /// What the user confirmed when pasting this material (#160 #167): { displayName, email?, location? }. It wins
+  /// over what parsing reads from the text, for the candidate and the profile.
+  confirmedIdentity Json?
   errorCode        String?
   // Hash of the lowercased, whitespace-collapsed extracted text. Two uploads with
   // different bytes (a PDF and a DOCX of the same resume) land on the same value here,
@@ -365,6 +368,11 @@ model CandidateProfile {
   location                Json
   workAuthorization       Json
   languages               Json
+  // When the candidate can start, as the résumé states it (#155); null when it doesn't.
+  availability            Json?
+  // The email and phone this version's résumé gives (or a person corrected), apart from the candidate's identity
+  // record, which keeps its first values (#155 review). Null on versions made before it was recorded.
+  contact                 Json?
   compensationExpectation Json?
   missingFields           Json
   corrections             Json

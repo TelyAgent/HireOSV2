@@ -61,8 +61,22 @@ export interface CorrectProfileInput {
   compensationMin?: number;
   compensationMax?: number;
   compensationCurrency?: CompensationCurrency;
-  reason: string;
+  /** Project descriptions by position in the project list. */
+  projects?: Array<{ index: number; description: string }>;
+  /** Required only when the change touches a field a current recommendation or evaluation used (#158). */
+  reasonType?: CorrectionReasonType;
+  /** Free-text note; required with "other". */
+  reason?: string;
 }
+
+export const CORRECTION_REASON_TYPES = ["parse_error", "candidate_update", "source_update", "other"] as const;
+export type CorrectionReasonType = (typeof CORRECTION_REASON_TYPES)[number];
+export const CORRECTION_REASON_LABEL: Record<CorrectionReasonType, string> = {
+  parse_error: "Parsing error",
+  candidate_update: "Candidate added or corrected",
+  source_update: "Source material updated",
+  other: "Other",
+};
 
 /** Corrections create a new profile snapshot conceptually and mark related
  * evaluations stale — they never rewrite the original source material. */
@@ -100,4 +114,45 @@ export interface JobRecommendation extends CandidateJobRecommendation {
  * recruiter confirms, dismisses, or defers one it belongs in a different view. */
 export async function getJobRecommendations(jobId: string): Promise<JobRecommendation[]> {
   return apiFetch<JobRecommendation[]>(`/jobs/${jobId}/recommendations`);
+}
+
+export interface ProfileCorrectionEntry {
+  fieldPath: string;
+  oldValue: unknown;
+  newValue: unknown;
+  reasonType: CorrectionReasonType | null;
+  reason: string;
+  correctedBy: string;
+  correctedAt: string;
+}
+
+export interface ProfileVersion {
+  version: number;
+  createdAt: string;
+  kind: "parsed" | "corrected";
+  resumeVersionId: string | null;
+  displayName: string;
+  location: string;
+  compensationExpectation: Record<string, unknown> | null;
+  projects: Array<{ name: string; description: string }>;
+  corrections: ProfileCorrectionEntry[];
+}
+
+/** Every profile version, newest first, with the corrections that produced it (#159). */
+export async function getProfileHistory(candidateId: string): Promise<{ current: number | null; versions: ProfileVersion[] }> {
+  return apiFetch(`/candidates/${candidateId}/profile/history`);
+}
+
+/** The source material as stored: its name and the text read from it — never rewritten by a correction. */
+export interface SourceMaterial {
+  id: string;
+  name: string;
+  text: string | null;
+  readStatus?: string;
+  /** Paragraphs as stored; `page` on PDFs. */
+  segments?: Array<{ id: string; text: string; page?: number }>;
+}
+
+export async function getSourceMaterial(materialId: string): Promise<SourceMaterial> {
+  return apiFetch(`/materials/${materialId}`);
 }

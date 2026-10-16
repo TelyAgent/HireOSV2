@@ -72,6 +72,32 @@ export async function runImportBatch(files: UploadFileInput[], opts?: { jobId?: 
   });
 }
 
+/** "Paste profile", step 1 (#167): who the text seems to be about, read by rules — fields not found are null. */
+export interface PastePreview {
+  displayName: string | null;
+  email: string | null;
+  location: string | null;
+}
+
+export async function previewPaste(text: string): Promise<PastePreview> {
+  return apiFetch<PastePreview>("/imports/paste/preview", { method: "POST", body: JSON.stringify({ text }) });
+}
+
+/** "Paste profile", step 2 (#160 #161 #167): import the text with the identity the user confirmed. */
+export async function runPasteImport(
+  input: { text: string; displayName: string; email?: string; location?: string },
+  opts?: { jobId?: string },
+): Promise<ImportBatch> {
+  return apiFetch<ImportBatch>("/imports/paste", {
+    method: "POST",
+    body: JSON.stringify(input),
+    headers: {
+      "Idempotency-Key": `resume-paste-${safeRandomUUID()}`,
+      ...(opts?.jobId ? { "X-Target-Job-Id": opts.jobId } : {}),
+    },
+  });
+}
+
 export async function retryImportItem(id: string): Promise<ImportBatch> {
   return apiFetch<ImportBatch>(`/import-items/${id}/retry`, { method: "POST" });
 }

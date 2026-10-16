@@ -6,6 +6,9 @@ import { PrismaService } from '../persistence/prisma.service';
 import type { Identity } from '../auth/workspace.guard';
 import { CoreRecordClient } from '../core-record/core-record.client';
 import type { ImportChannel } from './imports.types';
+import { confirmedIdentityOf, pasteImportSchema, pastePreviewSchema, type ConfirmedIdentity } from './confirmed-identity';
+import { invalidSchemaFromZod } from '../http/invalid-schema';
+import { splitText } from './materials.service';
 import { ProfilesService } from '../profiles/profiles.service';
 import { AUTO_MATCH_JOB } from '../discovery/discovery.service';
 
@@ -59,6 +62,7 @@ export class ImportsService implements OnModuleInit, OnModuleDestroy {
     channel: ImportChannel = 'manual_upload',
     idempotencyKey?: string,
     targetJobId?: string,
+    confirmed?: ConfirmedIdentity,
   ) {
     if (!files?.length) throw new NotFoundException({ code: 'NO_FILES' });
     if (targetJobId) {
@@ -112,10 +116,51 @@ export class ImportsService implements OnModuleInit, OnModuleDestroy {
           lastAttemptAt: new Date(),
         },
       });
-      await this.processOne(identity, operation.id, batch.id, item.id, file, channel);
+      await this.processOne(identity, operation.id, batch.id, item.id, file, channel, confirmed);
     }
 
     return this.finalizeBatch(identity.workspaceId, identity.actorId, operation.id, batch.id);
+  }
+
+  /**
+   * "Paste profile", step 1 (#167): what the text says about who this is, for the user to confirm or correct
+   * before anything is saved. Read by rules, not AI, and never invented: no name line means no name — an email
+   * address is not a name (#160).
+   */
+  previewPaste(raw: unknown) {
+    const input = pastePreviewSchema.safeParse(raw);
+    if (!input.success) throw invalidSchemaFromZod(input.error);
+    const segments = splitText(input.data.text).map((segment, index) => ({ ...segment, id: `s${index + 1}` }));
+    const signals = this.profiles.extractIdentitySignals('paste-preview', segments, '');
+    return { displayName: signals.displayName || null, email: signals.email || null, location: signals.location || null };
+  }
+
+  /**
+   * "Paste profile", step 2 (#160 #161 #167): import the text with the identity the user confirmed. The name is
+   * required here too, so a request that skips the form can't create a nameless candidate; the source is
+   * recorded as a paste, not a manual upload.
+   */
+  async importPaste(identity: Identity, raw: unknown, idempotencyKey?: string, targetJobId?: string) {
+    const input = pasteImportSchema.safeParse(raw);
+    if (!input.success) throw invalidSchemaFromZod(input.error);
+    const { text, displayName, email, location } = input.data;
+    const buffer = Buffer.from(text, 'utf-8');
+    const safeName = displayName.replace(/[\\/:*?"<>|]+/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 80) || 'pasted-resume';
+    const file = {
+      // Multer reads multipart file names as latin1; materials decode them back, so encode the same way.
+      originalname: Buffer.from(`${safeName}.txt`, 'utf8').toString('latin1'),
+      mimetype: 'text/plain',
+      size: buffer.length,
+      buffer,
+    } as MulterFile;
+    // A field the user cleared is null — they said there is none, so what parsing reads doesn't come back; one
+    // not sent at all (older clients) leaves parsing to fill it in.
+    const confirmed: ConfirmedIdentity = {
+      displayName,
+      ...(email !== undefined ? { email: email || null } : {}),
+      ...(location !== undefined ? { location: location || null } : {}),
+    };
+    return this.createBatch(identity, [file], 'paste', idempotencyKey, targetJobId, confirmed);
   }
 
   async getBatch(workspaceId: string, id: string) {
@@ -317,10 +362,11 @@ export class ImportsService implements OnModuleInit, OnModuleDestroy {
     itemId: string,
     file: MulterFile,
     channel: ImportChannel,
+    confirmed?: ConfirmedIdentity,
   ) {
     try {
       await this.updateItem(identity, operationId, batchId, itemId, { stage: 'validating', outcome: 'validating' });
-      const saved = await this.materials.saveUpload(identity, file, channel);
+      const saved = await this.materials.saveUpload(identity, file, channel, confirmed);
       await this.processSavedMaterial(identity, operationId, batchId, itemId, saved, channel);
     } catch (error) {
       await this.failItem(identity, operationId, batchId, itemId, error);
@@ -410,7 +456,7 @@ export class ImportsService implements OnModuleInit, OnModuleDestroy {
     });
     try {
       const material = await this.db.material.findUniqueOrThrow({ where: { id: job.materialId } });
-      const candidate = await this.createCandidateFromMaterial(identity, material.id, material.name, input.channel, material.coreMaterialId);
+      const candidate = await this.createCandidateFromMaterial(identity, material.id, material.name, input.channel, material.coreMaterialId, confirmedIdentityOf(material));
       const batch = await this.db.importBatch.findUnique({ where: { id: input.batchId }, select: { targetJobId: true } });
       await this.profiles.enqueue(job.workspaceId, candidate.id, candidate.resumeVersionId, material.id, batch?.targetJobId ?? undefined);
       await this.updateItem(identity, input.operationId, input.batchId, input.itemId, {
@@ -499,7 +545,12 @@ export class ImportsService implements OnModuleInit, OnModuleDestroy {
       return;
     }
 
-    const signals = this.profiles.extractIdentitySignals(material.id, material.segments, displayNameFromFileName(material.name));
+    const parsedSignals = this.profiles.extractIdentitySignals(material.id, material.segments, displayNameFromFileName(material.name));
+    // What the user confirmed on a paste is the identity checked for duplicates, not a guess from the text.
+    const confirmedSignals = confirmedIdentityOf(material);
+    const signals = confirmedSignals
+      ? { ...parsedSignals, displayName: confirmedSignals.displayName, email: confirmedSignals.email === undefined ? parsedSignals.email : (confirmedSignals.email ?? null) }
+      : parsedSignals;
     const match = await this.findPossibleDuplicate(identity.workspaceId, material, signals);
     if (match) {
       const duplicate = await this.db.$transaction(async (tx) => {
@@ -651,8 +702,15 @@ export class ImportsService implements OnModuleInit, OnModuleDestroy {
     await this.db.activityEvent.create({ data: input });
   }
 
-  private async createCandidateFromMaterial(identity: Identity, materialId: string, fileName: string, channel: ImportChannel, coreMaterialId?: string | null) {
-    const displayName = displayNameFromFileName(fileName);
+  private async createCandidateFromMaterial(
+    identity: Identity,
+    materialId: string,
+    fileName: string,
+    channel: ImportChannel,
+    coreMaterialId?: string | null,
+    confirmed?: ConfirmedIdentity | null,
+  ) {
+    const displayName = confirmed?.displayName || displayNameFromFileName(fileName);
     // A file already stored in Core Record resolves to the candidate other subsystems linked to
     // it (Interview/Written may have seen this résumé first), so one person stays one Core
     // candidate. Screening has already turned away an identical file as a duplicate before
@@ -666,7 +724,13 @@ export class ImportsService implements OnModuleInit, OnModuleDestroy {
       );
     return this.db.$transaction(async (tx) => {
       const candidate = await tx.candidate.create({
-        data: { ...(coreCandidate?.id ? { id: coreCandidate.id } : {}), workspaceId: identity.workspaceId, displayName, ownerId: identity.actorId },
+        data: {
+          ...(coreCandidate?.id ? { id: coreCandidate.id } : {}),
+          workspaceId: identity.workspaceId,
+          displayName,
+          ...(confirmed?.email ? { email: confirmed.email } : {}),
+          ownerId: identity.actorId,
+        },
       });
       await tx.libraryEntry.create({ data: { workspaceId: identity.workspaceId, candidateId: candidate.id, ownerId: identity.actorId } });
       const resumeVersion = await tx.resumeVersion.create({

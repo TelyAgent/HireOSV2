@@ -10,11 +10,14 @@ import { CoreRecordClient } from '../core-record/core-record.client';
 import type { Identity } from '../auth/workspace.guard';
 import type { ImportChannel } from './imports.types';
 import { SecurityScanService } from './security-scan.service';
+import type { ConfirmedIdentity } from './confirmed-identity';
 
 type Segment = { id: string; text: string; page?: number };
 type MulterFile = Express.Multer.File;
 
 const MAX_FILE_SIZE = 25 * 1024 * 1024;
+/** F01 BR-2: a résumé PDF is at most 10 pages (#162). */
+export const MAX_PDF_PAGES = 10;
 const MAX_TEXT_SIZE = 150000;
 // Below this length, extracted text is too sparse to reliably identify a real duplicate
 // (two failed/near-empty extractions would otherwise collide on the same hash).
@@ -31,10 +34,12 @@ export class MaterialsService {
     private readonly coreRecord: CoreRecordClient,
   ) {}
 
-  async saveUpload(identity: Identity, file?: MulterFile, sourceType: ImportChannel = 'manual_upload') {
-    if (!file || !file.size) throw new BadRequestException({ code: 'EMPTY_FILE' });
+  async saveUpload(identity: Identity, file?: MulterFile, sourceType: ImportChannel = 'manual_upload', confirmed?: ConfirmedIdentity) {
+    // Each refusal carries a readable message: without one Nest fills in "Bad Request Exception", which the
+    // import list then showed to users (#166).
+    if (!file || !file.size) throw new BadRequestException({ code: 'EMPTY_FILE', message: 'The file is empty. Choose a file with content.' });
     if (file.size > MAX_FILE_SIZE) {
-      throw new BadRequestException({ code: 'FILE_TOO_LARGE', maxBytes: MAX_FILE_SIZE });
+      throw new BadRequestException({ code: 'FILE_TOO_LARGE', maxBytes: MAX_FILE_SIZE, message: 'The file is too large. Choose a smaller file.' });
     }
 
     const originalName = decodeOriginalFileName(file.originalname);
@@ -76,7 +81,7 @@ export class MaterialsService {
       // only one of them re-processes the file and the other is a plain duplicate.
       const { count } = await this.db.material.updateMany({
         where: { id: existing.id, updatedAt: existing.updatedAt },
-        data: { name: originalName.slice(0, 255), sourceType, ...analysis },
+        data: { name: originalName.slice(0, 255), sourceType, ...(confirmed ? { confirmedIdentity: confirmed } : {}), ...analysis },
       });
       if (!count) return { kind: 'exact_file' as const, material: existing };
       const material = await this.db.material.findUniqueOrThrow({ where: { id: existing.id } });
@@ -91,6 +96,7 @@ export class MaterialsService {
         size: file.size,
         hash,
         sourceType,
+        ...(confirmed ? { confirmedIdentity: confirmed } : {}),
         ...(await this.analyze(file, originalName)),
       },
     });
@@ -105,6 +111,9 @@ export class MaterialsService {
     const parsed = scan.status === 'quarantined'
       ? { mime: file.mimetype, text: '', segments: [] as Segment[], errorCode: scan.reason ?? 'SECURITY_QUARANTINED' }
       : await this.extract(originalName, file.mimetype, file.buffer);
+    // A password-protected PDF can't be inspected, so it is isolated like any file the scan can't clear: never
+    // parsed into a candidate, never sent to AI, and shown as quarantined for its encryption (#163).
+    const quarantined = scan.status === 'quarantined' || parsed.errorCode === 'PDF_ENCRYPTED';
 
     const normalizedText = normalizeTextForDedupe(parsed.text);
     const normalizedTextHash = normalizedText.length >= MIN_TEXT_HASH_LENGTH
@@ -116,9 +125,9 @@ export class MaterialsService {
       normalizedTextHash,
       text: parsed.text,
       segments: parsed.segments,
-      readStatus: scan.status === 'quarantined' ? 'blocked' : parsed.errorCode ? 'failed' : 'available',
-      securityStatus: scan.status,
-      extractionStatus: scan.status === 'quarantined' ? 'blocked' : parsed.errorCode ? 'failed' : 'available',
+      readStatus: quarantined ? 'blocked' : parsed.errorCode ? 'failed' : 'available',
+      securityStatus: quarantined ? 'quarantined' : scan.status,
+      extractionStatus: quarantined ? 'blocked' : parsed.errorCode ? 'failed' : 'available',
       errorCode: parsed.errorCode ?? null,
     };
   }
@@ -181,13 +190,10 @@ export class MaterialsService {
       '.txt': 'text/plain',
     };
     const mime = mimeByExtension[ext];
-    if (!mime) throw new BadRequestException({ code: 'UNSUPPORTED_FILE_TYPE' });
-    if (ext === '.pdf' && buffer.subarray(0, 5).toString() !== '%PDF-') {
-      throw new BadRequestException({ code: 'UNSUPPORTED_FILE_TYPE' });
-    }
-    if (ext === '.docx' && buffer.subarray(0, 2).toString() !== 'PK') {
-      throw new BadRequestException({ code: 'UNSUPPORTED_FILE_TYPE' });
-    }
+    const unsupported = () => new BadRequestException({ code: 'UNSUPPORTED_FILE_TYPE', message: 'Only PDF, DOCX and TXT files are accepted. Choose another file.' });
+    if (!mime) throw unsupported();
+    if (ext === '.pdf' && buffer.subarray(0, 5).toString() !== '%PDF-') throw unsupported();
+    if (ext === '.docx' && buffer.subarray(0, 2).toString() !== 'PK') throw unsupported();
 
     try {
       let segments: Segment[];
@@ -200,6 +206,8 @@ export class MaterialsService {
         });
         try {
           const result = await parser.getText();
+          // Over the page limit: refused before any candidate is created, with the reason on the item (#162).
+          if (result.total > MAX_PDF_PAGES) return { mime, text: '', segments: [], errorCode: 'PDF_TOO_MANY_PAGES' };
           segments = result.pages.flatMap((page) => splitText(page.text, page.num));
         } finally {
           await parser.destroy();
@@ -224,7 +232,10 @@ export class MaterialsService {
       };
     } catch (error) {
       if (error instanceof BadRequestException) throw error;
-      return { mime, text: '', segments: [], errorCode: 'FILE_UNREADABLE' };
+      // Needs a password to open (#163); anything else that fails to decode is a damaged file (#165), told apart
+      // from a valid scan that merely has no text (OCR_REQUIRED above).
+      const errorCode = (error as { name?: string })?.name === 'PasswordException' ? 'PDF_ENCRYPTED' : 'FILE_UNREADABLE';
+      return { mime, text: '', segments: [], errorCode };
     }
   }
 }

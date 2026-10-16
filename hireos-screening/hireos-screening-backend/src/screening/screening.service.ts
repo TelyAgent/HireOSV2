@@ -273,7 +273,7 @@ export class ScreeningService {
   ) {
     const dimensions = asDimensions(input.criteria?.dimensions);
     const requirements = asRequirements(input.criteria?.requirements);
-    const hardRequirements = requirements.filter((requirement) => requirement.hard);
+    const hardRequirements = scoredHardRequirements(requirements);
     const resumeText = input.material?.text || '';
     const aiConfigured = this.aiEvaluator.isConfigured();
     const useAi = aiConfigured && !!resumeText;
@@ -313,7 +313,8 @@ export class ScreeningService {
         throw error;
       }
     } else {
-      evaluationResult = this.evaluateLocally(dimensions, hardRequirements, input.profile, buildCorpus(input.profile, resumeText));
+      const profile = withoutWorkAuthorization(input.profile);
+      evaluationResult = this.evaluateLocally(dimensions, hardRequirements, profile, buildCorpus(profile, resumeText));
     }
     const { dimensionResults, eligibilityResults, overall, coverage, evaluatorVersion } = evaluationResult;
     const metadata = evaluationMetadata(useAi, evaluationResult.confidence, modelVersion);
@@ -713,9 +714,9 @@ function evaluateDimension(dimension: DimensionInput, profile: any, corpus: stri
   const name = dimension.name.toLowerCase();
   if (!corpus.trim()) return unknownDimension(dimension, 'No readable source material is available.');
   if (name.includes('compensation') || name.includes('location')) {
-    const known = profile?.location?.status === 'known' || profile?.compensationExpectation?.status === 'known' || profile?.workAuthorization?.status === 'known';
+    const known = profile?.location?.status === 'known' || profile?.compensationExpectation?.status === 'known';
     return known
-      ? evaluatedDimension(dimension, 78, 0.72, 'Profile contains location, compensation, or work-authorization data.')
+      ? evaluatedDimension(dimension, 78, 0.72, 'Profile contains location or compensation data.')
       : unknownDimension(dimension, 'Compensation and location fit are not sufficiently documented.');
   }
   if (name.includes('skill') || name.includes('technical') || name.includes('experience') || name.includes('seniority') || name.includes('ownership')) {
@@ -737,14 +738,6 @@ function unknownDimension(dimension: DimensionInput, reason: string) {
 
 function evaluateRequirement(requirement: RequirementInput, profile: any, corpus: string) {
   const lower = `${requirement.label} ${corpus}`.toLowerCase();
-  if (requirement.kind === 'authorization') {
-    const authorization = profile?.workAuthorization;
-    return {
-      requirementId: requirement.id,
-      status: (authorization?.status === 'known' ? 'met' : 'unknown') as 'met' | 'unknown',
-      reason: authorization?.status === 'known' ? 'Work authorization is present in the candidate profile.' : 'Work authorization is not confirmed.',
-    };
-  }
   if (requirement.kind === 'experience' && profile?.employmentHistory?.length) {
     return { requirementId: requirement.id, status: 'met' as const, reason: 'Employment history is present in the candidate profile.' };
   }
@@ -762,6 +755,23 @@ function aggregateEligibility(results: Array<{ status: string }>) {
   if (results.some((result) => result.status === 'not_met')) return 'not_eligible';
   if (results.some((result) => result.status === 'unknown')) return 'needs_verification';
   return 'eligible';
+}
+
+/**
+ * The hard requirements eligibility is decided on. Work authorization is not a matching or scoring factor
+ * (F02 WA-2, #157 AC-3): an authorization requirement isn't evaluated, so whether a profile states it can't
+ * change a candidate's eligibility.
+ */
+export function scoredHardRequirements<T extends { hard: boolean; kind: string }>(requirements: T[]): T[] {
+  return requirements.filter((requirement) => requirement.hard && requirement.kind !== 'authorization');
+}
+
+/** The profile as scoring sees it: work authorization is not a matching or scoring factor (F02 WA-2, #157). */
+export function withoutWorkAuthorization<T>(profile: T): T {
+  if (!profile || typeof profile !== 'object') return profile;
+  const rest = { ...(profile as Record<string, unknown>) };
+  delete rest.workAuthorization;
+  return rest as T;
 }
 
 function buildCorpus(profile: any, text: string) {

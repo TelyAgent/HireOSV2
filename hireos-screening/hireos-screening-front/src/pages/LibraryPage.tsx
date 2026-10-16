@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
+import { sourceLabel } from "../features/imports/sources";
 import { Link, useNavigate } from "react-router-dom";
 import { useStore } from "../store/StoreContext";
 import { deleteCandidate, listLibraryEntries, runMatchAgain, type LibraryEntry } from "../data/api/library";
@@ -150,7 +151,7 @@ export function LibraryPage() {
                       </span>
                     ))}
                   </td>
-                  <td className="tiny">{latestSource}</td>
+                  <td className="tiny">{t(sourceLabel(latestSource))}</td>
                   <td>
                     <span className="flex items-center gap-8">
                       <PersonAvatar person={getPerson(candidate.owner)} size="sm" /> {getPerson(candidate.owner)?.name}

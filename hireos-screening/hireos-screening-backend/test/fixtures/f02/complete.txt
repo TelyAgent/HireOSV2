@@ -1,0 +1,23 @@
+Linh Pham
+Email: Linh.Pham@Example.test | Phone: +84 90 123 4567
+Location: Ho Chi Minh City, Vietnam
+
+Experience
+Senior Data Analyst, Example Retail — 2021-03 to present
+Built pricing dashboards in SQL and Python.
+Data Analyst, Sample Bank — 2018-07 to 2021-06
+
+Education
+B.Sc. Statistics, Vietnam National University (2014 – 2018)
+
+Skills: SQL, Python, Tableau
+
+Languages: English (IELTS 7.5), Vietnamese (native)
+
+Certifications: AWS Certified Cloud Practitioner, Google Data Analytics Certificate
+
+Projects
+Pricing dashboard: weekly price-elasticity dashboard for 120 stores.
+
+Salary expectation: USD 60-70k/yr gross
+Availability: 1 month

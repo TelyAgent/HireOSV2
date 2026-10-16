@@ -1,4 +1,5 @@
 import {
+  Body,
   Controller,
   Get,
   Headers,
@@ -68,6 +69,23 @@ export class IntakeController {
     @Headers('x-target-job-id') targetJobId?: string,
   ) {
     return this.imports.createBatch(req.identity, files, channel || 'manual_upload', idempotencyKey, targetJobId || undefined);
+  }
+
+  /** "Paste profile", step 1: who the pasted text seems to be about, for the user to confirm (#167). */
+  @Post('imports/paste/preview')
+  previewPaste(@Body() body: unknown) {
+    return this.imports.previewPaste(body);
+  }
+
+  /** "Paste profile", step 2: import the text with the identity the user confirmed (#160 #161 #167). */
+  @Post('imports/paste')
+  importPaste(
+    @Req() req: { identity: Identity },
+    @Body() body: unknown,
+    @Headers('idempotency-key') idempotencyKey?: string,
+    @Headers('x-target-job-id') targetJobId?: string,
+  ) {
+    return this.imports.importPaste(req.identity, body, idempotencyKey, targetJobId || undefined);
   }
 
   @Get('imports/:id')

@@ -12,6 +12,12 @@ export class ProfilesController {
     return this.profiles.getLatest(req.identity, id);
   }
 
+  /** Profile versions and their corrections, newest first (#159). */
+  @Get('candidates/:id/profile/history')
+  history(@Req() req: { identity: Identity }, @Param('id') id: string) {
+    return this.profiles.history(req.identity, id);
+  }
+
   @Patch('candidates/:id/profile')
   correct(@Req() req: { identity: Identity }, @Param('id') id: string, @Body() body: unknown) {
     return this.profiles.correct(req.identity, id, body);

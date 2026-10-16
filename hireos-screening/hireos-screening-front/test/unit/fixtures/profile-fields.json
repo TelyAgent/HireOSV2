@@ -1,0 +1,840 @@
+{
+  "complete": [
+    {
+      "field": "name",
+      "status": "known",
+      "values": [
+        "Linh Pham"
+      ],
+      "incomplete": [],
+      "source": "resume",
+      "evidence": [
+        {
+          "resumeVersionId": "rv-2",
+          "resumeVersion": 2,
+          "materialId": "m-1",
+          "segmentId": "s1",
+          "page": null,
+          "paragraph": 1,
+          "quote": "Linh Pham Email: Linh.Pham@Example.test | Phone: +84 90 123 4567 Location: Ho Chi Minh City, Vietnam"
+        }
+      ],
+      "evidenceUnavailable": null,
+      "unlocatedValues": []
+    },
+    {
+      "field": "email",
+      "status": "known",
+      "values": [
+        "linh.pham@example.test"
+      ],
+      "incomplete": [],
+      "source": "resume",
+      "evidence": [
+        {
+          "resumeVersionId": "rv-2",
+          "resumeVersion": 2,
+          "materialId": "m-1",
+          "segmentId": "s1",
+          "page": null,
+          "paragraph": 1,
+          "quote": "Linh Pham Email: Linh.Pham@Example.test | Phone: +84 90 123 4567 Location: Ho Chi Minh City, Vietnam"
+        }
+      ],
+      "evidenceUnavailable": null,
+      "unlocatedValues": []
+    },
+    {
+      "field": "phone",
+      "status": "known",
+      "values": [
+        "+84901234567"
+      ],
+      "incomplete": [],
+      "source": "resume",
+      "evidence": [
+        {
+          "resumeVersionId": "rv-2",
+          "resumeVersion": 2,
+          "materialId": "m-1",
+          "segmentId": "s1",
+          "page": null,
+          "paragraph": 1,
+          "quote": "Linh Pham Email: Linh.Pham@Example.test | Phone: +84 90 123 4567 Location: Ho Chi Minh City, Vietnam"
+        }
+      ],
+      "evidenceUnavailable": null,
+      "unlocatedValues": []
+    },
+    {
+      "field": "location",
+      "status": "known",
+      "values": [
+        "Ho Chi Minh City, Vietnam"
+      ],
+      "incomplete": [],
+      "source": "resume",
+      "evidence": [
+        {
+          "resumeVersionId": "rv-2",
+          "resumeVersion": 2,
+          "materialId": "m-1",
+          "segmentId": "s1",
+          "page": null,
+          "paragraph": 1,
+          "quote": "h Pham Email: Linh.Pham@Example.test | Phone: +84 90 123 4567 Location: Ho Chi Minh City, Vietnam"
+        }
+      ],
+      "evidenceUnavailable": null,
+      "unlocatedValues": []
+    },
+    {
+      "field": "employment_history",
+      "status": "known",
+      "values": [
+        "Senior Data Analyst · Example Retail (2021-03 – present)",
+        "Data Analyst · Sample Bank (2018-07 – 2021-06)"
+      ],
+      "incomplete": [],
+      "source": "resume",
+      "evidence": [
+        {
+          "resumeVersionId": "rv-2",
+          "resumeVersion": 2,
+          "materialId": "m-1",
+          "segmentId": "s2",
+          "page": null,
+          "paragraph": 2,
+          "quote": "Experience Senior Data Analyst, Example Retail — 2021-03 to present Built pricing dashboards in SQL and Python. Data Analyst, Sample Bank — 2018-07 to 2021-06"
+        }
+      ],
+      "evidenceUnavailable": null,
+      "unlocatedValues": []
+    },
+    {
+      "field": "education",
+      "status": "known",
+      "values": [
+        "Vietnam National University · B.Sc. · Statistics (2014 – 2018)"
+      ],
+      "incomplete": [],
+      "source": "resume",
+      "evidence": [
+        {
+          "resumeVersionId": "rv-2",
+          "resumeVersion": 2,
+          "materialId": "m-1",
+          "segmentId": "s3",
+          "page": null,
+          "paragraph": 3,
+          "quote": "Education B.Sc. Statistics, Vietnam National University (2014 – 2018)"
+        }
+      ],
+      "evidenceUnavailable": null,
+      "unlocatedValues": []
+    },
+    {
+      "field": "skills",
+      "status": "known",
+      "values": [
+        "SQL",
+        "Python",
+        "Tableau"
+      ],
+      "incomplete": [],
+      "source": "resume",
+      "evidence": [
+        {
+          "resumeVersionId": "rv-2",
+          "resumeVersion": 2,
+          "materialId": "m-1",
+          "segmentId": "s2",
+          "page": null,
+          "paragraph": 2,
+          "quote": "to present Built pricing dashboards in SQL and Python. Data Analyst, Sample Bank — 2018-07 to 2021-06"
+        },
+        {
+          "resumeVersionId": "rv-2",
+          "resumeVersion": 2,
+          "materialId": "m-1",
+          "segmentId": "s4",
+          "page": null,
+          "paragraph": 4,
+          "quote": "Skills: SQL, Python, Tableau"
+        }
+      ],
+      "evidenceUnavailable": null,
+      "unlocatedValues": []
+    },
+    {
+      "field": "languages",
+      "status": "known",
+      "values": [
+        "English (IELTS 7.5)",
+        "Vietnamese (native)"
+      ],
+      "incomplete": [],
+      "source": "resume",
+      "evidence": [
+        {
+          "resumeVersionId": "rv-2",
+          "resumeVersion": 2,
+          "materialId": "m-1",
+          "segmentId": "s5",
+          "page": null,
+          "paragraph": 5,
+          "quote": "Languages: English (IELTS 7.5), Vietnamese (native)"
+        }
+      ],
+      "evidenceUnavailable": null,
+      "unlocatedValues": []
+    },
+    {
+      "field": "certifications",
+      "status": "known",
+      "values": [
+        "AWS Certified Cloud Practitioner",
+        "Google Data Analytics Certificate"
+      ],
+      "incomplete": [],
+      "source": "resume",
+      "evidence": [
+        {
+          "resumeVersionId": "rv-2",
+          "resumeVersion": 2,
+          "materialId": "m-1",
+          "segmentId": "s6",
+          "page": null,
+          "paragraph": 6,
+          "quote": "Certifications: AWS Certified Cloud Practitioner, Google Data Analytics Certificate"
+        }
+      ],
+      "evidenceUnavailable": null,
+      "unlocatedValues": []
+    },
+    {
+      "field": "projects",
+      "status": "known",
+      "values": [
+        "Pricing dashboard: weekly price-elasticity dashboard for 120 stores."
+      ],
+      "incomplete": [],
+      "source": "resume",
+      "evidence": [
+        {
+          "resumeVersionId": "rv-2",
+          "resumeVersion": 2,
+          "materialId": "m-1",
+          "segmentId": "s7",
+          "page": null,
+          "paragraph": 7,
+          "quote": "Projects Pricing dashboard: weekly price-elasticity dashboard for 120 stores."
+        }
+      ],
+      "evidenceUnavailable": null,
+      "unlocatedValues": []
+    },
+    {
+      "field": "compensation_expectation",
+      "status": "known",
+      "values": [
+        "60,000–70,000 USD / year, gross"
+      ],
+      "incomplete": [],
+      "source": "resume",
+      "evidence": [
+        {
+          "resumeVersionId": "rv-2",
+          "resumeVersion": 2,
+          "materialId": "m-1",
+          "segmentId": "s8",
+          "page": null,
+          "paragraph": 8,
+          "quote": "Salary expectation: USD 60-70k/yr gross Availability: 1 month"
+        }
+      ],
+      "evidenceUnavailable": null,
+      "unlocatedValues": []
+    },
+    {
+      "field": "availability",
+      "status": "known",
+      "values": [
+        "1 month (30 days)"
+      ],
+      "incomplete": [],
+      "source": "resume",
+      "evidence": [
+        {
+          "resumeVersionId": "rv-2",
+          "resumeVersion": 2,
+          "materialId": "m-1",
+          "segmentId": "s8",
+          "page": null,
+          "paragraph": 8,
+          "quote": "tion: USD 60-70k/yr gross Availability: 1 month"
+        }
+      ],
+      "evidenceUnavailable": null,
+      "unlocatedValues": []
+    }
+  ],
+  "sparse": [
+    {
+      "field": "name",
+      "status": "known",
+      "values": [
+        "Minh Nguyen"
+      ],
+      "incomplete": [],
+      "source": "resume",
+      "evidence": [
+        {
+          "resumeVersionId": "rv-2",
+          "resumeVersion": 2,
+          "materialId": "m-1",
+          "segmentId": "s1",
+          "page": null,
+          "paragraph": 1,
+          "quote": "Minh Nguyen Software engineer."
+        }
+      ],
+      "evidenceUnavailable": null,
+      "unlocatedValues": []
+    },
+    {
+      "field": "email",
+      "status": "missing",
+      "values": [],
+      "incomplete": [],
+      "source": "resume",
+      "evidence": [],
+      "evidenceUnavailable": null,
+      "unlocatedValues": []
+    },
+    {
+      "field": "phone",
+      "status": "missing",
+      "values": [],
+      "incomplete": [],
+      "source": "resume",
+      "evidence": [],
+      "evidenceUnavailable": null,
+      "unlocatedValues": []
+    },
+    {
+      "field": "location",
+      "status": "missing",
+      "values": [],
+      "incomplete": [],
+      "source": "resume",
+      "evidence": [],
+      "evidenceUnavailable": null,
+      "unlocatedValues": []
+    },
+    {
+      "field": "employment_history",
+      "status": "missing",
+      "values": [],
+      "incomplete": [],
+      "source": "resume",
+      "evidence": [],
+      "evidenceUnavailable": null,
+      "unlocatedValues": []
+    },
+    {
+      "field": "education",
+      "status": "missing",
+      "values": [],
+      "incomplete": [],
+      "source": "resume",
+      "evidence": [],
+      "evidenceUnavailable": null,
+      "unlocatedValues": []
+    },
+    {
+      "field": "skills",
+      "status": "missing",
+      "values": [],
+      "incomplete": [],
+      "source": "resume",
+      "evidence": [],
+      "evidenceUnavailable": null,
+      "unlocatedValues": []
+    },
+    {
+      "field": "languages",
+      "status": "missing",
+      "values": [],
+      "incomplete": [],
+      "source": "resume",
+      "evidence": [],
+      "evidenceUnavailable": null,
+      "unlocatedValues": []
+    },
+    {
+      "field": "certifications",
+      "status": "missing",
+      "values": [],
+      "incomplete": [],
+      "source": "resume",
+      "evidence": [],
+      "evidenceUnavailable": null,
+      "unlocatedValues": []
+    },
+    {
+      "field": "projects",
+      "status": "missing",
+      "values": [],
+      "incomplete": [],
+      "source": "resume",
+      "evidence": [],
+      "evidenceUnavailable": null,
+      "unlocatedValues": []
+    },
+    {
+      "field": "compensation_expectation",
+      "status": "missing",
+      "values": [],
+      "incomplete": [],
+      "source": "resume",
+      "evidence": [],
+      "evidenceUnavailable": null,
+      "unlocatedValues": []
+    },
+    {
+      "field": "availability",
+      "status": "missing",
+      "values": [],
+      "incomplete": [],
+      "source": "resume",
+      "evidence": [],
+      "evidenceUnavailable": null,
+      "unlocatedValues": []
+    }
+  ],
+  "partlyLocated": [
+    {
+      "field": "name",
+      "status": "known",
+      "values": [
+        "Linh Pham"
+      ],
+      "incomplete": [],
+      "source": "resume",
+      "evidence": [
+        {
+          "resumeVersionId": "rv-2",
+          "resumeVersion": 2,
+          "materialId": "m-1",
+          "segmentId": "s1",
+          "page": null,
+          "paragraph": 1,
+          "quote": "Linh Pham Email: Linh.Pham@Example.test | Phone: +84 90 123 4567 Location: Ho Chi Minh City, Vietnam"
+        }
+      ],
+      "evidenceUnavailable": null,
+      "unlocatedValues": []
+    },
+    {
+      "field": "email",
+      "status": "known",
+      "values": [
+        "linh.pham@example.test"
+      ],
+      "incomplete": [],
+      "source": "resume",
+      "evidence": [
+        {
+          "resumeVersionId": "rv-2",
+          "resumeVersion": 2,
+          "materialId": "m-1",
+          "segmentId": "s1",
+          "page": null,
+          "paragraph": 1,
+          "quote": "Linh Pham Email: Linh.Pham@Example.test | Phone: +84 90 123 4567 Location: Ho Chi Minh City, Vietnam"
+        }
+      ],
+      "evidenceUnavailable": null,
+      "unlocatedValues": []
+    },
+    {
+      "field": "phone",
+      "status": "known",
+      "values": [
+        "+84901234567"
+      ],
+      "incomplete": [],
+      "source": "resume",
+      "evidence": [
+        {
+          "resumeVersionId": "rv-2",
+          "resumeVersion": 2,
+          "materialId": "m-1",
+          "segmentId": "s1",
+          "page": null,
+          "paragraph": 1,
+          "quote": "Linh Pham Email: Linh.Pham@Example.test | Phone: +84 90 123 4567 Location: Ho Chi Minh City, Vietnam"
+        }
+      ],
+      "evidenceUnavailable": null,
+      "unlocatedValues": []
+    },
+    {
+      "field": "location",
+      "status": "known",
+      "values": [
+        "Ho Chi Minh City, Vietnam"
+      ],
+      "incomplete": [],
+      "source": "resume",
+      "evidence": [
+        {
+          "resumeVersionId": "rv-2",
+          "resumeVersion": 2,
+          "materialId": "m-1",
+          "segmentId": "s1",
+          "page": null,
+          "paragraph": 1,
+          "quote": "h Pham Email: Linh.Pham@Example.test | Phone: +84 90 123 4567 Location: Ho Chi Minh City, Vietnam"
+        }
+      ],
+      "evidenceUnavailable": null,
+      "unlocatedValues": []
+    },
+    {
+      "field": "employment_history",
+      "status": "known",
+      "values": [
+        "Senior Data Analyst · Example Retail (2021-03 – present)",
+        "Data Analyst · Sample Bank (2018-07 – 2021-06)"
+      ],
+      "incomplete": [],
+      "source": "resume",
+      "evidence": [
+        {
+          "resumeVersionId": "rv-2",
+          "resumeVersion": 2,
+          "materialId": "m-1",
+          "segmentId": "s2",
+          "page": null,
+          "paragraph": 2,
+          "quote": "Experience Senior Data Analyst, Example Retail — 2021-03 to present Built pricing dashboards in SQL and Python. Data Analyst, Sample Bank — 2018-07 to 2021-06"
+        }
+      ],
+      "evidenceUnavailable": null,
+      "unlocatedValues": []
+    },
+    {
+      "field": "education",
+      "status": "known",
+      "values": [
+        "Vietnam National University · B.Sc. · Statistics (2014 – 2018)"
+      ],
+      "incomplete": [],
+      "source": "resume",
+      "evidence": [
+        {
+          "resumeVersionId": "rv-2",
+          "resumeVersion": 2,
+          "materialId": "m-1",
+          "segmentId": "s3",
+          "page": null,
+          "paragraph": 3,
+          "quote": "Education B.Sc. Statistics, Vietnam National University (2014 – 2018)"
+        }
+      ],
+      "evidenceUnavailable": null,
+      "unlocatedValues": []
+    },
+    {
+      "field": "skills",
+      "status": "known",
+      "values": [
+        "SQL",
+        "Python",
+        "Kubernetes"
+      ],
+      "incomplete": [],
+      "source": "resume",
+      "evidence": [
+        {
+          "resumeVersionId": "rv-2",
+          "resumeVersion": 2,
+          "materialId": "m-1",
+          "segmentId": "s2",
+          "page": null,
+          "paragraph": 2,
+          "quote": "to present Built pricing dashboards in SQL and Python. Data Analyst, Sample Bank — 2018-07 to 2021-06"
+        }
+      ],
+      "evidenceUnavailable": null,
+      "unlocatedValues": [
+        "Kubernetes"
+      ]
+    },
+    {
+      "field": "languages",
+      "status": "known",
+      "values": [
+        "English (IELTS 7.5)",
+        "Vietnamese (native)"
+      ],
+      "incomplete": [],
+      "source": "resume",
+      "evidence": [
+        {
+          "resumeVersionId": "rv-2",
+          "resumeVersion": 2,
+          "materialId": "m-1",
+          "segmentId": "s5",
+          "page": null,
+          "paragraph": 5,
+          "quote": "Languages: English (IELTS 7.5), Vietnamese (native)"
+        }
+      ],
+      "evidenceUnavailable": null,
+      "unlocatedValues": []
+    },
+    {
+      "field": "certifications",
+      "status": "known",
+      "values": [
+        "AWS Certified Cloud Practitioner",
+        "Google Data Analytics Certificate"
+      ],
+      "incomplete": [],
+      "source": "resume",
+      "evidence": [
+        {
+          "resumeVersionId": "rv-2",
+          "resumeVersion": 2,
+          "materialId": "m-1",
+          "segmentId": "s6",
+          "page": null,
+          "paragraph": 6,
+          "quote": "Certifications: AWS Certified Cloud Practitioner, Google Data Analytics Certificate"
+        }
+      ],
+      "evidenceUnavailable": null,
+      "unlocatedValues": []
+    },
+    {
+      "field": "projects",
+      "status": "known",
+      "values": [
+        "Pricing dashboard: weekly price-elasticity dashboard for 120 stores."
+      ],
+      "incomplete": [],
+      "source": "resume",
+      "evidence": [
+        {
+          "resumeVersionId": "rv-2",
+          "resumeVersion": 2,
+          "materialId": "m-1",
+          "segmentId": "s7",
+          "page": null,
+          "paragraph": 7,
+          "quote": "Projects Pricing dashboard: weekly price-elasticity dashboard for 120 stores."
+        }
+      ],
+      "evidenceUnavailable": null,
+      "unlocatedValues": []
+    },
+    {
+      "field": "compensation_expectation",
+      "status": "known",
+      "values": [
+        "60,000–70,000 USD / year, gross"
+      ],
+      "incomplete": [],
+      "source": "resume",
+      "evidence": [
+        {
+          "resumeVersionId": "rv-2",
+          "resumeVersion": 2,
+          "materialId": "m-1",
+          "segmentId": "s8",
+          "page": null,
+          "paragraph": 8,
+          "quote": "Salary expectation: USD 60-70k/yr gross Availability: 1 month"
+        }
+      ],
+      "evidenceUnavailable": null,
+      "unlocatedValues": []
+    },
+    {
+      "field": "availability",
+      "status": "known",
+      "values": [
+        "1 month (30 days)"
+      ],
+      "incomplete": [],
+      "source": "resume",
+      "evidence": [
+        {
+          "resumeVersionId": "rv-2",
+          "resumeVersion": 2,
+          "materialId": "m-1",
+          "segmentId": "s8",
+          "page": null,
+          "paragraph": 8,
+          "quote": "tion: USD 60-70k/yr gross Availability: 1 month"
+        }
+      ],
+      "evidenceUnavailable": null,
+      "unlocatedValues": []
+    }
+  ],
+  "sourceUnavailable": [
+    {
+      "field": "name",
+      "status": "known",
+      "values": [
+        "Linh Pham"
+      ],
+      "incomplete": [],
+      "source": "resume",
+      "evidence": [],
+      "evidenceUnavailable": "source_unavailable",
+      "unlocatedValues": []
+    },
+    {
+      "field": "email",
+      "status": "known",
+      "values": [
+        "linh.pham@example.test"
+      ],
+      "incomplete": [],
+      "source": "resume",
+      "evidence": [],
+      "evidenceUnavailable": "source_unavailable",
+      "unlocatedValues": []
+    },
+    {
+      "field": "phone",
+      "status": "known",
+      "values": [
+        "+84901234567"
+      ],
+      "incomplete": [],
+      "source": "resume",
+      "evidence": [],
+      "evidenceUnavailable": "source_unavailable",
+      "unlocatedValues": []
+    },
+    {
+      "field": "location",
+      "status": "known",
+      "values": [
+        "Ho Chi Minh City, Vietnam"
+      ],
+      "incomplete": [],
+      "source": "resume",
+      "evidence": [],
+      "evidenceUnavailable": "source_unavailable",
+      "unlocatedValues": []
+    },
+    {
+      "field": "employment_history",
+      "status": "known",
+      "values": [
+        "Senior Data Analyst · Example Retail (2021-03 – present)",
+        "Data Analyst · Sample Bank (2018-07 – 2021-06)"
+      ],
+      "incomplete": [],
+      "source": "resume",
+      "evidence": [],
+      "evidenceUnavailable": "source_unavailable",
+      "unlocatedValues": []
+    },
+    {
+      "field": "education",
+      "status": "known",
+      "values": [
+        "Vietnam National University · B.Sc. · Statistics (2014 – 2018)"
+      ],
+      "incomplete": [],
+      "source": "resume",
+      "evidence": [],
+      "evidenceUnavailable": "source_unavailable",
+      "unlocatedValues": []
+    },
+    {
+      "field": "skills",
+      "status": "known",
+      "values": [
+        "SQL",
+        "Python",
+        "Tableau"
+      ],
+      "incomplete": [],
+      "source": "resume",
+      "evidence": [],
+      "evidenceUnavailable": "source_unavailable",
+      "unlocatedValues": []
+    },
+    {
+      "field": "languages",
+      "status": "known",
+      "values": [
+        "English (IELTS 7.5)",
+        "Vietnamese (native)"
+      ],
+      "incomplete": [],
+      "source": "resume",
+      "evidence": [],
+      "evidenceUnavailable": "source_unavailable",
+      "unlocatedValues": []
+    },
+    {
+      "field": "certifications",
+      "status": "known",
+      "values": [
+        "AWS Certified Cloud Practitioner",
+        "Google Data Analytics Certificate"
+      ],
+      "incomplete": [],
+      "source": "resume",
+      "evidence": [],
+      "evidenceUnavailable": "source_unavailable",
+      "unlocatedValues": []
+    },
+    {
+      "field": "projects",
+      "status": "known",
+      "values": [
+        "Pricing dashboard: weekly price-elasticity dashboard for 120 stores."
+      ],
+      "incomplete": [],
+      "source": "resume",
+      "evidence": [],
+      "evidenceUnavailable": "source_unavailable",
+      "unlocatedValues": []
+    },
+    {
+      "field": "compensation_expectation",
+      "status": "known",
+      "values": [
+        "60,000–70,000 USD / year, gross"
+      ],
+      "incomplete": [],
+      "source": "resume",
+      "evidence": [],
+      "evidenceUnavailable": "source_unavailable",
+      "unlocatedValues": []
+    },
+    {
+      "field": "availability",
+      "status": "known",
+      "values": [
+        "1 month (30 days)"
+      ],
+      "incomplete": [],
+      "source": "resume",
+      "evidence": [],
+      "evidenceUnavailable": "source_unavailable",
+      "unlocatedValues": []
+    }
+  ]
+}

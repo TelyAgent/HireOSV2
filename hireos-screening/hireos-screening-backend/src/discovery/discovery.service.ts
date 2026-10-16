@@ -598,12 +598,12 @@ function skillNames(skills: unknown): string[] {
     .filter(Boolean);
 }
 
-function profileCorpus(profile: ProfileForMatch) {
+export function profileCorpus(profile: ProfileForMatch) {
   const skills = skillNames(profile.skills).map((s) => s.toLowerCase());
-  const workAuth = String(asRecord(profile.workAuthorization)?.value || '').toLowerCase();
+  // Work authorization is left out: it is not a matching factor (F02 WA-2, #157 AC-3).
   const location = String(asRecord(profile.location)?.value || '').toLowerCase();
   const employmentText = employmentHistoryText(profile.employmentHistory).toLowerCase();
-  return `${skills.join(' ')} ${workAuth} ${location} ${employmentText}`.toLowerCase();
+  return `${skills.join(' ')} ${location} ${employmentText}`.toLowerCase();
 }
 
 function employmentHistoryText(employmentHistory: unknown): string {

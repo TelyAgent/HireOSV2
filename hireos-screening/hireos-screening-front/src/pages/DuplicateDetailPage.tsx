@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { sourceLabel } from "../features/imports/sources";
 import { Link, useParams } from "react-router-dom";
 import { useStore } from "../store/StoreContext";
 import { getDuplicateReview, resolveDuplicateReview, RESOLUTION_LABEL } from "../data/api/imports";
@@ -115,7 +116,7 @@ export function DuplicateDetailPage() {
               <tr>
                 <td className="tiny">{t("Source")}</td>
                 <td>
-                  {review.uploaded.source} {t("by")} {getPerson(review.uploaded.uploadedBy)?.name}
+                  {t(sourceLabel(review.uploaded.source))} {t("by")} {getPerson(review.uploaded.uploadedBy)?.name}
                 </td>
               </tr>
             </tbody>
@@ -154,7 +155,7 @@ export function DuplicateDetailPage() {
               </tr>
               <tr>
                 <td className="tiny">{t("Source")}</td>
-                <td>{review.existing.source}</td>
+                <td>{t(sourceLabel(review.existing.source))}</td>
               </tr>
             </tbody>
           </table>

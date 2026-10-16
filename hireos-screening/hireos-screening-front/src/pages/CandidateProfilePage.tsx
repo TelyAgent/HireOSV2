@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
+import { sourceLabel } from "../features/imports/sources";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { useStore } from "../store/StoreContext";
 import {
@@ -6,6 +7,9 @@ import {
   correctProfile,
   reparseCandidate,
   COMPENSATION_CURRENCIES,
+  CORRECTION_REASON_LABEL,
+  CORRECTION_REASON_TYPES,
+  type CorrectionReasonType,
   type CandidateDetail,
   type CompensationCurrency,
 } from "../data/api/candidates";
@@ -22,6 +26,8 @@ import { useBoundedPolling } from "../lib/usePolling";
 import { StillProcessingNotice } from "../components/ui/StillProcessing";
 import { PageSkeleton } from "../components/ui/PageSkeleton";
 import { useFieldValidation } from "../lib/useFieldValidation";
+import { ProfileHistoryModal } from "../features/candidates/ProfileHistoryModal";
+import { ParsedFieldsCard } from "../features/candidates/ParsedFieldsCard";
 
 const MATCH_POLL_INTERVAL_MS = 3000;
 const PARSE_POLL_INTERVAL_MS = 3000;
@@ -153,8 +159,21 @@ function CorrectProfileModal({ candidate, onClose, onSaved }: { candidate: Candi
   );
   const [min, setMin] = useState(comp?.min != null ? String(comp.min) : "");
   const [max, setMax] = useState(comp?.max != null ? String(comp.max) : "");
+  const [projects, setProjects] = useState((candidate.projects ?? []).map((p) => p.description));
+  const [reasonType, setReasonType] = useState<CorrectionReasonType | "">("");
   const [reason, setReason] = useState("");
   const [saving, setSaving] = useState(false);
+  // Which fields this correction changes, by the same names the backend uses (#158).
+  const changedFields = [
+    ...(name.trim() !== candidate.displayName ? ["display_name"] : []),
+    ...(email.trim() !== candidate.contact.email ? ["email"] : []),
+    ...(phone.trim() !== candidate.contact.phone ? ["phone"] : []),
+    ...(location.trim() && location.trim() !== candidate.contact.location.value ? ["location"] : []),
+    ...(min.trim() && max.trim() && (Number(min) !== comp?.min || Number(max) !== comp?.max || currency !== comp?.currency) ? ["compensation_expectation"] : []),
+    ...(projects.some((d, i) => d !== candidate.projects?.[i]?.description) ? ["projects"] : []),
+  ];
+  // COR-1: a reason is needed only when the change touches what a current recommendation or evaluation used.
+  const reasonRequired = changedFields.some((field) => candidate.correctionReasonRequiredFor?.includes(field));
   const amount = (v: string) => (v.trim() && !/^\d+$/.test(v.trim()) ? t("Enter a whole number, e.g. 30000.") : null);
   const fields = useFieldValidation({
     name: () => (!name.trim() ? t("Name can't be empty.") : null),
@@ -165,7 +184,9 @@ function CorrectProfileModal({ candidate, onClose, onSaved }: { candidate: Candi
       amount(max) ??
       (min.trim() && !max.trim() ? t("Enter both the minimum and the maximum.") : null) ??
       (min.trim() && max.trim() && Number(max) < Number(min) ? t("The maximum can't be lower than the minimum.") : null),
-    reason: () => (!reason.trim() ? t("Say why the profile is being corrected — it is kept in the log.") : null),
+    reasonType: () =>
+      reasonRequired && !reasonType ? t("Choose a reason — this field is used by a current recommendation or evaluation.") : null,
+    reason: () => (reasonType === "other" && !reason.trim() ? t("Describe the reason when choosing “Other”.") : null),
   });
 
   const save = async () => {
@@ -180,7 +201,11 @@ function CorrectProfileModal({ candidate, onClose, onSaved }: { candidate: Candi
         ...(min.trim() && max.trim()
           ? { compensationMin: parseInt(min, 10), compensationMax: parseInt(max, 10), compensationCurrency: currency }
           : {}),
-        reason: reason.trim(),
+        ...(changedFields.includes("projects")
+          ? { projects: projects.map((description, index) => ({ index, description: description.trim() })) }
+          : {}),
+        ...(reasonType ? { reasonType } : {}),
+        ...(reason.trim() ? { reason: reason.trim() } : {}),
       });
     } catch (error) {
       const code = error instanceof ApiError ? error.code : "";
@@ -189,7 +214,7 @@ function CorrectProfileModal({ candidate, onClose, onSaved }: { candidate: Candi
       return;
     }
     onClose();
-    say(t("Profile corrected — affected screenings marked stale for refresh"), { type: "success" });
+    say(reasonRequired ? t("Profile corrected — affected screenings marked stale for refresh") : t("Profile corrected"), { type: "success" });
     onSaved();
   };
 
@@ -255,12 +280,54 @@ function CorrectProfileModal({ candidate, onClose, onSaved }: { candidate: Candi
           {fields.error("max")}
         </div>
       </div>
+      {(candidate.projects ?? []).length > 0 && (
+        <div className="field">
+          <label>{t("Project descriptions")}</label>
+          {(candidate.projects ?? []).map((project, index) => (
+            <div key={index} style={{ marginBottom: 8 }}>
+              <div className="tiny" style={{ marginBottom: 4 }}>{project.name || t("Project %s").replace("%s", String(index + 1))}</div>
+              <textarea
+                rows={2}
+                aria-label={t("Description of %s").replace("%s", project.name || String(index + 1))}
+                value={projects[index] ?? ""}
+                onChange={(e) => setProjects((current) => current.map((d, i) => (i === index ? e.target.value : d)))}
+              />
+            </div>
+          ))}
+        </div>
+      )}
+      <div className="field">
+        <label htmlFor={fields.labelFor("reasonType")}>
+          {t("Reason for correction")}
+          {reasonRequired && <span className="required-mark">*</span>}
+        </label>
+        <select {...fields.field("reasonType", { required: reasonRequired })} value={reasonType} onChange={(e) => setReasonType(e.target.value as CorrectionReasonType | "")}>
+          <option value="">{reasonRequired ? t("Choose a reason") : t("No reason given")}</option>
+          {CORRECTION_REASON_TYPES.map((type) => (
+            <option key={type} value={type}>
+              {t(CORRECTION_REASON_LABEL[type])}
+            </option>
+          ))}
+        </select>
+        {fields.error("reasonType")}
+        <p className="tiny" style={{ marginTop: 4 }}>
+          {reasonRequired
+            ? t("Required: this change touches a field a current recommendation or evaluation used.")
+            : t("Optional: nothing current relies on the fields you changed.")}
+        </p>
+      </div>
       <div className="field">
         <label htmlFor={fields.labelFor("reason")}>
-          {t("Reason for correction")}
-          <span className="required-mark">*</span>
+          {t("Note")}
+          {reasonType === "other" && <span className="required-mark">*</span>}
         </label>
-        <input type="text" {...fields.field("reason")} value={reason} onChange={(e) => setReason(e.target.value)} placeholder={t("e.g. Candidate confirmed by email")} />
+        <input
+          type="text"
+          {...fields.field("reason", { required: reasonType === "other" })}
+          value={reason}
+          onChange={(e) => setReason(e.target.value)}
+          placeholder={t("e.g. Candidate confirmed by email")}
+        />
         {fields.error("reason")}
       </div>
     </Modal>
@@ -281,6 +348,7 @@ export function CandidateProfilePage() {
   const { t, state, say } = useStore();
   const [detail, setDetail] = useState<CandidateDetail | null | undefined>(undefined);
   const [showCorrect, setShowCorrect] = useState(false);
+  const [showHistory, setShowHistory] = useState(false);
   const [matching, setMatching] = useState(false);
 
   const load = useCallback(() => {
@@ -408,6 +476,9 @@ export function CandidateProfilePage() {
         back="/library"
         actions={
           <>
+            <Button variant="secondary" icon="history" onClick={() => setShowHistory(true)}>
+              {candidate.profileVersion ? `${t("Profile history")} · v${candidate.profileVersion}` : t("Profile history")}
+            </Button>
             <Button variant="secondary" icon="edit" onClick={() => setShowCorrect(true)}>
               {t("Correct profile")}
             </Button>
@@ -525,7 +596,7 @@ export function CandidateProfilePage() {
                       {v.fileName} {v.isLatest ? <span className="badge badge-success">{t("Latest")}</span> : <span className="badge badge-outline">v{v.version}</span>}
                     </div>
                     <div className="tiny">
-                      {v.source} · {fmtDate(v.uploadedAt, state.lang)}
+                      {t(sourceLabel(v.source))} · {fmtDate(v.uploadedAt, state.lang)}
                       {v.changeNote ? ` · ${v.changeNote}` : ""}
                     </div>
                   </div>
@@ -575,8 +646,26 @@ export function CandidateProfilePage() {
             )}
           </div>
 
+          {parseStatus === "succeeded" && candidate.profileFields && <ParsedFieldsCard fields={candidate.profileFields} />}
+
           <div className="card card-pad">
             <div className="section-title">{t("Employment history")}</div>
+            {candidate.totalExperience && (
+              <div className="tiny" style={{ marginBottom: 12 }} data-testid="total-experience">
+                {candidate.totalExperience.status === "derived" ? (
+                  <>
+                    {t("Total experience")}: <strong>{t("%s years").replace("%s", String(candidate.totalExperience.years))}</strong>{" "}
+                    <span className="badge badge-outline" title={t("Worked out from the start and end dates above; overlapping months are counted once.")}>
+                      {t("Derived")}
+                    </span>
+                  </>
+                ) : (
+                  <>
+                    {t("Total experience")}: {t("Can't be calculated — the résumé gives no usable start and end dates.")}
+                  </>
+                )}
+              </div>
+            )}
             {candidate.employment.length ? (
               candidate.employment.map((e, i) => (
                 <div style={{ marginBottom: 14 }} key={i}>
@@ -620,6 +709,13 @@ export function CandidateProfilePage() {
         </div>
       </div>
 
+      {showHistory && (
+        <ProfileHistoryModal
+          candidateId={candidate.id}
+          materialByResumeVersion={Object.fromEntries(versions.flatMap((v) => (v.materialId ? [[v.id, { materialId: v.materialId, fileName: v.fileName }]] : [])))}
+          onClose={() => setShowHistory(false)}
+        />
+      )}
       {showCorrect && <CorrectProfileModal candidate={candidate} onClose={() => setShowCorrect(false)} onSaved={load} />}
     </>
   );

@@ -1,4 +1,7 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
+import { profileFields } from '../profiles/profile-fields';
+import { referencedProfileFields } from '../profiles/correction-rules';
+import { formatMonth, totalExperience } from '../profiles/experience';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../persistence/prisma.service';
 import { pasteCandidateSchema, validate } from '../intake/contracts';
@@ -122,7 +125,7 @@ export class CandidatesService {
       include: {
         resumeVersions: {
           orderBy: { version: 'asc' },
-          include: { material: { select: { id: true, name: true, readStatus: true, errorCode: true, createdAt: true } } },
+          include: { material: { select: { id: true, name: true, readStatus: true, errorCode: true, createdAt: true, segments: true } } },
         },
         profiles: { orderBy: { version: 'desc' }, take: 1 },
         recommendations: { orderBy: { createdAt: 'desc' } },
@@ -131,8 +134,24 @@ export class CandidatesService {
     });
     if (!candidate) throw new NotFoundException({ code: 'NOT_FOUND' });
     const matchingStatuses = await this.discovery.getMatchingStatuses(identity.workspaceId, [id]);
+    const referenced = await referencedProfileFields(this.db, identity.workspaceId, id);
+    // Field-by-field status and source locations, against the résumé version the profile was parsed from (#155).
+    const profile = candidate.profiles[0];
+    const parsedFrom = candidate.resumeVersions.find((version) => version.id === profile?.resumeVersionId);
+    const fields = profileFields(profile as unknown as Record<string, unknown> | undefined, candidate, parsedFrom ? {
+      resumeVersionId: parsedFrom.id,
+      resumeVersion: parsedFrom.version,
+      materialId: parsedFrom.materialId,
+      readable: parsedFrom.material.readStatus === 'available' && Array.isArray(parsedFrom.material.segments) && parsedFrom.material.segments.length > 0,
+      segments: (Array.isArray(parsedFrom.material.segments) ? parsedFrom.material.segments : []) as Array<{ id: string; text: string; page?: number }>,
+    } : null);
     return {
-      candidate: this.toFrontendCandidate(candidate, candidate.profiles[0]),
+      candidate: {
+        ...this.toFrontendCandidate(candidate, candidate.profiles[0]),
+        // Fields a correction needs a reason for right now: used by a current recommendation or evaluation (#158).
+        correctionReasonRequiredFor: referenced,
+        profileFields: fields,
+      },
       matching: matchingStatuses.get(id) ?? { isMatching: false, lastRun: null },
       resumeVersions: candidate.resumeVersions.map((version) => ({
         id: version.id,
@@ -194,17 +213,20 @@ export class CandidatesService {
     employmentHistory: unknown;
     compensationExpectation: unknown;
     missingFields: unknown;
+    projects?: unknown;
   }) {
     const location = asProfileValue(profile?.location);
+    const versionContact = asRecord((profile as { contact?: unknown } | undefined)?.contact);
     const workAuth = asProfileValue(profile?.workAuthorization);
     const compensation = asRecord(profile?.compensationExpectation);
     return {
       id: candidate.id,
       displayName: profile?.displayName || candidate.displayName,
       identityStatus: candidate.identityStatus === 'confirmed' ? 'confirmed' as const : 'provisional' as const,
+      // The latest profile version's contact when it recorded one, so the page and the correction form agree (#155 review).
       contact: {
-        email: candidate.email || '',
-        phone: candidate.phone || '',
+        email: (versionContact ? String(versionContact.email ?? '') : candidate.email) || '',
+        phone: (versionContact ? String(versionContact.phone ?? '') : candidate.phone) || '',
         location: { value: location?.value || '', status: location?.status || 'unknown' as const },
       },
       workAuth: { value: workAuth?.value || '', status: workAuth?.status || 'unknown' as const },
@@ -218,9 +240,21 @@ export class CandidatesService {
       compensationExpectation: compensation,
       // Profiles parsed before work authorization stopped counting as missing still carry it.
       missingFields: asArray(profile?.missingFields).map(String).filter((field) => field !== 'work_authorization'),
-      employment: asArray(profile?.employmentHistory),
+      // Dates as YYYY-MM whatever format the résumé used; "present" and unreadable values stay as written (#156).
+      employment: asArray(profile?.employmentHistory).map((entry) => {
+        const record = asRecord(entry);
+        if (!record) return entry;
+        return { ...record, start: formatMonth(record.start) ?? record.start, end: formatMonth(record.end) ?? record.end };
+      }),
+      totalExperience: totalExperience(profile?.employmentHistory),
       skills: asArray(profile?.skills).map((skill) => typeof skill === 'object' && skill && 'name' in skill ? String(skill.name) : String(skill)),
       education: asArray(profile?.education),
+      // The profile version shown, for its history (#159).
+      profileVersion: (profile as { version?: number } | undefined)?.version ?? null,
+      projects: asArray(profile?.projects).map((project) => {
+        const record = asRecord(project) ?? {};
+        return { name: String(record.name ?? ''), description: String(record.description ?? '') };
+      }),
     };
   }
 }
