@@ -252,7 +252,7 @@ test('#155 AC-2 (review): back-to-back stints and consecutive degrees — the pr
     { company: 'Acme', title: 'Analyst', start: '2019-01', end: '2021-10' }, { company: 'Acme', title: 'Analyst', start: '2021-10', end: 'present' },
   ] }, { displayName: 'A', email: null, phone: null }, source(current))).employment_history;
   assert.deepEqual(g.evidence.map((e) => e.segmentId), ['c1', 'c2'], 'an open-ended stint ends at "present"');
-  const degrees = [{ id: 'd1', text: 'Fudan University B.Sc. 2010 – 2014' }, { id: 'd2', text: 'Fudan University M.Sc. 2014 – 2016' }];
+  const degrees = [{ id: 'd1', text: 'Fudan University B.Sc. Math 2010 – 2014' }, { id: 'd2', text: 'Fudan University M.Sc. Statistics 2014 – 2016' }];
   const h = byField(profileFields({ displayName: 'A', education: [
     { school: 'Fudan University', degree: 'B.Sc.', major: 'Math', period: '2010 – 2014' }, { school: 'Fudan University', degree: 'M.Sc.', major: 'Statistics', period: '2014 – 2016' },
   ] }, { displayName: 'A', email: null, phone: null }, source(degrees))).education;
@@ -547,4 +547,26 @@ test('#155 AC-2 (review): two degrees from one school, the years on the line bel
   const f = byField(profileFields({ displayName: 'A', education }, { displayName: 'A', email: null, phone: null }, source(segments))).education;
   assert.deepEqual(f.evidence.map((e) => e.segmentId), ['u1', 'u3']);
   assert.deepEqual(f.unlocatedValues, []);
+});
+
+test('#155 AC-2 (review): a degree is not located at a job at the same university in the same years', () => {
+  const education = [{ school: 'Example University', degree: 'MSc', major: 'Statistics', period: '2020 – 2022' }];
+  const at = (segments) => byField(profileFields({ displayName: 'A', education }, { displayName: 'A', email: null, phone: null }, source(segments))).education;
+  const sameParagraph = at([
+    { id: 'job', text: 'Research Assistant at Example University, 2020 – 2022.' },
+    { id: 'deg', text: 'MSc Statistics at Example University, 2020 – 2022.' },
+  ]);
+  assert.deepEqual(sameParagraph.evidence.map((e) => e.segmentId), ['deg']);
+  // The degree on the line below the job, the school named only in the job: not the degree's place.
+  const below = at([
+    { id: 'job', text: 'Research Assistant at Example University, 2020 – 2022.' },
+    { id: 'deg', text: 'MSc Statistics, 2020 – 2022.' },
+  ]);
+  assert.deepEqual([below.evidence, below.evidenceUnavailable], [[], 'not_located']);
+});
+
+test('#155 AC-3: the payload the frontend renders in its tests is the candidate API\'s current output', async () => {
+  const { profileFieldsFixture, FIXTURE_PATH } = require('./fixtures/f02/profile-fields-fixture.cjs');
+  const written = JSON.parse(fs.readFileSync(FIXTURE_PATH, 'utf8'));
+  assert.deepEqual(written, JSON.parse(JSON.stringify(await profileFieldsFixture())), 'regenerate it: node scripts/gen-profile-fields-fixture.cjs');
 });
