@@ -119,7 +119,7 @@ function SideNav() {
   const collapsed = state.sidenavCollapsed;
   const toggleLabel = collapsed ? t("Expand navigation") : t("Collapse navigation");
   return (
-    <nav className={`sidenav${collapsed ? " collapsed" : ""}`} aria-label="Primary">
+    <nav className={`sidenav${collapsed ? " collapsed" : ""}`} aria-label={t("Primary navigation")}>
       <div className="sidenav-section">
         {NAV_PRIMARY.map((item) => (
           <NavLinkItem key={item.to} item={item} />

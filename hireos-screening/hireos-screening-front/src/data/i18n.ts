@@ -1368,6 +1368,9 @@ export const ZH: Record<string, string> = {
   "Confirm the job criteria before running screening.": "请先确认职位评分标准，再运行初筛。",
   "The resume hasn’t been parsed yet — wait for parsing to finish, then retry.": "简历尚未解析完成，请等解析结束后重试。",
   "This result was scored by local rules, not AI (AI isn’t configured or the resume has no readable text). Treat it as a rough guide only.": "该结果由本地规则估算，未使用 AI（未配置 AI 或简历没有可读文本），仅供粗略参考。",
+  // #239: names read out by screen readers, and input hints.
+  "Primary navigation": "主导航",
+  "e.g. %s": "例如 %s",
 };
 
 export function translate(lang: "en" | "zh", source: string, key?: string): string {

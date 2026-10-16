@@ -268,12 +268,12 @@ function CorrectProfileModal({ candidate, onClose, onSaved }: { candidate: Candi
         </div>
         <div className="field" style={{ flex: 1 }}>
           <label htmlFor={fields.labelFor("min")}>{t("Monthly salary expectation — min")}</label>
-          <input type="text" inputMode="numeric" {...fields.field("min", { required: false })} value={min} onChange={(e) => setMin(e.target.value)} placeholder="e.g. 30000" />
+          <input type="text" inputMode="numeric" {...fields.field("min", { required: false })} value={min} onChange={(e) => setMin(e.target.value)} placeholder={t("e.g. %s").replace("%s", "30000")} />
           {fields.error("min")}
         </div>
         <div className="field" style={{ flex: 1 }}>
           <label htmlFor={fields.labelFor("max")}>{t("Monthly salary expectation — max")}</label>
-          <input type="text" inputMode="numeric" {...fields.field("max", { required: false })} value={max} onChange={(e) => setMax(e.target.value)} placeholder="e.g. 40000" />
+          <input type="text" inputMode="numeric" {...fields.field("max", { required: false })} value={max} onChange={(e) => setMax(e.target.value)} placeholder={t("e.g. %s").replace("%s", "40000")} />
           {fields.error("max")}
         </div>
       </div>

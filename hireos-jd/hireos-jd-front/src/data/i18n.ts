@@ -1172,6 +1172,10 @@ export const ZH: Record<string, string> = {
   "Sorry, Copilot couldn’t process that just now. Your input is kept — please retry.": "抱歉，Copilot 暂时无法处理这条请求，你的输入已保留，请重试。",
   "Choose the file again": "重新选择文件",
   "Start over": "重新开始",
+  // #239: names read out by screen readers, and the resize handle's tooltip.
+  "Primary navigation": "主导航",
+  "Resize Copilot sidebar": "调整 Copilot 侧栏宽度",
+  "Drag to resize": "拖动以调整宽度",
 };
 
 /**

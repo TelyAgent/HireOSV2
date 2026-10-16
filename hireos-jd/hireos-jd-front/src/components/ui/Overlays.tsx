@@ -41,6 +41,7 @@ function DrawerShell({
   entry: { wide?: boolean; drawerClass?: string };
   children: ReactNode;
 }) {
+  const { t } = useStore();
   const ref = useRef<HTMLDivElement>(null);
   const resizable = entry.drawerClass === "gemini-drawer-shell";
 
@@ -92,8 +93,8 @@ function DrawerShell({
         <div
           className="gemini-resize-handle"
           role="separator"
-          aria-label="Resize Copilot sidebar"
-          title="Drag to resize"
+          aria-label={t("Resize Copilot sidebar")}
+          title={t("Drag to resize")}
           onPointerDown={startDrag}
         />
       )}

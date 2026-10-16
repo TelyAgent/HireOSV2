@@ -45,7 +45,7 @@ export function AppShell({ openTaskCount, children }: { openTaskCount: number; c
 
   return (
     <div className="appshell">
-      <nav className={`sidebar ${state.sidebarCollapsed ? "collapsed" : ""}`} aria-label="Primary navigation">
+      <nav className={`sidebar ${state.sidebarCollapsed ? "collapsed" : ""}`} aria-label={t("Primary navigation")}>
         <div className="nav-scroll">
           {NAV.map((group, gi) => (
             <div key={gi}>

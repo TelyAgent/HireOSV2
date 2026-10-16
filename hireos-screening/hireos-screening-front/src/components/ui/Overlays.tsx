@@ -29,6 +29,7 @@ export function Modal({
   footer?: ReactNode;
   children: ReactNode;
 }) {
+  const { t } = useStore();
   return (
     <AntModal
       open={open}
@@ -41,7 +42,7 @@ export function Modal({
     >
       <div className="modal-header">
         <h3 className="modal-title">{title}</h3>
-        <button className="close-x" onClick={onClose} aria-label="Close">
+        <button className="close-x" onClick={onClose} aria-label={t("Close")}>
           <Icon name="close" />
         </button>
       </div>
@@ -111,6 +112,7 @@ export function Drawer({
   footer?: ReactNode;
   children: ReactNode;
 }) {
+  const { t } = useStore();
   return (
     <AntDrawer
       open={open}
@@ -122,7 +124,7 @@ export function Drawer({
     >
       <div className="drawer-header">
         <h3 className="modal-title">{title}</h3>
-        <button className="close-x" onClick={onClose} aria-label="Close">
+        <button className="close-x" onClick={onClose} aria-label={t("Close")}>
           <Icon name="close" />
         </button>
       </div>

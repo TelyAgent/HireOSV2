@@ -521,6 +521,9 @@ export const ZH: Record<string, string> = {
   "Disable": "停用",
   "Enable": "启用",
   "Edit": "编辑",
+  // #239: names read out by screen readers.
+  "Primary navigation": "主导航",
+  "Breadcrumb": "面包屑导航",
 };
 
 export function translate(lang: "en" | "zh", source: string): string {

@@ -55,7 +55,7 @@ export interface CrumbItem { label: string; href?: string }
 export function Breadcrumbs({ items }: { items: CrumbItem[] }) {
   const { t } = useStore();
   return (
-    <nav className="crumbs" aria-label="Breadcrumb">
+    <nav className="crumbs" aria-label={t("Breadcrumb")}>
       {items.map((item, i) => (
         <span key={i} style={{ display: "contents" }}>
           {i > 0 && <span className="sep">/</span>}
