@@ -379,6 +379,23 @@ test('#155 AC-2 (review): an expected salary range is located where the whole ra
   assert.equal(at([{ id: 'z1', text: 'Salary: 160,000 – 170,000 USD' }]).evidence.length, 0, '60,000 inside 160,000 is not it');
 });
 
+test('#155 AC-2 (review): a skill is located as a whole term — Java is not JavaScript, SQL is not NoSQL', () => {
+  const segments = [{ id: 's1', text: 'Built services using JavaScript and NoSQL.' }, { id: 's2', text: 'Skills: Java, SQL, C++, C#.' }];
+  const f = byField(profileFields({ displayName: 'A', skills: ['Java', 'SQL', 'C++', 'C#'] }, { displayName: 'A', email: null, phone: null }, source(segments))).skills;
+  assert.deepEqual(f.evidence.map((e) => e.segmentId), ['s2']);
+  assert.deepEqual(f.unlocatedValues, []);
+  const only = byField(profileFields({ displayName: 'A', skills: ['Java'] }, { displayName: 'A', email: null, phone: null }, source([segments[0]]))).skills;
+  assert.deepEqual([only.evidence, only.evidenceUnavailable], [[], 'not_located']);
+  const { containsTerm } = require('../dist/profiles/profile-fields');
+  assert.equal(containsTerm('熟悉java开发和spring', 'java'), true, 'Chinese text around a term is not a join');
+  assert.equal(containsTerm('react native', 'react'), true);
+  assert.equal(containsTerm('preact', 'react'), false);
+  // The same for a job's company: "Acme" is not "Acmesoft".
+  const jobs = byField(profileFields({ displayName: 'A', employmentHistory: [{ company: 'Acme', title: 'Engineer', start: '', end: '' }] }, { displayName: 'A', email: null, phone: null },
+    source([{ id: 'w1', text: 'Engineer at Acmesoft' }, { id: 'w2', text: 'Engineer at Acme' }]))).employment_history;
+  assert.deepEqual(jobs.evidence.map((e) => e.segmentId), ['w2']);
+});
+
 test('#155 AC-1: a location confirmed unchanged on paste keeps its country and city; one the user typed is theirs', () => {
   const { withConfirmedIdentity } = require('../dist/profiles/profiles.service');
   const parsed = { displayName: 'A', email: null, location: { value: 'Ho Chi Minh City, Vietnam', status: 'known', country: 'Vietnam', city: 'Ho Chi Minh City' }, missingFields: [] };

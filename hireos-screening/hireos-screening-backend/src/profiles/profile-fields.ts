@@ -200,7 +200,7 @@ function numberParagraphs(segments: Segment[]) {
 function locateItem(item: Item, paragraphs: ReturnType<typeof numberParagraphs>, source: Source): FieldEvidence | null {
   if (item.together?.length) {
     const parts = item.together.map(normalize).filter(Boolean);
-    const candidates = paragraphs.filter((p) => parts.every((part) => p.normalized.includes(part)));
+    const candidates = paragraphs.filter((p) => parts.every((part) => containsTerm(p.normalized, part)));
     // The start month tells two stints of the same role apart (#155 review).
     // A start followed by its own end: the previous stint's end month ("Jan 2015 – Jan 2017") is not this one's start.
     const dated = item.dateForms?.length ? candidates.find((p) => startsThenEnds(p.normalized, item.dateForms!, item.endForms ?? [])) : undefined;
@@ -278,7 +278,7 @@ function locate(needles: string[], paragraphs: ReturnType<typeof numberParagraph
     const probe = needle;
     // A phone number is stored in E.164 but written with spaces or dashes: compare its digits.
     const phone = /^\+?\d{7,15}$/.test(needle) ? needle.replace('+', '') : null;
-    const hit = paragraphs.find((p) => (phone ? p.digits.includes(phone) : p.normalized.includes(probe)));
+    const hit = paragraphs.find((p) => (phone ? p.digits.includes(phone) : containsTerm(p.normalized, probe)));
     if (hit) return evidenceAt(hit, probe, source);
   }
   return null;
@@ -291,6 +291,22 @@ function salaryRange(c: Record<string, unknown>) {
 }
 
 /** How a salary figure may be written: 35000, 35,000, 35K, 35k, 3.5万. */
+/**
+ * The term as a whole word: "Java" is not in "JavaScript", nor "SQL" in "NoSQL" (#155 review). Only ASCII
+ * letters, digits, "+" and "#" count as joined, so C++ and C# work and "熟悉Java开发" still has Java.
+ */
+export function containsTerm(text: string, term: string): boolean {
+  const joined = /[a-z0-9+#]/i;
+  for (let at = text.indexOf(term); at !== -1; at = text.indexOf(term, at + 1)) {
+    const before = text[at - 1] ?? '';
+    const after = text[at + term.length] ?? '';
+    const startsJoined = joined.test(term[0]) && joined.test(before);
+    const endsJoined = joined.test(term[term.length - 1]) && joined.test(after);
+    if (!startsJoined && !endsJoined) return true;
+  }
+  return false;
+}
+
 /** How one amount may be written: 60000, 60,000, 60k, 6万. */
 function amountForms(n: number): string[] {
   return [`${n}`, n.toLocaleString('en-US'), ...(n % 1000 === 0 ? [`${n / 1000}k`] : []), ...(n % 1000 === 0 ? [`${n / 10000}万`] : [])];
