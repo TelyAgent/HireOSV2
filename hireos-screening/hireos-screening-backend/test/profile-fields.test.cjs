@@ -437,6 +437,13 @@ test('#155 AC-1: availability with a decimal is read whole — 1.5 months is 45 
   assert.equal(readAvailability('十二个月后').days, 360);
   assert.equal(readAvailability('a few weeks').days, undefined);
   assert.equal(readAvailability('几周后到岗').days, undefined);
+  // Compound number words are read whole, not by their last word.
+  assert.equal(readAvailability('Available after twenty one days').days, 21);
+  assert.equal(readAvailability('twenty-one days').days, 21);
+  assert.equal(readAvailability('thirty days notice').days, 30);
+  assert.equal(readAvailability('fifteen days').days, 15);
+  assert.equal(readAvailability('a hundred days').days, undefined);
+  assert.equal(readAvailability('half a month').days, undefined);
 });
 
 test('#155 AC-3: the candidate API returns the same fields, statuses and locations on every read', async () => {

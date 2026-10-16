@@ -39,6 +39,8 @@ export function readAvailability(value: string): Availability {
   // Amounts in words count like digits ("one month and two weeks" is 44 days); a vague one ("a few weeks") isn't
   // turned into days at all — the text alone is kept.
   if (/\b(a\s+)?(few|couple|several|some)\s+(days?|weeks?|months?)\b|几(天|周|个月)/i.test(text)) return { value: text, status: 'known' };
+  // An amount in words this can't read whole ("a hundred days", "a dozen weeks") keeps only the text too.
+  if (/\b(hundred|thousand|dozen|half)\b/i.test(text)) return { value: text, status: 'known' };
   const amounts = [...numbersAsDigits(text).matchAll(DURATION)];
   if (amounts.length) {
     return { value: text, status: 'known', days: Math.round(amounts.reduce((sum, m) => sum + Number(m[1]) * UNIT_DAYS(m[2]), 0)) };
@@ -52,13 +54,20 @@ export function readAvailability(value: string): Availability {
 
 const WORD_NUMBERS: Record<string, number> = {
   a: 1, an: 1, one: 1, two: 2, three: 3, four: 4, five: 5, six: 6, seven: 7, eight: 8, nine: 9, ten: 10, eleven: 11, twelve: 12,
+  thirteen: 13, fourteen: 14, fifteen: 15, sixteen: 16, seventeen: 17, eighteen: 18, nineteen: 19,
 };
+const TENS: Record<string, number> = { twenty: 20, thirty: 30, forty: 40, fifty: 50, sixty: 60, seventy: 70, eighty: 80, ninety: 90 };
 const CJK_DIGITS: Record<string, number> = { 一: 1, 二: 2, 两: 2, 三: 3, 四: 4, 五: 5, 六: 6, 七: 7, 八: 8, 九: 9 };
 
 /** Number words before a unit as digits: "one month and two weeks" → "1 month and 2 weeks", "两周" → "2周", "十二个月" → "12个月". */
 function numbersAsDigits(text: string): string {
+  const ones = 'one|two|three|four|five|six|seven|eight|nine';
+  const tens = Object.keys(TENS).join('|');
+  const simple = Object.keys(WORD_NUMBERS).join('|');
   return text
-    .replace(/\b(an?|one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve)(?=\s+(days?|weeks?|months?)\b)/gi, (w) => String(WORD_NUMBERS[w.toLowerCase()]))
+    // "twenty one", "twenty-one", "thirty" — the whole amount, not its last word (#155 review).
+    .replace(new RegExp(`\\b(${tens})(?:[\\s-]+(${ones}))?(?=\\s+(days?|weeks?|months?)\\b)`, 'gi'), (_w, t: string, o?: string) => String(TENS[t.toLowerCase()] + (o ? WORD_NUMBERS[o.toLowerCase()] : 0)))
+    .replace(new RegExp(`\\b(${simple})(?=\\s+(days?|weeks?|months?)\\b)`, 'gi'), (w) => String(WORD_NUMBERS[w.toLowerCase()]))
     .replace(/([一二两三四五六七八九]?十[一二三四五六七八九]?|[一二两三四五六七八九])(?=\s*(天|周|个?星期|个月))/g, (w) => {
       if (!w.includes('十')) return String(CJK_DIGITS[w]);
       const [tens, ones] = w.split('十');
