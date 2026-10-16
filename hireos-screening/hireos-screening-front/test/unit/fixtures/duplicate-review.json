@@ -47,7 +47,7 @@
     "Same phone number: +1 415 555 0134",
     "2 jobs with the same company, title and start month: Senior Data Analyst · Example Retail; Data Analyst · Sample Bank",
     "Same name: Nina Torres",
-    "Résumé text 95% similar",
+    "Résumé text 94% similar",
     "Same education: Vietnam National University"
   ],
   "scoring": {
@@ -78,7 +78,7 @@
       {
         "key": "content",
         "points": 15,
-        "detail": "Résumé text 95% similar"
+        "detail": "Résumé text 94% similar"
       },
       {
         "key": "education",

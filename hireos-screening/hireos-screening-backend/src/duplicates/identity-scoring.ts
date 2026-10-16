@@ -74,7 +74,7 @@ export function scoreIdentity(uploaded: UploadedSide, existing: ExistingSide): I
 
   const similarity = existing.text == null ? null : contentSimilarity(uploaded.text, existing.text);
   if (similarity != null && similarity >= IDENTITY_POLICY.content.signal && similarity < IDENTITY_POLICY.content.same) {
-    signals.push({ key: 'content', points: P.content, detail: `Résumé text ${Math.round(similarity * 100)}% similar` });
+    signals.push({ key: 'content', points: P.content, detail: `Résumé text ${Math.floor(similarity * 100)}% similar` });
   }
 
   const schools = existing.education.filter((entry) => educationInText(entry, uploadedLines));
