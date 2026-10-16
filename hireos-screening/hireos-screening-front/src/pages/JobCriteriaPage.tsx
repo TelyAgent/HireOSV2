@@ -1,4 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
+import { requirementProblem } from "../features/jobs/requirementPolicy";
+import { currentRubric, mentionsAuthorization } from "../features/jobs/dimensionCopy";
 import { useParams } from "react-router-dom";
 import { useStore } from "../store/StoreContext";
 import { confirmJobCriteria, getJobDetail, reopenJobCriteriaForEdit, updateJobCriteria } from "../data/api/jobs";
@@ -84,7 +86,8 @@ export function JobCriteriaPage() {
       .then((j) => {
         setJob(j);
         setRequirements(j.requirements);
-        setDimensions(j.dimensions);
+        // A draft starts from the current wording; a confirmed version is shown as it was confirmed (#180).
+        setDimensions(j.criteriaStatus === "confirmed" ? j.dimensions : j.dimensions.map((d) => ({ ...d, rubric: currentRubric(d.rubric) })));
         setTouched(false);
         setEditingNew(false);
       })
@@ -103,7 +106,9 @@ export function JobCriteriaPage() {
   const weightOk = Math.abs(weightSum - 1) < 0.001;
   const countOk = dimensions.length >= 3 && dimensions.length <= 8;
   const reqsOk = requirements.every((r) => r.label.trim());
-  const canConfirm = weightOk && countOk && reqsOk;
+  // Protected attributes, their proxies and unverifiable judgements are refused in place (#179); the server does the same.
+  const problems = new Map(requirements.map((r) => [r.id, requirementProblem(r.label)] as const).filter((entry) => entry[1]));
+  const canConfirm = weightOk && countOk && reqsOk && problems.size === 0;
   /** Shown under "Confirm this version" whenever it is disabled for a reason the user can fix (#23). */
   const confirmBlockedReason = !weightOk
     ? t("Weights must add up to 100% before confirming.")
@@ -111,6 +116,8 @@ export function JobCriteriaPage() {
       ? t("A role needs between 3 and 8 scoring dimensions.")
       : !reqsOk
         ? t("Every requirement needs a label before confirming.")
+        : problems.size
+          ? t("Fix the requirements marked below — protected attributes and unverifiable statements can't be used for screening.")
         : editingNew && !touched
           ? t("Make a change before confirming a new version")
           : null;
@@ -218,7 +225,13 @@ export function JobCriteriaPage() {
                 <span className="badge badge-success" style={{ padding: "7px 14px" }}>
                   {t("Confirmed")} v{job.criteriaVersion}
                 </span>
-                <Button variant="secondary" onClick={() => setEditingNew(true)}>
+                <Button
+                  variant="secondary"
+                  onClick={() => {
+                    setDimensions(job.dimensions.map((d) => ({ ...d, rubric: currentRubric(d.rubric) })));
+                    setEditingNew(true);
+                  }}
+                >
                   {t("Edit as new version")}
                 </Button>
               </>
@@ -296,7 +309,23 @@ export function JobCriteriaPage() {
                 editable ? (
                   <tr key={r.id}>
                     <td>
-                      <input type="text" value={r.label} placeholder={t("e.g. 5+ years relevant experience")} style={{ width: "100%" }} onChange={(e) => updateRequirement(r.id, { label: e.target.value })} />
+                      <input
+                        type="text"
+                        value={r.label}
+                        placeholder={t("e.g. 5+ years relevant experience")}
+                        style={{ width: "100%" }}
+                        aria-invalid={problems.has(r.id) || undefined}
+                        className={problems.has(r.id) ? "input-invalid" : undefined}
+                        onChange={(e) => updateRequirement(r.id, { label: e.target.value })}
+                      />
+                      {problems.get(r.id) && (
+                        <div className="field-error" role="alert" data-testid="requirement-problem">
+                          {problems.get(r.id)!.kind === "protected_attribute"
+                            ? t("Protected attributes ({attribute}) can't be used for screening.").replace("{attribute}", t(problems.get(r.id)!.attribute!))
+                            : t("This can't be checked against a résumé.")}{" "}
+                          {t(problems.get(r.id)!.suggestion)}
+                        </div>
+                      )}
                     </td>
                     <td>
                       <select value={r.priority} onChange={(e) => updateRequirement(r.id, { priority: e.target.value as Requirement["priority"] })}>
@@ -369,7 +398,12 @@ export function JobCriteriaPage() {
               <div className="list-row" style={{ padding: "10px 2px" }} key={d.id}>
                 <div style={{ flex: 1 }}>
                   <div style={{ fontWeight: 500, fontSize: "var(--fs-sm)" }}>{d.name}</div>
-                  <div className="tiny">{d.rubric}</div>
+                  <div className="tiny">{t(d.rubric)}</div>
+                  {mentionsAuthorization(d.rubric) && (
+                    <div className="tiny muted" data-testid="authorization-note">
+                      {t("Work authorization isn't used in screening — only salary expectation and work location are assessed.")}
+                    </div>
+                  )}
                 </div>
                 <div style={{ width: 110 }}>
                   <div className="bar-track">

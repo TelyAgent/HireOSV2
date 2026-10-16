@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
+import { recommendationStatus, staleReason } from "../features/recommendations/recommendationCopy";
 import { sourceLabel } from "../features/imports/sources";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { useStore } from "../store/StoreContext";
@@ -31,11 +32,6 @@ import { ParsedFieldsCard } from "../features/candidates/ParsedFieldsCard";
 
 const MATCH_POLL_INTERVAL_MS = 3000;
 const PARSE_POLL_INTERVAL_MS = 3000;
-
-const REC_STATUS_TONE: Record<string, string> = {
-  dismissed: "badge-outline",
-  deferred: "badge-neutral",
-};
 
 export function latestParseStatus(resumeVersions: CandidateDetail["resumeVersions"]) {
   return [...resumeVersions].sort((a, b) => b.version - a.version)[0]?.parseStatus;
@@ -109,7 +105,8 @@ export function NoJobState({
         title={t("No matching roles right now", "No open role in the current job set matches this profile yet.")}
         body={
           <>
-            {jd.reason || t("No open role in the current job set matches this profile yet.")}
+            {/* The backend's reason is an English sentence; it reads in the interface language (#184). */}
+            {jd.reason ? t(jd.reason) : t("No open role in the current job set matches this profile yet.")}
             <br />
             <span className="tiny">
               {t("Current search scope:")} {openRoles} {t("open roles")} · {t("last checked")} {relTime(jd.lastRunAt, state.lang)}
@@ -398,7 +395,7 @@ export function CandidateProfilePage() {
       return {
         key: a.id,
         jobTitle: job?.title || "—",
-        team: job?.team || "—",
+        team: job ? [job.team, job.location].filter(Boolean).join(" · ") : "—",
         status: <span className="badge badge-success">{t("Linked")}</span>,
         when: `${fmtDate(a.linkedAt, state.lang)} ${t("by")} ${getPerson(a.linkedBy)?.name}`,
         route,
@@ -413,20 +410,22 @@ export function CandidateProfilePage() {
       .filter((r) => r.status !== "confirmed")
       .map((r) => {
         const job = getJob(r.jobId);
-        const route = `/candidates/${candidate.id}/jobs`;
-        const statusBadge =
-          r.status === "proposed" ? (
-            <span className="badge badge-info">{t("Pending recommendation")}</span>
-          ) : (
-            <span className={`badge ${REC_STATUS_TONE[r.status] || "badge-outline"}`}>{t(r.status.charAt(0).toUpperCase() + r.status.slice(1))}</span>
-          );
+        // Straight to this job's card, so two same-named roles in different cities can't be mixed up (#185).
+        const route = `/candidates/${candidate.id}/jobs#rec-${r.id}`;
+        const status = recommendationStatus(r);
+        const statusBadge = (
+          <span className={`badge ${status.tone}`} title={staleReason(r) ? t(staleReason(r)!) : undefined} data-testid="rec-status">
+            {t(r.status === "proposed" ? "Pending recommendation" : status.label)}
+          </span>
+        );
         return {
           key: r.id,
           jobTitle: job?.title || "—",
-          team: job?.team || "—",
+          team: job ? [job.team, job.location].filter(Boolean).join(" · ") : "—",
           status: (
             <>
               {statusBadge}
+              {r.eligibility === "not_eligible" && r.status !== "stale" && <span className="badge badge-danger"> {t("Not eligible")}</span>}
               {job && job.status !== "open" && <span className="badge badge-warning"> {t("Role closed")}</span>}
             </>
           ),
@@ -628,7 +627,7 @@ export function CandidateProfilePage() {
                 <thead>
                   <tr>
                     <th>{t("Job")}</th>
-                    <th>{t("Team")}</th>
+                    <th>{t("Team · location")}</th>
                     <th>{t("Status")}</th>
                     <th>{t("When")}</th>
                     <th></th>

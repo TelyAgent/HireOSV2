@@ -40,9 +40,15 @@ export class ScreeningController {
   resolveConcern(
     @Req() req: { identity: Identity },
     @Param('id') id: string,
-    @Body() body: { resolution?: string },
+    @Body() body: unknown,
   ) {
-    return this.screening.resolveConcern(req.identity, id, body?.resolution);
+    return this.screening.resolveConcern(req.identity, id, body);
+  }
+
+  /** A handled concern back to open, with a note; the earlier handling stays in its history (#193). */
+  @Post('concerns/:id/reopen')
+  reopenConcern(@Req() req: { identity: Identity }, @Param('id') id: string, @Body() body: unknown) {
+    return this.screening.reopenConcern(req.identity, id, body);
   }
 
   @Post('verification-items/:id/assign')

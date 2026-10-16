@@ -1,4 +1,5 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
+import { toFrontendRecommendation } from '../discovery/discovery.service';
 import { profileFields } from '../profiles/profile-fields';
 import { referencedProfileFields } from '../profiles/correction-rules';
 import { formatMonth, totalExperience } from '../profiles/experience';
@@ -128,7 +129,7 @@ export class CandidatesService {
           include: { material: { select: { id: true, name: true, readStatus: true, errorCode: true, createdAt: true, segments: true } } },
         },
         profiles: { orderBy: { version: 'desc' }, take: 1 },
-        recommendations: { orderBy: { createdAt: 'desc' } },
+        recommendations: { orderBy: { createdAt: 'desc' }, include: { prelinkEvaluation: true } },
         applications: { orderBy: { linkedAt: 'desc' } },
         sources: { orderBy: { receivedAt: 'desc' }, take: 50, include: { material: { select: { id: true, name: true } } } },
       },
@@ -184,19 +185,8 @@ export class CandidatesService {
         linkedBy: application.linkedBy,
         linkReason: application.linkReason,
       })),
-      recommendations: candidate.recommendations.map((recommendation) => ({
-        id: recommendation.id,
-        candidateId: recommendation.candidateId,
-        jobId: recommendation.jobId,
-        status: recommendation.status,
-        createdAt: recommendation.createdAt.toISOString(),
-        confidence: recommendation.confidence,
-        rationale: recommendation.rationale,
-        gaps: Array.isArray(recommendation.gaps) ? recommendation.gaps.map(String) : [],
-        staleReason: recommendation.staleReason || undefined,
-        proposalSource: recommendation.proposalSource,
-        applicationRef: recommendation.applicationRef || undefined,
-      })),
+      // With eligibility, conflicts and what each was based on (#181 #183).
+      recommendations: candidate.recommendations.map((recommendation) => toFrontendRecommendation(recommendation)),
     };
   }
 

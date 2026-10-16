@@ -4,7 +4,7 @@ import { useStore } from "../../store/StoreContext";
 import { Button } from "../../components/ui/Primitives";
 import { Icon } from "../../components/ui/Icons";
 import { ApiError } from "../../data/api/shared";
-import { quickStartJob, readJdFile } from "../../data/api/jobs";
+import { previewJobFromJd, quickStartJob, readJdFile, type JdPreview } from "../../data/api/jobs";
 import type { Job } from "../../data/fixtures/jobs";
 
 // Error codes from the backend / upload checks -> the sentence shown under the form.
@@ -30,10 +30,11 @@ const ERRORS: Record<string, [string, string]> = {
 const newKey = () => (typeof crypto !== "undefined" && "randomUUID" in crypto ? crypto.randomUUID() : `${Date.now()}-${Math.random().toString(36).slice(2)}`);
 
 /**
- * "New job": paste a JD (or read it from a file). Nothing is created until AI has read it — title,
- * location, department, requirements all come from the AI. The job is then a draft in HireOS JD +
- * Core Record that Screening uses right away (Screening can be used without JD, so it doesn't wait
- * for anyone to publish it there); the recruiter confirms the rubric on the criteria page.
+ * "New job", in two steps (#178; Owner decision 2026-10-16): paste a JD (or read it from a file) and let AI
+ * read it, then check the title and team it found — both required, each with its own message — before
+ * anything is created. The job is then a draft in HireOS JD + Core Record that Screening uses right away;
+ * the recruiter lands on its criteria draft and confirms the rubric before any matching. One idempotency key
+ * per modal, so a double click creates one job.
  */
 export function NewJobModal({ open, onClose, onCreated }: { open: boolean; onClose: () => void; onCreated: (job: Job, duplicate: boolean) => void }) {
   const { t, state } = useStore();
@@ -43,11 +44,20 @@ export function NewJobModal({ open, onClose, onCreated }: { open: boolean; onClo
   const [fileBusy, setFileBusy] = useState(false);
   const [creating, setCreating] = useState(false);
   const [error, setError] = useState("");
+  const [reading, setReading] = useState(false);
+  const [preview, setPreview] = useState<JdPreview | null>(null);
+  const [title, setTitle] = useState("");
+  const [team, setTeam] = useState("");
+  const [fieldErrors, setFieldErrors] = useState<{ title?: boolean; team?: boolean }>({});
   const fileGeneration = useRef(0);
+  const key = useRef(newKey());
   const errorText = (code: string) => (ERRORS[code] || ERRORS.REQUEST_FAILED)[zh ? 1 : 0];
-  const busy = creating || fileBusy;
+  const busy = creating || fileBusy || reading;
 
-  function reset() { fileGeneration.current++; setText(""); setFileName(""); setFileBusy(false); setError(""); }
+  function reset() {
+    fileGeneration.current++; setText(""); setFileName(""); setFileBusy(false); setError("");
+    setPreview(null); setTitle(""); setTeam(""); setFieldErrors({}); key.current = newKey();
+  }
   function close() { if (creating) return; reset(); onClose(); }
 
   async function pickFile(file: File) {
@@ -62,11 +72,26 @@ export function NewJobModal({ open, onClose, onCreated }: { open: boolean; onClo
     finally { if (g === fileGeneration.current) setFileBusy(false); }
   }
 
-  async function create() {
+  async function read() {
     if (!text.trim()) { setError("JD_REQUIRED"); return; }
+    setReading(true); setError("");
+    try {
+      const found = await previewJobFromJd(text);
+      setPreview(found);
+      setTitle(found.title ?? "");
+      setTeam(found.team ?? "");
+      setFieldErrors({});
+    } catch (e) { setError(e instanceof ApiError ? e.code : "REQUEST_FAILED"); }
+    finally { setReading(false); }
+  }
+
+  async function create() {
+    const missing = { title: !title.trim(), team: !team.trim() };
+    if (!preview?.duplicateOf && (missing.title || missing.team)) { setFieldErrors(missing); return; }
+    if (creating) return;
     setCreating(true); setError("");
     try {
-      const { job, duplicate } = await quickStartJob(text, newKey());
+      const { job, duplicate } = await quickStartJob({ text, title: title.trim() || preview?.duplicateOf?.title || "", team: team.trim() || "—" }, key.current);
       reset();
       onCreated(job, duplicate);
     } catch (e) { setError(e instanceof ApiError ? e.code : "REQUEST_FAILED"); }
@@ -90,7 +115,7 @@ export function NewJobModal({ open, onClose, onCreated }: { open: boolean; onClo
       <div style={{ marginTop: 20 }}>
         <label htmlFor="screeningJdText" style={{ display: "block", fontSize: 13, fontWeight: 600, color: "var(--text)" }}>{t("Job description")}</label>
         <div style={{ marginTop: 3, fontSize: 11, fontWeight: 700, color: "var(--danger-text)" }}>{t("Required")}</div>
-        <textarea id="screeningJdText" value={text} onChange={(e) => setText(e.target.value)} placeholder={t("Paste the job description here…")}
+        <textarea id="screeningJdText" value={text} readOnly={!!preview} onChange={(e) => setText(e.target.value)} placeholder={t("Paste the job description here…")}
           style={{ marginTop: 8, width: "100%", height: 170, border: "1px solid var(--border-strong)", borderRadius: 11, padding: "12px 14px", fontSize: 13, color: "var(--text-secondary)", background: "var(--surface)", lineHeight: 1.55, resize: "none", boxSizing: "border-box", outline: "none", fontFamily: "inherit" }} />
         <label htmlFor="screeningJdFile"
           style={{ marginTop: 14, width: "100%", display: "flex", alignItems: "center", gap: 12, padding: "14px 16px", border: "1px dashed var(--border-strong)", borderRadius: 12, background: "var(--surface-alt)", cursor: fileBusy ? "progress" : "pointer", boxSizing: "border-box" }}>
@@ -104,12 +129,45 @@ export function NewJobModal({ open, onClose, onCreated }: { open: boolean; onClo
         </label>
       </div>
 
+      {preview && (
+        <div style={{ marginTop: 18 }} data-testid="jd-preview">
+          {preview.duplicateOf ? (
+            <p className="tiny">{t("This JD already created the job “%s”. Creating opens that job instead of adding another.").replace("%s", preview.duplicateOf.title)}</p>
+          ) : (
+            <>
+              <p className="tiny" style={{ marginTop: 0 }}>{t("AI read the JD. Check the title and team before the job is created.")}</p>
+              <div className={`field${fieldErrors.title ? " field-invalid" : ""}`}>
+                <label htmlFor="newJobTitle">{t("Job title")} <span className="req">*</span></label>
+                <input id="newJobTitle" type="text" value={title} aria-invalid={fieldErrors.title || undefined}
+                  onChange={(e) => { setTitle(e.target.value); if (e.target.value.trim()) setFieldErrors((f) => ({ ...f, title: false })); }} />
+                {fieldErrors.title && <div className="field-error">{t("Enter the job title.")}</div>}
+              </div>
+              <div className={`field${fieldErrors.team ? " field-invalid" : ""}`}>
+                <label htmlFor="newJobTeam">{t("Team / function")} <span className="req">*</span></label>
+                <input id="newJobTeam" type="text" value={team} aria-invalid={fieldErrors.team || undefined}
+                  onChange={(e) => { setTeam(e.target.value); if (e.target.value.trim()) setFieldErrors((f) => ({ ...f, team: false })); }} />
+                {fieldErrors.team && <div className="field-error">{t("Enter the team or function.")}</div>}
+              </div>
+              {preview.location && <p className="tiny muted">{t("Location")}: {preview.location}</p>}
+            </>
+          )}
+        </div>
+      )}
       {error && <div role="alert" style={{ marginTop: 12, fontSize: 12.5, color: "var(--danger-text)" }}>{errorText(error)}</div>}
       <div style={{ marginTop: 22, paddingTop: 16, borderTop: "1px solid var(--border)", display: "flex", alignItems: "center", justifyContent: "flex-end", gap: 12 }}>
         <Button variant="text" onClick={close}>{t("Cancel")}</Button>
-        <Button variant="primary" onClick={() => void create()} disabled={busy}>
-          {creating ? t("AI is reading the JD…") : t("Create job")}
-        </Button>
+        {preview ? (
+          <>
+            <Button variant="secondary" onClick={() => { setPreview(null); setFieldErrors({}); }} disabled={creating}>{t("Back to JD")}</Button>
+            <Button variant="primary" onClick={() => void create()} disabled={creating} data-testid="create-job">
+              {creating ? t("Creating…") : preview.duplicateOf ? t("Open existing job") : t("Create job")}
+            </Button>
+          </>
+        ) : (
+          <Button variant="primary" onClick={() => void read()} disabled={busy} data-testid="read-jd">
+            {reading ? t("AI is reading the JD…") : t("Read JD")}
+          </Button>
+        )}
       </div>
     </Modal>
   );
