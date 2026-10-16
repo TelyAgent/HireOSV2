@@ -1,5 +1,8 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { BadRequestException, ConflictException, Injectable, NotFoundException, ServiceUnavailableException } from '@nestjs/common';
+import { z } from 'zod';
+import { invalidSchemaFromZod } from '../http/invalid-schema';
+import { asSegments, locateQuote } from '../shared/locate-quote';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../persistence/prisma.service';
 import type { Identity } from '../auth/workspace.guard';
@@ -65,8 +68,11 @@ export class ScreeningService {
       orderBy: { version: 'desc' },
       select: { id: true, version: true, overallScore: true, coverage: true, completedAt: true, createdAt: true, modelVersion: true, evaluationMode: true, aiStatus: true, freshness: true },
     });
+    const detail = this.serializeDetail(application, evaluation, decision);
     return {
-      ...this.serializeDetail(application, evaluation, decision),
+      ...detail,
+      // Each evidence item with the paragraph it came from, so "Evidence (N)" opens real excerpts (#192).
+      evaluation: detail.evaluation && evaluation ? { ...detail.evaluation, evidence: await this.evidenceOf(identity.workspaceId, evaluation) } : detail.evaluation,
       withdrawnDecisions: withdrawnDecisions.map(serializeDecision),
       history: history.map(serializeSnapshotSummary),
       screeningInProgress: this.inFlight.has(applicationId),
@@ -80,7 +86,46 @@ export class ScreeningService {
       orderBy: { version: 'desc' },
       include: { dimensionScores: true, concerns: true, verificationItems: true, humanAssessments: true, evidenceItems: true },
     });
-    return evaluations.map((evaluation) => serializeEvaluation(evaluation));
+    return Promise.all(evaluations.map(async (evaluation) => ({
+      ...serializeEvaluation(evaluation),
+      evidence: await this.evidenceOf(identity.workspaceId, evaluation),
+    })));
+  }
+
+  /**
+   * An evaluation's evidence as the reviewer sees it (#192): source material and résumé version, the excerpt,
+   * where it sits (page / paragraph) and whether it was found there. A quote the material doesn't contain is
+   * "not_located"; a material that can't be read is "source_unavailable" — never shown as verified.
+   */
+  private async evidenceOf(workspaceId: string, evaluation: { evidenceItems?: Array<Record<string, unknown>> }) {
+    const items = evaluation.evidenceItems ?? [];
+    const materialIds = [...new Set(items.map((item) => item.materialId).filter((id): id is string => typeof id === 'string'))];
+    const materials = materialIds.length
+      ? await this.db.material.findMany({
+          where: { workspaceId, id: { in: materialIds } },
+          select: { id: true, name: true, readStatus: true, segments: true, resumeVersion: { select: { version: true } } },
+        })
+      : [];
+    const byId = new Map(materials.map((material) => [material.id, material]));
+    return items.map((item) => {
+      const material = typeof item.materialId === 'string' ? byId.get(item.materialId) : undefined;
+      const segments = asSegments(material?.segments);
+      const readable = !!material && material.readStatus === 'available' && segments.length > 0;
+      const location = readable ? locateQuote(segments, String(item.statement ?? '')) : null;
+      return {
+        id: String(item.id),
+        materialId: material?.id,
+        resumeVersion: material?.resumeVersion?.version,
+        sourceLabel: String(item.sourceLabel ?? material?.name ?? 'Resume'),
+        kind: String(item.kind ?? 'documented_fact'),
+        statement: String(item.statement ?? ''),
+        location,
+        located: !readable ? 'source_unavailable' : location ? 'located' : 'not_located',
+        verification: String(item.verification ?? 'unverified'),
+        confidence: typeof item.confidence === 'number' ? item.confidence : null,
+        availability: String(item.availability ?? 'available'),
+      };
+    });
   }
 
   async run(identity: Identity, applicationId: string, purpose: string) {
@@ -181,17 +226,60 @@ export class ScreeningService {
     return serializeHumanAssessment(assessment);
   }
 
-  async resolveConcern(identity: Identity, concernId: string, resolution?: string) {
-    if (!['dismissed', 'confirmed', 'accepted_risk'].includes(resolution || '')) {
-      throw new BadRequestException({ code: 'INVALID_CONCERN_RESOLUTION' });
-    }
-    const concern = await this.db.screeningConcern.findFirst({
-      where: { id: concernId, workspaceId: identity.workspaceId },
-    });
+  /**
+   * Handling a concern (F08 FR-8, #193, Owner decision 2026-10-16): a note is required, references to the
+   * candidate's material are optional, and the change is recorded — status before and after, note, references,
+   * who and when — next to the unchanged concern. Only an open concern can be handled, once: a second or
+   * concurrent attempt finds it already handled. Linked verification items are left as they are; they are
+   * answered on their own.
+   */
+  async resolveConcern(identity: Identity, concernId: string, raw: unknown) {
+    const parsed = concernResolutionSchema.safeParse(raw);
+    if (!parsed.success) throw invalidSchemaFromZod(parsed.error);
+    const { resolution, note, evidenceRefs } = parsed.data;
+    const concern = await this.db.screeningConcern.findFirst({ where: { id: concernId, workspaceId: identity.workspaceId } });
     if (!concern) throw new NotFoundException({ code: 'NOT_FOUND' });
-    const updated = await this.db.screeningConcern.update({
-      where: { id: concernId },
-      data: { status: resolution, resolution },
+    const entry = { action: 'resolve', fromStatus: 'open', toStatus: resolution, note, evidenceRefs, actorId: identity.actorId, at: new Date().toISOString() };
+    return this.recordConcernChange(identity, concern, 'open', resolution, entry);
+  }
+
+  /** Back to open after a mistaken handling, with a note; nothing earlier is erased (#193 AC-4). */
+  async reopenConcern(identity: Identity, concernId: string, raw: unknown) {
+    const parsed = z.object({ note: z.string().trim().min(1, 'Say why the concern is reopened.').max(2000) }).strict().safeParse(raw);
+    if (!parsed.success) throw invalidSchemaFromZod(parsed.error);
+    const concern = await this.db.screeningConcern.findFirst({ where: { id: concernId, workspaceId: identity.workspaceId } });
+    if (!concern) throw new NotFoundException({ code: 'NOT_FOUND' });
+    if (concern.status === 'open') throw new ConflictException({ code: 'CONCERN_ALREADY_OPEN' });
+    const entry = { action: 'reopen', fromStatus: concern.status, toStatus: 'open', note: parsed.data.note, evidenceRefs: [], actorId: identity.actorId, at: new Date().toISOString() };
+    return this.recordConcernChange(identity, concern, concern.status, 'open', entry);
+  }
+
+  private async recordConcernChange(
+    identity: Identity,
+    concern: { id: string; status: string; resolutionHistory: unknown },
+    from: string,
+    to: string,
+    entry: Record<string, unknown>,
+  ) {
+    const history = [...(Array.isArray(concern.resolutionHistory) ? concern.resolutionHistory : []), entry];
+    const updated = await this.db.$transaction(async (tx) => {
+      // Compare-and-set on the status read: a concurrent change makes this one a no-op that reports the conflict.
+      const claim = await tx.screeningConcern.updateMany({
+        where: { id: concern.id, workspaceId: identity.workspaceId, status: from },
+        data: { status: to, resolution: to === 'open' ? null : to, resolutionHistory: json(history) },
+      });
+      if (claim.count !== 1) throw new ConflictException({ code: 'CONCERN_CHANGED', message: 'This concern was changed in the meantime. Reload and try again.' });
+      await tx.auditRecord.create({
+        data: {
+          workspaceId: identity.workspaceId,
+          actorId: identity.actorId,
+          action: entry.action === 'reopen' ? 'screening_concern_reopened' : 'screening_concern_resolved',
+          objectType: 'ScreeningConcern',
+          objectId: concern.id,
+          payload: json(entry),
+        },
+      });
+      return tx.screeningConcern.findUniqueOrThrow({ where: { id: concern.id } });
     });
     return serializeConcern(updated);
   }
@@ -273,7 +361,7 @@ export class ScreeningService {
   ) {
     const dimensions = asDimensions(input.criteria?.dimensions);
     const requirements = asRequirements(input.criteria?.requirements);
-    const hardRequirements = requirements.filter((requirement) => requirement.hard);
+    const hardRequirements = scoredHardRequirements(requirements);
     const resumeText = input.material?.text || '';
     const aiConfigured = this.aiEvaluator.isConfigured();
     const useAi = aiConfigured && !!resumeText;
@@ -313,7 +401,8 @@ export class ScreeningService {
         throw error;
       }
     } else {
-      evaluationResult = this.evaluateLocally(dimensions, hardRequirements, input.profile, buildCorpus(input.profile, resumeText));
+      const profile = withoutWorkAuthorization(input.profile);
+      evaluationResult = this.evaluateLocally(dimensions, hardRequirements, profile, buildCorpus(profile, resumeText));
     }
     const { dimensionResults, eligibilityResults, overall, coverage, evaluatorVersion } = evaluationResult;
     const metadata = evaluationMetadata(useAi, evaluationResult.confidence, modelVersion);
@@ -713,9 +802,9 @@ function evaluateDimension(dimension: DimensionInput, profile: any, corpus: stri
   const name = dimension.name.toLowerCase();
   if (!corpus.trim()) return unknownDimension(dimension, 'No readable source material is available.');
   if (name.includes('compensation') || name.includes('location')) {
-    const known = profile?.location?.status === 'known' || profile?.compensationExpectation?.status === 'known' || profile?.workAuthorization?.status === 'known';
+    const known = profile?.location?.status === 'known' || profile?.compensationExpectation?.status === 'known';
     return known
-      ? evaluatedDimension(dimension, 78, 0.72, 'Profile contains location, compensation, or work-authorization data.')
+      ? evaluatedDimension(dimension, 78, 0.72, 'Profile contains location or compensation data.')
       : unknownDimension(dimension, 'Compensation and location fit are not sufficiently documented.');
   }
   if (name.includes('skill') || name.includes('technical') || name.includes('experience') || name.includes('seniority') || name.includes('ownership')) {
@@ -737,14 +826,6 @@ function unknownDimension(dimension: DimensionInput, reason: string) {
 
 function evaluateRequirement(requirement: RequirementInput, profile: any, corpus: string) {
   const lower = `${requirement.label} ${corpus}`.toLowerCase();
-  if (requirement.kind === 'authorization') {
-    const authorization = profile?.workAuthorization;
-    return {
-      requirementId: requirement.id,
-      status: (authorization?.status === 'known' ? 'met' : 'unknown') as 'met' | 'unknown',
-      reason: authorization?.status === 'known' ? 'Work authorization is present in the candidate profile.' : 'Work authorization is not confirmed.',
-    };
-  }
   if (requirement.kind === 'experience' && profile?.employmentHistory?.length) {
     return { requirementId: requirement.id, status: 'met' as const, reason: 'Employment history is present in the candidate profile.' };
   }
@@ -762,6 +843,23 @@ function aggregateEligibility(results: Array<{ status: string }>) {
   if (results.some((result) => result.status === 'not_met')) return 'not_eligible';
   if (results.some((result) => result.status === 'unknown')) return 'needs_verification';
   return 'eligible';
+}
+
+/**
+ * The hard requirements eligibility is decided on. Work authorization is not a matching or scoring factor
+ * (F02 WA-2, #157 AC-3): an authorization requirement isn't evaluated, so whether a profile states it can't
+ * change a candidate's eligibility.
+ */
+export function scoredHardRequirements<T extends { hard: boolean; kind: string }>(requirements: T[]): T[] {
+  return requirements.filter((requirement) => requirement.hard && requirement.kind !== 'authorization');
+}
+
+/** The profile as scoring sees it: work authorization is not a matching or scoring factor (F02 WA-2, #157). */
+export function withoutWorkAuthorization<T>(profile: T): T {
+  if (!profile || typeof profile !== 'object') return profile;
+  const rest = { ...(profile as Record<string, unknown>) };
+  delete rest.workAuthorization;
+  return rest as T;
 }
 
 function buildCorpus(profile: any, text: string) {
@@ -867,8 +965,18 @@ function serializeConcern(concern: any) {
     verificationItemIds: concern.verificationItemIds,
     restricted: concern.restricted,
     resolution: concern.resolution,
+    history: Array.isArray(concern.resolutionHistory) ? concern.resolutionHistory : [],
   };
 }
+
+const concernResolutionSchema = z.object({
+  resolution: z.enum(['dismissed', 'confirmed', 'accepted_risk']),
+  note: z.string().trim().min(1, 'Describe how the concern was checked.').max(2000),
+  evidenceRefs: z.array(z.object({
+    materialId: z.string().min(1).max(100),
+    label: z.string().trim().max(300).optional(),
+  }).strict()).max(10).optional().default([]),
+}).strict();
 
 function serializeVerificationItem(item: any) {
   return {

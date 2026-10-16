@@ -1,4 +1,5 @@
 import { applyServerState, db } from "../db";
+import type { Evidence } from "../fixtures/evidence";
 import type { Application } from "../fixtures/applications";
 import type { Evaluation } from "../fixtures/evaluations";
 import type { Concern } from "../fixtures/concerns";
@@ -40,6 +41,8 @@ export async function getApplicationDetail(id: string): Promise<ApplicationDetai
   if (existingApplication >= 0) db.applications[existingApplication] = detail.application;
   else db.applications.push(detail.application);
   if (detail.evaluation) db.evaluations[id] = detail.evaluation;
+  // The evidence behind each dimension, so its drawer can show the excerpts (#192).
+  for (const item of (detail.evaluation as { evidence?: Evidence[] } | null)?.evidence ?? []) db.evidence[item.id] = item;
   db.concerns[id] = detail.concerns;
   for (const item of detail.verificationItems) db.verificationItems[item.id] = item;
   db.humanAssessments[id] = detail.humanAssessments;
@@ -112,11 +115,23 @@ export async function saveHumanOverride(applicationId: string, input: SaveHumanO
 }
 
 export type ConcernResolution = "dismissed" | "confirmed" | "accepted_risk";
-export async function resolveConcern(applicationId: string, concernId: string, resolution: ConcernResolution): Promise<Concern> {
+/** Handling a concern needs a note; references to the candidate's material are optional (#193). */
+export async function resolveConcern(
+  applicationId: string,
+  concernId: string,
+  input: { resolution: ConcernResolution; note: string; evidenceRefs?: Array<{ materialId: string; label?: string }> },
+): Promise<Concern> {
   const concern = await apiFetch<Concern>(`/concerns/${concernId}/resolve`, {
     method: "POST",
-    body: JSON.stringify({ resolution }),
+    body: JSON.stringify(input),
   });
+  applyServerState({ applicationId, concern });
+  return concern;
+}
+
+/** A handled concern back to open, with a note; its history is kept (#193 AC-4). */
+export async function reopenConcern(applicationId: string, concernId: string, note: string): Promise<Concern> {
+  const concern = await apiFetch<Concern>(`/concerns/${concernId}/reopen`, { method: "POST", body: JSON.stringify({ note }) });
   applyServerState({ applicationId, concern });
   return concern;
 }

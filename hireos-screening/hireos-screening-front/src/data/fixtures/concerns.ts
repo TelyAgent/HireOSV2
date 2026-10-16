@@ -14,4 +14,16 @@ export interface Concern {
   verificationItemIds: string[];
   restricted?: boolean;
   resolution?: string;
+  /** Every handling and reopening, oldest first (#193). */
+  history?: ConcernHistoryEntry[];
+}
+
+export interface ConcernHistoryEntry {
+  action: "resolve" | "reopen";
+  fromStatus: ConcernStatus;
+  toStatus: ConcernStatus;
+  note: string;
+  evidenceRefs: Array<{ materialId: string; label?: string }>;
+  actorId: string;
+  at: string;
 }

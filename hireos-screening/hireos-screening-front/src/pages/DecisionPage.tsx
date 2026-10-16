@@ -311,7 +311,8 @@ export function DecisionPage() {
   const cand = getCandidate(app.candidateId)!;
   const job = getJob(app.jobId)!;
   const ev = getEvaluation(app.id);
-  const aiRec = ev ? (ev.evaluationStatus === "insufficient_evidence" ? "review" : inferRecommendation(ev)) : null;
+  // The same rule, with the same open concerns, as the screening detail and the workspace (#194).
+  const aiRec = inferRecommendation(ev, getConcerns(app.id));
 
   const requiredAssessment = job.workflowPolicy?.assessmentDisposition === "required";
   const assessmentMissing = app.assessmentStatus !== "completed";

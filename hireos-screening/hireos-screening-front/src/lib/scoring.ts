@@ -50,18 +50,5 @@ export function confidenceLabel(
   return translate(lang, "Limited match signal");
 }
 
-/** Inferred AI recommendation badge for a screening evaluation — a display
- * derivation only, never itself an approval/rejection action. Ported
- * verbatim from the prototype's `inferRecommendation`. */
-export type InferredRecommendation = "strong_advance" | "advance" | "review" | "do_not_advance";
-export function inferRecommendation(
-  ev: { eligibilityStatus?: EligibilityStatus; evaluationStatus?: string; overall: number | null } | null | undefined,
-): InferredRecommendation | null {
-  if (!ev) return null;
-  if (ev.eligibilityStatus === "not_eligible") return "do_not_advance";
-  if (ev.evaluationStatus === "insufficient_evidence") return "review";
-  if (ev.overall == null) return "review";
-  if (ev.overall >= 80 && ev.eligibilityStatus === "eligible") return "strong_advance";
-  if (ev.overall >= 65) return "advance";
-  return "review";
-}
+// The AI recommendation rule lives in one dependency-free module (#194) so every page and the tests share it.
+export { inferRecommendation, recommend, type InferredRecommendation } from "./recommendationRule";
