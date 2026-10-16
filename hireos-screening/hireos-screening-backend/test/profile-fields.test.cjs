@@ -292,6 +292,29 @@ test('#155 (review): a parse records the version\'s contact; a correction carrie
   assert.deepEqual(created[0].contact, { email: 'mai@example.test', phone: '+84 90 111 2222' });
 });
 
+test('#155 (review): a contact correction is measured against the version shown, not the identity record', async () => {
+  const created = [];
+  const audits = [];
+  const profile = { id: 'p-2', version: 2, resumeVersionId: 'rv-2', displayName: 'Mai', dataStatus: 'complete', parserVersion: 'x', parseStatus: 'succeeded', sourceEntries: [],
+    resumeVersionRefs: [], employmentHistory: [], skills: [], education: [], certifications: [], languages: [], projects: [], location: null, workAuthorization: null,
+    compensationExpectation: null, missingFields: [], corrections: [], contact: { email: 'new@example.test', phone: null } };
+  const db = {
+    candidate: { findFirst: async () => ({ id: 'c-1', displayName: 'Mai', email: 'old@example.test', phone: null, profiles: [profile] }), update: async () => ({}) },
+    candidateJobRecommendation: { findFirst: async () => null }, screeningEvaluation: { findFirst: async () => null },
+    candidateProfile: { create: async ({ data }) => { created.push(data); return { id: 'p-3', ...data }; } },
+    auditRecord: { create: async ({ data }) => audits.push(data) },
+  };
+  db.$transaction = async (fn) => fn(db);
+  await new ProfilesService(db, {}, {}, {}).correct({ workspaceId: 'ws-1', actorId: 'hr-1', roles: [] }, 'c-1', { email: 'old@example.test' });
+  assert.equal(created[0].contact.email, 'old@example.test', 'changing the version back to the old address is a change');
+  const entry = created[0].corrections.find((c) => c.fieldPath === 'email');
+  assert.deepEqual([entry.oldValue, entry.newValue], ['new@example.test', 'old@example.test']);
+  // The page and the form show the version's contact.
+  const { CandidatesService } = require('../dist/library/candidates.service');
+  const shown = new CandidatesService({}, {}, {}).toFrontendCandidate({ id: 'c-1', displayName: 'Mai', identityStatus: 'provisional', email: 'old@example.test', phone: null, ownerId: 'hr-1', createdAt: new Date(), lastMatchedAt: null, retention: 'standard' }, profile);
+  assert.equal(shown.contact.email, 'new@example.test');
+});
+
 test('#155 (review): correcting one contact on a version from before contacts were recorded keeps the other one', async () => {
   const created = [];
   const legacy = { id: 'p-1', version: 1, resumeVersionId: 'rv-1', displayName: 'Mai', dataStatus: 'complete', parserVersion: 'x', parseStatus: 'succeeded', sourceEntries: [],

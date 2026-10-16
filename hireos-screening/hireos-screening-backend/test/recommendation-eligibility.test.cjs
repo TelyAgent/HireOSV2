@@ -62,6 +62,9 @@ test('#181 AC-1 (F06 FR-5): a ruled-out match is still shown as a recommendation
 });
 
 test('#181 AC-3: no explicit statement — or a "conflict" whose quote isn\'t in the résumé — is not a conflict', async () => {
+  const doctored = setup(answer({ conflicts: [{ requirement: 'Job location', quote: 'Product manager, Example Retail (2020-03 to present) and I cannot relocate to Beijing' }] }));
+  await doctored.service['matchCandidateForJob']('ws-1', candidate(LIN), job, 'run-9');
+  assert.equal(doctored.created.evaluations[0].eligibility, 'eligible', 'a true opening with an invented ending is no conflict');
   const unknown = setup(answer());
   await unknown.service['matchCandidateForJob']('ws-1', candidate(LIN), job, 'run-9');
   assert.equal(unknown.created.evaluations[0].eligibility, 'eligible');
@@ -87,6 +90,10 @@ test('#183 AC-1: evidence quotes are checked against the text the match read, wi
   assert.equal(evidence[2].evidence, 'Skills: roadmap, SQL, user research', 'the verbatim excerpt is what is shown');
   assert.equal(evidence[2].explanation, '有多年产品经验');
   assert.equal(quoteInText('SENIOR product manager — Example Fintech', BEN), true, 'case, dashes and spacing are ignored');
+  // The whole quote must be there: a true opening with an invented ending is not (#181 review).
+  const long = 'I have extensive experience designing and delivering distributed software systems for international customers. I am willing to relocate to Beijing.';
+  assert.equal(quoteInText('I have extensive experience designing and delivering distributed software systems for international customers. I cannot relocate to Beijing.', long), false);
+  assert.equal(quoteInText('I am willing to relocate to Beijing.', long), true);
 });
 
 const rec = (over = {}) => ({

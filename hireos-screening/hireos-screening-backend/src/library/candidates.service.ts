@@ -215,15 +215,17 @@ export class CandidatesService {
     projects?: unknown;
   }) {
     const location = asProfileValue(profile?.location);
+    const versionContact = asRecord((profile as { contact?: unknown } | undefined)?.contact);
     const workAuth = asProfileValue(profile?.workAuthorization);
     const compensation = asRecord(profile?.compensationExpectation);
     return {
       id: candidate.id,
       displayName: profile?.displayName || candidate.displayName,
       identityStatus: candidate.identityStatus === 'confirmed' ? 'confirmed' as const : 'provisional' as const,
+      // The latest profile version's contact when it recorded one, so the page and the correction form agree (#155 review).
       contact: {
-        email: candidate.email || '',
-        phone: candidate.phone || '',
+        email: (versionContact ? String(versionContact.email ?? '') : candidate.email) || '',
+        phone: (versionContact ? String(versionContact.phone ?? '') : candidate.phone) || '',
         location: { value: location?.value || '', status: location?.status || 'unknown' as const },
       },
       workAuth: { value: workAuth?.value || '', status: workAuth?.status || 'unknown' as const },

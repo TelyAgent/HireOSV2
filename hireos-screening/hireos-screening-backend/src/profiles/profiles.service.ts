@@ -173,10 +173,15 @@ export class ProfilesService implements OnModuleInit, OnModuleDestroy {
     const projectEdits = (data.projects ?? []).filter(
       ({ index, description }) => index < currentProjects.length && description !== String(currentProjects[index].description ?? ''),
     );
+    // The contact this version shows — its own, or the candidate's record on a version from before contacts were
+    // recorded — is what the form shows, what a change is measured against and what the log keeps as before (#155 review).
+    const shownContact = current.contact
+      ? { email: String(asRecord(current.contact)?.email ?? ''), phone: String(asRecord(current.contact)?.phone ?? '') }
+      : { email: candidate.email ?? '', phone: candidate.phone ?? '' };
     const changed = {
       displayName: data.displayName !== undefined && data.displayName !== (current.displayName || candidate.displayName),
-      email: data.email !== undefined && data.email !== (candidate.email ?? ''),
-      phone: data.phone !== undefined && data.phone !== (candidate.phone ?? ''),
+      email: data.email !== undefined && data.email !== shownContact.email,
+      phone: data.phone !== undefined && data.phone !== shownContact.phone,
       location: !!data.location && data.location !== currentLocation,
       compensation: data.compensationMin != null && (
         data.compensationMin !== currentCompensation?.min || data.compensationMax !== currentCompensation?.max ||
@@ -218,8 +223,8 @@ export class ProfilesService implements OnModuleInit, OnModuleDestroy {
     const correctionValues = (fieldPath: string): { oldValue: unknown; newValue: unknown } => {
       switch (fieldPath) {
         case 'display_name': return { oldValue: current.displayName || candidate.displayName, newValue: data.displayName };
-        case 'email': return { oldValue: candidate.email ?? '', newValue: data.email };
-        case 'phone': return { oldValue: candidate.phone ?? '', newValue: data.phone };
+        case 'email': return { oldValue: shownContact.email, newValue: data.email };
+        case 'phone': return { oldValue: shownContact.phone, newValue: data.phone };
         case 'location': return { oldValue: currentLocation, newValue: data.location };
         case 'compensation_expectation': return { oldValue: currentCompensation, newValue: nextCompensation };
         case 'projects': return {

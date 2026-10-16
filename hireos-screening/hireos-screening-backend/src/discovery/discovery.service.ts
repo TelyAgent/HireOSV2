@@ -746,11 +746,14 @@ export function toFrontendRecommendation(recommendation: {
   };
 }
 
-/** Whether a quote appears in the text, ignoring case, spacing and punctuation. */
+/**
+ * Whether the whole quote appears in the text, ignoring case, spacing and punctuation. The whole of it: a quote
+ * that rules a candidate out can't pass on a true opening and an invented ending (#181 review).
+ */
 export function quoteInText(quote: string, text: string): boolean {
   const norm = (value: string) => value.normalize('NFKC').toLowerCase().replace(/[\s\p{P}\p{S}]/gu, '');
   const q = norm(quote);
-  return q.length >= 4 && norm(text).includes(q.length > 60 ? q.slice(0, 60) : q);
+  return q.length >= 4 && norm(text).includes(q);
 }
 
 function serializeRun(run: {
