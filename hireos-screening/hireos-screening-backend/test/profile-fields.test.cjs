@@ -428,6 +428,15 @@ test('#155 AC-1: availability with a decimal is read whole — 1.5 months is 45 
   assert.equal(readAvailability('1个月零10天').days, 40);
   assert.equal(readAvailability('可于3月到岗').days, undefined);
   assert.equal(readAvailability('15日后到岗').days, undefined);
+  // Amounts in words and digits mixed add up the same; vague amounts aren't guessed.
+  assert.equal(readAvailability('one month and 2 weeks notice').days, 44);
+  assert.equal(readAvailability('1 month and two weeks notice').days, 44);
+  assert.equal(readAvailability('a month notice').days, 30);
+  assert.equal(readAvailability('两周').days, 14);
+  assert.equal(readAvailability('一个月零十天').days, 40);
+  assert.equal(readAvailability('十二个月后').days, 360);
+  assert.equal(readAvailability('a few weeks').days, undefined);
+  assert.equal(readAvailability('几周后到岗').days, undefined);
 });
 
 test('#155 AC-3: the candidate API returns the same fields, statuses and locations on every read', async () => {

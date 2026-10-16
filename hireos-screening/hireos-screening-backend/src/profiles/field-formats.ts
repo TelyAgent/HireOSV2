@@ -36,7 +36,10 @@ export function readAvailability(value: string): Availability {
     }
   }
   // A stated notice period wins over any other wording ("Not immediately available; 2 months notice" is 60 days).
-  const amounts = [...text.matchAll(DURATION)];
+  // Amounts in words count like digits ("one month and two weeks" is 44 days); a vague one ("a few weeks") isn't
+  // turned into days at all — the text alone is kept.
+  if (/\b(a\s+)?(few|couple|several|some)\s+(days?|weeks?|months?)\b|几(天|周|个月)/i.test(text)) return { value: text, status: 'known' };
+  const amounts = [...numbersAsDigits(text).matchAll(DURATION)];
   if (amounts.length) {
     return { value: text, status: 'known', days: Math.round(amounts.reduce((sum, m) => sum + Number(m[1]) * UNIT_DAYS(m[2]), 0)) };
   }
@@ -44,10 +47,21 @@ export function readAvailability(value: string): Availability {
   const negated = /\b(not|no|isn't|cannot|can't|unable)\b[^.;,]{0,24}(immediate|right away)|(不能|无法|不可|非)\s*(随时|立即|马上)/i.test(text);
   if (!negated && /immediate|right away|随时|立即|马上/i.test(text)) return { value: text, status: 'known', days: 0 };
   if (negated) return { value: text, status: 'known' };
-  const word = text.match(/\b(one|two|three|four|six)\s+(week|month)s?\b/i);
-  if (word) {
-    const n = { one: 1, two: 2, three: 3, four: 4, six: 6 }[word[1].toLowerCase() as 'one'];
-    return { value: text, status: 'known', days: n * (word[2].toLowerCase() === 'week' ? 7 : 30) };
-  }
   return { value: text, status: 'known' };
+}
+
+const WORD_NUMBERS: Record<string, number> = {
+  a: 1, an: 1, one: 1, two: 2, three: 3, four: 4, five: 5, six: 6, seven: 7, eight: 8, nine: 9, ten: 10, eleven: 11, twelve: 12,
+};
+const CJK_DIGITS: Record<string, number> = { 一: 1, 二: 2, 两: 2, 三: 3, 四: 4, 五: 5, 六: 6, 七: 7, 八: 8, 九: 9 };
+
+/** Number words before a unit as digits: "one month and two weeks" → "1 month and 2 weeks", "两周" → "2周", "十二个月" → "12个月". */
+function numbersAsDigits(text: string): string {
+  return text
+    .replace(/\b(an?|one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve)(?=\s+(days?|weeks?|months?)\b)/gi, (w) => String(WORD_NUMBERS[w.toLowerCase()]))
+    .replace(/([一二两三四五六七八九]?十[一二三四五六七八九]?|[一二两三四五六七八九])(?=\s*(天|周|个?星期|个月))/g, (w) => {
+      if (!w.includes('十')) return String(CJK_DIGITS[w]);
+      const [tens, ones] = w.split('十');
+      return String((tens ? CJK_DIGITS[tens] : 1) * 10 + (ones ? CJK_DIGITS[ones] : 0));
+    });
 }
