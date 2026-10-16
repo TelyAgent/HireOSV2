@@ -478,9 +478,10 @@ export class TasksService {
     if (!task) throw new NotFoundException({ code: 'NOT_FOUND' });
     if (task.offerAttemptId !== input.attemptId) throw new ConflictException({ code: 'STALE_OFFER_ATTEMPT' });
     if (task.offerState === 'acknowledged' && input.acknowledged) return this.package(identity.workspaceId, taskId);
-    await this.db.interviewTask.update({ where: { id: taskId }, data: input.acknowledged
+    const updated = await this.db.interviewTask.updateMany({ where: { id: taskId, workspaceId: identity.workspaceId, offerAttemptId: input.attemptId, offerState: 'pending' }, data: input.acknowledged
       ? { offerState: 'acknowledged', offerAckAt: new Date(), offerError: null }
       : { offerState: 'failed', offerAckAt: null, offerError: input.error ?? 'OFFER_ACK_FAILED' } });
+    if (!updated.count) throw new ConflictException({ code: 'STALE_OFFER_ATTEMPT' });
     return this.package(identity.workspaceId, taskId);
   }
 }

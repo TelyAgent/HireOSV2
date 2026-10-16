@@ -1,5 +1,6 @@
 import { API_BASE_URL } from '../../utils/apiBase';
 import { authFetch } from "../../lib/session";
+import { exportFailureCode } from './download-status';
 
 export type MaterialKind = 'resume' | 'screening' | 'assessment' | 'other';
 export type Material = { id: string; name: string; text: string; readStatus: string; errorCode: string | null; segments: { id: string; text: string; page?: number }[] };
@@ -188,9 +189,9 @@ export async function api<T>(path: string, init?: RequestInit): Promise<T> {
 export async function downloadApi(path: string): Promise<Blob> {
   let response: Response;
   try { response = await authFetch(`${API_BASE_URL}api${path}`); }
-  catch { throw new ApiError('EXPORT_FAILED'); }
-  if (!response.ok) throw new ApiError('EXPORT_FAILED');
-  try { return await response.blob(); } catch { throw new ApiError('DOWNLOAD_FAILED'); }
+  catch { throw new ApiError(exportFailureCode('request')); }
+  if (!response.ok) throw new ApiError(exportFailureCode('request'));
+  try { return await response.blob(); } catch { throw new ApiError(exportFailureCode('download')); }
 }
 export async function uploadMaterial(file: File) {
   if (file.size > 10 * 1024 * 1024) throw new ApiError('FILE_TOO_LARGE');

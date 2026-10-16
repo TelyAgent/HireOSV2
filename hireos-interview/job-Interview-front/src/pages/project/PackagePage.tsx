@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { useStore } from "../../store/StoreContext";
 import { Pill, type Tone } from "../../utils/status";
 import { api, downloadApi, type PackageState, type Decision } from "../../features/project-intake/api";
+import { exportFailureCode } from "../../features/project-intake/download-status";
 
 const card = { padding: "15px 17px", border: "1px solid var(--line)", borderRadius: 14, background: "var(--surface)" } as const;
 const eyebrow = { fontFamily: "'IBM Plex Mono', monospace", fontSize: 10.5, letterSpacing: ".05em", color: "var(--ink-3)" } as const;
@@ -37,6 +38,7 @@ export function PackagePage() {
   const [confirmationNotes, setConfirmationNotes] = useState<{ hr: string; hm: string }>({ hr: "", hm: "" });
   const [exporting, setExporting] = useState(false);
   const [exportError, setExportError] = useState("");
+  const [now, setNow] = useState(() => Date.now());
 
   useEffect(() => {
     if (!taskId) { setData(null); return; }
@@ -46,6 +48,12 @@ export function PackagePage() {
       .catch((e) => { if (active) setError(e instanceof Error ? e.message : "REQUEST_FAILED"); });
     return () => { active = false; };
   }, [taskId]);
+
+  useEffect(() => {
+    if (data?.offerState !== "pending") return;
+    const timer = window.setInterval(() => setNow(Date.now()), 1000);
+    return () => window.clearInterval(timer);
+  }, [data?.offerState]);
 
   const toggleConfirm = async (role: "hr" | "hm") => {
     if (!taskId || !data) return;
@@ -80,7 +88,7 @@ export function PackagePage() {
         const anchor = document.createElement("a");
         anchor.href = url; anchor.download = `evaluation-package-${taskId}.pdf`;
         document.body.appendChild(anchor); anchor.click(); anchor.remove(); URL.revokeObjectURL(url);
-      } catch { throw new Error("DOWNLOAD_FAILED"); }
+      } catch { throw new Error(exportFailureCode("download")); }
     } catch (e) {
       const code = e instanceof Error ? e.message : "DOWNLOAD_FAILED";
       setExportError(code === "EXPORT_FAILED" ? (zh ? "PDF 生成失败，请稍后重试。" : "PDF generation failed. Please retry.") : (zh ? "PDF 已生成，但下载失败，请重试。" : "The PDF was generated, but the download failed. Please retry."));
@@ -179,11 +187,11 @@ export function PackagePage() {
           <div style={{ ...card, padding: "14px 16px" }}>
             <div style={eyebrow}>{t.offerHandoffStatus}</div>
             <div style={statusPill}>
-              {data.offerState === "acknowledged" ? `${zh ? "Offer 已接收" : "Acknowledged by Offer"} · ${data.offerAckAt ? new Date(data.offerAckAt).toLocaleString(zh ? "zh-CN" : "en-US") : ""}` : data.offerState === "pending" ? (zh ? "等待 Offer 接收确认" : "Awaiting Offer ACK") : data.offerState === "failed" ? `${zh ? "交接失败" : "Handoff failed"}${data.offerError ? ` · ${data.offerError}` : ""}` : (zh ? "未连接" : "Not connected")}
+              {data.offerState === "acknowledged" ? `${zh ? "Offer 已接收" : "Acknowledged by Offer"} · ${data.offerAckAt ? new Date(data.offerAckAt).toLocaleString(zh ? "zh-CN" : "en-US") : ""}` : data.offerState === "pending" && data.offerSentAt && now - new Date(data.offerSentAt).getTime() >= 5 * 60 * 1000 ? (zh ? "确认超时，可重试" : "ACK timed out; retry available") : data.offerState === "pending" ? (zh ? "等待 Offer 接收确认" : "Awaiting Offer ACK") : data.offerState === "failed" ? `${zh ? "交接失败" : "Handoff failed"}${data.offerError ? ` · ${data.offerError}` : ""}` : (zh ? "未连接" : "Not connected")}
             </div>
             <div style={{ marginTop: 10, display: "flex", gap: 8 }}>
-              <button disabled={sendingOffer || data.offerState === "pending" || data.offerState === "acknowledged"} onClick={() => void sendOffer()} style={{ ...btn, cursor: sendingOffer || data.offerState === "pending" || data.offerState === "acknowledged" ? "not-allowed" : "pointer" }}>
-                {data.offerState === "acknowledged" ? (zh ? "Offer 已接收" : "Offer acknowledged") : data.offerState === "pending" ? (zh ? "等待确认…" : "Awaiting ACK…") : sendingOffer ? (zh ? "发送中…" : "Sending…") : data.offerState === "failed" ? (zh ? "重试交接" : "Retry handoff") : (zh ? "发送至 Offer" : "Send to Offer")}
+              <button disabled={sendingOffer || data.offerState === "acknowledged" || (data.offerState === "pending" && (!data.offerSentAt || now - new Date(data.offerSentAt).getTime() < 5 * 60 * 1000))} onClick={() => void sendOffer()} style={{ ...btn, cursor: sendingOffer || data.offerState === "acknowledged" || (data.offerState === "pending" && (!data.offerSentAt || now - new Date(data.offerSentAt).getTime() < 5 * 60 * 1000)) ? "not-allowed" : "pointer" }}>
+                {data.offerState === "acknowledged" ? (zh ? "Offer 已接收" : "Offer acknowledged") : data.offerState === "pending" && data.offerSentAt && now - new Date(data.offerSentAt).getTime() >= 5 * 60 * 1000 ? (zh ? "重试交接" : "Retry handoff") : data.offerState === "pending" ? (zh ? "等待确认…" : "Awaiting ACK…") : sendingOffer ? (zh ? "发送中…" : "Sending…") : data.offerState === "failed" ? (zh ? "重试交接" : "Retry handoff") : (zh ? "发送至 Offer" : "Send to Offer")}
               </button>
             </div>
             {actionError && <div role="alert" style={{ marginTop: 8, fontSize: 11.5, color: "var(--bad)" }}>{actionError}</div>}

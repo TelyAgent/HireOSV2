@@ -8,7 +8,14 @@ function wrap(value: unknown, width = 86): string[] {
   const text = String(value ?? '').replace(/\s+/g, ' ').trim();
   if (!text) return [''];
   const lines: string[] = [];
-  for (let i = 0; i < text.length; i += width) lines.push(text.slice(i, i + width));
+  let line = '';
+  let lineWidth = 0;
+  for (const char of text) {
+    const charWidth = char.charCodeAt(0) < 128 ? 1 : 2;
+    if (line && lineWidth + charWidth > width) { lines.push(line); line = ''; lineWidth = 0; }
+    line += char; lineWidth += charWidth;
+  }
+  if (line) lines.push(line);
   return lines;
 }
 
