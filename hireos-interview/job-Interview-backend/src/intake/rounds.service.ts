@@ -12,7 +12,7 @@ const ROUND_SELECT = {
   id: true, taskId: true, sequence: true, name: true, format: true, duration: true,
   competencies: true, questions: true, mandatory: true, notes: true, status: true, version: true,
   scheduledAt: true, timezone: true, meetingLink: true,
-  transcriptStatus: true, transcriptError: true, completedAt: true, recommendation: true,
+  transcriptStatus: true, transcriptError: true, completedAt: true, briefSnapshotAt: true, briefSnapshotRubricVersion: true, recommendation: true,
   createdAt: true, interviewer: { select: { id: true, name: true, title: true } },
 } satisfies Prisma.InterviewRoundSelect;
 
@@ -72,7 +72,7 @@ export class RoundsService {
 
   async update(identity: { workspaceId: string }, roundId: string, raw: unknown) {
     const input = validate(updateRoundSchema, raw);
-    const existing = await this.db.interviewRound.findFirst({ where: { id: roundId, workspaceId: identity.workspaceId }, include: { task: { select: { planConfirmedAt: true } } } });
+    const existing = await this.db.interviewRound.findFirst({ where: { id: roundId, workspaceId: identity.workspaceId }, include: { task: { select: { planConfirmedAt: true, jobId: true } } } });
     if (!existing) throw new NotFoundException({ code: 'NOT_FOUND' });
     if (existing.task.planConfirmedAt) throw new ConflictException({ code: 'PLAN_CONFIRMED' });
     if (input.interviewerId) await this.getInterviewer(identity.workspaceId, input.interviewerId);
@@ -92,12 +92,18 @@ export class RoundsService {
   /** Sets or moves a round's meeting time — distinct from `update`, which edits round content. */
   async schedule(identity: { workspaceId: string }, roundId: string, raw: unknown) {
     const input = validate(scheduleRoundSchema, raw);
-    const existing = await this.db.interviewRound.findFirst({ where: { id: roundId, workspaceId: identity.workspaceId }, include: { task: { select: { planConfirmedAt: true } } } });
+    const existing = await this.db.interviewRound.findFirst({ where: { id: roundId, workspaceId: identity.workspaceId }, include: { task: { select: { planConfirmedAt: true, jobId: true } } } });
     if (!existing) throw new NotFoundException({ code: 'NOT_FOUND' });
     if (!existing.task.planConfirmedAt) throw new BadRequestException({ code: 'PLAN_NOT_CONFIRMED' });
+    if (!existing.interviewerId) throw new BadRequestException({ code: 'INTERVIEWER_REQUIRED' });
+    const stages = await taskStages(this.db, identity.workspaceId, existing.taskId);
+    if (!stages.find((stage) => stage.stage === 'schedule')!.unlocked) {
+      throw new BadRequestException({ code: 'RUBRIC_NOT_CONFIRMED' });
+    }
+    const rubric = await this.db.rubricVersion.findFirst({ where: { workspaceId: identity.workspaceId, jobId: existing.task.jobId, status: 'confirmed' }, orderBy: { versionNumber: 'desc' }, select: { versionNumber: true } });
     const updated = await this.db.interviewRound.updateMany({
       where: { id: roundId, workspaceId: identity.workspaceId, version: input.version },
-      data: { scheduledAt: new Date(input.scheduledAt), timezone: input.timezone, meetingLink: input.meetingLink || null, version: { increment: 1 } },
+      data: { scheduledAt: new Date(input.scheduledAt), timezone: input.timezone, meetingLink: input.meetingLink || null, briefSnapshotAt: existing.briefSnapshotAt ?? new Date(), briefSnapshotRubricVersion: existing.briefSnapshotRubricVersion ?? rubric?.versionNumber ?? null, version: { increment: 1 } },
     });
     if (!updated.count) throw new ConflictException({ code: 'VERSION_CONFLICT' });
     await advanceTaskStatus(this.db, identity.workspaceId, existing.taskId, 'interview_in_progress');

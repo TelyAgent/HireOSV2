@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useStore } from "../../store/StoreContext";
 import { Pill, type Tone } from "../../utils/status";
-import { api, type PackageState, type Decision } from "../../features/project-intake/api";
+import { api, downloadApi, type PackageState, type Decision } from "../../features/project-intake/api";
 
 const card = { padding: "15px 17px", border: "1px solid var(--line)", borderRadius: 14, background: "var(--surface)" } as const;
 const eyebrow = { fontFamily: "'IBM Plex Mono', monospace", fontSize: 10.5, letterSpacing: ".05em", color: "var(--ink-3)" } as const;
@@ -34,6 +34,9 @@ export function PackagePage() {
   const [confirming, setConfirming] = useState<"hr" | "hm" | null>(null);
   const [sendingOffer, setSendingOffer] = useState(false);
   const [actionError, setActionError] = useState("");
+  const [confirmationNotes, setConfirmationNotes] = useState<{ hr: string; hm: string }>({ hr: "", hm: "" });
+  const [exporting, setExporting] = useState(false);
+  const [exportError, setExportError] = useState("");
 
   useEffect(() => {
     if (!taskId) { setData(null); return; }
@@ -48,7 +51,7 @@ export function PackagePage() {
     if (!taskId || !data) return;
     const confirmed = role === "hr" ? !data.hrConfirmedAt : !data.hmConfirmedAt;
     setConfirming(role); setActionError("");
-    try { setData(await api<PackageState>(`/tasks/${taskId}/package/confirm`, { method: "PATCH", body: JSON.stringify({ role, confirmed }) })); }
+    try { setData(await api<PackageState>(`/tasks/${taskId}/package/confirm`, { method: "PATCH", body: JSON.stringify({ role, confirmed, note: confirmationNotes[role] }) })); }
     catch (e) { setActionError(e instanceof Error ? e.message : "REQUEST_FAILED"); }
     finally { setConfirming(null); }
   };
@@ -61,9 +64,24 @@ export function PackagePage() {
       const code = e instanceof Error ? e.message : "REQUEST_FAILED";
       setActionError(code === "DECISION_NOT_RECOMMEND_OFFER" ? (zh ? "当前决定不是「推荐发放 Offer」，无法发送。" : "The recorded decision isn't \"Recommend for offer\" — can't send.")
         : code === "PACKAGE_NOT_CONFIRMED" ? (zh ? "需要 HR 和招聘经理都确认后才能发送。" : "Both HR and Hiring Manager must confirm first.")
-        : code === "ALREADY_SENT" ? (zh ? "已经发送过了。" : "Already sent.")
+        : code === "ALREADY_SENT" ? (zh ? "该版本已在交接中或已被 Offer 接收。" : "This package version is already pending or acknowledged.")
         : code);
     } finally { setSendingOffer(false); }
+  };
+
+  const exportPdf = async () => {
+    if (!taskId) return;
+    setExporting(true); setExportError("");
+    try {
+      const blob = await downloadApi(`/tasks/${taskId}/package.pdf`);
+      const url = URL.createObjectURL(blob);
+      const anchor = document.createElement("a");
+      anchor.href = url; anchor.download = `evaluation-package-${taskId}.pdf`;
+      document.body.appendChild(anchor); anchor.click(); anchor.remove(); URL.revokeObjectURL(url);
+    } catch (e) {
+      const code = e instanceof Error ? e.message : "DOWNLOAD_FAILED";
+      setExportError(code === "EXPORT_FAILED" ? (zh ? "PDF 生成失败，请稍后重试。" : "PDF generation failed. Please retry.") : (zh ? "PDF 已生成，但下载失败，请重试。" : "The PDF was generated, but the download failed. Please retry."));
+    } finally { setExporting(false); }
   };
 
   if (!taskId) return <div style={{ ...card, fontSize: 12.5, color: "var(--ink-3)" }}>{zh ? "未关联真实面试任务。" : "No real task linked."}</div>;
@@ -78,9 +96,14 @@ export function PackagePage() {
         <div style={{ flex: 1 }}>
           <div style={{ fontSize: 14.5, fontWeight: 700 }}>{t.hiringEvalPackage}</div>
           <div style={{ fontSize: 11.5, color: "var(--ink-3)" }}>{data.candidateName} · {data.jobTitle} · {data.published ? (zh ? "已发布" : "Published") : (zh ? "审阅中" : "In review")}</div>
+            <div style={{ marginTop: 3, fontSize: 10.5, color: "var(--ink-3)" }}>
+              {zh ? `包 ${data.packageId.slice(0, 8)} · 版本 ${data.packageVersion} · Rubric v${data.rubricVersion ?? "-"} · ${new Date(data.generatedAt).toLocaleString("zh-CN")}` : `Package ${data.packageId.slice(0, 8)} · Version ${data.packageVersion} · Rubric v${data.rubricVersion ?? "-"} · ${new Date(data.generatedAt).toLocaleString("en-US")}`}
+            </div>
         </div>
-        <button onClick={() => say("Export is simulated here. It would carry the rubric, scores, evidence links and both confirmations as one PDF.")} style={btn}>{t.exportPdf}</button>
+        <button disabled={exporting} onClick={() => void exportPdf()} style={{ ...btn, cursor: exporting ? "not-allowed" : "pointer" }}>{exporting ? (zh ? "生成中…" : "Generating…") : t.exportPdf}</button>
       </div>
+      {exportError && <div role="alert" style={{ marginTop: 8, padding: "9px 12px", border: "1px solid var(--bad)", borderRadius: 9, background: "var(--bad-soft)", color: "var(--bad)", fontSize: 12 }}>{exportError}</div>}
+      {data.needsReview && <div role="status" style={{ marginTop: 8, padding: "9px 12px", border: "1px solid var(--warn)", borderRadius: 9, background: "var(--warn-soft)", fontSize: 12 }}>{zh ? `该包需复核：${data.reviewReason === "RUBRIC_UPDATED" ? "评分标准已更新" : "岗位资料已更新"}。旧版本仍保留供追溯。` : `This package needs review: ${data.reviewReason === "RUBRIC_UPDATED" ? "the rubric changed" : "upstream job data changed"}. The old version remains available for traceability.`}</div>}
 
       {!data.published && (
         <div style={{ padding: "11px 14px", border: "1px solid var(--warn)", borderRadius: 12, background: "var(--warn-soft)", fontSize: 12.5 }}>
@@ -102,7 +125,12 @@ export function PackagePage() {
                   {(e.cardPriority === "P0" ? (zh ? "必须项" : "Must-have") : e.cardPriority)} · {zh ? "权重" : "Weight"} {e.weight}%{e.roundName ? ` · ${e.roundName}` : ""}
                 </div>
                 {e.note && <div style={{ marginTop: 6 }}>{zh ? "人工备注：" : "Note: "}{e.note}</div>}
+                <div style={{ marginTop: 4, color: "var(--ink-2)" }}>
+                  {e.score == null ? (zh ? "人工评分：Unknown（不是零分）" : "Human score: Unknown (not zero)") : `${zh ? "人工评分：" : "Human score: "}${e.score}/5`}
+                </div>
                 {e.aiRationale && <div style={{ marginTop: 4, color: "var(--ai)" }}>{zh ? "AI 依据：" : "AI rationale: "}{e.aiRationale}</div>}
+                {e.sourceRefs.length > 0 && <div style={{ marginTop: 4, color: "var(--ink-3)" }}>{zh ? "受控证据：" : "Controlled evidence: "}{e.sourceRefs.map((ref) => ref.quote).join(" · ")}</div>}
+                {e.score == null && e.sourceRefs.length === 0 && <div style={{ marginTop: 4, color: "var(--ink-3)" }}>{zh ? "暂无受控证据引用。" : "No controlled evidence reference."}</div>}
               </div>
               <Pill label={evidenceLabel(e.tag, zh)} tone={EVIDENCE_TONE[e.tag]} />
             </div>
@@ -122,7 +150,9 @@ export function PackagePage() {
                   <div key={role} style={{ display: "flex", alignItems: "center", gap: 8 }}>
                     <div style={{ flex: 1 }}>
                       <div style={{ fontSize: 12.5 }}>{label}</div>
-                      {confirmedAt && <div style={{ fontSize: 11, color: "var(--ok)" }}>✓ {zh ? "已确认 · " : "Confirmed · "}{new Date(confirmedAt).toLocaleString(zh ? "zh-CN" : "en-US")}</div>}
+                      {confirmedAt && <div style={{ fontSize: 11, color: "var(--ok)" }}>✓ {zh ? "已确认 · " : "Confirmed · "}{role === "hr" ? data.hrConfirmedBy : data.hmConfirmedBy} · {new Date(confirmedAt).toLocaleString(zh ? "zh-CN" : "en-US")}</div>}
+                      {confirmedAt && (role === "hr" ? data.hrConfirmationNote : data.hmConfirmationNote) && <div style={{ marginTop: 3, fontSize: 11, color: "var(--ink-2)" }}>{role === "hr" ? data.hrConfirmationNote : data.hmConfirmationNote}</div>}
+                      {!confirmedAt && <input value={confirmationNotes[role]} onChange={(e) => setConfirmationNotes((current) => ({ ...current, [role]: e.target.value }))} placeholder={zh ? "确认意见（可选）" : "Confirmation note (optional)"} style={{ marginTop: 5, width: "100%", boxSizing: "border-box", height: 28, border: "1px solid var(--line-strong)", borderRadius: 6, padding: "0 7px", fontSize: 11 }} />}
                     </div>
                     <button disabled={confirming === role} onClick={() => void toggleConfirm(role)} style={{ ...btn, height: 28, cursor: confirming === role ? "not-allowed" : "pointer" }}>
                       {confirming === role ? "…" : confirmedAt ? (zh ? "取消确认" : "Unconfirm") : (zh ? "确认" : "Confirm")}
@@ -146,11 +176,11 @@ export function PackagePage() {
           <div style={{ ...card, padding: "14px 16px" }}>
             <div style={eyebrow}>{t.offerHandoffStatus}</div>
             <div style={statusPill}>
-              {data.offerState === "sent" ? `${zh ? "已发送" : "Sent"} · ${data.offerSentAt ? new Date(data.offerSentAt).toLocaleString(zh ? "zh-CN" : "en-US") : ""}` : (zh ? "未连接" : "Not connected")}
+              {data.offerState === "acknowledged" ? `${zh ? "Offer 已接收" : "Acknowledged by Offer"} · ${data.offerAckAt ? new Date(data.offerAckAt).toLocaleString(zh ? "zh-CN" : "en-US") : ""}` : data.offerState === "pending" ? (zh ? "等待 Offer 接收确认" : "Awaiting Offer ACK") : data.offerState === "failed" ? `${zh ? "交接失败" : "Handoff failed"}${data.offerError ? ` · ${data.offerError}` : ""}` : (zh ? "未连接" : "Not connected")}
             </div>
             <div style={{ marginTop: 10, display: "flex", gap: 8 }}>
-              <button disabled={sendingOffer || data.offerState === "sent"} onClick={() => void sendOffer()} style={{ ...btn, cursor: sendingOffer || data.offerState === "sent" ? "not-allowed" : "pointer" }}>
-                {data.offerState === "sent" ? (zh ? "已发送至 Offer" : "Sent to Offer") : sendingOffer ? (zh ? "发送中…" : "Sending…") : (zh ? "发送至 Offer" : "Send to Offer")}
+              <button disabled={sendingOffer || data.offerState === "pending" || data.offerState === "acknowledged"} onClick={() => void sendOffer()} style={{ ...btn, cursor: sendingOffer || data.offerState === "pending" || data.offerState === "acknowledged" ? "not-allowed" : "pointer" }}>
+                {data.offerState === "acknowledged" ? (zh ? "Offer 已接收" : "Offer acknowledged") : data.offerState === "pending" ? (zh ? "等待确认…" : "Awaiting ACK…") : sendingOffer ? (zh ? "发送中…" : "Sending…") : data.offerState === "failed" ? (zh ? "重试交接" : "Retry handoff") : (zh ? "发送至 Offer" : "Send to Offer")}
               </button>
             </div>
             {actionError && <div role="alert" style={{ marginTop: 8, fontSize: 11.5, color: "var(--bad)" }}>{actionError}</div>}

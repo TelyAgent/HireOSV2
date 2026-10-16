@@ -20,6 +20,7 @@ export type Round = {
   competencies: string; questions: number; mandatory: number; notes: string;
   status: 'Planned' | 'completed'; version: number; createdAt: string;
   scheduledAt: string | null; timezone: string | null; meetingLink: string | null;
+  briefSnapshotAt: string | null; briefSnapshotRubricVersion: number | null;
   transcriptStatus: string; transcriptError: string | null;
   completedAt: string | null; recommendation: Recommendation | null;
   interviewer: { id: string; name: string; title: string | null } | null;
@@ -51,7 +52,7 @@ export type Task = {
   decision: Decision | null; hrConfirmedAt: string | null; hmConfirmedAt: string | null;
   // Flow progress computed by the backend (intake/task-stages.ts): a stage is unlocked only
   // once every earlier stage is done. FlowNav/flowGate read this and nothing else.
-  stages: { stage: string; done: boolean; unlocked: boolean }[];
+  stages: { stage: string; done: boolean; unlocked: boolean; needsRepair?: boolean; repairCode?: string }[];
 };
 
 // Requirements & Rubric (see job-Interview-front/docs/prod-plan/HireOS_Interview_Capability_Verification_Card_Implementation_Plan_v1.0.md).
@@ -141,16 +142,20 @@ export type PackageEvidenceItem = {
   cardId: string; requirement: string; cardPriority: CardPriority; weight: number;
   roundName: string | null; score: number | null; note: string;
   aiScore: number | null; aiRationale: string | null;
+  sourceRefs: { segmentId: string; quote: string }[];
   tag: 'strong' | 'medium' | 'weak' | 'unknown';
 };
 export type PackageState = {
   candidateName: string; jobTitle: string;
+  packageId: string; packageVersion: number; rubricVersion: number | null; generatedAt: string;
+  needsReview: boolean; reviewReason: string | null; invalidatedAt: string | null;
   decision: Decision | null; decisionAt: string | null; conclusion: string | null;
   debrief: DebriefSummary;
   evidence: PackageEvidenceItem[];
-  hrConfirmedAt: string | null; hmConfirmedAt: string | null;
+  hrConfirmedBy: string | null; hrConfirmedAt: string | null; hrConfirmationNote: string | null;
+  hmConfirmedBy: string | null; hmConfirmedAt: string | null; hmConfirmationNote: string | null;
   published: boolean;
-  offerState: 'none' | 'sent'; offerSentAt: string | null;
+  offerState: 'none' | 'pending' | 'acknowledged' | 'failed'; offerSentAt: string | null; offerAckAt: string | null; offerAttemptId: string | null; offerPackageVersion: number | null; offerError: string | null;
 };
 
 // GET/POST /jobs/:id/brief-questions — one STAR (Situation/Task/Action/Result) follow-up
@@ -179,6 +184,13 @@ export async function api<T>(path: string, init?: RequestInit): Promise<T> {
     throw new ApiError(error.code || (response.status === 413 ? 'FILE_TOO_LARGE' : 'REQUEST_FAILED'));
   }
   return response.json();
+}
+export async function downloadApi(path: string): Promise<Blob> {
+  let response: Response;
+  try { response = await authFetch(`${API_BASE_URL}api${path}`); }
+  catch { throw new ApiError('DOWNLOAD_FAILED'); }
+  if (!response.ok) throw new ApiError(response.status >= 500 ? 'EXPORT_FAILED' : 'DOWNLOAD_FAILED');
+  try { return await response.blob(); } catch { throw new ApiError('DOWNLOAD_FAILED'); }
 }
 export async function uploadMaterial(file: File) {
   if (file.size > 10 * 1024 * 1024) throw new ApiError('FILE_TOO_LARGE');

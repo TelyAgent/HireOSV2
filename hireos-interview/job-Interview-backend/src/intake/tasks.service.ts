@@ -1,11 +1,13 @@
 import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
+import { randomUUID } from 'node:crypto';
 import { PrismaService } from '../persistence/prisma.service';
-import { attachTaskMaterialSchema, confirmPackageSchema, confirmPlanSchema, createTaskSchema, reviewTaskSchema, setDecisionSchema, validate, type ParseInput } from './contracts';
+import { attachTaskMaterialSchema, confirmPackageSchema, confirmPlanSchema, createTaskSchema, reviewTaskSchema, setDecisionSchema, offerAckSchema, validate, type ParseInput } from './contracts';
 import { CandidatesService } from './candidates.service';
 import { RoundsService } from './rounds.service';
 import { advanceTaskStatus } from './task-status';
 import { taskStages } from './task-stages';
+import { buildPackagePdf, packagePdfLines } from './package-pdf';
 import { mergeTranscriptLines } from '../rubric/summary-contracts';
 import { CoreRecordClient } from '../core-record/core-record.client';
 import type { Identity } from './workspace.guard';
@@ -135,6 +137,12 @@ export class TasksService {
     const stages = await taskStages(this.db, identity.workspaceId, taskId);
     if (!stages.find((s) => s.stage === 'plan')!.unlocked) throw new BadRequestException({ code: 'RUBRIC_NOT_CONFIRMED' });
     if (!input.confirmed && stages.find((s) => s.stage === 'schedule')!.done) throw new ConflictException({ code: 'PLAN_ALREADY_SCHEDULED' });
+    if (input.confirmed) {
+      const rounds = await this.db.interviewRound.findMany({ where: { taskId, workspaceId: identity.workspaceId },
+        select: { sequence: true, name: true, interviewerId: true, competencies: true, notes: true } });
+      const incomplete = rounds.filter((round) => !round.name.trim() || !round.interviewerId || !round.competencies.trim() || !round.notes.trim());
+      if (incomplete.length) throw new BadRequestException({ code: 'PLAN_NOT_READY', rounds: incomplete.map((round) => round.sequence) });
+    }
     await this.db.interviewTask.update({ where: { id: taskId }, data: { planConfirmedAt: input.confirmed ? new Date() : null } });
     if (input.confirmed) await advanceTaskStatus(this.db, identity.workspaceId, taskId, 'ready_to_schedule');
     return this.get(identity.workspaceId, taskId);
@@ -366,7 +374,7 @@ export class TasksService {
   private async packageEvidence(workspaceId: string, taskId: string, jobId: string) {
     const rubric = await this.db.rubricVersion.findFirst({
       where: { workspaceId, jobId, status: 'confirmed' }, orderBy: { versionNumber: 'desc' },
-      select: { cards: { orderBy: { createdAt: 'asc' }, select: { id: true, requirement: true, cardPriority: true, weight: true } } },
+      select: { cards: { orderBy: { createdAt: 'asc' }, select: { id: true, requirement: true, cardPriority: true, weight: true, sourceRefs: true } } },
     });
     const cards = rubric?.cards ?? [];
     if (!cards.length) return [];
@@ -388,6 +396,7 @@ export class TasksService {
         : 'medium' as const;
       return {
         cardId: card.id, requirement: card.requirement, cardPriority: card.cardPriority, weight: card.weight,
+        sourceRefs: card.sourceRefs as { segmentId: string; quote: string }[],
         roundName: s ? byRound.get(s.roundId) ?? s.roundId : null,
         score, note: s?.note ?? '', aiScore: s?.aiScore ?? null, aiRationale: s?.aiRationale ?? null, tag,
       };
@@ -399,23 +408,35 @@ export class TasksService {
    * state" convention as decision()/debrief(). */
   async package(workspaceId: string, taskId: string) {
     const task = await this.db.interviewTask.findFirst({ where: { id: taskId, workspaceId }, select: {
-      jobId: true, hrConfirmedBy: true, hrConfirmedAt: true, hmConfirmedBy: true, hmConfirmedAt: true, offerState: true, offerSentAt: true,
+      jobId: true, version: true, updatedAt: true, packageNeedsReview: true, packageReviewReason: true, packageInvalidatedAt: true, hrConfirmedBy: true, hrConfirmedAt: true, hrConfirmationNote: true, hmConfirmedBy: true, hmConfirmedAt: true, hmConfirmationNote: true, offerState: true, offerSentAt: true, offerAckAt: true, offerAttemptId: true, offerPackageVersion: true, offerError: true,
       job: { select: { title: true } }, candidate: { select: { name: true } },
     } });
     if (!task) throw new NotFoundException({ code: 'NOT_FOUND' });
-    const [decision, debrief, evidence] = await Promise.all([
+    const [decision, debrief, evidence, rubric] = await Promise.all([
       this.decision(workspaceId, taskId),
       this.debrief(workspaceId, taskId),
       this.packageEvidence(workspaceId, taskId, task.jobId),
+      this.db.rubricVersion.findFirst({ where: { workspaceId, jobId: task.jobId, status: 'confirmed' }, orderBy: { versionNumber: 'desc' }, select: { versionNumber: true } }),
     ]);
     return {
       candidateName: task.candidate.name, jobTitle: task.job.title,
+      packageId: taskId, packageVersion: task.version, rubricVersion: rubric?.versionNumber ?? null, generatedAt: task.updatedAt,
+      needsReview: task.packageNeedsReview, reviewReason: task.packageReviewReason, invalidatedAt: task.packageInvalidatedAt,
       decision: decision.decision, decisionAt: decision.decisionAt, conclusion: decision.conclusion,
       debrief, evidence,
-      hrConfirmedAt: task.hrConfirmedAt, hmConfirmedAt: task.hmConfirmedAt,
+      hrConfirmedBy: task.hrConfirmedBy, hrConfirmedAt: task.hrConfirmedAt,
+      hrConfirmationNote: task.hrConfirmationNote,
+      hmConfirmedBy: task.hmConfirmedBy, hmConfirmedAt: task.hmConfirmedAt,
+      hmConfirmationNote: task.hmConfirmationNote,
       published: decision.decision != null && task.hrConfirmedAt != null && task.hmConfirmedAt != null,
       offerState: task.offerState, offerSentAt: task.offerSentAt,
+      offerAckAt: task.offerAckAt, offerAttemptId: task.offerAttemptId, offerPackageVersion: task.offerPackageVersion, offerError: task.offerError,
     };
+  }
+
+  async packagePdf(workspaceId: string, taskId: string) {
+    const data = await this.package(workspaceId, taskId);
+    return buildPackagePdf(packagePdfLines(data));
   }
 
   /** HR and Hiring Manager confirm independently — there's no real per-role login in this
@@ -426,8 +447,8 @@ export class TasksService {
     const existing = await this.db.interviewTask.findFirst({ where: { id: taskId, workspaceId: identity.workspaceId } });
     if (!existing) throw new NotFoundException({ code: 'NOT_FOUND' });
     const data = input.role === 'hr'
-      ? { hrConfirmedBy: input.confirmed ? identity.actorId : null, hrConfirmedAt: input.confirmed ? new Date() : null }
-      : { hmConfirmedBy: input.confirmed ? identity.actorId : null, hmConfirmedAt: input.confirmed ? new Date() : null };
+      ? { hrConfirmedBy: input.confirmed ? identity.actorId : null, hrConfirmedAt: input.confirmed ? new Date() : null, hrConfirmationNote: input.confirmed ? input.note ?? null : null }
+      : { hmConfirmedBy: input.confirmed ? identity.actorId : null, hmConfirmedAt: input.confirmed ? new Date() : null, hmConfirmationNote: input.confirmed ? input.note ?? null : null };
     await this.db.interviewTask.update({ where: { id: taskId }, data });
     await this.syncPackageStatus(identity.workspaceId, taskId);
     return this.package(identity.workspaceId, taskId);
@@ -437,12 +458,26 @@ export class TasksService {
    * to call, so this is a local, deterministic state transition — not a live downstream ack. */
   async sendOffer(identity: Identity, taskId: string) {
     const task = await this.db.interviewTask.findFirst({ where: { id: taskId, workspaceId: identity.workspaceId },
-      select: { decision: true, hrConfirmedAt: true, hmConfirmedAt: true, offerState: true } });
+      select: { decision: true, version: true, hrConfirmedAt: true, hmConfirmedAt: true, offerState: true } });
     if (!task) throw new NotFoundException({ code: 'NOT_FOUND' });
     if (task.decision !== 'recommend_offer') throw new BadRequestException({ code: 'DECISION_NOT_RECOMMEND_OFFER' });
     if (!task.hrConfirmedAt || !task.hmConfirmedAt) throw new BadRequestException({ code: 'PACKAGE_NOT_CONFIRMED' });
-    if (task.offerState === 'sent') throw new ConflictException({ code: 'ALREADY_SENT' });
-    await this.db.interviewTask.update({ where: { id: taskId }, data: { offerState: 'sent', offerSentAt: new Date() } });
+    if (task.offerState === 'pending' || task.offerState === 'acknowledged') throw new ConflictException({ code: 'ALREADY_SENT' });
+    const attemptId = randomUUID();
+    await this.db.interviewTask.update({ where: { id: taskId }, data: { offerState: 'pending', offerSentAt: new Date(), offerAckAt: null, offerAttemptId: attemptId, offerPackageVersion: task.version, offerError: null } });
+    return this.package(identity.workspaceId, taskId);
+  }
+
+  /** Offer's idempotent delivery callback. A stale attempt can never overwrite a newer one. */
+  async acknowledgeOffer(identity: Identity, taskId: string, raw: unknown) {
+    const input = validate(offerAckSchema, raw);
+    const task = await this.db.interviewTask.findFirst({ where: { id: taskId, workspaceId: identity.workspaceId }, select: { offerAttemptId: true, offerState: true } });
+    if (!task) throw new NotFoundException({ code: 'NOT_FOUND' });
+    if (task.offerAttemptId !== input.attemptId) throw new ConflictException({ code: 'STALE_OFFER_ATTEMPT' });
+    if (task.offerState === 'acknowledged' && input.acknowledged) return this.package(identity.workspaceId, taskId);
+    await this.db.interviewTask.update({ where: { id: taskId }, data: input.acknowledged
+      ? { offerState: 'acknowledged', offerAckAt: new Date(), offerError: null }
+      : { offerState: 'failed', offerAckAt: null, offerError: input.error ?? 'OFFER_ACK_FAILED' } });
     return this.package(identity.workspaceId, taskId);
   }
 }

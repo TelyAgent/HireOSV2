@@ -188,7 +188,7 @@ export function PlanPage() {
             <div className="mt-[9px] text-xs text-[var(--ink-3)]">
               {qLabel} —{" "}
               <button
-                onClick={(e) => { e.stopPropagation(); set({ screen: "brief" }); }}
+                onClick={(e) => { e.stopPropagation(); set({ screen: "brief", roundView: r.sequence === 2 ? "r2" : "r1" }); }}
                 className="cursor-pointer border-0 bg-transparent p-0 text-xs text-[var(--brand)] underline"
               >
                 {t.viewInBrief}

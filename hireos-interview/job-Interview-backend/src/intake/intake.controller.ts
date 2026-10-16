@@ -1,4 +1,5 @@
-import { Body, Controller, Get, Headers, Param, Patch, Post, Query, Req, UploadedFile, UseGuards, UseInterceptors } from '@nestjs/common';
+import { Body, Controller, Get, Headers, Param, Patch, Post, Query, Req, Res, UploadedFile, UseGuards, UseInterceptors } from '@nestjs/common';
+import type { Response } from 'express';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { MaterialsService } from './materials.service';
 import { JobsService } from './jobs.service';
@@ -89,12 +90,20 @@ export class IntakeController {
   setTaskDecision(@Req() req: { identity: Identity }, @Param('id') id: string, @Body() body: unknown) { return this.tasks.setDecision(req.identity, id, body); }
   @Get('tasks/:id/package')
   taskPackage(@Req() req: { identity: Identity }, @Param('id') id: string) { return this.tasks.package(req.identity.workspaceId, id); }
+  @Get('tasks/:id/package.pdf')
+  async taskPackagePdf(@Req() req: { identity: Identity }, @Param('id') id: string, @Res() response: Response) {
+    const pdf = await this.tasks.packagePdf(req.identity.workspaceId, id);
+    response.set({ 'Content-Type': 'application/pdf', 'Content-Disposition': `attachment; filename="evaluation-package-${id}.pdf"` });
+    response.send(pdf);
+  }
   @Patch('tasks/:id/plan/confirm')
   confirmPlan(@Req() req: { identity: Identity }, @Param('id') id: string, @Body() body: unknown) { return this.tasks.confirmPlan(req.identity, id, body); }
   @Patch('tasks/:id/package/confirm')
   confirmPackage(@Req() req: { identity: Identity }, @Param('id') id: string, @Body() body: unknown) { return this.tasks.confirmPackage(req.identity, id, body); }
   @Post('tasks/:id/package/offer')
   sendOffer(@Req() req: { identity: Identity }, @Param('id') id: string) { return this.tasks.sendOffer(req.identity, id); }
+  @Post('tasks/:id/package/offer/ack')
+  acknowledgeOffer(@Req() req: { identity: Identity }, @Param('id') id: string, @Body() body: unknown) { return this.tasks.acknowledgeOffer(req.identity, id, body); }
 
   // Called by Screening's outbox dispatcher when a decision moves a candidate to
   // interview -- see docs/HireOS-Database-Architecture-Decision.md 路径三 and

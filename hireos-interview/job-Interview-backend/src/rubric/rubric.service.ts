@@ -91,6 +91,7 @@ export class RubricService {
       data: { status: 'confirmed', confirmedBy: identity.actorId, confirmedAt: new Date(), version: { increment: 1 } },
     });
     if (!updated.count) throw new ConflictException({ code: 'VERSION_CONFLICT' });
+    await this.db.interviewTask.updateMany({ where: { workspaceId: identity.workspaceId, jobId, decision: { not: null } }, data: { packageNeedsReview: true, packageReviewReason: 'RUBRIC_UPDATED', packageInvalidatedAt: new Date() } });
     await advanceTasksStatusForJob(this.db, identity.workspaceId, jobId, 'requirements_ready');
     return this.db.rubricVersion.findUniqueOrThrow({ where: { id: draft.id }, select: RUBRIC_SELECT });
   }
