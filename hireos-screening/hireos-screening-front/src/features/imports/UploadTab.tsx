@@ -119,10 +119,16 @@ function ImportItemRow({
   /** Opens the file picker again, for a file that has to be replaced (#165 #166). */
   onReselect?: () => void;
 }) {
-  const { t } = useStore();
-  const { tone, label, detail, reselect } = describeItem(item);
+  const { t, state } = useStore();
+  const { tone, label, detail, reselect, facts } = describeItem(item);
   let action: React.ReactNode = null;
-  if (item.status === "needs_review" && item.duplicateReviewId) {
+  if (item.outcome === "exact_file" && item.existingCandidate) {
+    action = (
+      <Link className="btn btn-sm btn-secondary" to={`/candidates/${item.existingCandidate.id}`}>
+        {t("Open existing candidate")}
+      </Link>
+    );
+  } else if (item.status === "needs_review" && item.duplicateReviewId) {
     action = (
       <Link className="btn btn-sm btn-secondary" to={`/duplicates/${item.duplicateReviewId}`}>
         {t("Review", "Review (action)")}
@@ -165,7 +171,16 @@ function ImportItemRow({
         <div style={{ fontSize: "var(--fs-sm)" }}>
           {item.fileName} <span className="tiny muted">({formatFileSize(item.sizeKB)})</span>
         </div>
-        <div className="tiny">{t(detail)}</div>
+        <div className="tiny">
+          {t(detail)}
+          {item.outcome === "exact_file" && item.existingCandidate && (
+            <span data-testid="existing-candidate">
+              {" "}
+              {t("Existing candidate:")} {item.existingCandidate.displayName}
+            </span>
+          )}
+          {facts && <span data-testid="contact-facts"> {facts.map((fact) => t(fact)).join(state.lang === "zh" ? "；" : "; ")}</span>}
+        </div>
         {jobScoped && item.status === "completed" && item.candidateId && <JobMatchSteps progress={item.jobMatch} />}
       </div>
       <Badge tone={tone}>{t(label)}</Badge>

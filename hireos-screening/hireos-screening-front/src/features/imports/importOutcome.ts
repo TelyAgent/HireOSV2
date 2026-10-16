@@ -1,8 +1,10 @@
 import type { ImportItemResult, ImportOutcome } from "../../data/api/imports";
 import type { BadgeTone } from "../../components/ui/Primitives";
+import type { ContactComparison } from "../../data/fixtures/duplicateReviews";
 
 export const OUTCOME_BADGE: Record<ImportOutcome, { tone: BadgeTone; label: string }> = {
   exact_file: { tone: "neutral", label: "Already exists — reused" },
+  same_content: { tone: "warning", label: "Same content — review needed" },
   new_resume_version: { tone: "warning", label: "Newer version — review needed" },
   possible_same_person: { tone: "warning", label: "Possible duplicate — review needed" },
   new_candidate: { tone: "success", label: "Added to library" },
@@ -14,8 +16,9 @@ export const OUTCOME_BADGE: Record<ImportOutcome, { tone: BadgeTone; label: stri
 
 export const OUTCOME_DETAIL: Record<ImportOutcome, string> = {
   exact_file: "Identical to a file already on record — content reused, this upload logged as a new source.",
-  new_resume_version: "Same contact details as the existing candidate, newer content — needs confirmation.",
-  possible_same_person: "Name matches an existing candidate, contact details differ — identity unclear.",
+  same_content: "Same résumé content as an existing candidate's, in another format — needs confirmation.",
+  new_resume_version: "Strong match with an existing candidate — may be a newer résumé, needs confirmation.",
+  possible_same_person: "Partly matches an existing candidate — identity unclear, needs review.",
   new_candidate: "New candidate, no conflicts — added to the Resume Library. No job selected.",
   quarantined: "Isolated for security review — not sent to parsing or AI.",
   parse_failed:
@@ -103,7 +106,7 @@ const DUPLICATE_RESOLUTION_DETAIL: Record<string, { tone: BadgeTone; label: stri
  * always reflect current truth, `outcome` is a snapshot that can still be "processing".
  * This resolves display state from `status` first, falling back to the static
  * outcome tables above only once the item is in a genuinely terminal state. */
-export function describeItem(item: ImportItemResult): { tone: BadgeTone; label: string; detail: string; reselect?: boolean } {
+export function describeItem(item: ImportItemResult): { tone: BadgeTone; label: string; detail: string; reselect?: boolean; facts?: string[] } {
   if (item.status === "processing") {
     return {
       tone: "neutral",
@@ -124,11 +127,57 @@ export function describeItem(item: ImportItemResult): { tone: BadgeTone; label: 
   }
   const badge = OUTCOME_BADGE[item.outcome as ImportOutcome];
   if (badge) {
-    return { ...badge, detail: OUTCOME_DETAIL[item.outcome as ImportOutcome] };
+    // A flagged duplicate also says how the email and phone actually compare (#154).
+    const facts = item.status === "needs_review" ? contactFacts(item.duplicateContact) : [];
+    return { ...badge, detail: OUTCOME_DETAIL[item.outcome as ImportOutcome], ...(facts.length ? { facts } : {}) };
   }
   if (item.status === "failed") {
     // An unknown failure still reads as one, without an internal code (#166).
     return { tone: "danger", label: "Import failed", detail: "This file could not be imported. Try again, or choose another file." };
   }
   return { tone: "neutral", label: item.status || item.outcome, detail: item.errorMessage || item.status || item.outcome };
+}
+
+export type ContactComparisons = { email: ContactComparison; phone: ContactComparison };
+
+const FACT: Record<"email" | "phone", Record<Exclude<ContactComparison, "missing_both">, string>> = {
+  email: {
+    same: "Same email",
+    different: "Email differs",
+    missing_uploaded: "No email in this upload",
+    missing_existing: "No email on the existing candidate",
+  },
+  phone: {
+    same: "Same phone number",
+    different: "Phone number differs",
+    missing_uploaded: "No phone number in this upload",
+    missing_existing: "No phone number on the existing candidate",
+  },
+};
+
+/**
+ * What the two sides' email and phone actually have in common or not (#154), as short phrases to translate one
+ * by one. A value missing on one side is said to be missing, never "different".
+ */
+export function contactFacts(contact: ContactComparisons | null | undefined): string[] {
+  if (!contact) return [];
+  return (["email", "phone"] as const).flatMap((field) => {
+    const state = contact[field];
+    return state && state !== "missing_both" ? [FACT[field][state]] : [];
+  });
+}
+
+/** The same comparison the backend makes, for checks stored before it kept one: email ignoring case, phone by digits. */
+export function compareContacts(
+  uploaded: { email?: string; phone?: string },
+  existing: { email?: string; phone?: string },
+): ContactComparisons {
+  const email = (v?: string) => (v ?? "").trim().toLowerCase();
+  const phone = (v?: string) => {
+    const digits = (v ?? "").replace(/\D/g, "");
+    return digits.length >= 7 ? digits : "";
+  };
+  const compare = (a: string, b: string): ContactComparison =>
+    !a && !b ? "missing_both" : !a ? "missing_uploaded" : !b ? "missing_existing" : a === b ? "same" : "different";
+  return { email: compare(email(uploaded.email), email(existing.email)), phone: compare(phone(uploaded.phone), phone(existing.phone)) };
 }

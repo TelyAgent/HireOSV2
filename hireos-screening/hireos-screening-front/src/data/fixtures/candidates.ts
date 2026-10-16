@@ -66,6 +66,8 @@ export interface Candidate {
   missingFields: string[];
   employment: EmploymentEntry[];
   projects?: Array<{ name: string; description: string }>;
+  /** The owner's account id (the library filters by it, #172); absent on fixtures. */
+  ownerId?: string;
   /** Each F02 field with its status and source locations (#155); absent on fixtures. */
   profileFields?: ProfileField[];
   /** The profile version shown (#159). */

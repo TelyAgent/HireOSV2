@@ -1,3 +1,4 @@
+import type { ContactComparisons } from "../../features/imports/importOutcome";
 import type { DuplicateReview, DuplicateResolutionOutcome } from "../fixtures/duplicateReviews";
 import type { PersonId } from "../fixtures/people";
 import { apiFetch, apiUpload } from "./shared";
@@ -5,6 +6,7 @@ import { safeRandomUUID } from "../../lib/uuid";
 
 export type ImportOutcome =
   | "exact_file"
+  | "same_content"
   | "new_resume_version"
   | "possible_same_person"
   | "new_candidate"
@@ -30,6 +32,10 @@ export interface ImportItemResult {
   businessConsumeStatus?: string;
   candidateId?: string;
   duplicateReviewId?: string;
+  /** For an item flagged as a possible duplicate: how its email and phone compare with the existing candidate's (#154). */
+  duplicateContact?: ContactComparisons;
+  /** For an identical file: the candidate it already belongs to (#153). */
+  existingCandidate?: { id: string; displayName: string };
   /** Only for batches imported from a job: parse → match → outcome against that job. */
   jobMatch?: JobMatchProgress;
 }

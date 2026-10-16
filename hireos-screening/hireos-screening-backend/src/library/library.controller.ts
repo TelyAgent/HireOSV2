@@ -12,7 +12,7 @@ export class LibraryController {
   ) {}
 
   @Get('library')
-  list(@Req() req: { identity: Identity }, @Query('q') query?: string) {
+  list(@Req() req: { identity: Identity }, @Query() query: Record<string, string>) {
     return this.library.list(req.identity, query);
   }
 

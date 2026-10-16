@@ -9,9 +9,19 @@ import { listJobs } from "./jobs";
 export interface CandidateDetail {
   candidate: Candidate;
   resumeVersions: (typeof db.resumeVersions)[string];
+  /** Every time this candidate's material came in, re-uploads of a file already on record included (#153). */
+  sources?: CandidateSourceRecord[];
   applications: Application[];
   recommendations: CandidateJobRecommendation[];
   jobDiscovery: JobDiscoveryRun & { isMatching: boolean };
+}
+
+export interface CandidateSourceRecord {
+  id: string;
+  channel: string;
+  receivedAt: string;
+  materialId?: string;
+  fileName?: string;
 }
 
 interface RawMatchingStatus {
@@ -39,6 +49,7 @@ export async function getCandidateDetail(id: string): Promise<CandidateDetail> {
     apiFetch<{
       candidate: Candidate;
       resumeVersions: (typeof db.resumeVersions)[string];
+      sources?: CandidateSourceRecord[];
       applications: Application[];
       recommendations: CandidateJobRecommendation[];
       matching: RawMatchingStatus;

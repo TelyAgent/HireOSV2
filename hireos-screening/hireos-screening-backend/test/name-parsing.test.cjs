@@ -32,13 +32,12 @@ test('#164 AC-1: PDF and DOCX with a dated name line and a separate Location: li
 test('#164 AC-2: that résumé is not matched to a different candidate through a "Location" name', async () => {
   const material = await extracted('name-with-date.pdf', 'application/pdf');
   const signals = new ProfileParserService().parse(material.id, material.segments, 'name with date');
-  const old = { id: 'c-old', displayName: 'Location Hanoi Vietnam', phone: null };
+  const old = { id: 'c-old', displayName: 'Location Hanoi Vietnam', email: null, phone: null, profiles: [], resumeVersions: [] };
   const db = {
-    material: { findFirst: async () => null },
-    candidate: { findFirst: async () => null, findMany: async () => [old] },
+    material: { findMany: async () => [], findUnique: async () => ({ text: material.text }) },
+    candidate: { findMany: async () => [old] },
   };
   const service = new ImportsService(db, {}, {}, {});
-  service.findByNormalizedName = async (_w, _file, parsedName) => (/location/i.test(parsedName) ? { id: 'c-old', displayName: 'Location Hanoi Vietnam' } : null);
   const match = await service['findPossibleDuplicate']('ws-1', material, signals);
   assert.equal(match, null);
 });

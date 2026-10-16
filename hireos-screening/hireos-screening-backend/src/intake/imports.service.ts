@@ -1,4 +1,5 @@
 import { BadRequestException, Injectable, NotFoundException, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
+import { IDENTITY_POLICY, normalizeName as normalizeIdentityName, scoreIdentity, type ExistingSide, type IdentityScore } from '../duplicates/identity-scoring';
 import { randomUUID } from 'node:crypto';
 import { Prisma } from '@prisma/client';
 import { decodeOriginalFileName, MaterialsService } from './materials.service';
@@ -164,13 +165,33 @@ export class ImportsService implements OnModuleInit, OnModuleDestroy {
     });
     if (!batch) throw new NotFoundException({ code: 'NOT_FOUND' });
     const progress = batch.targetJobId ? await this.jobMatchProgress(workspaceId, batch.targetJobId, batch.items) : undefined;
+    // How each flagged item's email and phone compare with the existing candidate's, so the result says what
+    // actually matched or differs (#154) — the same comparison the review page shows.
+    const reviewIds = batch.items.map((item) => item.duplicateReviewId).filter((id): id is string => !!id);
+    const checks = reviewIds.length
+      ? await this.db.duplicateCheck.findMany({ where: { workspaceId, id: { in: reviewIds } }, select: { id: true, basis: true } })
+      : [];
+    const contactOf = new Map(checks.map((check) => [check.id, (check.basis as { contact?: unknown } | null)?.contact ?? undefined]));
+    // An identical file names the candidate it already belongs to (#153).
+    const reusedIds = [...new Set(batch.items.filter((item) => item.outcome === 'exact_file' && item.candidateId).map((item) => item.candidateId!))];
+    const reused = reusedIds.length
+      ? await this.db.candidate.findMany({ where: { workspaceId, id: { in: reusedIds } }, select: { id: true, displayName: true } })
+      : [];
+    const nameOf = new Map(reused.map((candidate) => [candidate.id, candidate.displayName]));
     return {
       id: batch.id,
       operationId: batch.operationId ?? undefined,
       createdAt: batch.createdAt.toISOString(),
       status: batch.status,
       targetJobId: batch.targetJobId ?? undefined,
-      items: batch.items.map((item) => ({ ...serializeItem(item), jobMatch: progress?.get(item.id) })),
+      items: batch.items.map((item) => ({
+        ...serializeItem(item),
+        jobMatch: progress?.get(item.id),
+        duplicateContact: item.duplicateReviewId ? contactOf.get(item.duplicateReviewId) : undefined,
+        existingCandidate: item.outcome === 'exact_file' && item.candidateId && nameOf.has(item.candidateId)
+          ? { id: item.candidateId, displayName: nameOf.get(item.candidateId)! }
+          : undefined,
+      })),
     };
   }
 
@@ -496,12 +517,16 @@ export class ImportsService implements OnModuleInit, OnModuleDestroy {
     channel: ImportChannel,
   ) {
     if (saved.kind === 'exact_file') {
+      // The same file is already someone's résumé: this upload is recorded as another source of that candidate
+      // and the result points at them (#153). Nothing new is created — no candidate, version or analysis.
+      const owner = await this.db.resumeVersion.findUnique({ where: { materialId: saved.material.id }, select: { candidateId: true } });
       await this.db.candidateSource.create({
-        data: { workspaceId: identity.workspaceId, materialId: saved.material.id, channel, receivedAt: new Date() },
+        data: { workspaceId: identity.workspaceId, materialId: saved.material.id, candidateId: owner?.candidateId ?? null, channel, receivedAt: new Date() },
       });
       await this.updateItem(identity, operationId, batchId, itemId, {
         materialId: saved.material.id,
         duplicateOfMaterialId: saved.material.id,
+        candidateId: owner?.candidateId ?? null,
         stage: 'duplicate',
         status: 'duplicate',
         outcome: 'exact_file',
@@ -552,10 +577,10 @@ export class ImportsService implements OnModuleInit, OnModuleDestroy {
           data: {
             workspaceId: identity.workspaceId,
             materialId: material.id,
-            kind: 'possible_same_person',
+            kind: match.kind,
             existingCandidateId: match.candidate.id,
             confidence: match.confidence,
-            basis: match.basis,
+            basis: match.basis as unknown as Prisma.InputJsonValue,
           },
         });
         await tx.candidateSource.create({
@@ -581,7 +606,7 @@ export class ImportsService implements OnModuleInit, OnModuleDestroy {
             queue: null,
             // Confidence drives urgency: a strong signal (matched email/phone/identical
             // text) is worth a human's attention sooner than a weak name-only guess.
-            priority: match.confidence >= 0.8 ? 'high' : 'normal',
+            priority: match.kind === 'possible_same_person' ? 'normal' : 'high',
             linkRoute: `/duplicates/${check.id}`,
           },
         });
@@ -591,7 +616,7 @@ export class ImportsService implements OnModuleInit, OnModuleDestroy {
         materialId: material.id,
         stage: 'needs_identity_review',
         status: 'needs_review',
-        outcome: 'possible_same_person',
+        outcome: match.kind,
         duplicateReviewId: duplicate.id,
         businessConsumeStatus: 'pending',
         completedAt: new Date(),
@@ -747,74 +772,93 @@ export class ImportsService implements OnModuleInit, OnModuleDestroy {
     });
   }
 
-  // Layered identity matching, strongest signal first. Every branch still only produces a
-  // DuplicateCheck + HumanTask for a human to confirm -- nothing here ever merges a
-  // candidate on its own, per the "name alone can't auto-merge" rule.
+  /**
+   * Who on record this upload might be (F03 §4.1–4.2, #151). Candidates are gathered by any identity signal —
+   * same text, email, phone or a same / near name — and each is scored on every signal; the best score decides
+   * the band. A check is a prompt for a person: nothing here ever merges a candidate.
+   */
   private async findPossibleDuplicate(
     workspaceId: string,
-    material: { id: string; name: string; normalizedTextHash: string | null },
+    material: { id: string; name: string; normalizedTextHash: string | null; text?: string | null },
     signals: { displayName: string; email: string | null; phone: string | null },
-  ): Promise<{ candidate: { id: string; displayName: string }; confidence: number; basis: string[] } | null> {
+  ): Promise<DuplicateMatch | null> {
+    const uploadedText = material.text ?? (await this.db.material.findUnique({ where: { id: material.id }, select: { text: true } }))?.text ?? '';
+    const ids = new Set<string>();
     if (material.normalizedTextHash) {
-      const textMatch = await this.db.material.findFirst({
+      const same = await this.db.material.findMany({
         where: { workspaceId, normalizedTextHash: material.normalizedTextHash, id: { not: material.id } },
-        orderBy: { createdAt: 'desc' },
-        include: { resumeVersion: { include: { candidate: { select: { id: true, displayName: true } } } } },
+        select: { resumeVersion: { select: { candidateId: true } } },
       });
-      const candidate = textMatch?.resumeVersion?.candidate;
-      if (candidate) {
-        return {
-          candidate,
-          confidence: 0.97,
-          basis: [`Extracted text is identical to a file already on record for ${candidate.displayName} (different file format or bytes).`],
-        };
-      }
+      for (const row of same) if (row.resumeVersion?.candidateId) ids.add(row.resumeVersion.candidateId);
     }
-
     if (signals.email) {
-      const candidate = await this.db.candidate.findFirst({
-        where: { workspaceId, email: signals.email },
-        select: { id: true, displayName: true },
+      const byEmail = await this.db.candidate.findMany({
+        where: { workspaceId, email: { equals: signals.email, mode: 'insensitive' } },
+        select: { id: true },
       });
-      if (candidate) {
-        return { candidate, confidence: 0.9, basis: [`Email on the resume matches an existing candidate's email: ${signals.email}`] };
+      for (const row of byEmail) ids.add(row.id);
+    }
+    const phone = onlyDigits(signals.phone ?? '');
+    const uploadedName = normalizeIdentityName(signals.displayName);
+    const everyone = await this.db.candidate.findMany({ where: { workspaceId }, select: { id: true, displayName: true, phone: true } });
+    for (const row of everyone) {
+      if (phone.length >= 7 && onlyDigits(row.phone ?? '') === phone) ids.add(row.id);
+      const name = normalizeIdentityName(row.displayName);
+      if (uploadedName && name && (name === uploadedName || scoreIdentity(
+        { name: signals.displayName, email: null, phone: null, text: '' },
+        { name: row.displayName, email: null, phone: null, text: null, employment: [], education: [] },
+      ).signals.some((signal) => signal.key === 'name_close'))) ids.add(row.id);
+    }
+    if (!ids.size) return null;
+
+    const candidates = await this.db.candidate.findMany({
+      where: { workspaceId, id: { in: [...ids].slice(0, 50) } },
+      select: {
+        id: true, displayName: true, email: true, phone: true,
+        profiles: { orderBy: { version: 'desc' }, take: 1, select: { employmentHistory: true, education: true } },
+        resumeVersions: { where: { isLatest: true }, take: 1, select: { material: { select: { text: true } } } },
+      },
+    });
+    let best: DuplicateMatch | null = null;
+    for (const candidate of candidates) {
+      const profile = candidate.profiles[0];
+      const score = scoreIdentity(
+        { name: signals.displayName, email: signals.email, phone: signals.phone, text: uploadedText },
+        {
+          name: candidate.displayName, email: candidate.email, phone: candidate.phone,
+          text: candidate.resumeVersions[0]?.material.text ?? null,
+          employment: Array.isArray(profile?.employmentHistory) ? (profile.employmentHistory as ExistingSide['employment']) : [],
+          education: Array.isArray(profile?.education) ? (profile.education as ExistingSide['education']) : [],
+        },
+      );
+      // CNT-4: the same content in another format is its own finding, whatever the identity score.
+      const sameContent = score.contentSimilarity != null && score.contentSimilarity >= IDENTITY_POLICY.content.same;
+      const kind = sameContent ? 'same_content' : score.band;
+      if (kind === 'none') continue;
+      const rank = sameContent ? 101 : score.total;
+      if (!best || rank > best.rank) {
+        best = { candidate: { id: candidate.id, displayName: candidate.displayName }, kind, confidence: score.total / 100, basis: toBasis(score, kind), rank };
       }
     }
-
-    if (signals.phone) {
-      const phoneDigits = onlyDigits(signals.phone);
-      if (phoneDigits.length >= 7) {
-        const candidates = await this.db.candidate.findMany({
-          where: { workspaceId, phone: { not: null } },
-          select: { id: true, displayName: true, phone: true },
-        });
-        const match = candidates.find((candidate) => onlyDigits(candidate.phone || '') === phoneDigits);
-        if (match) {
-          return { candidate: match, confidence: 0.8, basis: [`Phone number on the resume matches an existing candidate's phone: ${signals.phone}`] };
-        }
-      }
-    }
-
-    const nameMatch = await this.findByNormalizedName(workspaceId, material.name, signals.displayName);
-    if (nameMatch) {
-      return {
-        candidate: nameMatch,
-        confidence: 0.35,
-        basis: [`Name "${signals.displayName}" resembles existing candidate "${nameMatch.displayName}" -- filename/name similarity only, no email or phone confirmation.`],
-      };
-    }
-    return null;
+    return best;
   }
+}
 
-  private async findByNormalizedName(workspaceId: string, fileName: string, parsedDisplayName: string) {
-    const normalized = normalizeName(fileName) || normalizeName(parsedDisplayName);
-    if (!normalized) return null;
-    const candidates = await this.db.candidate.findMany({ where: { workspaceId }, select: { id: true, displayName: true } });
-    return candidates.find((candidate) => {
-      const current = normalizeName(candidate.displayName);
-      return current === normalized || current.includes(normalized) || normalized.includes(current);
-    }) ?? null;
-  }
+type DuplicateMatch = {
+  candidate: { id: string; displayName: string };
+  kind: 'same_content' | 'new_resume_version' | 'possible_same_person';
+  confidence: number;
+  basis: DuplicateBasis;
+  rank: number;
+};
+
+/** What a check stores: the score breakdown, its policy version, and readable lines for the review. */
+export type DuplicateBasis = IdentityScore & { kind: DuplicateMatch['kind']; lines: string[] };
+
+function toBasis(score: IdentityScore, kind: DuplicateMatch['kind']): DuplicateBasis {
+  const lines = score.signals.map((signal) => `${signal.detail} (${signal.points > 0 ? '+' : ''}${signal.points})`);
+  if (kind === 'same_content') lines.unshift(`Same résumé content in another format (${Math.round((score.contentSimilarity ?? 1) * 100)}% similar)`);
+  return { ...score, kind, lines };
 }
 
 function onlyDigits(value: string) {
