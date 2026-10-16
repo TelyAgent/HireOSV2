@@ -51,6 +51,8 @@ type Item = {
   /** Ways the start (and end) may be written; company + title + a start followed by its end pins the paragraph. */
   dateForms?: string[];
   endForms?: string[];
+  /** Words one of which must be in the paragraph too: a salary is where the résumé talks about pay (#155 review). */
+  context?: RegExp;
   /** Another item has the same company and title, so they alone can't tell which paragraph is this one. */
   ambiguous?: boolean;
   incomplete?: string[];
@@ -130,6 +132,8 @@ export function profileFields(
       ? [{
           value: `${salaryRange(compensation)} ${text(compensation.currency)}${compensation.period ? ` / ${compensation.period}` : ''}${compensation.basis === 'gross' || compensation.basis === 'net' ? `, ${compensation.basis}` : ''}`.trim(),
           needles: salaryNeedles(compensation),
+          // An amount alone could be any number in the résumé ("cut costs by 60000 USD"): only a paragraph about pay counts.
+          context: SALARY_CONTEXT,
           incomplete: [...(!text(compensation.currency) ? ['currency'] : []), ...(!compensation.period ? ['period'] : [])],
         }]
       : [],
@@ -195,8 +199,14 @@ function locateItem(item: Item, paragraphs: ReturnType<typeof numberParagraphs>,
     if (candidates.length === 1 && !item.ambiguous) return evidenceAt(candidates[0], parts[0], source);
     return null;
   }
+  if (item.context) {
+    const about = paragraphs.filter((p) => item.context!.test(p.segment.text));
+    return locate(item.needles, about, source);
+  }
   return locate(item.needles, paragraphs, source);
 }
+
+const SALARY_CONTEXT = /salary|compensation|expected\s+(pay|package|income|ctc)|pay\s+expectation|\bctc\b|remuneration|薪资|薪酬|期望薪|月薪|年薪|待遇|薪水|工资/i;
 
 const PRESENT_FORMS = ['present', 'now', 'current', 'today', '至今', '现在', '目前'];
 

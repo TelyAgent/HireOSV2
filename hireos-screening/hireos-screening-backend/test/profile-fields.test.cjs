@@ -334,6 +334,19 @@ test('#155 (review): correcting one contact on a version from before contacts we
   assert.equal(shown.email.source, 'correction');
 });
 
+test('#155 AC-2 (review): a salary is located where the résumé talks about pay, not at any matching amount', () => {
+  const segments = [
+    { id: 'x1', text: 'Reduced annual infrastructure costs by 60000 USD.' },
+    { id: 'x2', text: 'Salary expectation: USD 60,000 – 70,000 per year, gross' },
+  ];
+  const pay = { min: 60000, max: 70000, currency: 'USD', period: 'year', basis: 'gross' };
+  const f = byField(profileFields({ displayName: 'A', compensationExpectation: pay }, { displayName: 'A', email: null, phone: null }, source(segments))).compensation_expectation;
+  assert.deepEqual(f.evidence.map((e) => e.segmentId), ['x2']);
+  // With no paragraph about pay, the amount alone doesn't pin it.
+  const g = byField(profileFields({ displayName: 'A', compensationExpectation: pay }, { displayName: 'A', email: null, phone: null }, source([segments[0]]))).compensation_expectation;
+  assert.deepEqual([g.evidence, g.evidenceUnavailable], [[], 'not_located']);
+});
+
 test('#155 AC-1: a location confirmed unchanged on paste keeps its country and city; one the user typed is theirs', () => {
   const { withConfirmedIdentity } = require('../dist/profiles/profiles.service');
   const parsed = { displayName: 'A', email: null, location: { value: 'Ho Chi Minh City, Vietnam', status: 'known', country: 'Vietnam', city: 'Ho Chi Minh City' }, missingFields: [] };

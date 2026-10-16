@@ -8,7 +8,8 @@ import { ZH } from "../../src/data/i18n.ts";
 test("#179 AC-1/AC-2/AC-4: same verdicts as the server rules", () => {
   for (const label of ["限男性 35岁以下", "Male only, under 35", "age under 30"]) assert.equal(requirementProblem(label)?.kind, "protected_attribute", label);
   assert.equal(requirementProblem("Great person")?.kind, "unverifiable");
-  for (const label of ["5+ years of backend experience", "Experience with single sign-on (SSO)", "有女性用户产品经验"]) assert.equal(requirementProblem(label), null, label);
+  for (const label of ["5+ years of backend experience", "Experience with single sign-on (SSO)", "有女性用户产品经验", "Experience diagnosing race conditions in concurrent systems", "Rolled out disabled feature flags safely"]) assert.equal(requirementProblem(label), null, label);
+  assert.equal(requirementProblem("Race: Asian")?.kind, "protected_attribute");
 });
 
 test("#179: every reason, attribute and alternative has Chinese text", () => {

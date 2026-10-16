@@ -5,11 +5,12 @@ const assert = require('node:assert/strict');
 const { requirementProblem } = require('../dist/jobs/requirement-policy');
 const { JobsService } = require('../dist/jobs/jobs.service');
 
-const PROTECTED = ['限男性 35岁以下', 'Male only, under 35', 'age under 30', '女性优先', '已婚已育', '本地户口', 'Height 170cm+', 'No children', 'Must be Christian'];
+const PROTECTED = ['限男性 35岁以下', 'Male only, under 35', 'age under 30', '女性优先', '已婚已育', '本地户口', 'Height 170cm+', 'No children', 'Must be Christian', 'Race: Asian', 'Candidates of a specific race', 'Ethnicity preferred', 'No disabled applicants'];
 const VAGUE = ['Great person', 'good attitude', 'Culture fit', '人品好'];
 const FINE = [
   '5+ years of backend experience', 'Experience with single sign-on (SSO)', "Built products for women's fashion e-commerce", '有女性用户产品经验',
   'Led a team of over 10 engineers', 'Supported clients in over 20 countries', 'Healthy test coverage habits', 'Fluent English and Mandarin', '3 年以上 Java 开发经验',
+  'Experience diagnosing race conditions in concurrent systems', 'Rolled out disabled feature flags safely', 'Built a race-free job scheduler', 'Fixed a race condition in the payment queue',
 ];
 
 test('#179 AC-1: protected attributes and proxies are refused, with an alternative', () => {
