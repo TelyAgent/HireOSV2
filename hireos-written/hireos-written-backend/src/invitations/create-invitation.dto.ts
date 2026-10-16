@@ -56,4 +56,9 @@ export class CreateInvitationDto {
 
   @IsEmail()
   recipientEmail!: string;
+
+  /** The language the candidate is written to (#229); Chinese when not given, as before. */
+  @IsOptional()
+  @IsIn(['zh', 'en'])
+  locale?: 'zh' | 'en';
 }

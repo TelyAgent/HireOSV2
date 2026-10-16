@@ -526,6 +526,9 @@ export const ZH: Record<string, string> = {
   "Breadcrumb": "面包屑导航",
   // #237: the zone is said with the time.
   "Beijing time": "北京时间",
+  // #229: the candidate's language is chosen when sending.
+  "Candidate's language": "候选人沟通语言",
+  "The email, the letter and the candidate's page are written in this language. The questions stay as written.": "邮件、邀请信和候选人页面都使用该语言；题目内容保持原文不变。",
 };
 
 export function translate(lang: "en" | "zh", source: string): string {

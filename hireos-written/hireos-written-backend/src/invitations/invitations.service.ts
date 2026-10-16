@@ -74,6 +74,7 @@ export class InvitationsService implements OnModuleInit, OnModuleDestroy {
           durationMin: dto.mode === 'timed' ? dto.durationMin : undefined,
           deadline: new Date(dto.deadline),
           disclosurePolicy: dto.disclosurePolicy,
+          locale: dto.locale ?? 'zh',
         },
       });
       await tx.planItem.updateMany({ where: { id: { in: draftItems.map((i) => i.id) } }, data: { invitationId: created.id } });
@@ -93,7 +94,7 @@ export class InvitationsService implements OnModuleInit, OnModuleDestroy {
     const link = `${appBaseUrl}/apply/${invitation.token}`;
     const sender = await this.mailAccounts.senderAccount(identity.workspaceId);
     const { subject, text, html } = invitationEmail(
-      { candidateName: kase.candidate.name, jobTitle: kase.job.title, senderName: sender?.name ?? null, mode: invitation.mode, durationMin: invitation.durationMin, deadline: invitation.deadline },
+      { locale: invitation.locale === 'en' ? 'en' : 'zh', candidateName: kase.candidate.name, jobTitle: kase.job.title, senderName: sender?.name ?? null, mode: invitation.mode, durationMin: invitation.durationMin, deadline: invitation.deadline },
       link,
     );
     const result = await this.mailAccounts.sendFromWorkspaceAccount(identity, { to: dto.recipientEmail, subject, text, html });
@@ -232,7 +233,10 @@ export class InvitationsService implements OnModuleInit, OnModuleDestroy {
       candidateName: invitation.case.candidate.name,
       jobTitle: invitation.case.job.title,
       // Same greeting, introduction and HR sign-off as the invitation email.
+      // The page is written in the invitation's language, like the email (#229).
+      locale: invitation.locale === 'en' ? 'en' : 'zh',
       letter: invitationLetter({
+        locale: invitation.locale === 'en' ? 'en' : 'zh',
         candidateName: invitation.case.candidate.name,
         jobTitle: invitation.case.job.title,
         senderName: sender?.name ?? null,

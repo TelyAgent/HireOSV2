@@ -39,7 +39,7 @@ export function SendToCandidateDrawer({
   items: PlanItem[];
   onSent: () => void;
 }) {
-  const { t, say } = useStore();
+  const { t, say, state } = useStore();
   const c = CASES[caseId];
   const cand = CORE_CANDIDATES[c.candidateId];
   const app = c.applicationId ? CORE_APPLICATIONS[c.applicationId] : undefined;
@@ -52,6 +52,8 @@ export function SendToCandidateDrawer({
   // Result disclosure is no longer chosen per send: results aren't shown to candidates, the backend still records the default.
   const disclosure = "score_and_summary" as const;
   const [recipientEmail, setRecipientEmail] = useState("");
+  // The language the candidate is written to (#229): the sender's interface language unless they pick another.
+  const [locale, setLocale] = useState<"zh" | "en">(state.lang === "zh" ? "zh" : "en");
   const [sending, setSending] = useState(false);
   const [sentLink, setSentLink] = useState<string | null>(null);
   const [emailSent, setEmailSent] = useState(false);
@@ -112,6 +114,7 @@ export function SendToCandidateDrawer({
         deadline: deadlineIso,
         disclosurePolicy: disclosure,
         recipientEmail: recipientEmail.trim(),
+        locale,
       });
       token = created.token;
       setEmailSent(created.emailSent);
@@ -212,6 +215,14 @@ export function SendToCandidateDrawer({
           </div>
 
           <div className="field" style={{ marginBottom: 16 }}>
+            <label>{t("Candidate's language")}</label>
+            <select className="input" value={locale} onChange={(e) => setLocale(e.target.value as "zh" | "en")}>
+              <option value="zh">中文</option>
+              <option value="en">English</option>
+            </select>
+            <div className="tiny" style={{ marginTop: 4 }}>{t("The email, the letter and the candidate's page are written in this language. The questions stay as written.")}</div>
+          </div>
+          <div className="field" style={{ marginBottom: 16 }}>
             <label>{t("Recipient email")}</label>
             <input
               className="input"
@@ -245,6 +256,7 @@ export function SendToCandidateDrawer({
           {(() => {
             const deadlineIso = deadline ? new Date(deadline).toISOString() : "";
             const letter = previewInvitationLetter({
+              locale,
               candidateName: cand.name,
               jobTitle: job?.title ?? "—",
               senderName: sender?.name ?? null,
@@ -254,7 +266,7 @@ export function SendToCandidateDrawer({
             });
             return (
               <>
-                <DeadlineBanner letter={letter} deadline={deadlineIso || null} />
+                <DeadlineBanner letter={letter} deadline={deadlineIso || null} locale={locale} />
                 <InvitationLetterCard letter={letter} />
               </>
             );

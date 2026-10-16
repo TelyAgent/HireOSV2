@@ -239,6 +239,8 @@ export async function createInvitation(
     deadline: string;
     disclosurePolicy: "score_and_summary" | "summary_only";
     recipientEmail: string;
+    /** The candidate's language (#229); Chinese when left out. */
+    locale?: "zh" | "en";
   },
 ): Promise<{ id: string; round: number; token: string; emailSent: boolean; emailError?: string }> {
   const response = await authFetch(`${BASE}/cases/${encodeURIComponent(caseId)}/invitations`, {
@@ -391,6 +393,8 @@ export interface InvitationLetter {
 }
 
 export interface PublicInvitation {
+  /** The language the candidate is written to (#229). */
+  locale?: "zh" | "en";
   candidateName: string;
   jobTitle: string;
   letter?: InvitationLetter;

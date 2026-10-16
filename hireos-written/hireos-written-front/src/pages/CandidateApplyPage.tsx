@@ -6,6 +6,7 @@ import { DeadlineBanner, InvitationLetterCard } from "../components/InvitationLe
 import { fetchPublicInvitation, submitPublicInvitation, type PublicInvitation } from "../data/writtenApi";
 import { formatDateTime } from "../utils/calendar";
 import { TZ } from "../data/fixtures";
+import { translate } from "../data/i18n";
 
 /**
  * The candidate-facing side of "send to candidate" — reached from the emailed /apply/:token link,
@@ -15,9 +16,12 @@ import { TZ } from "../data/fixtures";
  */
 export function CandidateApplyPage() {
   const { token = "" } = useParams();
-  const { t, state: app } = useStore();
-  const lang = app.lang === "zh" ? "zh" : "en";
+  const { state: app } = useStore();
   const [state, setState] = useState<{ status: "loading" } | { status: "error" } | { status: "ready"; data: PublicInvitation }>({ status: "loading" });
+  // The page speaks the invitation's language, like the email the candidate got (#229) — not whatever this browser
+  // last used. Until it loads (or for an invitation from before languages), the browser's app language.
+  const lang: "zh" | "en" = state.status === "ready" && state.data.locale ? state.data.locale : app.lang === "zh" ? "zh" : "en";
+  const t = (source: string) => translate(lang, source);
   const [answers, setAnswers] = useState<Record<string, string>>({});
   const [submitting, setSubmitting] = useState(false);
   const [justSubmitted, setJustSubmitted] = useState(false);
@@ -87,7 +91,7 @@ export function CandidateApplyPage() {
 
         {state.status === "ready" && !state.data.submission && !justSubmitted && (
           <>
-            {state.data.letter && <DeadlineBanner letter={state.data.letter} deadline={state.data.deadline} />}
+            {state.data.letter && <DeadlineBanner letter={state.data.letter} deadline={state.data.deadline} locale={lang} />}
             {timedDue && !deadlinePassed && (
               <div className="banner warning" style={{ marginBottom: 16 }} data-testid="timed-due">
                 {t("Time limit: answers are due by %time (%left minutes left). The clock started when you first opened this page.")

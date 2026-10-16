@@ -169,6 +169,9 @@ model Invitation {
   durationMin      Int?
   deadline         DateTime?
   disclosurePolicy String
+  // The language the candidate is written to: email, letter and their page (#229). Chosen when sending,
+  // independent of the questions' language; older invitations were all sent in Chinese.
+  locale           String      @default("zh")
   // 1, 2, ... per case in send order: each invitation is one assessment round (#48).
   round            Int         @default(1)
   status           String      @default("sent")
