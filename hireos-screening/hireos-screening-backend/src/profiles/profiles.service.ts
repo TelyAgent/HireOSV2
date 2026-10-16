@@ -1,4 +1,7 @@
 import { BadRequestException, Injectable, NotFoundException, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
+import { readAvailability, storedPhone } from './field-formats';
+import { CORRECTION_REASON_TYPES, referencedProfileFields } from './correction-rules';
+import { confirmedIdentityOf, type ConfirmedIdentity } from '../intake/confirmed-identity';
 import { randomUUID } from 'node:crypto';
 import { z } from 'zod';
 import { Prisma } from '@prisma/client';
@@ -7,7 +10,7 @@ import type { Identity } from '../auth/workspace.guard';
 import { ProfileParserService } from './profile-parser.service';
 import { AiProfileParserService } from './ai-profile-parser.service';
 import { DiscoveryService } from '../discovery/discovery.service';
-import { invalidSchemaFromZod } from '../http/invalid-schema';
+import { invalidSchema, invalidSchemaFromZod } from '../http/invalid-schema';
 
 // A parse is one AI call (HIREOS_AI_TIMEOUT_SECONDS, 60s by default) plus a few writes, so
 // the lease comfortably outlasts it. A job still "running" past its lease means the
@@ -78,6 +81,61 @@ export class ProfilesService implements OnModuleInit, OnModuleDestroy {
     });
   }
 
+  /**
+   * Every version of a candidate's profile, newest first (#159): how it came about (parsed or corrected), what it
+   * said, and for a correction each field's old and new value with who, when and why. Corrections logged before
+   * values were recorded get them from the neighbouring versions. Restricted fields (work authorization) are
+   * left out until roles exist to read them.
+   */
+  async history(identity: Identity, candidateId: string) {
+    const candidate = await this.db.candidate.findFirst({ where: { id: candidateId, workspaceId: identity.workspaceId }, select: { id: true } });
+    if (!candidate) throw new NotFoundException({ code: 'NOT_FOUND' });
+    const profiles = await this.db.candidateProfile.findMany({
+      where: { candidateId, workspaceId: identity.workspaceId },
+      orderBy: { version: 'asc' },
+    });
+    const snapshot = (profile: (typeof profiles)[number]) => ({
+      displayName: profile.displayName,
+      location: (asRecord(profile.location)?.value as string | undefined) ?? '',
+      compensationExpectation: asRecord(profile.compensationExpectation),
+      projects: asArray(profile.projects).map((project) => {
+        const record = asRecord(project) ?? {};
+        return { name: String(record.name ?? ''), description: String(record.description ?? '') };
+      }),
+    });
+    const versions = profiles.map((profile, index) => {
+      const previous = index > 0 ? profiles[index - 1] : null;
+      const added = asArray(profile.corrections).slice(previous ? asArray(previous.corrections).length : 0).map((entry) => {
+        const record = asRecord(entry) ?? {};
+        const fieldPath = String(record.fieldPath ?? '');
+        const before = previous ? snapshot(previous) : null;
+        const after = snapshot(profile);
+        const fromSnapshots: Record<string, [unknown, unknown]> = before
+          ? { display_name: [before.displayName, after.displayName], location: [before.location, after.location], compensation_expectation: [before.compensationExpectation, after.compensationExpectation], projects: [before.projects, after.projects] }
+          : {};
+        const [oldValue, newValue] = 'oldValue' in record ? [record.oldValue, record.newValue] : (fromSnapshots[fieldPath] ?? [null, null]);
+        return {
+          fieldPath,
+          oldValue: oldValue ?? null,
+          newValue: newValue ?? null,
+          reasonType: record.reasonType ?? null,
+          reason: String(record.reason ?? ''),
+          correctedBy: String(record.correctedBy ?? ''),
+          correctedAt: String(record.correctedAt ?? ''),
+        };
+      });
+      return {
+        version: profile.version,
+        createdAt: profile.createdAt.toISOString(),
+        kind: added.length ? ('corrected' as const) : ('parsed' as const),
+        resumeVersionId: profile.resumeVersionId,
+        ...snapshot(profile),
+        corrections: added,
+      };
+    });
+    return { current: profiles.at(-1)?.version ?? null, versions: versions.reverse() };
+  }
+
   async correct(identity: Identity, candidateId: string, raw: unknown) {
     const input = z.object({
       displayName: z.string().trim().min(1).max(200).optional(),
@@ -88,9 +146,15 @@ export class ProfilesService implements OnModuleInit, OnModuleDestroy {
       compensationMin: z.number().finite().nonnegative().optional(),
       compensationMax: z.number().finite().nonnegative().optional(),
       compensationCurrency: z.enum(COMPENSATION_CURRENCIES).optional(),
-      reason: z.string().trim().min(1).max(1000),
+      // Project descriptions by their position in the profile's project list (UC-F02-10).
+      projects: z.array(z.object({ index: z.number().int().nonnegative(), description: z.string().trim().max(2000) }).strict()).max(50).optional(),
+      // Why (COR-2): a quick choice, and a note — the note is required with "other". Whether a reason is required
+      // at all depends on what the change touches (COR-1), checked below.
+      reasonType: z.enum(CORRECTION_REASON_TYPES).optional(),
+      reason: z.string().trim().max(1000).optional(),
     }).strict().refine((v) => (v.compensationMin == null) === (v.compensationMax == null), { message: 'min and max go together' })
       .refine((v) => v.compensationMin == null || v.compensationMax! >= v.compensationMin, { message: 'max below min' })
+      .refine((v) => v.reasonType !== 'other' || !!v.reason, { message: 'Describe the reason when choosing "other".', path: ['reason'] })
       .safeParse(raw);
     if (!input.success) throw invalidSchemaFromZod(input.error);
     const candidate = await this.db.candidate.findFirst({
@@ -105,6 +169,10 @@ export class ProfilesService implements OnModuleInit, OnModuleDestroy {
     const data = input.data;
     const currentLocation = (asRecord(current.location)?.value as string | undefined) ?? '';
     const currentCompensation = asRecord(current.compensationExpectation);
+    const currentProjects = asArray(current.projects).map((project) => asRecord(project) ?? {});
+    const projectEdits = (data.projects ?? []).filter(
+      ({ index, description }) => index < currentProjects.length && description !== String(currentProjects[index].description ?? ''),
+    );
     const changed = {
       displayName: data.displayName !== undefined && data.displayName !== (current.displayName || candidate.displayName),
       email: data.email !== undefined && data.email !== (candidate.email ?? ''),
@@ -121,8 +189,23 @@ export class ProfilesService implements OnModuleInit, OnModuleDestroy {
       ...(changed.phone ? ['phone'] : []),
       ...(changed.location ? ['location'] : []),
       ...(changed.compensation ? ['compensation_expectation'] : []),
+      ...(projectEdits.length ? ['projects'] : []),
     ];
     if (!fieldPaths.length) throw new BadRequestException({ code: 'NO_CHANGES' });
+
+    // COR-1: a reason is required only when the change touches something an effective recommendation or
+    // evaluation used; otherwise an empty reason is fine and is logged as such.
+    const referenced = await referencedProfileFields(this.db, identity.workspaceId, candidateId);
+    const touched = fieldPaths.filter((field) => referenced.includes(field));
+    if (touched.length && !data.reasonType) {
+      throw invalidSchema({ reasonType: [`A reason is required: ${touched.join(', ')} is used by a current recommendation or evaluation.`] });
+    }
+    const nextProjects = projectEdits.length
+      ? currentProjects.map((project, index) => {
+          const edit = projectEdits.find((e) => e.index === index);
+          return edit ? { ...project, description: edit.description } : project;
+        })
+      : current.projects;
 
     const nextLocation = changed.location
       ? { value: data.location, status: 'known', evidence: { source: 'human_correction', actorId: identity.actorId } }
@@ -132,9 +215,32 @@ export class ProfilesService implements OnModuleInit, OnModuleDestroy {
       ? { min: data.compensationMin, max: data.compensationMax, currency: data.compensationCurrency ?? 'CNY', period: 'month', basis: 'gross', status: 'known' }
       : current.compensationExpectation;
     const correctedAt = new Date().toISOString();
+    const correctionValues = (fieldPath: string): { oldValue: unknown; newValue: unknown } => {
+      switch (fieldPath) {
+        case 'display_name': return { oldValue: current.displayName || candidate.displayName, newValue: data.displayName };
+        case 'email': return { oldValue: candidate.email ?? '', newValue: data.email };
+        case 'phone': return { oldValue: candidate.phone ?? '', newValue: data.phone };
+        case 'location': return { oldValue: currentLocation, newValue: data.location };
+        case 'compensation_expectation': return { oldValue: currentCompensation, newValue: nextCompensation };
+        case 'projects': return {
+          oldValue: projectEdits.map(({ index }) => ({ index, description: String(currentProjects[index].description ?? '') })),
+          newValue: projectEdits,
+        };
+        default: return { oldValue: null, newValue: null };
+      }
+    };
     const corrections = [
       ...asArray(current.corrections),
-      ...fieldPaths.map((fieldPath) => ({ fieldPath, reason: data.reason, correctedBy: identity.actorId, correctedAt })),
+      ...fieldPaths.map((fieldPath) => ({
+        fieldPath,
+        // What the field said before and after (#159), so the history shows the change itself.
+        ...correctionValues(fieldPath),
+        reasonType: data.reasonType ?? null,
+        reason: data.reason ?? '',
+        reasonRequired: touched.includes(fieldPath),
+        correctedBy: identity.actorId,
+        correctedAt,
+      })),
     ];
     const profile = await this.db.$transaction(async (tx) => {
       // Name and contacts live on the Candidate identity record; the profile keeps its own name copy.
@@ -164,10 +270,11 @@ export class ProfilesService implements OnModuleInit, OnModuleDestroy {
           skills: toJson(current.skills),
           education: toJson(current.education),
           certifications: toJson(current.certifications),
-          projects: toJson(current.projects),
+          projects: toJson(nextProjects),
           location: toJson(nextLocation),
           workAuthorization: toJson(current.workAuthorization),
           languages: toJson(current.languages),
+          ...(current.availability ? { availability: toJson(current.availability) } : {}),
           ...(nextCompensation ? { compensationExpectation: toJson(nextCompensation) } : {}),
           missingFields: toJson(asArray(current.missingFields).filter((field) => !(
             (field === 'location' && changed.location) || (field === 'compensation_expectation' && changed.compensation)
@@ -182,7 +289,7 @@ export class ProfilesService implements OnModuleInit, OnModuleDestroy {
           action: 'candidate_profile_corrected',
           objectType: 'CandidateProfile',
           objectId: created.id,
-          payload: { candidateId, reason: data.reason, fields: fieldPaths },
+          payload: { candidateId, reasonType: data.reasonType ?? null, reason: data.reason ?? '', fields: fieldPaths, reasonRequiredFor: touched },
         },
       });
       return created;
@@ -283,9 +390,11 @@ export class ProfilesService implements OnModuleInit, OnModuleDestroy {
       // resumes even though parseStatus says "succeeded". A genuine AI failure must
       // surface as a failed job (retryable), not silently fall back to that weak parser
       // and look successful while extracting almost nothing.
-      const parsed = this.aiParser.isConfigured()
+      const read = this.aiParser.isConfigured()
         ? await this.parseWithAi(material, candidate.displayName)
         : this.parseLocally(material, candidate.displayName);
+      // What the user confirmed on a paste wins over what was read from the text (#160 #167).
+      const parsed = withConfirmedIdentity(read, confirmedIdentityOf(material));
       const profile = await this.db.$transaction(async (tx) => {
         const latest = await tx.candidateProfile.findFirst({
           where: { candidateId: candidate.id },
@@ -312,6 +421,7 @@ export class ProfilesService implements OnModuleInit, OnModuleDestroy {
             location: parsed.location || { value: '', status: 'unknown' },
             workAuthorization: parsed.workAuthorization || { value: '', status: 'unknown' },
             languages: parsed.languages,
+            ...(parsed.availability ? { availability: parsed.availability } : {}),
             ...(parsed.compensationExpectation ? { compensationExpectation: parsed.compensationExpectation } : {}),
             missingFields: parsed.missingFields,
             corrections: [],
@@ -393,12 +503,13 @@ export class ProfilesService implements OnModuleInit, OnModuleDestroy {
     ];
     return {
       displayName: ai.displayName || fallbackName,
-      email: ai.email,
-      phone: ai.phone,
+      email: ai.email ? ai.email.trim().toLowerCase() : null,
+      phone: storedPhone(ai.phone),
       location: ai.location,
       workAuthorization: ai.workAuthorization,
       skills: ai.skills,
       languages: ai.languages,
+      availability: ai.availability.status === 'known' && ai.availability.value ? readAvailability(ai.availability.value) : null,
       employmentHistory: ai.employmentHistory,
       education: ai.education,
       certifications: ai.certifications,
@@ -454,5 +565,25 @@ function serializeJob(job: {
     result: job.result,
     createdAt: job.createdAt.toISOString(),
     updatedAt: job.updatedAt.toISOString(),
+  };
+}
+
+type ParsedForProfile = {
+  displayName: string;
+  email: string | null;
+  location: { value: string; status: string; evidence?: unknown } | null;
+  missingFields: string[];
+};
+
+export function withConfirmedIdentity<T extends ParsedForProfile>(parsed: T, confirmed: ConfirmedIdentity | null): T {
+  if (!confirmed) return parsed;
+  const evidence = { source: 'user_confirmed' };
+  return {
+    ...parsed,
+    displayName: confirmed.displayName,
+    email: confirmed.email || parsed.email,
+    ...(confirmed.location
+      ? { location: { value: confirmed.location, status: 'known', evidence }, missingFields: parsed.missingFields.filter((f) => f !== 'location') }
+      : {}),
   };
 }

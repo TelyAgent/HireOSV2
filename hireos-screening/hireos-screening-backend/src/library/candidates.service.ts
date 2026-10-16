@@ -1,4 +1,8 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
+import { toFrontendRecommendation } from '../discovery/discovery.service';
+import { profileFields } from '../profiles/profile-fields';
+import { referencedProfileFields } from '../profiles/correction-rules';
+import { formatMonth, totalExperience } from '../profiles/experience';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../persistence/prisma.service';
 import { pasteCandidateSchema, validate } from '../intake/contracts';
@@ -122,18 +126,43 @@ export class CandidatesService {
       include: {
         resumeVersions: {
           orderBy: { version: 'asc' },
-          include: { material: { select: { id: true, name: true, readStatus: true, errorCode: true, createdAt: true } } },
+          include: { material: { select: { id: true, name: true, readStatus: true, errorCode: true, createdAt: true, segments: true } } },
         },
         profiles: { orderBy: { version: 'desc' }, take: 1 },
-        recommendations: { orderBy: { createdAt: 'desc' } },
+        recommendations: { orderBy: { createdAt: 'desc' }, include: { prelinkEvaluation: true } },
         applications: { orderBy: { linkedAt: 'desc' } },
+        sources: { orderBy: { receivedAt: 'desc' }, take: 50, include: { material: { select: { id: true, name: true } } } },
       },
     });
     if (!candidate) throw new NotFoundException({ code: 'NOT_FOUND' });
     const matchingStatuses = await this.discovery.getMatchingStatuses(identity.workspaceId, [id]);
+    const referenced = await referencedProfileFields(this.db, identity.workspaceId, id);
+    // Field-by-field status and source locations, against the résumé version the profile was parsed from (#155).
+    const profile = candidate.profiles[0];
+    const parsedFrom = candidate.resumeVersions.find((version) => version.id === profile?.resumeVersionId);
+    const fields = profileFields(profile as unknown as Record<string, unknown> | undefined, candidate, parsedFrom ? {
+      resumeVersionId: parsedFrom.id,
+      resumeVersion: parsedFrom.version,
+      materialId: parsedFrom.materialId,
+      readable: parsedFrom.material.readStatus === 'available' && Array.isArray(parsedFrom.material.segments) && parsedFrom.material.segments.length > 0,
+      segments: (Array.isArray(parsedFrom.material.segments) ? parsedFrom.material.segments : []) as Array<{ id: string; text: string; page?: number }>,
+    } : null);
     return {
-      candidate: this.toFrontendCandidate(candidate, candidate.profiles[0]),
+      candidate: {
+        ...this.toFrontendCandidate(candidate, candidate.profiles[0]),
+        // Fields a correction needs a reason for right now: used by a current recommendation or evaluation (#158).
+        correctionReasonRequiredFor: referenced,
+        profileFields: fields,
+      },
       matching: matchingStatuses.get(id) ?? { isMatching: false, lastRun: null },
+      // Every way this candidate's material came in, including re-uploads of a file already on record (#153).
+      sources: candidate.sources.map((source) => ({
+        id: source.id,
+        channel: source.channel,
+        receivedAt: source.receivedAt.toISOString(),
+        materialId: source.materialId ?? undefined,
+        fileName: source.material?.name,
+      })),
       resumeVersions: candidate.resumeVersions.map((version) => ({
         id: version.id,
         version: version.version,
@@ -156,19 +185,8 @@ export class CandidatesService {
         linkedBy: application.linkedBy,
         linkReason: application.linkReason,
       })),
-      recommendations: candidate.recommendations.map((recommendation) => ({
-        id: recommendation.id,
-        candidateId: recommendation.candidateId,
-        jobId: recommendation.jobId,
-        status: recommendation.status,
-        createdAt: recommendation.createdAt.toISOString(),
-        confidence: recommendation.confidence,
-        rationale: recommendation.rationale,
-        gaps: Array.isArray(recommendation.gaps) ? recommendation.gaps.map(String) : [],
-        staleReason: recommendation.staleReason || undefined,
-        proposalSource: recommendation.proposalSource,
-        applicationRef: recommendation.applicationRef || undefined,
-      })),
+      // With eligibility, conflicts and what each was based on (#181 #183).
+      recommendations: candidate.recommendations.map((recommendation) => toFrontendRecommendation(recommendation)),
     };
   }
 
@@ -194,6 +212,7 @@ export class CandidatesService {
     employmentHistory: unknown;
     compensationExpectation: unknown;
     missingFields: unknown;
+    projects?: unknown;
   }) {
     const location = asProfileValue(profile?.location);
     const workAuth = asProfileValue(profile?.workAuthorization);
@@ -218,9 +237,21 @@ export class CandidatesService {
       compensationExpectation: compensation,
       // Profiles parsed before work authorization stopped counting as missing still carry it.
       missingFields: asArray(profile?.missingFields).map(String).filter((field) => field !== 'work_authorization'),
-      employment: asArray(profile?.employmentHistory),
+      // Dates as YYYY-MM whatever format the résumé used; "present" and unreadable values stay as written (#156).
+      employment: asArray(profile?.employmentHistory).map((entry) => {
+        const record = asRecord(entry);
+        if (!record) return entry;
+        return { ...record, start: formatMonth(record.start) ?? record.start, end: formatMonth(record.end) ?? record.end };
+      }),
+      totalExperience: totalExperience(profile?.employmentHistory),
       skills: asArray(profile?.skills).map((skill) => typeof skill === 'object' && skill && 'name' in skill ? String(skill.name) : String(skill)),
       education: asArray(profile?.education),
+      // The profile version shown, for its history (#159).
+      profileVersion: (profile as { version?: number } | undefined)?.version ?? null,
+      projects: asArray(profile?.projects).map((project) => {
+        const record = asRecord(project) ?? {};
+        return { name: String(record.name ?? ''), description: String(record.description ?? '') };
+      }),
     };
   }
 }
