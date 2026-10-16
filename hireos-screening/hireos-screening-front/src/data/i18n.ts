@@ -1252,6 +1252,7 @@ export const ZH: Record<string, string> = {
   "Could not test this mailbox.": "无法测试该邮箱。",
   "Mailbox address is required.": "邮箱地址为必填项。",
   "An authorization code is required for the first connection.": "首次连接需要填写授权码。",
+  "The server or account changed — enter the authorization code again. The saved one is only used for the server it was saved for.": "服务器或账号已更改，请重新填写授权码。已保存的授权码只用于原来的服务器。",
   "IMAP and SMTP server addresses are required.": "IMAP 和 SMTP 服务器地址为必填项。",
   /* #26 — previously untranslated keys */
   "Working…": "处理中…",

@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import nodemailer from 'nodemailer';
+import { MailTargetError, resolveMailTarget } from './mail-target';
 
 // Ported from hireos-screening-backend's src/settings/mail.service.ts -- SMTP-send half only
 // (this service never needs the IMAP/receive half, since nothing here imports resumes from an
@@ -20,12 +21,24 @@ export interface SmtpCredentials {
   smtpSecure: boolean;
 }
 
+/** The checked address for a user-entered host (#128), or the reason it can't be used as a MailApiError. */
+async function checkedTarget(host: string) {
+  try {
+    return await resolveMailTarget(host);
+  } catch (error) {
+    if (error instanceof MailTargetError) throw new MailApiError(error.message, error);
+    throw error;
+  }
+}
+
 @Injectable()
 export class MailService {
   /** A real SMTP handshake + AUTH without sending a message -- confirms credentials before save. */
   async testConnection(creds: SmtpCredentials): Promise<void> {
+    const target = await checkedTarget(creds.smtpHost);
     const transporter = nodemailer.createTransport({
-      host: creds.smtpHost,
+      host: target.address,
+      ...(target.servername ? { tls: { servername: target.servername } } : {}),
       port: creds.smtpPort,
       secure: creds.smtpSecure,
       auth: { user: creds.email, pass: creds.password },
@@ -40,8 +53,10 @@ export class MailService {
   }
 
   async send(creds: SmtpCredentials, message: { to: string; subject: string; html: string; text: string }): Promise<void> {
+    const target = await checkedTarget(creds.smtpHost);
     const transporter = nodemailer.createTransport({
-      host: creds.smtpHost,
+      host: target.address,
+      ...(target.servername ? { tls: { servername: target.servername } } : {}),
       port: creds.smtpPort,
       secure: creds.smtpSecure,
       auth: { user: creds.email, pass: creds.password },

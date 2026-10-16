@@ -111,10 +111,24 @@ function CorporateMailboxDrawer({
     purposes: { inbound, outbound },
   });
 
+  // The saved code belongs to the server and account it was saved for (#125 #127): changing either needs it again.
+  const same = (x: string | undefined, y: string) => (x ?? "").trim().toLowerCase() === y.trim().toLowerCase();
+  const connectionChanged = !!mailbox && (
+    !same(mailbox.email, email) || !same(mailbox.imapHost, imapHost) || !same(mailbox.smtpHost, smtpHost)
+    || mailbox.imapPort !== imapPort || mailbox.smtpPort !== smtpPort || mailbox.imapTls !== imapTls || mailbox.smtpSecure !== smtpSecure
+  );
+
   // Each field reports its own problem next to it (#26 AC-1); a failed save focuses the first one.
   const fields = useFieldValidation({
     email: () => (!email.trim() ? t("Mailbox address is required.") : !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim()) ? t("Enter a valid email address.") : null),
-    password: () => (!password.trim() && !mailbox?.hasPassword ? t("An authorization code is required for the first connection.") : null),
+    password: () =>
+      password.trim()
+        ? null
+        : !mailbox?.hasPassword
+          ? t("An authorization code is required for the first connection.")
+          : connectionChanged
+            ? t("The server or account changed — enter the authorization code again. The saved one is only used for the server it was saved for.")
+            : null,
     imapHost: () => (!imapHost.trim() ? t("IMAP server address is required.") : null),
     smtpHost: () => (!smtpHost.trim() ? t("SMTP server address is required.") : null),
   });
@@ -224,15 +238,15 @@ function CorporateMailboxDrawer({
           <div className="field" style={{ flex: 1 }}>
             <label htmlFor={fields.labelFor("password")}>
               {t("Authorization code")}
-              {!mailbox?.hasPassword && <span className="required-mark">*</span>}
+              {(!mailbox?.hasPassword || connectionChanged) && <span className="required-mark">*</span>}
             </label>
             <div style={{ position: "relative" }}>
               <input
-                {...fields.field("password", { required: !mailbox?.hasPassword })}
+                {...fields.field("password", { required: !mailbox?.hasPassword || connectionChanged })}
                 type={showPassword ? "text" : "password"}
                 value={password}
                 onChange={(e) => setPassword(e.target.value.replace(/\s+/g, ""))}
-                placeholder={mailbox?.hasPassword ? t("Already saved; leave blank to keep it") : t("Enter authorization code")}
+                placeholder={mailbox?.hasPassword && !connectionChanged ? t("Already saved; leave blank to keep it") : t("Enter authorization code")}
                 style={{ paddingRight: 34 }}
               />
               <button

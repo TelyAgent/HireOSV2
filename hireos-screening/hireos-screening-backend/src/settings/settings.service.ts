@@ -8,7 +8,7 @@ import { PrismaService } from '../persistence/prisma.service';
 import type { Identity } from '../auth/workspace.guard';
 import { MailService, MailApiError, type MailInboxMessage, type MailAttachmentMessage, type MailboxCredentials } from './mail.service';
 import { ImportsService } from '../intake/imports.service';
-import { invalidSchemaFromZod } from '../http/invalid-schema';
+import { invalidSchema, invalidSchemaFromZod } from '../http/invalid-schema';
 
 const corporateMailboxSchema = z.object({
   name: z.string().trim().max(200).optional(),
@@ -38,6 +38,24 @@ const DEFAULT_WORKSPACE = 'local-screening-workspace';
 function normalizePassword(value: string | undefined): string | undefined {
   const stripped = value?.replace(/\s+/g, '');
   return stripped || undefined;
+}
+
+/**
+ * The saved password belongs to the server and account it was saved for (#125 #127). When any of these change, a
+ * blank password is not filled in from storage: the new target would otherwise receive the old credential.
+ */
+const CONNECTION_FIELDS = ['email', 'imapHost', 'imapPort', 'imapTls', 'smtpHost', 'smtpPort', 'smtpSecure'] as const;
+function connectionChanged(prev: Record<string, unknown>, next: Record<string, unknown>) {
+  const same = (a: unknown, b: unknown) => (typeof a === 'string' && typeof b === 'string' ? a.trim().toLowerCase() === b.trim().toLowerCase() : a === b);
+  return CONNECTION_FIELDS.some((field) => !same(prev[field], next[field]));
+}
+function savedPasswordFor(prev: Record<string, unknown> | null, next: Record<string, unknown>, submitted: string | undefined): string | undefined {
+  if (submitted) return submitted;
+  if (!prev?.password) return undefined;
+  if (connectionChanged(prev, next)) {
+    throw invalidSchema({ password: ['Enter the password again: the server or account changed, so the saved one is not sent to it.'] });
+  }
+  return prev.password as string;
 }
 
 @Injectable()
@@ -144,7 +162,7 @@ export class SettingsService {
     const input = parsed.data;
     const existing = id ? await this.getMailboxSetting(identity.workspaceId, id) : null;
     const prev = existing ? (existing.payload as any) : null;
-    const password = normalizePassword(input.password) || prev?.password;
+    const password = savedPasswordFor(prev, input, normalizePassword(input.password));
     if (!password) throw new BadRequestException({ code: 'CREDENTIALS_REQUIRED', message: 'An authorization code / password is required.' });
     const creds: MailboxCredentials = { email: input.email, password, imapHost: input.imapHost, imapPort: input.imapPort, imapTls: input.imapTls, smtpHost: input.smtpHost, smtpPort: input.smtpPort, smtpSecure: input.smtpSecure };
     const checks: { code: 'imap' | 'smtp'; level: 'pass' | 'fail'; message: string }[] = [];
@@ -189,7 +207,7 @@ export class SettingsService {
     if (!parsed.success) throw invalidSchemaFromZod(parsed.error);
     const input = parsed.data;
     const prev = existing ? (existing.payload as any) : null;
-    const password = normalizePassword(input.password) || prev?.password;
+    const password = savedPasswordFor(prev, input, normalizePassword(input.password));
     if (!password) {
       throw new BadRequestException({ code: 'CREDENTIALS_REQUIRED', message: 'An authorization code / password is required for the first connection.' });
     }

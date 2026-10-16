@@ -3,6 +3,7 @@ import { PrismaService } from '../persistence/prisma.service';
 import type { Identity } from '../auth/workspace.guard';
 import { MailApiError, MailService } from './mail.service';
 import type { CreateMailAccountDto, TestMailAccountDto, UpdateMailAccountDto } from './mail-account.dto';
+import { invalidSchema } from '../http/invalid-schema';
 
 @Injectable()
 export class MailAccountsService {
@@ -70,13 +71,21 @@ export class MailAccountsService {
     const existing = await this.db.mailAccount.findFirst({ where: { id, workspaceId: identity.workspaceId } });
     if (!existing) throw new NotFoundException({ code: 'MAIL_ACCOUNT_NOT_FOUND' });
 
-    const merged = {
+    const target = {
       email: dto.email ?? existing.email,
-      password: dto.password ?? existing.password,
       smtpHost: dto.smtpHost ?? existing.smtpHost,
       smtpPort: dto.smtpPort ?? existing.smtpPort,
       smtpSecure: dto.smtpSecure ?? existing.smtpSecure,
     };
+    // The saved password belongs to the server and account it was saved for (#125 #127): when either changes, a
+    // new password must come with it, so the old one is never sent to the new target.
+    const sameText = (a: string, b: string) => a.trim().toLowerCase() === b.trim().toLowerCase();
+    const changed = !sameText(target.email, existing.email) || !sameText(target.smtpHost, existing.smtpHost)
+      || target.smtpPort !== existing.smtpPort || target.smtpSecure !== existing.smtpSecure;
+    if (changed && !dto.password) {
+      throw invalidSchema({ password: ['Enter the password again: the server or account changed, so the saved one is not sent to it.'] });
+    }
+    const merged = { ...target, password: dto.password ?? existing.password };
     await this.mail.testConnection(merged);
 
     const account = await this.db.mailAccount.update({

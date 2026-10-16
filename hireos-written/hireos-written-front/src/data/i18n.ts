@@ -306,6 +306,7 @@ export const ZH: Record<string, string> = {
   "Test connectivity": "测试连通性", "Testing…": "测试中…", "Connected successfully.": "连接成功。",
   "Save and verify": "验证并保存", "Saving…": "保存中…",
   "Enter the mailbox address and app password first.": "请先填写邮箱地址和授权码。",
+  "The server or account changed — enter the app password again. The saved one is only used for the server it was saved for.": "服务器或账号已更改，请重新填写应用密码。已保存的密码只用于原来的服务器。",
   "Connection test failed.": "连接测试失败。", "Could not save this mailbox.": "保存该邮箱失败。",
   "Mailbox account saved.": "邮箱账号已保存。", "Mailbox account removed.": "邮箱账号已移除。",
   "Could not remove this mailbox.": "移除该邮箱失败。", "Could not update this mailbox.": "更新该邮箱失败。",

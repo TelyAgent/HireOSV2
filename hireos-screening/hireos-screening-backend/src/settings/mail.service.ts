@@ -1,3 +1,4 @@
+import { MailTargetError, resolveMailTarget } from './mail-target';
 import { Injectable } from '@nestjs/common';
 import { Buffer } from 'node:buffer';
 import type { Readable } from 'node:stream';
@@ -74,11 +75,24 @@ async function streamToBuffer(stream: Readable): Promise<Buffer> {
   return Buffer.concat(chunks);
 }
 
+/** The checked address for a user-entered host, or the reason it can't be used as a MailApiError. */
+async function checkedTarget(host: string) {
+  try {
+    return await resolveMailTarget(host);
+  } catch (error) {
+    if (error instanceof MailTargetError) throw new MailApiError(error.message, error);
+    throw error;
+  }
+}
+
 @Injectable()
 export class MailService {
-  private buildImapClient(creds: MailboxCredentials): ImapFlow {
+  /** Connects to the checked address for the host, never to whatever the name resolves to later (#128). */
+  private async buildImapClient(creds: MailboxCredentials): Promise<ImapFlow> {
+    const target = await checkedTarget(creds.imapHost);
     return new ImapFlow({
-      host: creds.imapHost,
+      host: target.address,
+      ...(target.servername ? { servername: target.servername } : {}),
       port: creds.imapPort,
       secure: creds.imapTls,
       auth: { user: creds.email, pass: creds.password },
@@ -89,7 +103,7 @@ export class MailService {
   /** Connects and locks INBOX, then disconnects -- proves the address, password
    * (app password / auth code) and IMAP host/port actually work together. */
   async testImap(creds: MailboxCredentials): Promise<{ messagesExist: number }> {
-    const client = this.buildImapClient(creds);
+    const client = await this.buildImapClient(creds);
     try {
       await client.connect();
       const lock = await client.getMailboxLock('INBOX');
@@ -108,8 +122,10 @@ export class MailService {
   /** nodemailer's verify() does a real SMTP handshake + AUTH without sending a
    * message -- confirms outbound credentials without risking an actual send. */
   async testSmtp(creds: MailboxCredentials): Promise<void> {
+    const target = await checkedTarget(creds.smtpHost);
     const transporter = nodemailer.createTransport({
-      host: creds.smtpHost,
+      host: target.address,
+      ...(target.servername ? { tls: { servername: target.servername } } : {}),
       port: creds.smtpPort,
       secure: creds.smtpSecure,
       auth: { user: creds.email, pass: creds.password },
@@ -124,7 +140,7 @@ export class MailService {
   }
 
   async listRecentInbox(creds: MailboxCredentials, maxResults = 10): Promise<MailInboxMessage[]> {
-    const client = this.buildImapClient(creds);
+    const client = await this.buildImapClient(creds);
     try {
       await client.connect();
       const lock = await client.getMailboxLock('INBOX');
@@ -158,7 +174,7 @@ export class MailService {
    * own. Only .pdf/.doc/.docx attachments are downloaded; everything else
    * (inline images, signature logos) is skipped without ever fetching its bytes. */
   async listUnseenResumeAttachments(creds: MailboxCredentials, maxMessages = 20): Promise<MailAttachmentMessage[]> {
-    const client = this.buildImapClient(creds);
+    const client = await this.buildImapClient(creds);
     try {
       await client.connect();
       const lock = await client.getMailboxLock('INBOX');
@@ -198,7 +214,7 @@ export class MailService {
    * import pipeline -- this is what makes them drop out of the next unseen search. */
   async markSeen(creds: MailboxCredentials, uids: number[]): Promise<void> {
     if (!uids.length) return;
-    const client = this.buildImapClient(creds);
+    const client = await this.buildImapClient(creds);
     try {
       await client.connect();
       const lock = await client.getMailboxLock('INBOX');

@@ -65,15 +65,28 @@ export function MailAccountDrawer({
     return { name: name.trim() || email.trim(), provider, email: email.trim(), smtpHost, smtpPort, smtpSecure };
   }
 
+  // The saved password belongs to the server and account it was saved for (#125 #127): changing either needs it again.
+  const same = (x: string, y: string) => x.trim().toLowerCase() === y.trim().toLowerCase();
+  const connectionChanged = !!account && (!same(account.email, email) || !same(account.smtpHost, smtpHost) || account.smtpPort !== smtpPort || account.smtpSecure !== smtpSecure);
+  const needsPassword = isNew || connectionChanged;
+
+  function passwordMissing() {
+    if (password) return false;
+    if (isNew) say(t("Enter the mailbox address and app password first."), { type: "danger" });
+    else say(t("The server or account changed — enter the app password again. The saved one is only used for the server it was saved for."), { type: "danger" });
+    return needsPassword;
+  }
+
   function connectionInput() {
     return { email: email.trim(), smtpHost, smtpPort, smtpSecure };
   }
 
   async function handleTest() {
-    if (!email.trim() || (!password && isNew)) {
+    if (!email.trim()) {
       say(t("Enter the mailbox address and app password first."), { type: "danger" });
       return;
     }
+    if (!password && needsPassword && passwordMissing()) return;
     setTesting(true);
     setTestResult(null);
     try {
@@ -87,10 +100,11 @@ export function MailAccountDrawer({
   }
 
   async function handleSave() {
-    if (!email.trim() || (!password && isNew)) {
+    if (!email.trim()) {
       say(t("Enter the mailbox address and app password first."), { type: "danger" });
       return;
     }
+    if (!password && needsPassword && passwordMissing()) return;
     setSaving(true);
     try {
       const input = { ...currentInput(), ...(password ? { password } : {}) };
