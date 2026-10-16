@@ -53,7 +53,8 @@ export function packagePdfLines(data: {
   candidateName: string; jobTitle: string; decision: string | null; decisionAt: Date | null;
   needsReview?: boolean; reviewReason?: string | null; invalidatedAt?: Date | null;
   evidence: { requirement: string; expectedEvidence?: string; levelAnchors?: unknown; score: number | null; note: string; roundId?: string | null; roundName: string | null; sourceRefs: { segmentId: string; quote: string }[] }[];
-  hrConfirmedBy: string | null; hrConfirmedAt: Date | null; hmConfirmedBy: string | null; hmConfirmedAt: Date | null;
+  hrConfirmedBy: string | null; hrConfirmedAt: Date | null; hrConfirmationNote?: string | null;
+  hmConfirmedBy: string | null; hmConfirmedAt: Date | null; hmConfirmationNote?: string | null;
 }) {
   const lines: PdfLine[] = [
     { text: 'Hiring Evaluation Package', bold: true }, { text: `Candidate: ${data.candidateName}` },
@@ -71,11 +72,13 @@ export function packagePdfLines(data: {
     for (const line of wrap(`Reason: ${item.note}`)) lines.push({ text: line });
     for (const ref of item.sourceRefs) {
       for (const line of wrap(`Evidence ${ref.segmentId}: ${ref.quote}`)) lines.push({ text: line });
-      if (item.roundId) for (const line of wrap(`Evidence link: /interview/api/rounds/${item.roundId}/transcript#${ref.segmentId}`)) lines.push({ text: line });
+      if (item.roundId) for (const line of wrap(`Evidence link: /hireos/interview/api/rounds/${item.roundId}/transcript/${ref.segmentId}`)) lines.push({ text: line });
     }
   }
   lines.push({ text: '' }, { text: 'Human review', bold: true });
   for (const line of wrap(`HR: ${data.hrConfirmedBy ?? 'Not confirmed'} | ${data.hrConfirmedAt?.toISOString() ?? 'No confirmation time'}`)) lines.push({ text: line });
+  if (data.hrConfirmationNote) for (const line of wrap(`HR note: ${data.hrConfirmationNote}`)) lines.push({ text: line });
   for (const line of wrap(`Hiring Manager: ${data.hmConfirmedBy ?? 'Not confirmed'} | ${data.hmConfirmedAt?.toISOString() ?? 'No confirmation time'}`)) lines.push({ text: line });
+  if (data.hmConfirmationNote) for (const line of wrap(`Hiring Manager note: ${data.hmConfirmationNote}`)) lines.push({ text: line });
   return lines;
 }

@@ -114,8 +114,14 @@ export class RoundsService {
   async transcript(workspaceId: string, roundId: string) {
     const round = await this.db.interviewRound.findFirst({ where: { id: roundId, workspaceId }, select: { transcriptStatus: true, transcriptError: true } });
     if (!round) throw new NotFoundException({ code: 'NOT_FOUND' });
-    const lines = await this.db.transcriptLine.findMany({ where: { roundId }, orderBy: { createdAt: 'asc' }, select: { speaker: true, text: true, createdAt: true } });
+    const lines = await this.db.transcriptLine.findMany({ where: { roundId }, orderBy: { createdAt: 'asc' }, select: { id: true, speaker: true, text: true, createdAt: true } });
     return { status: round.transcriptStatus, error: round.transcriptError, lines };
+  }
+
+  async transcriptSegment(workspaceId: string, roundId: string, segmentId: string) {
+    const line = await this.db.transcriptLine.findFirst({ where: { id: segmentId, roundId, workspaceId }, select: { id: true, speaker: true, text: true, createdAt: true } });
+    if (!line) throw new NotFoundException({ code: 'NOT_FOUND' });
+    return line;
   }
 
   /** The job's confirmed capability cards, each paired with this round's own human score
