@@ -8,10 +8,18 @@ function setup(finalizedAt = null) {
   const submission = { id: 's-1', finalizedAt, finalizedBy: null };
   const db = {
     invitation: {
-      findFirst: async ({ where }) => (where.workspaceId === 'ws-1' ? { id: 'i-1', submission } : null),
+      findFirst: async ({ where }) => (where.workspaceId === 'ws-1' || where.caseId ? { id: 'i-1', round: 1, submission } : null),
     },
-    submission: { update: async ({ data }) => { writes.push(data); return { ...submission, ...data }; } },
+    submission: {
+      update: async ({ data }) => { writes.push(data); return { ...submission, ...data }; },
+      updateMany: async ({ where, data }) => {
+        if (where.finalizedAt === null && submission.finalizedAt) return { count: 0 };
+        writes.push(data); Object.assign(submission, data); return { count: 1 };
+      },
+    },
+    case: { updateMany: async () => ({ count: 1 }) },
   };
+  db.$transaction = async (fn) => fn(db);
   const lifecycle = { advance: async () => {} };
   return { service: new InvitationsService(db, {}, { get: (_k, d) => d }, {}, lifecycle), writes };
 }

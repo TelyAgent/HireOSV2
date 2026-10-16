@@ -10,7 +10,7 @@ import { computeOverall } from "../utils/score";
 
 /** A score differing from the AI's needs a reason -- the same condition that shows the reason box. */
 function needsReason(c: Criterion): boolean {
-  return c.human != null && c.human !== c.ai && !(c.overrideReason ?? "").trim();
+  return !c.manual && c.human != null && c.human !== c.ai && !(c.overrideReason ?? "").trim();
 }
 
 /** The first criterion that blocks finalizing, if any: unscored, or changed from the AI score without a reason. */
@@ -80,7 +80,9 @@ export function EvaluationReviewContent({
   }
 
   const ev = evaluation; // narrowed non-null, for the closures below (TS doesn't carry the early-return narrowing into nested function scopes)
-  const overallAI = computeOverall(ev.criteria, "ai");
+  // Scored by hand: there is no AI score to show or to compare against (#121).
+  const manual = ev.criteria.some((c) => c.manual);
+  const overallAI = manual ? null : computeOverall(ev.criteria, "ai");
   const overallHuman = computeOverall(ev.criteria, "human");
   // Raw points, shown under the out-of-100 overall so the conversion is visible.
   const pointsMax = ev.criteria.reduce((sum, c) => sum + c.max, 0);
@@ -209,7 +211,7 @@ export function EvaluationReviewContent({
           <div className="metric">
             <div className="label">{t("Overall (AI)")}</div>
             <div className="value">{overallAI == null ? "—" : <>{overallAI}<span className="tiny"> / 100</span></>}</div>
-            <div className="sub">{t("Points:")} {pointsAI} / {pointsMax} · {t("Draft only, not a hiring probability")}</div>
+            <div className="sub">{manual ? t("No automatic scoring for this submission") : <>{t("Points:")} {pointsAI} / {pointsMax} · {t("Draft only, not a hiring probability")}</>}</div>
           </div>
           <div className="metric">
             <div className="label">{t("Coverage / Confidence")}</div>
@@ -221,7 +223,16 @@ export function EvaluationReviewContent({
 
       <div className="card card-pad" style={{ marginBottom: 16 }}>
         <h4 style={{ marginBottom: 8 }}>{t("Criteria")}</h4>
-        {!isFinalized && (
+        {!isFinalized && manual && (
+          <div className={`banner ${ev.aiStatus === "failed" ? "warning" : "info"} tiny`} style={{ marginBottom: 8 }} data-testid="ai-scoring-status">
+            {ev.aiStatus === "pending" || ev.aiStatus === "running"
+              ? t("Automatic scoring is still running. You can score by hand now; if it finishes before you enter a score, its suggestions appear here.")
+              : ev.aiStatus === "failed"
+                ? `${t("Automatic scoring failed, so score each criterion by hand.")}${ev.aiError ? ` (${ev.aiError})` : ""}`
+                : t("There is no automatic scoring for this submission. Score each criterion by hand.")}
+          </div>
+        )}
+        {!isFinalized && !manual && (
           <div className="banner info tiny" style={{ marginBottom: 8 }}>
             {t("AI scores are suggestions only. Enter the final score for each criterion under \"Human score\" on the right — or use \"Accept all AI scores\" to fill them in, then adjust any of them. Every criterion needs a human score before finalizing.")}
           </div>
@@ -233,7 +244,7 @@ export function EvaluationReviewContent({
 
       <div className="flex gap-2 wrap" style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
         {/* Once finalized the scoring is locked and the flow has moved on — no more AI actions. */}
-        {!isFinalized && (
+        {!isFinalized && !manual && (
           <>
             <Button onClick={acceptAll}>{t("Accept all AI scores")}</Button>
             <Button variant="ghost" onClick={reRunAi}>{t("Re-run AI (demo)")}</Button>
@@ -303,7 +314,7 @@ function CriterionRow({ id, c, locked, showErrors, onChange }: { id: string; c: 
       <div className="flex items-center justify-between wrap gap-2" style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 8 }}>
         <div><b>{c.name}</b> <span className="tiny">{t("max")} {c.max}</span></div>
         <div className="flex gap-2 items-center" style={{ display: "flex", gap: 8, alignItems: "center" }}>
-          <span className="chip">{t("AI suggests")} {c.ai}</span>
+          {!c.manual && <span className="chip">{t("AI suggests")} {c.ai}</span>}
           {/* The human score is the one that counts -- labelled and outlined so it reads as the place to score. */}
           <label style={{ display: "flex", alignItems: "center", gap: 6, fontWeight: 600 }}>
             {t("Human score")}
@@ -322,13 +333,13 @@ function CriterionRow({ id, c, locked, showErrors, onChange }: { id: string; c: 
             />
             <span className="tiny" style={{ fontWeight: 400 }}>/ {c.max}</span>
           </label>
-          {!locked && c.human !== c.ai && (
+          {!locked && !c.manual && c.human !== c.ai && (
             <Button size="sm" variant="ghost" onClick={() => { setHumanText(String(c.ai)); onChange({ human: c.ai, overridden: false }); }}>
               {t("Use AI score")}
             </Button>
           )}
-          <span className={`badge ${c.confidence === "High" ? "success" : "info"}`}>{t("Confidence:")} {t(c.confidence)}</span>
-          <span className="badge neutral">{t("Coverage:")} {t(c.coverage)}</span>
+          {!c.manual && <span className={`badge ${c.confidence === "High" ? "success" : "info"}`}>{t("Confidence:")} {t(c.confidence)}</span>}
+          {!c.manual && <span className="badge neutral">{t("Coverage:")} {t(c.coverage)}</span>}
         </div>
       </div>
       {outOfRange && (
@@ -337,14 +348,14 @@ function CriterionRow({ id, c, locked, showErrors, onChange }: { id: string; c: 
         </div>
       )}
       <div className="scorebar" style={{ margin: "8px 0" }}><div style={{ width: `${Math.min(bar, 100)}%` }} /></div>
-      <details>
+      {!c.manual && <details>
         <summary style={{ cursor: "pointer", color: "var(--accent)", fontSize: "calc(var(--text-base)*.85)" }}>{t("View evidence")}</summary>
         <div className="evidence-excerpt" style={{ marginTop: 8 }}>
           {c.evidence}
           <div className="tiny" style={{ marginTop: 4 }}>{t("Source:")} {c.source}</div>
         </div>
-      </details>
-      {c.human != null && c.human !== c.ai && (
+      </details>}
+      {!c.manual && c.human != null && c.human !== c.ai && (
         <div className="field" style={{ marginTop: 8 }}>
           {/* Says why it's asked: the human score differs from the AI's suggestion. */}
           <label className="tiny">

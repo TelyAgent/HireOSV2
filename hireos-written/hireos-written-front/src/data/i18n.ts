@@ -317,6 +317,7 @@ export const ZH: Record<string, string> = {
   "Thank you — your submission has been received.": "感谢提交，我们已收到您的作答内容。",
   "The hiring team will review your answers and follow up with next steps.": "招聘团队将审阅您的作答内容，并与您沟通后续安排。",
   "Your answer": "你的作答", "Submitting…": "提交中…", "Submit": "提交",
+  "Time limit: answers are due by %time (%left minutes left). The clock started when you first opened this page.": "限时作答：请在 %time 前提交（剩余 %left 分钟）。计时从您首次打开本页面开始。",
   "Delivery": "发送情况", "Sent": "已发送", "Simulated bounce": "模拟退信",
 
   "Submission Inbox": "提交收件箱",
@@ -351,6 +352,10 @@ export const ZH: Record<string, string> = {
   "All AI scores filled in — adjust any of them under \"Human score\" on each criterion.": "已填入全部 AI 评分，可在各评分项的「人工评分」中继续调整。",
   "AI scores are suggestions only. Enter the final score for each criterion under \"Human score\" on the right — or use \"Accept all AI scores\" to fill them in, then adjust any of them. Every criterion needs a human score before finalizing.": "AI 分数仅供参考。请在每个评分项右侧的「人工评分」中填写最终分数；也可以先点「采纳全部 AI 评分」一键填入，再逐项调整。所有评分项都有人工评分后才能定稿。",
   "AI suggests": "AI 建议", "Points:": "得分：", "Reason for changing the AI score": "修改 AI 分的理由",
+  "No automatic scoring for this submission": "本次提交没有自动评分",
+  "Automatic scoring is still running. You can score by hand now; if it finishes before you enter a score, its suggestions appear here.": "自动评分仍在进行中。您现在就可以人工评分；如果在您填分前自动评分完成，建议分会显示在这里。",
+  "Automatic scoring failed, so score each criterion by hand.": "自动评分失败，请逐项人工评分。",
+  "There is no automatic scoring for this submission. Score each criterion by hand.": "本次提交没有自动评分，请逐项人工评分。",
   "Required: you changed the AI score, so say why — or click \"Use AI score\" to keep it.": "必填：人工评分与 AI 建议分不同，请说明理由；如不需要修改，可点「用 AI 分」恢复。", "scaled to 100": "已折算为百分制", "Out of range — allowed:": "分数超出范围，允许：", "(whole numbers)": "（整数）", "Human score": "人工评分", "Use AI score": "用 AI 分",
   "Already finalized — AI re-run is disabled.": "已定稿，无法重新运行 AI。",
   "AI re-run complete — AI scores refreshed.": "AI 已重新评分，AI 分数已更新。",

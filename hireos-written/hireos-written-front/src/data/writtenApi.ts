@@ -188,6 +188,11 @@ export interface RealSubmission {
   answers: { questionId: string; answerText: string }[];
   submittedAt: string;
   evaluation: RealEvaluation | null;
+  /** Where the automatic scoring stands: it runs after the submission, never holding it up (#121). */
+  evaluationStatus?: "pending" | "running" | "done" | "failed" | "skipped";
+  evaluationError?: string | null;
+  /** The round's scoring dimensions, for scoring by hand when there is no automatic scoring. */
+  rubric?: { name: string; max: number }[];
   /** Set once a reviewer finalizes the scoring (Comprehensive evaluation tab). */
   finalEvaluation?: { overall: number; criteria: RealFinalCriterion[] } | null;
   finalizedBy?: string | null;
@@ -393,6 +398,10 @@ export interface PublicInvitation {
   mode: "timed" | "deadline_only";
   durationMin: number | null;
   deadline: string | null;
+  /** When the questions were first opened: a timed round's clock starts then (#129). */
+  openedAt?: string | null;
+  /** When answers are due — the deadline, or sooner in timed mode; the server refuses answers after it. */
+  dueAt?: string | null;
   status: string;
   submission: { answers: { questionId: string; answerText: string }[]; submittedAt: string } | null;
 }

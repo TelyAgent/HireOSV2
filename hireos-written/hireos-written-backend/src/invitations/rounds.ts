@@ -1,5 +1,6 @@
 import { BadRequestException, ConflictException } from '@nestjs/common';
 import { TERMINAL_STATUSES } from '../cases/case-lifecycle.service';
+import { invalidSchema } from '../http/invalid-schema';
 
 // Issue #48 -- an assessment is organised in rounds: every invitation (send) is one round, and the
 // questions not yet sent form the case's single draft round. These are the rules every write obeys.
@@ -40,4 +41,38 @@ export function assertBeforeDeadline(deadline: Date | null, now: Date = new Date
   if (deadline && now.getTime() > deadline.getTime() + DEADLINE_GRACE_MS) {
     throw new ConflictException({ code: 'DEADLINE_PASSED', deadline: deadline.toISOString(), message: 'The submission deadline has passed.' });
   }
+}
+
+/**
+ * When a round's answers are due (#129): the round's deadline, and — in timed mode — the stated duration counted
+ * from when the candidate first opened the questions, whichever is earlier. The start is recorded once, the first
+ * time the link is opened, so reloading or opening it on another device doesn't restart the clock. Before it is
+ * opened (or for an invitation without a duration) only the deadline applies.
+ */
+export function effectiveDeadline(invitation: { mode: string; durationMin: number | null; deadline: Date | null; openedAt: Date | null }): Date | null {
+  const timed = invitation.mode === 'timed' && invitation.durationMin && invitation.openedAt
+    ? new Date(invitation.openedAt.getTime() + invitation.durationMin * 60_000)
+    : null;
+  if (timed && invitation.deadline) return timed.getTime() < invitation.deadline.getTime() ? timed : invitation.deadline;
+  return timed ?? invitation.deadline;
+}
+
+/**
+ * The answers must be the round's questions, each answered once (#136): no question that wasn't asked, none twice,
+ * none left out or blank — the same rule the candidate page applies before it lets the form be sent. Refused
+ * before anything is stored or scored.
+ */
+export function assertAnswersMatchQuestions(questions: { questionId: string }[], answers: { questionId: string; answerText: string }[]): void {
+  const asked = new Set(questions.map((q) => q.questionId));
+  const seen = new Set<string>();
+  const fieldErrors: Record<string, string[]> = {};
+  answers.forEach((answer, index) => {
+    if (!asked.has(answer.questionId)) fieldErrors[`answers.${index}.questionId`] = ['This question is not part of this test.'];
+    else if (seen.has(answer.questionId)) fieldErrors[`answers.${index}.questionId`] = ['This question is answered more than once.'];
+    else if (!answer.answerText.trim()) fieldErrors[`answers.${index}.answerText`] = ['Answer this question before submitting.'];
+    seen.add(answer.questionId);
+  });
+  const missing = [...asked].filter((id) => !seen.has(id));
+  if (missing.length) fieldErrors.answers = [`Every question needs an answer; missing: ${missing.join(', ')}.`];
+  if (Object.keys(fieldErrors).length) throw invalidSchema(fieldErrors);
 }

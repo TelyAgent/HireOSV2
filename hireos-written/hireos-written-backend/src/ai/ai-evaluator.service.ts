@@ -44,7 +44,8 @@ const SYSTEM_PROMPT = `你是一名资深招聘评估专家。根据笔试题目
 }
 criteria 数组必须恰好包含"评分维度"部分列出的每一项，name 与给出的维度名称完全一致。`;
 
-function buildRubric(questions: EvaluationInput['questions']): { name: string; max: number }[] {
+/** The scoring dimensions of a round — what the AI scores against, and what a reviewer scores by hand without it (#121). */
+export function buildRubric(questions: EvaluationInput['questions']): { name: string; max: number }[] {
   const all = questions.flatMap((q) => q.competencies ?? []);
   if (all.length === 0) return [{ name: '整体作答质量', max: 100 }];
   const totalFraction = all.reduce((sum, c) => sum + c.fraction, 0) || 1;

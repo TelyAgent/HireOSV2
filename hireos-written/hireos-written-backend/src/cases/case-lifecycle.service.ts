@@ -1,5 +1,6 @@
 import { BadGatewayException, ConflictException, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { Prisma } from '@prisma/client';
 import { PrismaService } from '../persistence/prisma.service';
 import type { Identity } from '../auth/workspace.guard';
 
@@ -19,8 +20,25 @@ import type { Identity } from '../auth/workspace.guard';
  * Progress events that arrive while a case is on hold (e.g. the candidate submits) move
  * statusBeforeHold instead, so resuming lands on the up-to-date status. Terminal cases ignore them.
  * The case's Task is only completed on a terminal status -- a released result still needs a decision.
+ *
+ * Every write here is conditional on the status it moves from (#119 #131): a progress event moves the case only
+ * from the statuses listed in ADVANCES_FROM, in one UPDATE, so a case that was closed or handed off meanwhile is
+ * never written back to an earlier status, and an event that arrives late (an invitation opened after the answers
+ * came in) never moves it backwards. Closing and handing off complete the Task in the same transaction (#118).
  */
 export const TERMINAL_STATUSES = ['handed_off', 'closed'];
+
+/** The statuses each progress event may move a case from. A new round's invitation may follow any open status. */
+export const ADVANCES_FROM: Record<string, string[]> = {
+  invited: ['linked', 'invited', 'awaiting_submission', 'review_pending', 'finalized', 'released'],
+  awaiting_submission: ['invited'],
+  review_pending: ['invited', 'awaiting_submission'],
+  finalized: ['review_pending'],
+  released: ['finalized'],
+};
+
+/** The database, or the transaction a progress event is part of. */
+type Db = PrismaService | Prisma.TransactionClient;
 export const CLOSE_REASONS = ['passed', 'rejected', 'withdrawn'] as const;
 export type CloseReason = (typeof CLOSE_REASONS)[number];
 
@@ -33,16 +51,38 @@ export class CaseLifecycleService {
     private readonly config: ConfigService,
   ) {}
 
-  /** A progress event (invite sent / opened / submitted / finalized / released). */
-  async advance(caseId: string, next: string) {
-    const kase = await this.db.case.findUnique({ where: { id: caseId } });
-    if (!kase || TERMINAL_STATUSES.includes(kase.status)) return;
-    const data = kase.status === 'on_hold' ? { statusBeforeHold: next } : { status: next };
-    await this.db.case.update({ where: { id: caseId }, data });
+  /**
+   * A progress event (invite sent / opened / submitted / finalized / released), part of the caller's transaction
+   * when given one. Moves the case only from the statuses this event may follow — on hold, its remembered status
+   * moves instead — and does nothing otherwise (terminal, or already further along). Returns whether it moved.
+   */
+  async advance(caseId: string, next: string, db: Db = this.db): Promise<boolean> {
+    const from = ADVANCES_FROM[next] ?? [];
+    const moved = await db.case.updateMany({ where: { id: caseId, status: { in: from } }, data: { status: next } });
+    if (moved.count) return true;
+    const held = await db.case.updateMany({
+      where: { id: caseId, status: 'on_hold', OR: [{ statusBeforeHold: { in: from } }, ...(from.includes('linked') ? [{ statusBeforeHold: null }] : [])] },
+      data: { statusBeforeHold: next },
+    });
+    return held.count > 0;
   }
 
-  private async completeTask(caseId: string) {
-    await this.db.task.updateMany({ where: { caseId, status: { not: 'completed' } }, data: { status: 'completed' } });
+  /**
+   * Locks the case row until the transaction ends, so a submission or a new round and a close of the same case
+   * take turns: whichever commits first is what the other one sees (#130).
+   */
+  async lockCase(tx: Prisma.TransactionClient, caseId: string): Promise<{ status: string } | null> {
+    const rows = await tx.$queryRaw<{ status: string }[]>`SELECT status FROM "Case" WHERE id = ${caseId} FOR UPDATE`;
+    return rows[0] ?? null;
+  }
+
+  private async completeTask(caseId: string, db: Db = this.db) {
+    await db.task.updateMany({ where: { caseId, status: { not: 'completed' } }, data: { status: 'completed' } });
+  }
+
+  /** The case as it is now, for a response after a conditional write. */
+  private async current(caseId: string) {
+    return this.db.case.findUniqueOrThrow({ where: { id: caseId } });
   }
 
   private async findCase(identity: Identity, caseId: string) {
@@ -106,29 +146,42 @@ export class CaseLifecycleService {
     return this.roundState(identity, caseId);
   }
 
+  // Hold and resume read and write the status in one UPDATE (#131): a progress event landing in between can't be
+  // lost, and the status remembered for resuming is the one the case actually had.
   async hold(identity: Identity, caseId: string) {
-    const kase = await this.findCase(identity, caseId);
-    if (kase.status === 'on_hold' || TERMINAL_STATUSES.includes(kase.status)) throw new ConflictException({ code: 'CANNOT_HOLD', status: kase.status });
-    const updated = await this.db.case.update({ where: { id: caseId }, data: { status: 'on_hold', statusBeforeHold: kase.status } });
-    return this.serialize(updated);
+    await this.findCase(identity, caseId);
+    const held = await this.db.$executeRaw`
+      UPDATE "Case" SET "statusBeforeHold" = status, status = 'on_hold', "updatedAt" = now()
+      WHERE id = ${caseId} AND status NOT IN ('on_hold', 'handed_off', 'closed')`;
+    const kase = await this.current(caseId);
+    if (!held) throw new ConflictException({ code: 'CANNOT_HOLD', status: kase.status });
+    return this.serialize(kase);
   }
 
   async resume(identity: Identity, caseId: string) {
-    const kase = await this.findCase(identity, caseId);
-    if (kase.status !== 'on_hold') throw new ConflictException({ code: 'NOT_ON_HOLD', status: kase.status });
-    const updated = await this.db.case.update({ where: { id: caseId }, data: { status: kase.statusBeforeHold ?? 'linked', statusBeforeHold: null } });
-    return this.serialize(updated);
+    await this.findCase(identity, caseId);
+    const resumed = await this.db.$executeRaw`
+      UPDATE "Case" SET status = COALESCE("statusBeforeHold", 'linked'), "statusBeforeHold" = NULL, "updatedAt" = now()
+      WHERE id = ${caseId} AND status = 'on_hold'`;
+    const kase = await this.current(caseId);
+    if (!resumed) throw new ConflictException({ code: 'NOT_ON_HOLD', status: kase.status });
+    return this.serialize(kase);
   }
 
   async close(identity: Identity, caseId: string, reason: CloseReason) {
-    const kase = await this.findCase(identity, caseId);
-    if (TERMINAL_STATUSES.includes(kase.status)) throw new ConflictException({ code: 'ALREADY_ENDED', status: kase.status });
-    const updated = await this.db.case.update({
-      where: { id: caseId },
-      data: { status: 'closed', statusBeforeHold: null, closeReason: reason, closedAt: new Date() },
+    await this.findCase(identity, caseId);
+    // Closing and completing the task are one step (#118), and only an open case closes (#131).
+    const closed = await this.db.$transaction(async (tx) => {
+      const { count } = await tx.case.updateMany({
+        where: { id: caseId, status: { notIn: TERMINAL_STATUSES } },
+        data: { status: 'closed', statusBeforeHold: null, closeReason: reason, closedAt: new Date() },
+      });
+      if (count) await this.completeTask(caseId, tx);
+      return count > 0;
     });
-    await this.completeTask(caseId);
-    return this.serialize(updated);
+    const kase = await this.current(caseId);
+    if (!closed) throw new ConflictException({ code: 'ALREADY_ENDED', status: kase.status });
+    return this.serialize(kase);
   }
 
   /**
@@ -181,11 +234,18 @@ export class CaseLifecycleService {
       throw new BadGatewayException({ code: 'INTERVIEW_HANDOFF_FAILED', message });
     }
 
-    const updated = await this.db.case.update({
-      where: { id: caseId },
-      data: { status: 'handed_off', statusBeforeHold: null, handedOffAt: new Date(), interviewTaskId },
+    // Only a case still released is handed off, together with completing its task (#118 #131). If it changed
+    // meanwhile the interview task already exists; Interview's intake is idempotent, so a retry finds it again.
+    const handedOff = await this.db.$transaction(async (tx) => {
+      const { count } = await tx.case.updateMany({
+        where: { id: caseId, status: 'released' },
+        data: { status: 'handed_off', statusBeforeHold: null, handedOffAt: new Date(), interviewTaskId },
+      });
+      if (count) await this.completeTask(caseId, tx);
+      return count > 0;
     });
-    await this.completeTask(caseId);
-    return this.serialize(updated);
+    const after = await this.current(caseId);
+    if (!handedOff) throw new ConflictException({ code: 'CASE_CHANGED', status: after.status, message: 'This case changed while it was being handed off. Refresh and try again.' });
+    return this.serialize(after);
   }
 }

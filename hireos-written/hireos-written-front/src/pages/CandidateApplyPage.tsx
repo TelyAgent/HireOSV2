@@ -18,16 +18,22 @@ export function CandidateApplyPage() {
   const [answers, setAnswers] = useState<Record<string, string>>({});
   const [submitting, setSubmitting] = useState(false);
   const [justSubmitted, setJustSubmitted] = useState(false);
-  // The backend refuses answers after the deadline (DEADLINE_PASSED); the page closes the form too.
+  // The backend refuses answers after they are due (DEADLINE_PASSED); the page closes the form at the same moment:
+  // the due time the server works out — sooner than the deadline in timed mode (#129).
   const [deadlinePassed, setDeadlinePassed] = useState(false);
-  const deadline = state.status === "ready" ? state.data.deadline : null;
+  const [now, setNow] = useState(() => Date.now());
+  const deadline = state.status === "ready" ? (state.data.dueAt ?? state.data.deadline) : null;
   useEffect(() => {
     if (!deadline) return;
-    const check = () => setDeadlinePassed(Date.now() > new Date(deadline).getTime());
+    const check = () => {
+      setNow(Date.now());
+      setDeadlinePassed(Date.now() > new Date(deadline).getTime());
+    };
     check();
-    const timer = window.setInterval(check, 30_000);
+    const timer = window.setInterval(check, 10_000);
     return () => window.clearInterval(timer);
   }, [deadline]);
+  const timedDue = state.status === "ready" && state.data.mode === "timed" && state.data.dueAt ? new Date(state.data.dueAt) : null;
 
   useEffect(() => {
     let cancelled = false;
@@ -79,6 +85,13 @@ export function CandidateApplyPage() {
         {state.status === "ready" && !state.data.submission && !justSubmitted && (
           <>
             {state.data.letter && <DeadlineBanner letter={state.data.letter} deadline={state.data.deadline} />}
+            {timedDue && !deadlinePassed && (
+              <div className="banner warning" style={{ marginBottom: 16 }} data-testid="timed-due">
+                {t("Time limit: answers are due by %time (%left minutes left). The clock started when you first opened this page.")
+                  .replace("%time", timedDue.toLocaleString())
+                  .replace("%left", String(Math.max(0, Math.ceil((timedDue.getTime() - now) / 60_000))))}
+              </div>
+            )}
             {deadlinePassed && (
               <div className="banner danger" style={{ marginBottom: 16 }}>
                 {t("The submission deadline has passed, so answers can no longer be submitted. If you have questions, please reply to the invitation email.")}

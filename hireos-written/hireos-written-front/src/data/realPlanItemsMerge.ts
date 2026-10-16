@@ -152,7 +152,24 @@ export function applyRealEvaluation(caseId: string, invitation: RealInvitation):
     return attemptId;
   }
 
-  if (!submission.evaluation || EVALUATIONS[evaluationId]) return attemptId;
+  const existing = EVALUATIONS[evaluationId];
+  if (!submission.evaluation) {
+    // No automatic scoring (yet, or it failed): a reviewer scores by hand on the round's dimensions, and the page
+    // says where the automatic scoring stands (#121).
+    if (existing) {
+      if (existing.criteria.every((c) => c.manual)) EVALUATIONS[evaluationId] = { ...existing, aiStatus: submission.evaluationStatus, aiError: submission.evaluationError ?? null };
+      return attemptId;
+    }
+    if (!submission.rubric?.length) return attemptId;
+    EVALUATIONS[evaluationId] = {
+      id: evaluationId, attemptId, status: "ai_draft", finalizedBy: null, finalizedAt: null,
+      aiStatus: submission.evaluationStatus, aiError: submission.evaluationError ?? null,
+      criteria: submission.rubric.map((r) => ({ name: r.name, max: r.max, ai: 0, human: null, confidence: "Manual", coverage: "—", evidence: "", source: "Manual scoring", manual: true })),
+    };
+    return attemptId;
+  }
+  // The automatic scoring arrived after a hand-scoring draft was opened: use it unless a score was already typed.
+  if (existing && !(existing.criteria.every((c) => c.manual) && existing.criteria.every((c) => c.human == null))) return attemptId;
   const evaluation: Evaluation = {
     id: evaluationId, attemptId, status: "ai_draft", finalizedBy: null, finalizedAt: null,
     criteria: submission.evaluation.criteria.map(toCriterion),

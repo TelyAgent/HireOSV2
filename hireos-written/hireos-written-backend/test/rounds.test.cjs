@@ -15,6 +15,9 @@ function matches(row, where = {}) {
   return Object.entries(where).every(([k, v]) => {
     if (k === 'submission') return v.isNot === null ? row.submission != null : true;
     if (v && typeof v === 'object' && 'in' in v) return v.in.includes(row[k]);
+    if (v && typeof v === 'object' && 'notIn' in v) return !v.notIn.includes(row[k]);
+    if (v && typeof v === 'object' && 'not' in v) return (row[k] ?? null) !== v.not;
+    if (v === null) return row[k] == null;
     return row[k] === v;
   });
 }
@@ -49,7 +52,14 @@ function setup({ status = 'released', draftRoundOpen = false, invitations: invit
     case: table([{ id: 'c1', workspaceId: WS, status, draftRoundOpen, candidate: { name: 'Ann' }, job: { title: 'PM' } }]),
     invitation: table(invitationRows, { prefix: 'inv' }),
     planItem: table(planItemRows, { prefix: 'pi' }),
-    submission: { update: async ({ where, data }) => Object.assign(db.invitation.rows.find((i) => i.submission?.id === where.id).submission, data) },
+    submission: {
+      update: async ({ where, data }) => Object.assign(db.invitation.rows.find((i) => i.submission?.id === where.id).submission, data),
+      updateMany: async ({ where, data }) => {
+        const hit = db.invitation.rows.map((i) => i.submission).filter((sub) => sub && matches(sub, where));
+        hit.forEach((sub) => Object.assign(sub, data));
+        return { count: hit.length };
+      },
+    },
     task: table([]),
   };
   db.case.findFirst = async ({ where }) => {
@@ -57,6 +67,8 @@ function setup({ status = 'released', draftRoundOpen = false, invitations: invit
     return c ?? null;
   };
   db.$transaction = async (fn) => fn(db);
+  // SELECT status FROM "Case" WHERE id = $1 FOR UPDATE
+  db.$queryRaw = async (_sql, id) => db.case.rows.filter((r) => r.id === id).map((r) => ({ status: r.status }));
   const config = { get: (_k, d) => d };
   const lifecycle = new CaseLifecycleService(db, config);
   const invitations = new InvitationsService(db, { sendFromWorkspaceAccount: async () => ({ sent: true }), senderAccount: async () => null }, config, {}, lifecycle);

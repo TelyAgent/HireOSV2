@@ -195,6 +195,12 @@ model Submission {
   // never rewritten after the initial AI pass), same as this app's other "AI draft, human review"
   // fixtures elsewhere (e.g. the AI-generated question rubric).
   evaluation   Json?
+  // The automatic scoring runs after the submission is accepted, never before answering the candidate (#121):
+  // pending -> running -> done | failed (retried a few times) | skipped (a reviewer finalized first).
+  evaluationStatus    String    @default("pending")
+  evaluationError     String?
+  evaluationAttempts  Int       @default(0)
+  evaluationStartedAt DateTime?
   // The reviewer's finalized scoring (frontend "Comprehensive evaluation" -> Confirm finalize):
   // { overall, criteria: [{name, max, ai, human, overridden, overrideReason}] }. Null until finalized.
   finalEvaluation Json?
