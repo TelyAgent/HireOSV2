@@ -1,6 +1,19 @@
 # I09 Issue 草稿与对应截图
 
-日期：2026-10-15。以下均为**草稿，尚未创建 GitHub Issue**。截图为线上 Chrome 页面原始截图，只裁切了含候选人姓名的页头及无关区域。草稿 4～9 缺少能验证断言的目标测试数据或角色身份，不能把现有页面截图当作线上复现证据。
+日期：2026-10-15；2026-10-16 复核并提交 GitHub。以下保留提交前草稿格式，正式记录见对应 Issue。截图为线上 Chrome 页面原始截图，只裁切了含候选人姓名的页头及无关区域。草稿 4～8 可使用当前账号测试，但线上现有项目没有覆盖所需状态；不能把已发布项目的页面截图当作目标状态的复现证据。草稿 9 属于尚未实现的 I15 权限能力，当前阶段不做跨角色拒绝测试。
+
+| 草稿 | GitHub 记录 | 截图 |
+| --- | --- | --- |
+| 1 | [#324](https://github.com/TelyAgent/HireOSV2/issues/324) | 3 张 |
+| 2 | [#325](https://github.com/TelyAgent/HireOSV2/issues/325) | 2 张 |
+| 3 | [#326](https://github.com/TelyAgent/HireOSV2/issues/326) | 1 张 |
+| 4 | [#327](https://github.com/TelyAgent/HireOSV2/issues/327) | 无有效目标状态截图 |
+| 5 | [#328](https://github.com/TelyAgent/HireOSV2/issues/328) | 无有效目标状态截图 |
+| 6 | [#329](https://github.com/TelyAgent/HireOSV2/issues/329) | 无有效目标状态截图 |
+| 7 | [#330](https://github.com/TelyAgent/HireOSV2/issues/330) | 无有效目标状态截图 |
+| 8 | [#331](https://github.com/TelyAgent/HireOSV2/issues/331) | 无有效目标状态截图 |
+| 9 | [#332](https://github.com/TelyAgent/HireOSV2/issues/332) | 权限功能未实现，暂无验证截图 |
+| 10 | [#220 的补充证据](https://github.com/TelyAgent/HireOSV2/issues/220#issuecomment-6207599181) | 1 张；复用已有 Issue |
 
 ## 草稿 1｜Debrief 未展示全部轮次意见
 
@@ -104,11 +117,11 @@ Debrief 显示 L3：
   - **AC-4：** 重复点击创建操作只产生一个补证请求和一个补证轮；自动测试覆盖该情况。
 - **References：** I09 PRD AC-5～AC-7；[测试报告](Test_Report_2026-10-15.md) E-06、I09-UX-04。
 - **Dependencies：** 需确认补证入口设在 Debrief、决定页，还是两处都有。
-- **Reproduction：** 当前工作区 [DebriefPage.tsx](/Users/apple/work/HireOSV2/hireos-interview/job-Interview-front/src/pages/project/DebriefPage.tsx:184) 无补证流程；线上需使用 `S_all_rounds_scored_security_unknown` 复核。
+- **Reproduction：** 当前工作区 [DebriefPage.tsx](../../../../hireos-interview/job-Interview-front/src/pages/project/DebriefPage.tsx#L184) 无补证流程；线上需使用 `S_all_rounds_scored_security_unknown` 复核。
 - **Expected / Actual：** 预期证据缺口可进入补证闭环；当前代码没有对应流程，线上目标状态尚未验证。
 - **Environment：** 线上入口同上；目标 seed 与构建号未知。
 
-**截图证据：** 暂无有效线上截图；需要 Unknown seed 验证创建入口、状态和补证轮。
+**截图证据：** 暂无有效线上截图；当前账号可测试，但需要隔离的 Unknown Must-have 测试项目，验证创建入口、状态和补证轮。现有已发布项目不能证明未完成项目中的入口行为。
 
 ## 草稿 5｜缺少 Candidate Evidence Map
 
@@ -126,11 +139,11 @@ Debrief 显示 L3：
   - **AC-4：** 自动测试覆盖跨轮证据和空证据。
 - **References：** I09 PRD FR-10；[测试报告](Test_Report_2026-10-15.md) E-06。
 - **Dependencies：** 需确认独立页面还是合并在 Debrief。
-- **Reproduction：** 当前工作区 [DebriefPage.tsx](/Users/apple/work/HireOSV2/hireos-interview/job-Interview-front/src/pages/project/DebriefPage.tsx:184) 仅逐项渲染评分卡；线上已发布样本未用于完整功能验收。
+- **Reproduction：** 当前工作区 [DebriefPage.tsx](../../../../hireos-interview/job-Interview-front/src/pages/project/DebriefPage.tsx#L184) 仅逐项渲染评分卡；线上已发布样本未用于完整功能验收。
 - **Expected / Actual：** 预期可按来源、能力和轮次查证；当前实现无对应视图。
 - **Environment：** 代码缺口，线上构建号未知。
 
-**截图证据：** 暂无能证明完整证据图流程的线上截图；需先确定页面形态并准备多来源 seed。
+**截图证据：** 暂无能证明完整证据图流程的线上截图；当前账号可测试，需要含两轮及多来源证据的隔离项目。
 
 ## 草稿 6｜未解决问题没有责任人
 
@@ -145,13 +158,13 @@ Debrief 显示 L3：
   - **AC-1：** 每项重大未解决问题显示负责人或明确的“待分配”状态。
   - **AC-2：** 授权用户可指定负责人，刷新后仍保留。
   - **AC-3：** 自动测试覆盖多项问题分别指派不同负责人。
-- **References：** I09 PRD FR-6；[tasks.service.ts](/Users/apple/work/HireOSV2/hireos-interview/job-Interview-backend/src/intake/tasks.service.ts:145) 的 `unresolved: string[]`。
+- **References：** I09 PRD FR-6；[tasks.service.ts](../../../../hireos-interview/job-Interview-backend/src/intake/tasks.service.ts#L145) 的 `unresolved: string[]`。
 - **Dependencies：** 需确认谁可指派和修改负责人。
 - **Reproduction：** 当前代码只返回未解决问题文本；本次线上样本没有 AI 跨轮草稿，尚无可观察的未解决问题列表。
 - **Expected / Actual：** 预期每项有责任人；当前数据结构无法表达责任人。
 - **Environment：** 代码依据，线上未验证。
 
-**截图证据：** 暂无有效线上截图；需包含未解决问题的 AI 草稿样本。
+**截图证据：** 暂无有效线上截图；当前账号可测试，需要包含两项未解决问题的 AI 草稿样本，才能核查逐项负责人。
 
 ## 草稿 7｜“See both traces”缺少完整追溯链
 
@@ -169,11 +182,11 @@ Debrief 显示 L3：
   - **AC-4：** 自动测试覆盖 1 级与 2 级差距边界。
 - **References：** I09 PRD AC-4、FR-5；[测试报告](Test_Report_2026-10-15.md) UC-I09-04 未验证。
 - **Dependencies：** 需要 `ai_gap` 测试数据和可追溯的证据标识。
-- **Reproduction：** 当前 [DebriefPage.tsx](/Users/apple/work/HireOSV2/hireos-interview/job-Interview-front/src/pages/project/DebriefPage.tsx:115) 的按钮仅展开卡片；本次线上样本无 AI 跨轮草稿。
+- **Reproduction：** 当前 [DebriefPage.tsx](../../../../hireos-interview/job-Interview-front/src/pages/project/DebriefPage.tsx#L115) 的按钮仅展开卡片；本次线上样本无 AI 跨轮草稿。
 - **Expected / Actual：** 预期打开两条来源链；当前实现只提供摘要展示。
 - **Environment：** 代码依据，线上未验证。
 
-**截图证据：** 暂无有效线上截图；需 `ai_gap` 样本触发分歧列表。
+**截图证据：** 暂无有效线上截图；当前账号可测试，需要有两级以上 AI/人工分歧及有效原始引用的样本。现有已发布样本显示 `No AI cross-round draft yet`。
 
 ## 草稿 8｜Unknown Must-have 的最终结论阻断需补齐
 
@@ -191,18 +204,18 @@ Debrief 显示 L3：
   - **AC-4：** UI 与 API 自动测试均覆盖阻断和例外。
 - **References：** I09 PRD BR-3、BR-4；[测试报告](Test_Report_2026-10-15.md) AC-2、AC-5 未验证。
 - **Dependencies：** I10 的例外确认规则；需准备 Security Unknown seed。
-- **Reproduction：** 当前 [tasks.service.ts](/Users/apple/work/HireOSV2/hireos-interview/job-Interview-backend/src/intake/tasks.service.ts:249) 检查“至少一项评分”即可生成决定草稿；本次没有 Unknown 线上 seed，未执行最终确认。
+- **Reproduction：** 当前 [tasks.service.ts](../../../../hireos-interview/job-Interview-backend/src/intake/tasks.service.ts#L249) 检查“至少一项评分”即可生成决定草稿；本次没有 Unknown 线上 seed，未执行最终确认。
 - **Expected / Actual：** 预期 Unknown Must-have 阻断默认最终交接；当前代码未见对应校验。
 - **Environment：** 代码风险，线上未验证。
 
-**截图证据：** 暂无有效线上截图；需 Unknown Must-have seed，并核 UI 与 API 阻断。
+**截图证据：** 暂无有效线上截图；当前账号可核普通路径，需要 Unknown Must-have 的隔离项目，并核 UI 与 API 阻断。HR/HM 双方例外确认属于后续权限能力，当前不能据单账号测试判定通过。
 
-## 草稿 9｜Interviewer 的 Debrief 权限缺少服务端限制
+## 草稿 9｜Interviewer 的 Debrief 权限尚待实现
 
-**标题：** `[Bug] I09 Debrief 接口未按面试业务角色限制访问`
+**标题：** `[Feature] I15 按面试业务角色限制 Debrief 访问`
 
-- **Type / Subsystem / Severity / Risk：** Bug / hireos-interview / S2 / high
-- **Problem：** I09 规定 Interviewer 不能进入 Debrief；当前接口使用 Workspace 身份校验，未见 Debrief 专属业务角色校验。
+- **Type / Subsystem / Severity / Risk：** Feature / hireos-interview / S2 / high
+- **Problem：** I09 规定 Interviewer 不能进入 Debrief；当前 I15 业务角色权限尚未实现，接口只使用 Workspace 身份校验。
 - **User Outcome：** 只有授权的 HR、Hiring Manager 和适用的委员会成员能查看跨轮评估。
 - **Scope：** Debrief 页面入口及读取、AI 生成接口的角色校验。
 - **Non-goals：** 不改变 Interviewer 对自己轮次 Review 的权限。
@@ -211,12 +224,12 @@ Debrief 显示 L3：
   - **AC-2：** HR、Hiring Manager 可按授权访问。
   - **AC-3：** 自动测试使用独立身份验证 UI 和 API。
 - **References：** I09 User Cases UC-I09-10；Interview README 的 I15 权限缺口。
-- **Dependencies：** I15 业务角色与独立测试账号。
-- **Reproduction：** 本次只有一个已登录账号，没有 `interviewer_a` 身份；当前 [intake.controller.ts](/Users/apple/work/HireOSV2/hireos-interview/job-Interview-backend/src/intake/intake.controller.ts:75) 未见角色判断。
-- **Expected / Actual：** 预期 Interviewer 被服务端拒绝；线上结果未验证。
-- **Environment：** 代码风险，线上未验证。
+- **Dependencies：** I15 业务角色实现；完成后需具备 Interviewer 身份进行拒绝测试。
+- **Reproduction：** 当前 [intake.controller.ts](../../../../hireos-interview/job-Interview-backend/src/intake/intake.controller.ts#L75) 未见业务角色判断。权限功能尚未交付，不将当前账号访问成功视为权限缺陷复现。
+- **Expected / Actual：** 目标是 Interviewer 被服务端拒绝；现阶段为已知未实现能力，不判线上 Bug 复现。
+- **Environment：** 当前账号；权限专项验收待 I15 实现。
 
-**截图证据：** 暂无有效线上截图；需独立 Interviewer 身份和 API 403 证据。
+**截图证据：** 当前阶段不需要截图；I15 实现后再以 Interviewer 身份取得无入口及 API 403 证据。
 
 ## 草稿 10｜确认的 Rubric 权重合计 105%
 
