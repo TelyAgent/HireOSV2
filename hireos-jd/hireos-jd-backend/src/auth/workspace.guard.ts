@@ -2,6 +2,7 @@ import { CanActivate, ExecutionContext, ForbiddenException, Injectable, Logger, 
 import { ConfigService } from '@nestjs/config';
 import { Buffer } from 'node:buffer';
 import { timingSafeEqual } from 'node:crypto';
+import { randomUUID } from 'node:crypto';
 
 /*
  * Shared HireOS request authentication. The same file lives in every backend (core-record, jd,
@@ -30,6 +31,12 @@ export type Identity = {
 
 type Headers = Record<string, string | string[] | undefined>;
 type Introspection = { active: boolean; userId?: string; email?: string; displayName?: string; workspaceId?: string; roles?: string[] };
+
+class IdentityIntrospectionError extends Error {
+  constructor(readonly kind: 'timeout' | 'unreachable' | 'http_error', message: string) {
+    super(message);
+  }
+}
 
 const SESSION_COOKIE = 'hireos_sid';
 const SAFE_METHODS = new Set(['GET', 'HEAD', 'OPTIONS']);
@@ -62,6 +69,8 @@ export class WorkspaceGuard implements CanActivate {
 
   async canActivate(context: ExecutionContext) {
     const request = context.switchToHttp().getRequest<{ headers: Headers; method: string; identity: Identity }>();
+    const requestId = header(request.headers, 'x-request-id') || randomUUID();
+    request.headers['x-request-id'] = requestId;
     request.identity = await this.authenticate(request);
     return true;
   }
@@ -80,8 +89,11 @@ export class WorkspaceGuard implements CanActivate {
       try {
         user = await this.introspect(token);
       } catch (error) {
-        if (this.sessionMode) throw new ServiceUnavailableException({ code: 'IDENTITY_UNAVAILABLE', message: 'Sign-in service is unavailable.' });
-        this.logger.warn(`Session check skipped (identity service unreachable): ${error instanceof Error ? error.message : String(error)}`);
+        const requestId = header(request.headers, 'x-request-id') || 'unknown';
+        const kind = error instanceof IdentityIntrospectionError ? error.kind : 'unreachable';
+        this.logger.error(`Identity introspection failed requestId=${requestId} kind=${kind}: ${error instanceof Error ? error.message : String(error)}`);
+        if (this.sessionMode) throw new ServiceUnavailableException({ code: 'IDENTITY_UNAVAILABLE', message: 'Sign-in service is unavailable.', requestId });
+        this.logger.warn(`Session check skipped requestId=${requestId} kind=${kind}`);
       }
       if (user) {
         this.assertAllowedOrigin(request);
@@ -117,13 +129,19 @@ export class WorkspaceGuard implements CanActivate {
   private async introspect(token: string): Promise<Identity | null> {
     const baseUrl = this.config.get<string>('IDENTITY_INTERNAL_URL', '');
     if (!baseUrl) throw new Error('IDENTITY_INTERNAL_URL is not configured');
-    const response = await globalThis.fetch(`${baseUrl.replace(/\/+$/, '')}/internal/sessions/introspect`, {
-      method: 'POST',
-      headers: { 'content-type': 'application/json', 'x-internal-token': this.config.get<string>('IDENTITY_INTERNAL_TOKEN', '') },
-      body: JSON.stringify({ token }),
-      signal: AbortSignal.timeout(3000),
-    });
-    if (!response.ok) throw new Error(`identity introspection returned HTTP ${response.status}`);
+    let response: Response;
+    try {
+      response = await globalThis.fetch(`${baseUrl.replace(/\/+$/, '')}/internal/sessions/introspect`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', 'x-internal-token': this.config.get<string>('IDENTITY_INTERNAL_TOKEN', '') },
+        body: JSON.stringify({ token }),
+        signal: AbortSignal.timeout(3000),
+      });
+    } catch (error) {
+      const timeout = error instanceof Error && (error.name === 'TimeoutError' || error.name === 'AbortError');
+      throw new IdentityIntrospectionError(timeout ? 'timeout' : 'unreachable', error instanceof Error ? error.message : String(error));
+    }
+    if (!response.ok) throw new IdentityIntrospectionError('http_error', `identity introspection returned HTTP ${response.status}`);
     const result = (await response.json()) as Introspection;
     return result.active && result.userId && result.workspaceId
       ? { workspaceId: result.workspaceId, actorId: result.userId, roles: result.roles ?? [], kind: 'user', email: result.email, displayName: result.displayName }

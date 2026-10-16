@@ -93,6 +93,33 @@ test('Identity service down in session mode fails closed (503), never falls back
   }
 });
 
+test('Identity outages expose a request id while logs retain the failure category', async () => {
+  const realFetch = globalThis.fetch;
+  try {
+    globalThis.fetch = async () => new Response('identity failed', { status: 502 });
+    const guard = new WorkspaceGuard(new ConfigService(SESSION_MODE));
+    await assert.rejects(
+      guard.canActivate(context(request({ cookie: 'hireos_sid=any', 'x-request-id': 'req-32' }))),
+      (error) => error.getStatus() === 503 && error.response.code === 'IDENTITY_UNAVAILABLE' && error.response.requestId === 'req-32',
+    );
+  } finally {
+    globalThis.fetch = realFetch;
+  }
+});
+
+test('Identity timeout is classified separately from a network failure', async () => {
+  const realFetch = globalThis.fetch;
+  try {
+    const timeout = new Error('request timed out');
+    timeout.name = 'TimeoutError';
+    globalThis.fetch = async () => { throw timeout; };
+    const guard = new WorkspaceGuard(new ConfigService(SESSION_MODE));
+    await assert.rejects(guard.canActivate(context(request({ cookie: 'hireos_sid=any' }))), (error) => error.getStatus() === 503 && typeof error.response.requestId === 'string');
+  } finally {
+    globalThis.fetch = realFetch;
+  }
+});
+
 test('Cross-site state-changing requests with a valid cookie are refused', async () => {
   const realFetch = globalThis.fetch;
   try {
