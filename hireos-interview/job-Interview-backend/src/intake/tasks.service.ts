@@ -1,11 +1,13 @@
 import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
+import { randomUUID } from 'node:crypto';
 import { PrismaService } from '../persistence/prisma.service';
-import { attachTaskMaterialSchema, confirmPackageSchema, confirmPlanSchema, createTaskSchema, reviewTaskSchema, setDecisionSchema, validate, type ParseInput } from './contracts';
+import { attachTaskMaterialSchema, confirmPackageSchema, confirmPlanSchema, createTaskSchema, reviewTaskSchema, setDecisionSchema, offerAckSchema, validate, type ParseInput } from './contracts';
 import { CandidatesService } from './candidates.service';
 import { RoundsService } from './rounds.service';
 import { advanceTaskStatus } from './task-status';
 import { taskStages } from './task-stages';
+import { buildPackagePdf, packagePdfLines } from './package-pdf';
 import { mergeTranscriptLines } from '../rubric/summary-contracts';
 import { CoreRecordClient } from '../core-record/core-record.client';
 import type { Identity } from './workspace.guard';
@@ -135,6 +137,12 @@ export class TasksService {
     const stages = await taskStages(this.db, identity.workspaceId, taskId);
     if (!stages.find((s) => s.stage === 'plan')!.unlocked) throw new BadRequestException({ code: 'RUBRIC_NOT_CONFIRMED' });
     if (!input.confirmed && stages.find((s) => s.stage === 'schedule')!.done) throw new ConflictException({ code: 'PLAN_ALREADY_SCHEDULED' });
+    if (input.confirmed) {
+      const rounds = await this.db.interviewRound.findMany({ where: { taskId, workspaceId: identity.workspaceId },
+        select: { sequence: true, name: true, interviewerId: true, competencies: true, notes: true } });
+      const incomplete = rounds.filter((round) => !round.name.trim() || !round.interviewerId || !round.competencies.trim() || !round.notes.trim());
+      if (incomplete.length) throw new BadRequestException({ code: 'PLAN_NOT_READY', rounds: incomplete.map((round) => round.sequence) });
+    }
     await this.db.interviewTask.update({ where: { id: taskId }, data: { planConfirmedAt: input.confirmed ? new Date() : null } });
     if (input.confirmed) await advanceTaskStatus(this.db, identity.workspaceId, taskId, 'ready_to_schedule');
     return this.get(identity.workspaceId, taskId);
@@ -366,7 +374,7 @@ export class TasksService {
   private async packageEvidence(workspaceId: string, taskId: string, jobId: string) {
     const rubric = await this.db.rubricVersion.findFirst({
       where: { workspaceId, jobId, status: 'confirmed' }, orderBy: { versionNumber: 'desc' },
-      select: { cards: { orderBy: { createdAt: 'asc' }, select: { id: true, requirement: true, cardPriority: true, weight: true } } },
+      select: { cards: { orderBy: { createdAt: 'asc' }, select: { id: true, requirement: true, expectedEvidence: true, levelAnchors: true, cardPriority: true, weight: true } } },
     });
     const cards = rubric?.cards ?? [];
     if (!cards.length) return [];
@@ -375,7 +383,7 @@ export class TasksService {
     const scores = await this.db.cardScore.findMany({
       where: { roundId: { in: rounds.map((r) => r.id) }, cardId: { in: cards.map((c) => c.id) } },
       orderBy: { updatedAt: 'desc' },
-      select: { cardId: true, roundId: true, score: true, note: true, aiScore: true, aiRationale: true },
+      select: { cardId: true, roundId: true, score: true, note: true, aiScore: true, aiRationale: true, aiQuoteSegmentId: true, aiQuote: true },
     });
     const latest = new Map<string, (typeof scores)[number]>();
     for (const s of scores) if (!latest.has(s.cardId)) latest.set(s.cardId, s);
@@ -387,8 +395,9 @@ export class TasksService {
         : score >= 4 ? 'strong' as const
         : 'medium' as const;
       return {
-        cardId: card.id, requirement: card.requirement, cardPriority: card.cardPriority, weight: card.weight,
-        roundName: s ? byRound.get(s.roundId) ?? s.roundId : null,
+        cardId: card.id, requirement: card.requirement, expectedEvidence: card.expectedEvidence, levelAnchors: card.levelAnchors, cardPriority: card.cardPriority, weight: card.weight,
+        sourceRefs: s?.aiQuoteSegmentId && s.aiQuote ? [{ segmentId: s.aiQuoteSegmentId, quote: s.aiQuote }] : [],
+        roundId: s?.roundId ?? null, roundName: s ? byRound.get(s.roundId) ?? s.roundId : null,
         score, note: s?.note ?? '', aiScore: s?.aiScore ?? null, aiRationale: s?.aiRationale ?? null, tag,
       };
     });
@@ -399,23 +408,35 @@ export class TasksService {
    * state" convention as decision()/debrief(). */
   async package(workspaceId: string, taskId: string) {
     const task = await this.db.interviewTask.findFirst({ where: { id: taskId, workspaceId }, select: {
-      jobId: true, hrConfirmedBy: true, hrConfirmedAt: true, hmConfirmedBy: true, hmConfirmedAt: true, offerState: true, offerSentAt: true,
+      jobId: true, version: true, updatedAt: true, packageNeedsReview: true, packageReviewReason: true, packageInvalidatedAt: true, hrConfirmedBy: true, hrConfirmedAt: true, hrConfirmationNote: true, hmConfirmedBy: true, hmConfirmedAt: true, hmConfirmationNote: true, offerState: true, offerSentAt: true, offerAckAt: true, offerAttemptId: true, offerPackageVersion: true, offerError: true,
       job: { select: { title: true } }, candidate: { select: { name: true } },
     } });
     if (!task) throw new NotFoundException({ code: 'NOT_FOUND' });
-    const [decision, debrief, evidence] = await Promise.all([
+    const [decision, debrief, evidence, rubric] = await Promise.all([
       this.decision(workspaceId, taskId),
       this.debrief(workspaceId, taskId),
       this.packageEvidence(workspaceId, taskId, task.jobId),
+      this.db.rubricVersion.findFirst({ where: { workspaceId, jobId: task.jobId, status: 'confirmed' }, orderBy: { versionNumber: 'desc' }, select: { versionNumber: true } }),
     ]);
     return {
       candidateName: task.candidate.name, jobTitle: task.job.title,
+      packageId: taskId, packageVersion: task.version, rubricVersion: rubric?.versionNumber ?? null, generatedAt: task.updatedAt,
+      needsReview: task.packageNeedsReview, reviewReason: task.packageReviewReason, invalidatedAt: task.packageInvalidatedAt,
       decision: decision.decision, decisionAt: decision.decisionAt, conclusion: decision.conclusion,
       debrief, evidence,
-      hrConfirmedAt: task.hrConfirmedAt, hmConfirmedAt: task.hmConfirmedAt,
+      hrConfirmedBy: task.hrConfirmedBy, hrConfirmedAt: task.hrConfirmedAt,
+      hrConfirmationNote: task.hrConfirmationNote,
+      hmConfirmedBy: task.hmConfirmedBy, hmConfirmedAt: task.hmConfirmedAt,
+      hmConfirmationNote: task.hmConfirmationNote,
       published: decision.decision != null && task.hrConfirmedAt != null && task.hmConfirmedAt != null,
       offerState: task.offerState, offerSentAt: task.offerSentAt,
+      offerAckAt: task.offerAckAt, offerAttemptId: undefined, offerPackageVersion: task.offerPackageVersion, offerError: task.offerError,
     };
+  }
+
+  async packagePdf(workspaceId: string, taskId: string) {
+    const data = await this.package(workspaceId, taskId);
+    return buildPackagePdf(packagePdfLines(data));
   }
 
   /** HR and Hiring Manager confirm independently — there's no real per-role login in this
@@ -426,8 +447,8 @@ export class TasksService {
     const existing = await this.db.interviewTask.findFirst({ where: { id: taskId, workspaceId: identity.workspaceId } });
     if (!existing) throw new NotFoundException({ code: 'NOT_FOUND' });
     const data = input.role === 'hr'
-      ? { hrConfirmedBy: input.confirmed ? identity.actorId : null, hrConfirmedAt: input.confirmed ? new Date() : null }
-      : { hmConfirmedBy: input.confirmed ? identity.actorId : null, hmConfirmedAt: input.confirmed ? new Date() : null };
+      ? { hrConfirmedBy: input.confirmed ? identity.actorId : null, hrConfirmedAt: input.confirmed ? new Date() : null, hrConfirmationNote: input.confirmed ? input.note ?? null : null }
+      : { hmConfirmedBy: input.confirmed ? identity.actorId : null, hmConfirmedAt: input.confirmed ? new Date() : null, hmConfirmationNote: input.confirmed ? input.note ?? null : null };
     await this.db.interviewTask.update({ where: { id: taskId }, data });
     await this.syncPackageStatus(identity.workspaceId, taskId);
     return this.package(identity.workspaceId, taskId);
@@ -437,12 +458,41 @@ export class TasksService {
    * to call, so this is a local, deterministic state transition — not a live downstream ack. */
   async sendOffer(identity: Identity, taskId: string) {
     const task = await this.db.interviewTask.findFirst({ where: { id: taskId, workspaceId: identity.workspaceId },
-      select: { decision: true, hrConfirmedAt: true, hmConfirmedAt: true, offerState: true } });
+      select: { decision: true, version: true, hrConfirmedAt: true, hmConfirmedAt: true, offerState: true, offerSentAt: true } });
     if (!task) throw new NotFoundException({ code: 'NOT_FOUND' });
     if (task.decision !== 'recommend_offer') throw new BadRequestException({ code: 'DECISION_NOT_RECOMMEND_OFFER' });
     if (!task.hrConfirmedAt || !task.hmConfirmedAt) throw new BadRequestException({ code: 'PACKAGE_NOT_CONFIRMED' });
-    if (task.offerState === 'sent') throw new ConflictException({ code: 'ALREADY_SENT' });
-    await this.db.interviewTask.update({ where: { id: taskId }, data: { offerState: 'sent', offerSentAt: new Date() } });
+    const attemptId = randomUUID();
+    const now = new Date();
+    const timeoutBefore = new Date(now.getTime() - 5 * 60 * 1000);
+    const claimed = await this.db.interviewTask.updateMany({
+      where: { id: taskId, workspaceId: identity.workspaceId, OR: [
+        { offerState: { in: ['none', 'failed', 'sent'] } },
+        { offerState: 'pending', offerSentAt: { lt: timeoutBefore } },
+      ] },
+      data: { offerState: 'pending', offerSentAt: now, offerAckAt: null, offerAttemptId: attemptId, offerPackageVersion: task.version, offerError: null },
+    });
+    if (!claimed.count) {
+      const current = await this.db.interviewTask.findFirst({ where: { id: taskId, workspaceId: identity.workspaceId }, select: { offerState: true } });
+      if (current?.offerState === 'acknowledged') throw new ConflictException({ code: 'ALREADY_SENT' });
+      if (current?.offerState === 'pending') throw new ConflictException({ code: 'OFFER_PENDING' });
+      throw new ConflictException({ code: 'OFFER_STATE_CHANGED' });
+    }
+    return { ...(await this.package(identity.workspaceId, taskId)), offerAttemptId: attemptId };
+  }
+
+  /** Offer's idempotent delivery callback. A stale attempt can never overwrite a newer one. */
+  async acknowledgeOffer(identity: Identity, taskId: string, raw: unknown) {
+    const input = validate(offerAckSchema, raw);
+    if (identity.kind !== 'service') throw new BadRequestException({ code: 'SERVICE_AUTH_REQUIRED' });
+    const task = await this.db.interviewTask.findFirst({ where: { id: taskId, workspaceId: identity.workspaceId }, select: { offerAttemptId: true, offerState: true } });
+    if (!task) throw new NotFoundException({ code: 'NOT_FOUND' });
+    if (task.offerAttemptId !== input.attemptId) throw new ConflictException({ code: 'STALE_OFFER_ATTEMPT' });
+    if (task.offerState === 'acknowledged' && input.acknowledged) return this.package(identity.workspaceId, taskId);
+    const updated = await this.db.interviewTask.updateMany({ where: { id: taskId, workspaceId: identity.workspaceId, offerAttemptId: input.attemptId, offerState: 'pending' }, data: input.acknowledged
+      ? { offerState: 'acknowledged', offerAckAt: new Date(), offerError: null }
+      : { offerState: 'failed', offerAckAt: null, offerError: input.error ?? 'OFFER_ACK_FAILED' } });
+    if (!updated.count) throw new ConflictException({ code: 'STALE_OFFER_ATTEMPT' });
     return this.package(identity.workspaceId, taskId);
   }
 }

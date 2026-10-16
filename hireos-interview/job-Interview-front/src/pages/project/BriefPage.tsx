@@ -21,6 +21,7 @@ export function BriefPage() {
   const isGenerating = briefState?.generation?.status === "queued" || briefState?.generation?.status === "parsing";
   const hasConfirmedRubric = !!briefState?.rubricVersionId;
   const stageLabels = zh ? ["背景", "任务", "行动", "结果"] : ["SITUATION", "TASK", "ACTION", "RESULT"];
+  const selectedRound = task?.rounds.find((round) => round.sequence === (state.roundView === "r2" ? 2 : 1)) ?? null;
 
   const onGenerateQuestions = async () => {
     try { await generateQuestions(); } catch (e) { say(errorText((e as { code?: string }).code || "REQUEST_FAILED", state.lang)); }
@@ -42,7 +43,11 @@ export function BriefPage() {
     return `${task.candidate.name} — ${applyingFor}. ${resumeNote}`;
   })();
 
-  const businessItems = (briefState?.questions ?? []).map((q) => {
+  const roundCompetencies = new Set((selectedRound?.competencies ?? "").split(",").map((tag) => tag.trim().toLowerCase()).filter(Boolean));
+  const roundQuestions = roundCompetencies.size
+    ? (briefState?.questions ?? []).filter((q) => q.card.competencyTags.split(",").some((tag) => roundCompetencies.has(tag.trim().toLowerCase())))
+    : (briefState?.questions ?? []);
+  const businessItems = roundQuestions.map((q) => {
     const priority = `Card-${q.card.cardPriority}` as CardPriority;
     const tags = q.card.competencyTags.split(",").map((s) => s.trim()).filter(Boolean);
     const owner = q.card.responsibilityType === "lead" ? (zh ? "招聘经理" : "Hiring Manager") : (zh ? "面试官" : "Interviewer");
@@ -57,16 +62,28 @@ export function BriefPage() {
     };
   });
 
+  const resumeExperience = (task?.resume?.parseJobs[0]?.result?.facts ?? [])
+    .filter((fact) => fact.category === "experience")
+    .map((fact) => fact.value)
+    .filter(Boolean);
+  const resumeFacts = task?.resume?.parseJobs[0]?.result?.facts ?? [];
+  const openResumeSource = (fact = resumeFacts[0]) => {
+    if (!fact || !task?.resume) return;
+    const segment = task.resume.material.segments.find((item) => item.id === fact.segmentId);
+    say(`${fact.quote}${segment?.page ? ` · ${zh ? `第 ${segment.page} 页` : `page ${segment.page}`}` : ""}`);
+  };
   const hrItems = [
     {
+      classification: resumeFacts.length ? (zh ? "Known" : "Known") : (zh ? "Unknown" : "Unknown"),
       title: zh ? "履历完整性" : "Career history integrity",
       detail: zh ? "核实教育经历、证书、工作时间线与履历空档。" : "Verify education, certifications, timeline, and any employment gaps.",
       status: zh ? "待 HR 核实" : "Needs HR verification",
       tone: "warn" as Tone,
       ref: "Résumé",
-      open: () => say(evidence.resume?.[0]?.text || ""),
+      open: () => openResumeSource(),
     },
     {
+      classification: "Unknown",
       title: zh ? "求职意愿与约束" : "Motivation & constraints",
       detail: zh ? "确认求职动机、到岗时间、工作地点和期望薪资。" : "Confirm motivation, start date, location constraints, and compensation expectations.",
       status: zh ? "未提供" : "Not provided",
@@ -74,16 +91,23 @@ export function BriefPage() {
       ref: zh ? "需 HR 提问" : "HR question",
       open: () => say(zh ? "请在 HR 面试中确认求职意愿与约束。" : "Confirm motivation and constraints during the HR interview."),
     },
-    {
+    ...(task?.resume && resumeExperience.length ? [{
+      classification: zh ? "Claim" : "Claim",
       title: zh ? "AI 风险提示" : "AI risk flags",
-      detail: zh
-        ? "简历声称“主导微服务迁移”，但缺少范围和个人贡献，需要人工追问。"
-        : "Résumé claims “led migration to microservices” without scope or personal contribution; ask before treating it as evidence.",
+      detail: zh ? `简历经历待核实：${resumeExperience[0]}` : `Résumé experience to verify: ${resumeExperience[0]}`,
       status: zh ? "待核实 Claim" : "Claim to verify",
       tone: "warn" as Tone,
       ref: "Résumé",
-      open: () => say(evidence.resume?.[0]?.text || ""),
-    },
+      open: () => openResumeSource(resumeFacts.find((fact) => fact.category === "experience")),
+    }] : [{
+      classification: zh ? "Unknown" : "Unknown",
+      title: zh ? "简历证据" : "Résumé evidence",
+      detail: zh ? "未提供简历，无法生成具体经历 Claim。" : "No résumé was provided, so no specific experience Claim is available.",
+      status: zh ? "未提供" : "Not provided",
+      tone: "unknown" as Tone,
+      ref: zh ? "无原始证据" : "No source",
+      open: () => undefined,
+    }]),
   ];
 
   // Evidence gaps — confirmed capability cards with no human score yet, from the same
@@ -164,6 +188,11 @@ export function BriefPage() {
               <div className="flex items-center gap-2">
                 <span className="flex h-7 w-7 items-center justify-center rounded-[9px] bg-[var(--brand)] text-[12px] font-extrabold text-[var(--brand-ink)]">BI</span>
                 <div className="text-sm font-bold">{t.businessLaneTitle}</div>
+                {selectedRound && (
+                  <div className="inline-flex h-[22px] items-center whitespace-nowrap rounded-md bg-[var(--surface-3)] px-2 text-[11px] font-semibold text-[var(--ink-2)]">
+                    {zh ? `第 ${selectedRound.sequence} 轮` : `Round ${selectedRound.sequence}`}
+                  </div>
+                )}
                 {briefState?.versionNumber != null && (
                   <div className="inline-flex h-[22px] items-center whitespace-nowrap rounded-md bg-[var(--surface-3)] px-2 text-[11px] font-semibold text-[var(--ink-2)]">
                     {t.rubricVersionLabel}{briefState.versionNumber}
@@ -171,6 +200,16 @@ export function BriefPage() {
                 )}
               </div>
               <div className="mt-[7px] text-xs leading-[1.45] text-[var(--ink-2)]">{t.businessLaneSubtitle}</div>
+              {selectedRound && (
+                <div className="mt-1 text-[10.5px] text-[var(--ink-3)]">
+                  {zh ? `本轮题目配额 ${selectedRound.questions} · 已生成 ${businessItems.length}` : `Round quota ${selectedRound.questions} · generated ${businessItems.length}`}
+                </div>
+              )}
+              {selectedRound?.briefSnapshotAt && (
+                <div className="mt-1 text-[10.5px] text-[var(--ink-3)]">
+                  {zh ? `本轮快照：${new Date(selectedRound.briefSnapshotAt).toLocaleString("zh-CN")} · 证据截止 Rubric v${selectedRound.briefSnapshotRubricVersion ?? "-"}` : `Round snapshot: ${new Date(selectedRound.briefSnapshotAt).toLocaleString("en-US")} · evidence through Rubric v${selectedRound.briefSnapshotRubricVersion ?? "-"}`}
+                </div>
+              )}
             </div>
             <div className="flex flex-col gap-2.5 px-4 py-[13px]">
               {!jobId && (
@@ -205,6 +244,11 @@ export function BriefPage() {
                 <div className="px-1 py-2 text-xs text-[var(--ink-3)]">
                   {errorText(briefError, state.lang)}{" "}
                   <button onClick={reloadBrief} className="cursor-pointer border-0 bg-transparent p-0 text-xs text-[var(--brand)] underline">{zh ? "重试" : "Retry"}</button>
+                </div>
+              )}
+              {selectedRound && roundCompetencies.size > 0 && businessItems.length === 0 && (
+                <div className="rounded-[10px] border border-dashed border-[var(--line-strong)] bg-[var(--surface-2)] p-4 text-center text-xs text-[var(--ink-2)]">
+                  {zh ? "当前轮次没有匹配到已生成的问题，请补充目标能力或生成对应问题。" : "No generated questions match this round's target competencies yet."}
                 </div>
               )}
               {businessItems.map((item) => (
@@ -262,12 +306,13 @@ export function BriefPage() {
                 <div key={i} className="rounded-[10px] border border-[var(--line)] bg-[var(--surface)] p-3">
                   <div className="flex items-start gap-2">
                     <div className="flex-1 text-[13px] font-semibold">{item.title}</div>
+                    <span className="font-mono text-[10px] text-[var(--ink-3)]">{item.classification}</span>
                     <Pill label={item.status} tone={item.tone} />
                   </div>
                   <div className="mt-1.5 text-xs leading-[1.5] text-[var(--ink-2)]">{item.detail}</div>
-                  <button onClick={item.open} className="mt-2 cursor-pointer border-0 bg-transparent p-0 text-[11.5px] text-[var(--brand)] underline">
-                    {item.ref}
-                  </button>
+                  {item.ref === "Résumé" && (task?.resume && resumeFacts.length > 0) ? (
+                    <button onClick={item.open} className="mt-2 cursor-pointer border-0 bg-transparent p-0 text-[11.5px] text-[var(--brand)] underline">{zh ? "查看原始证据" : "Open source evidence"}</button>
+                  ) : <span className="mt-2 block text-[11.5px] text-[var(--ink-3)]">{item.ref}</span>}
                 </div>
               ))}
             </div>

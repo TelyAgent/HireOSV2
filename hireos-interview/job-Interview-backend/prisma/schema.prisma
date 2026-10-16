@@ -122,13 +122,22 @@ model InterviewTask {
   decisionSourceJobId  String?   // which ParseJob's draft is materialized above
   // Evaluation Package: HR / Hiring Manager sign-off, independent of `decision` and of each
   // other. `offerState` is a local handoff record only — no real Offer module exists in this
-  // codebase to call, so "sent" is this state machine's own terminal state, not a live ack.
+  // codebase to call. Legacy "sent" rows are normalized to "acknowledged" by migration.
   hrConfirmedBy        String?
   hrConfirmedAt        DateTime?
+  hrConfirmationNote   String?
   hmConfirmedBy        String?
   hmConfirmedAt        DateTime?
-  offerState           String    @default("none") // none | sent
+  hmConfirmationNote   String?
+  packageNeedsReview   Boolean   @default(false)
+  packageReviewReason  String?
+  packageInvalidatedAt DateTime?
+  offerState           String    @default("none") // none | pending | acknowledged | failed
   offerSentAt          DateTime?
+  offerAckAt           DateTime?
+  offerAttemptId       String?
+  offerPackageVersion  Int?
+  offerError           String?
   // Flow-stage confirmations that have no other durable trace (see intake/task-stages.ts):
   // Interview Plan "confirm", Review's "Continue to debrief", Debrief's "Continue to decision".
   planConfirmedAt      DateTime?
@@ -177,6 +186,8 @@ model InterviewRound {
   // Set by "Complete session & review" on Live Interview — distinct from `status`
   // ("Planned" is a plan-time label; this is "did the interview actually happen").
   completedAt   DateTime?
+  briefSnapshotAt DateTime?
+  briefSnapshotRubricVersion Int?
   recommendation String? // strong_advance | advance | hold | do_not_advance | request_info
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt

@@ -84,9 +84,21 @@ export function ProjectOverviewPage() {
   const next = task.stages.find((s) => s.stage !== "overview" && s.stage !== "package" && !s.done);
   const awaitingSignOff = task.status === "awaiting_confirmation";
   const planConfirmed = !!task.stages.find((s) => s.stage === "plan")?.done;
+  const needsRepair = task.stages.some((s) => s.needsRepair);
 
   return (
     <>
+      {needsRepair && (
+        <Banner tone="warn">
+          <span>!</span>
+          <div style={{ flex: 1 }}>
+            {L("This project has an inconsistent rubric state. Confirm the rubric before continuing.", "该项目的评分标准状态异常，请先确认评分标准后再继续。")}
+          </div>
+          <a href="#" onClick={(e) => { e.preventDefault(); go("rubric"); }} style={{ textDecoration: "underline" }}>
+            {L("Open Rubric →", "打开评分标准 →")}
+          </a>
+        </Banner>
+      )}
       {awaitingSignOff ? (
         <Banner tone="warn">
           <span>⏱</span>

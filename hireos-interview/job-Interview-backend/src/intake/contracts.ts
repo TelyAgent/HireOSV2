@@ -98,7 +98,8 @@ export const setDecisionSchema = z.object({ decision: decisionSchema.nullable() 
 // Evaluation Package sign-off: HR and Hiring Manager confirm independently of each other —
 // see TasksService.confirmPackage.
 export const confirmPlanSchema = z.object({ confirmed: z.boolean() }).strict();
-export const confirmPackageSchema = z.object({ role: z.enum(['hr', 'hm']), confirmed: z.boolean() }).strict();
+export const confirmPackageSchema = z.object({ role: z.enum(['hr', 'hm']), confirmed: z.boolean(), note: z.string().trim().max(2000).optional() }).strict();
+export const offerAckSchema = z.object({ attemptId: z.string().uuid(), acknowledged: z.boolean(), error: z.string().trim().max(1000).optional() }).strict();
 
 export type Segment = { id: string; text: string; page?: number };
 // `cards` is only used by the `round_scores` and `debrief_scores` extraction types (see

@@ -54,6 +54,9 @@ export class JobsService {
         jdText,
       },
     });
+    if (jdChanged) {
+      await this.db.interviewTask.updateMany({ where: { workspaceId: identity.workspaceId, jobId: job.id, decision: { not: null } }, data: { packageNeedsReview: true, packageReviewReason: 'JD_UPDATED', packageInvalidatedAt: new Date() } });
+    }
     return this.get(identity.workspaceId, job.id);
   }
 

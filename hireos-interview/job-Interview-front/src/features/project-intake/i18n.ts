@@ -65,6 +65,8 @@ const errors: Record<string, [string, string]> = {
   PLAN_CONFIRMED: ['The interview plan is confirmed. Unconfirm it before editing rounds.', '面试计划已确定，如需修改轮次请先撤销确认。'],
   PLAN_NOT_CONFIRMED: ['Confirm the interview plan before scheduling.', '请先确定面试计划，再进行排期。'],
   PLAN_ALREADY_SCHEDULED: ['A round is already scheduled; the plan can no longer be unconfirmed.', '已有轮次排期，面试计划不能再撤销确认。'],
+  PLAN_NOT_READY: ['Complete each round name, owner, target competency and interview objective before confirming the plan.', '请先补齐每轮名称、负责人、目标能力和面试目标，再确认计划。'],
+  INTERVIEWER_REQUIRED: ['Assign an interviewer before scheduling this round.', '请先为本轮指定面试官，再进行排期。'],
   BRIEF_NOT_READY: ['Generate the Interview Brief questions before completing an interview.', '请先在「面试提要」生成面试题目，再完成面试。'],
   DEBRIEF_NOT_CONFIRMED: ['Finish Debrief with “Continue to decision” first.', '请先在「汇总评估」点击「继续到决定」。'],
   UNKNOWN_EXTRACTION_TYPE: ['This generation type is not supported yet.', '暂不支持此生成类型。'],

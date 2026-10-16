@@ -17,6 +17,9 @@ const LOCKED_REASON: Record<string, [string, string]> = {
 // Single source of truth for "can the user be on this project-flow screen right now",
 // shared by FlowNav (blocks the click) and ProjectShell (bounces a direct URL visit).
 export function flowGateReason(task: Task | null, screen: Screen, zh: boolean): string | null {
+  if (screen !== "overview" && screen !== "rubric" && task?.stages?.some((s) => s.needsRepair)) {
+    return zh ? "该项目的评分标准状态异常，请先修复后再继续。" : "This project's rubric state needs repair before you can continue.";
+  }
   const stage = task?.stages?.find((s) => s.stage === screen);
   if (!stage || stage.unlocked) return null;
   const reason = LOCKED_REASON[screen] ?? ["Complete the previous step first.", "请先完成上一步。"];

@@ -186,6 +186,7 @@ export function SchedulePage() {
     }
   };
 
+  const isOverdue = (round: Round) => round.status !== "completed" && !!round.scheduledAt && new Date(round.scheduledAt).getTime() < Date.now();
   const followUpRows = state.followUpRounds.map((r) => ({
     id: r.id,
     name: r.name,
@@ -268,8 +269,9 @@ export function SchedulePage() {
           </div>
 
           {rounds.map((r) => {
+            const overdue = isOverdue(r);
             const isScheduled = !!r.scheduledAt && r.status !== "completed";
-            const statusLabel = r.status === "completed" ? t.scheduleStatusCompleted : isScheduled ? t.scheduleStatusScheduled : t.scheduleStatusPlanned;
+            const statusLabel = r.status === "completed" ? t.scheduleStatusCompleted : overdue ? (zh ? "已逾期" : "Overdue") : isScheduled ? t.scheduleStatusScheduled : t.scheduleStatusPlanned;
             const when = r.scheduledAt
               ? `${new Date(r.scheduledAt).toLocaleString(zh ? "zh-CN" : "en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })} ${r.timezone || ""}`
               : t.notScheduledLabel;
