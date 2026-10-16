@@ -8,6 +8,7 @@ import { criteriaSchema, validate, type CriteriaInput } from './contracts';
 import { CoreRecordClient } from '../core-record/core-record.client';
 import { JobCriteriaFacade, type RemoteCriteriaProjection } from './job-criteria.facade';
 import { invalidSchemaFromZod } from '../http/invalid-schema';
+import { computeJobFunnels, type ResumeInfo } from './job-funnels';
 
 const DEFAULT_DIMENSIONS = [
   { id: 'dim-skills', name: 'Skills', weight: 0.25, rubric: 'How closely the candidate skills match the role.' },
@@ -63,7 +64,7 @@ export class JobsService {
     });
     const startOfToday = new Date();
     startOfToday.setHours(0, 0, 0, 0);
-    const resumeInfo = new Map<string, { source: string; version: number; isLatest: boolean; today: boolean }>();
+    const resumeInfo = new Map<string, ResumeInfo>();
     for (const v of versions) {
       const prev = resumeInfo.get(v.candidateId);
       const today = (prev?.today ?? false) || v.uploadedAt >= startOfToday;
@@ -73,32 +74,7 @@ export class JobsService {
         : { ...prev, today });
     }
 
-    const result = new Map<string, { resumes: number; matched: number; linked: number; pending: number; today: number; sources: Array<{ source: string; count: number }> }>();
-    for (const jobId of jobIds) {
-      const linked = new Set(applications.filter((a) => a.jobId === jobId).map((a) => a.candidateId));
-      const jobRecs = recs.filter((r) => r.jobId === jobId);
-      const matched = new Set([...linked, ...jobRecs.map((r) => r.candidateId)]);
-      const pending = new Set(jobRecs.filter((r) => r.status === 'proposed' && !linked.has(r.candidateId)).map((r) => r.candidateId));
-      const evaluated = evaluations.filter((e) => e.jobId === jobId).map((e) => e.candidateId);
-      const pool = new Set([...evaluated, ...matched]);
-      const sources = new Map<string, number>();
-      let today = 0;
-      for (const id of pool) {
-        const info = resumeInfo.get(id);
-        if (!info) continue;
-        sources.set(info.source, (sources.get(info.source) || 0) + 1);
-        if (info.today) today++;
-      }
-      result.set(jobId, {
-        resumes: pool.size,
-        matched: matched.size,
-        linked: linked.size,
-        pending: pending.size,
-        today,
-        sources: [...sources.entries()].sort((a, b) => b[1] - a[1]).map(([source, count]) => ({ source, count })),
-      });
-    }
-    return result;
+    return computeJobFunnels(jobIds, evaluations, recs, applications, resumeInfo);
   }
 
   /**
