@@ -1,6 +1,13 @@
 # Written Test 主流程产品文档
 
-按 [功能拆分](Written_Test_Feature_Breakdown.md) 的 W01～W13 主流程，每个功能一个文件夹，各放一份 `PRD.md`。格式与 [Resume_Screening](../Resume_Screening/) 下的 `Fxx_*/PRD.md` 保持一致。
+按 [功能拆分](Written_Test_Feature_Breakdown.md) 的 W01～W13 主流程，每个功能一个文件夹，各含四份文档，格式与 [JD_Management](../JD_Management/README_Modules.md) 的模块文档一致：
+
+| 文档 | 作用 | 读者 |
+|---|---|---|
+| `PRD.md` 产品文档 | 目标、范围、功能需求、业务规则、数据、权限、验收标准、待确认 | 产品、研发、测试 |
+| `Loop_IO.md` 输入输出闭环 | 结构化流程规格（YAML）、测试数据、路径清单、流程图 | AI 生成 test case、模拟测试 |
+| `User_Journey.md` 用户旅程 | 角色目的、步骤、用户判断、可见/不可见、异常恢复、交接 | 产品、设计、AI Review |
+| `User_Cases.md` 用户用例 | 按 User Journey 整理的功能测试用例：前置数据、步骤、预期结果、检查位置、追溯到闭环路径和验收标准 | 测试、AI 执行测试 |
 
 | 编号 | 文件夹 | 功能 |
 |---|---|---|
@@ -51,6 +58,64 @@
 ### 状态分离
 
 Received / Submitted / Evaluated / Published / Delivered 是五个独立状态；打开链接 ≠ 接受 ≠ 开始；机器任务成功 ≠ 人工任务完成。各 PRD 中的状态以此为准。
+
+### 测试身份
+
+| 身份 | 角色 | 说明 |
+|---|---|---|
+| hr_emma | HR / Recruiter | 大多数雇主端用例的默认执行者 |
+| hm_daniel | Hiring Manager / Reviewer | 评分复核、领取队列任务 |
+| admin_morgan | Admin | 完整授权 workspace；也承担 Operations（隔离邮件、交付异常） |
+| hr_restricted | HR（受限 scope） | 只能访问部分 Case，用于权限隔离用例 |
+| hr_other_ws | 其他 workspace 的 HR | 跨 workspace 隔离 |
+| cand_alex / cand_jordan / cand_casey / cand_taylor / cand_riley | Candidate（受限参与者） | 只访问本人任务 |
+| cand_other | Candidate | 用他人链接 / 会话做越权尝试 |
+
+开发态目前只有固定身份，多身份用例需要先补测试账号；候选人统一 Identity 尚未实现，相关用例标记为 known gap。
+
+### Seed（前置状态）目录
+
+| Seed | 内容 | 使用模块 |
+|---|---|---|
+| S0_employer | 已登录员工；Brief §7 基线（ws_demo、prj_fin、case_a–d、任务 t1–t6） | 全部 |
+| S_bank_fin | 题库含已发布 FIN-001 / 002 / 004 / 008；FIN-003 为 follow-up guide；FIN-009 / 010 为概念题 | W01、W02、W04 |
+| S_question_published_v1 | FIN-001 v1 已发布，且已有一份邀请使用 v1 | W01、W02 |
+| S_zip_fin_pack | 合成 ZIP：1 个 prompt、2 份材料、1 份内部答案、1 份旧候选人提交 | W01 |
+| S_core_candidate_unlinked | Riley 已在 Core 建 Candidate，未确认招聘关系 | W03、W05 |
+| S_screened_candidates | Finance 岗位有 2 名已筛选、未进入测评的候选人 | W03 |
+| S_case_plan_empty | 已确认关系的 Case，计划为空 | W04 |
+| S_case_plan_ready | 计划含 FIN-001（必评）未发送 | W04、W05 |
+| S_inv_sent_timed / S_inv_sent_deadline | 邀请已发送未打开（timed 90 分钟 / deadline-only） | W06 |
+| S_inv_accepted_deadline | = case_b | W06、W07 |
+| S_inv_started_missing | = case_c | W07 |
+| S_attempt_submitted_ai_draft | = case_d | W08、W12 |
+| S_result_final_unreleased | = case_a | W09、W11 |
+| S_result_released | case_a 结果已发布 | W10、W11 |
+| S_revision_round1_sent | case_a 修订轮 1 已发出，候选人未接受 | W10 |
+| S_two_final_results | 同岗位两名候选人 final、同试卷版本 | W12 |
+
+所有测试候选人姓名加 `[UJ-TEST]` 前缀，邮箱用 example.com，测试后清理。所有发信走 simulation adapter。
+
+### 注入点
+
+| 注入 | 含义 | 通过标准 |
+|---|---|---|
+| network_down | 断网 | 有失败提示和重试；输入不丢 |
+| llm_fail | AI 失败 / 超时 | 可恢复，保留人工路径；不显示假成功 |
+| double_click | 重复点击提交类按钮 | 只生效一次 |
+| refresh | 中途刷新 / 后退 | 不产生半成品 |
+| http_500 | 保存接口返回 500 | 不显示 Saved |
+| core_unavailable | Core / Identity 不可用 | 如实阻塞依赖动作；草稿保留 |
+| core_response_lost | Core 已成功但响应丢失 | 进入 Reconciling，同 request_id 恢复，不重复创建 |
+| mail_bounce | 邮件退信 | 业务状态不回滚；可重试失败项 |
+| bus_down | 事件总线不可用 / 重投 / 乱序 | Outbox 保留；下游去重 |
+| concurrent | 两人同时操作同一对象 | 只有一人成功，另一人看到冲突提示 |
+
+### 闭环文档格式
+
+`Loop_IO.md` 的字段（`flow_id`、`actor`、`seed`、`entry`、`max_loop`、`external`、`nodes`、`edges`）和断言原则与 [JD_Management 闭环文档格式](../JD_Management/README_Modules.md#闭环文档格式) 相同：权限类断言必须检查 `api`；AI 输出写判定条件，同一输入至少跑 2 次；未实现的功能路径照写，执行时标记 known gap。
+
+用例状态：✅ 可测（功能已有实现，不代表会通过）；🟡 部分可测；❌ 未实现。
 
 ## 说明
 
