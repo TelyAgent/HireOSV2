@@ -513,6 +513,14 @@ export const ZH: Record<string, string> = {
   "No corporate mailbox is set up, so no email will be sent — you'll get a link to send yourself.": "尚未配置企业邮箱，不会自动发送邮件；发送后会给你一个链接，需自行发给候选人。",
   "Set one up in Settings": "去设置中配置",
   "The submission deadline has passed, so answers can no longer be submitted. If you have questions, please reply to the invitation email.": "已超过提交截止时间，无法再提交作答。如有疑问，请回复邀请邮件联系我们。",
+  // #235: used with t() but missing until the static check below caught them.
+  "Select a preset question, or generate one with AI, to see its content here.": "选择一道预设题目，或用 AI 生成一道，即可在这里查看题目内容。",
+  "Draft saved. Saving is not the same as publishing.": "草稿已保存。保存不等于发布。",
+  "Only show differences": "只看差异",
+  "Add at least one recipient.": "请至少添加一位收件人。",
+  "Disable": "停用",
+  "Enable": "启用",
+  "Edit": "编辑",
 };
 
 export function translate(lang: "en" | "zh", source: string): string {
