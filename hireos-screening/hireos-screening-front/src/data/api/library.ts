@@ -38,14 +38,18 @@ export interface LibraryFilters {
 }
 
 export interface LibraryList {
+  /** The first `limit` candidates that match. */
   items: LibraryEntry[];
+  /** How many candidates match the search and filters. */
+  matched: number;
   /** Everyone in the library, for "N of M". */
   total: number;
-  facets: Record<"tags" | "sources" | "owners" | "matchStatuses", Array<{ value: string; count: number }>>;
+  facets: Record<"tags" | "sources" | "owners", Array<{ value: string; count: number }>>;
 }
 
-export async function listLibraryEntries(filters: LibraryFilters = {}): Promise<LibraryList> {
+export async function listLibraryEntries(filters: LibraryFilters = {}, limit = 100): Promise<LibraryList> {
   const params = new URLSearchParams(Object.entries(filters).filter((entry): entry is [string, string] => !!entry[1]?.trim()));
+  params.set("limit", String(limit));
   const suffix = params.toString() ? `?${params}` : "";
   return apiFetch<LibraryList>(`/library${suffix}`);
 }

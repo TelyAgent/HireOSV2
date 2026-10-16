@@ -31,6 +31,8 @@ export type ProfileField = {
   evidence: FieldEvidence[];
   /** Why there is no source location: the source text can't be read, or the value wasn't found in it. */
   evidenceUnavailable: 'source_unavailable' | 'not_located' | null;
+  /** Values of a list field that couldn't be found in the source, while others could (#155 AC-2). */
+  unlocatedValues: string[];
 };
 
 export const PROFILE_FIELDS = [
@@ -53,6 +55,8 @@ export function profileFields(
   const text = (value: unknown) => (typeof value === 'string' ? value.trim() : '');
   const named = (value: unknown) => text(typeof value === 'string' ? value : record(value).name);
   const location = record(p.location);
+  // A location the user typed on paste (different from what was read) is theirs: no split, no source position.
+  const confirmedLocation = record(location.evidence).source === 'user_confirmed';
   const availability = record(p.availability);
   const compensation = record(p.compensationExpectation);
 
@@ -65,7 +69,7 @@ export function profileFields(
           value: text(location.value),
           needles: [text(location.value), text(location.city)],
           // §4.1: country + city as well as the text.
-          incomplete: [...(!text(location.country) ? ['country'] : []), ...(!text(location.city) ? ['city'] : [])],
+          incomplete: confirmedLocation ? [] : [...(!text(location.country) ? ['country'] : []), ...(!text(location.city) ? ['city'] : [])],
         }]
       : [],
     employment_history: asArray(p.employmentHistory).map((entry) => {
@@ -120,8 +124,11 @@ export function profileFields(
   return PROFILE_FIELDS.map((field) => {
     const list = items[field].filter((item) => item.value);
     const incomplete = [...new Set(list.flatMap((item) => item.incomplete ?? []))];
-    const fromCorrection = !!correctedField[field] && corrected.has(correctedField[field]!);
-    const evidence = source?.readable ? dedupe(list.map((item) => locate(item.needles, paragraphs, source)).filter((e): e is FieldEvidence => !!e)) : [];
+    const fromCorrection = (!!correctedField[field] && corrected.has(correctedField[field]!)) || (field === 'location' && confirmedLocation);
+    // Each value is located on its own, so one found value can't hide another that wasn't (#155 AC-2).
+    const located = source?.readable ? list.map((item) => ({ item, at: locate(item.needles, paragraphs, source) })) : [];
+    const evidence = dedupe(located.map((l) => l.at).filter((e): e is FieldEvidence => !!e));
+    const unlocatedValues = located.length && evidence.length ? located.filter((l) => !l.at).map((l) => l.item.value) : [];
     // A name the résumé text doesn't contain came from the file name: it stands until someone confirms it (§4.1).
     if (field === 'name' && list.length && !fromCorrection && source?.readable && !evidence.length) incomplete.push('to_confirm');
     // A person's correction stands as entered; the split formats apply to parsed values.
@@ -135,6 +142,7 @@ export function profileFields(
       source: fromCorrection ? 'correction' : 'resume',
       evidence,
       evidenceUnavailable: !list.length ? null : !source?.readable ? 'source_unavailable' : evidence.length ? null : 'not_located',
+      unlocatedValues,
     };
   });
 }

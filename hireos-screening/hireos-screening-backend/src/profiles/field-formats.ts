@@ -20,10 +20,11 @@ export function storedPhone(phone: string | null | undefined): string | null {
 
 export type Availability = { value: string; status: 'known'; days?: number; date?: string };
 
+// The whole number, decimals included ("1.5 months" is 45 days, not 5 months).
 const UNIT_DAYS: Array<[RegExp, number]> = [
-  [/(\d+)\s*(?:days?|天|日)/i, 1],
-  [/(\d+)\s*(?:weeks?|周|星期)/i, 7],
-  [/(\d+)\s*(?:months?|个月|月)/i, 30],
+  [/(\d+(?:\.\d+)?)\s*(?:days?|天|日)/i, 1],
+  [/(\d+(?:\.\d+)?)\s*(?:weeks?|周|星期)/i, 7],
+  [/(\d+(?:\.\d+)?)\s*(?:months?|个月|月)/i, 30],
 ];
 
 /** "1 month notice" → 30 days, "随时到岗" → 0, "available from 2026-11-01" → that date; otherwise the text alone. */
@@ -39,7 +40,7 @@ export function readAvailability(value: string): Availability {
   if (/immediate|right away|随时|立即|马上/i.test(text)) return { value: text, status: 'known', days: 0 };
   for (const [pattern, days] of UNIT_DAYS) {
     const match = text.match(pattern);
-    if (match) return { value: text, status: 'known', days: Number(match[1]) * days };
+    if (match) return { value: text, status: 'known', days: Math.round(Number(match[1]) * days) };
   }
   const word = text.match(/\b(one|two|three|four|six)\s+(week|month)s?\b/i);
   if (word) {

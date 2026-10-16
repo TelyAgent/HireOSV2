@@ -145,6 +145,63 @@ test('#155 AC-2: without readable source text the location is reported unavailab
   assert.equal(location.evidenceUnavailable, 'not_located');
 });
 
+/** The candidate API for one stored profile and its résumé version — what the detail page receives. */
+async function apiFields(parsed, text, contact) {
+  const candidate = {
+    id: 'c-1', displayName: parsed.displayName, identityStatus: 'provisional', email: contact.email, phone: contact.phone, ownerId: 'hr-1',
+    createdAt: new Date('2026-10-16'), lastMatchedAt: null, retention: 'standard',
+    profiles: [{ ...parsed, version: 1, resumeVersionId: 'rv-2', parseStatus: 'succeeded', dataStatus: 'complete', corrections: [] }],
+    resumeVersions: [{ id: 'rv-2', version: 2, materialId: 'm-1', uploadedAt: new Date(), source: 'paste', parseStatus: 'succeeded', isLatest: true,
+      material: { id: 'm-1', name: 'resume.txt', readStatus: 'available', errorCode: null, createdAt: new Date(), segments: segmentsOf(text) } }],
+    recommendations: [], applications: [], sources: [],
+  };
+  const db = { candidate: { findFirst: async () => candidate }, candidateJobRecommendation: { findFirst: async () => null }, screeningEvaluation: { findFirst: async () => null } };
+  const service = new CandidatesService(db, {}, { getMatchingStatuses: async () => new Map() });
+  const identity = { workspaceId: 'ws-1', actorId: 'hr-1', roles: [] };
+  return [(await service.get(identity, 'c-1')).candidate.profileFields, (await service.get(identity, 'c-1')).candidate.profileFields];
+}
+
+test('#155 AC-3: through the candidate API, the complete and the sparse résumé give stable fields, statuses and locations', async () => {
+  const fullText = read('complete.txt');
+  const full = await aiProfile(fullText);
+  const [a, b] = await apiFields(full, fullText, { email: full.email, phone: full.phone });
+  assert.deepEqual(a, b, 'the same on every read (a refresh)');
+  assert.ok(a.every((f) => f.status === 'known' && f.evidence.length > 0), 'complete: every field known and located');
+  const sparseText = read('sparse.txt');
+  const sparse = new ProfileParserService().parse('m-1', segmentsOf(sparseText), 'fallback');
+  const [c, d] = await apiFields(sparse, sparseText, { email: null, phone: null });
+  assert.deepEqual(c, d);
+  assert.deepEqual(c.filter((f) => f.status !== 'missing').map((f) => f.field), ['name']);
+  assert.ok(c.filter((f) => f.status === 'missing').every((f) => f.values.length === 0 && f.evidence.length === 0 && f.evidenceUnavailable === null));
+});
+
+test('#155 AC-2: each value of a list field is located on its own — one found value does not hide another', () => {
+  const text = 'Skills: SQL, Python';
+  const fields = byField(profileFields({ displayName: 'A', skills: ['SQL', 'Python', 'Tableau'] }, { displayName: 'A', email: null, phone: null }, source(segmentsOf(text))));
+  assert.equal(fields.skills.evidence.length, 1, 'SQL and Python share a paragraph');
+  assert.deepEqual(fields.skills.unlocatedValues, ['Tableau']);
+  assert.equal(fields.skills.evidenceUnavailable, null);
+});
+
+test('#155 AC-1: a location confirmed unchanged on paste keeps its country and city; one the user typed is theirs', () => {
+  const { withConfirmedIdentity } = require('../dist/profiles/profiles.service');
+  const parsed = { displayName: 'A', email: null, location: { value: 'Ho Chi Minh City, Vietnam', status: 'known', country: 'Vietnam', city: 'Ho Chi Minh City' }, missingFields: [] };
+  const same = withConfirmedIdentity(parsed, { displayName: 'A', location: 'ho chi minh city, vietnam ' });
+  assert.equal(same.location.country, 'Vietnam');
+  const sameField = byField(profileFields(same, { displayName: 'A', email: null, phone: null }, null)).location;
+  assert.deepEqual([sameField.status, sameField.incomplete], ['known', []]);
+  const typed = withConfirmedIdentity(parsed, { displayName: 'A', location: 'Da Nang' });
+  const typedField = byField(profileFields(typed, { displayName: 'A', email: null, phone: null }, null)).location;
+  assert.deepEqual([typedField.status, typedField.source, typedField.values], ['known', 'correction', ['Da Nang']]);
+});
+
+test('#155 AC-1: availability with a decimal is read whole — 1.5 months is 45 days', () => {
+  const { readAvailability } = require('../dist/profiles/field-formats');
+  assert.equal(readAvailability('1.5 months notice').days, 45);
+  assert.equal(readAvailability('2 weeks').days, 14);
+  assert.equal(readAvailability('0.5个月').days, 15);
+});
+
 test('#155 AC-3: the candidate API returns the same fields, statuses and locations on every read', async () => {
   const text = read('complete.txt');
   const parsed = await aiProfile(text);

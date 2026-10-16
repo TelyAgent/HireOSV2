@@ -1,49 +1,8 @@
 import { useState } from "react";
 import { useStore } from "../../store/StoreContext";
 import type { FieldEvidence, ProfileField } from "../../data/fixtures/candidates";
+import { parsedFieldRows } from "./parsedFieldRows";
 import { SourceMaterialModal } from "./SourceMaterialModal";
-
-export const PROFILE_FIELD_LABELS: Record<string, string> = {
-  name: "Name",
-  email: "Email",
-  phone: "Phone",
-  location: "Location",
-  employment_history: "Work experience",
-  education: "Education",
-  skills: "Skills",
-  languages: "Languages",
-  certifications: "Certifications",
-  projects: "Projects",
-  compensation_expectation: "Salary expectation",
-  availability: "Availability",
-};
-
-const INCOMPLETE_LABELS: Record<string, string> = {
-  dates: "dates",
-  company: "company",
-  title: "title",
-  description: "description",
-  currency: "currency",
-  period: "pay period",
-  country: "country",
-  city: "city",
-  school: "school",
-  degree: "degree",
-  major: "major",
-  to_confirm: "to be confirmed — taken from the file name",
-};
-
-const STATUS: Record<ProfileField["status"], { label: string; badge: string }> = {
-  known: { label: "Known", badge: "badge-success" },
-  missing: { label: "Not provided", badge: "badge-outline" },
-  partial: { label: "Partly read", badge: "badge-warning" },
-};
-
-/** "Page 2 · paragraph 4", or "Paragraph 4" for files without pages. */
-export function evidenceLabel(e: FieldEvidence, lang: string) {
-  if (lang === "zh") return `v${e.resumeVersion} · ${e.page != null ? `第 ${e.page} 页 · ` : ""}第 ${e.paragraph} 段`;
-  return `v${e.resumeVersion} · ${e.page != null ? `page ${e.page} · ` : ""}paragraph ${e.paragraph}`;
-}
 
 /**
  * Every profile field from the résumé (F02, #155): its value, whether it is known, not provided or only partly
@@ -67,13 +26,13 @@ export function ParsedFieldsCard({ fields }: { fields: ProfileField[] }) {
           </tr>
         </thead>
         <tbody>
-          {fields.map((f) => (
-            <tr key={f.field} data-field={f.field} data-status={f.status}>
-              <td>{t(PROFILE_FIELD_LABELS[f.field] ?? f.field)}</td>
+          {parsedFieldRows(fields, state.lang).map((row) => (
+            <tr key={row.field} data-field={row.field} data-status={fields.find((f) => f.field === row.field)?.status}>
+              <td>{t(row.label)}</td>
               <td>
-                {f.values.length ? (
+                {row.values.length ? (
                   <ul className="parsed-values">
-                    {f.values.map((v, i) => (
+                    {row.values.map((v, i) => (
                       <li key={i}>{v}</li>
                     ))}
                   </ul>
@@ -82,24 +41,26 @@ export function ParsedFieldsCard({ fields }: { fields: ProfileField[] }) {
                 )}
               </td>
               <td>
-                <span className={`badge ${STATUS[f.status].badge}`}>{t(STATUS[f.status].label)}</span>
-                {f.status === "partial" && (
+                <span className={`badge ${row.status.badge}`}>{t(row.status.label)}</span>
+                {row.missing.length > 0 && (
                   <div className="tiny">
-                    {t("Missing:")} {f.incomplete.map((i) => t(INCOMPLETE_LABELS[i] ?? i)).join(", ")}
+                    {t("Missing:")} {row.missing.map((m) => t(m)).join(", ")}
                   </div>
                 )}
-                {f.source === "correction" && <div className="tiny">{t("Corrected by a person")}</div>}
+                {row.correctedByPerson && <div className="tiny">{t("Corrected by a person")}</div>}
               </td>
               <td>
-                {f.evidence.map((e) => (
-                  <button key={e.segmentId} type="button" className="link-btn evidence-link" title={e.quote} onClick={() => setOpen(e)}>
-                    {evidenceLabel(e, state.lang)}
+                {row.links.map((link) => (
+                  <button key={link.evidence.segmentId} type="button" className="link-btn evidence-link" title={link.evidence.quote} onClick={() => setOpen(link.evidence)}>
+                    {link.label}
                   </button>
                 ))}
-                {f.evidenceUnavailable === "source_unavailable" && <span className="tiny">{t("Source text unavailable")}</span>}
-                {f.evidenceUnavailable === "not_located" && (
-                  <span className="tiny">{f.source === "correction" ? t("Entered by a person — not in the source") : t("Not found in the source text")}</span>
-                )}
+                {row.notes.map((note, i) => (
+                  <span key={i} className="tiny" style={{ display: "block" }} data-testid="evidence-note">
+                    {t(note.text)}
+                    {note.values ? ` ${note.values.join(", ")}` : ""}
+                  </span>
+                ))}
               </td>
             </tr>
           ))}

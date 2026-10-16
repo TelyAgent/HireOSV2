@@ -42,6 +42,8 @@ export interface ProfileField {
   source: "resume" | "correction";
   evidence: FieldEvidence[];
   evidenceUnavailable: "source_unavailable" | "not_located" | null;
+  /** Values of a list field that couldn't be found in the source while others could. */
+  unlocatedValues?: string[];
 }
 
 export interface Candidate {

@@ -27,6 +27,7 @@ function MatchStatusBadge({ entry }: { entry: LibraryEntry }) {
 
 const FILTER_KEYS = ["q", "tag", "source", "owner", "matchStatus", "addedFrom", "addedTo"] as const;
 const SCROLL_KEY = "screening.library.scroll";
+const PAGE_SIZE = 100;
 const SEARCH_KEY = "screening.library.search";
 
 function savedSearch(): string {
@@ -79,6 +80,8 @@ export function LibraryPage() {
   const [confirmingDeleteId, setConfirmingDeleteId] = useState<string | null>(null);
   const [importTab, setImportTab] = useState<ImportTab | null>(null);
   const restoredScroll = useRef(false);
+  // How many matching candidates to show; "Show more" asks for the next page.
+  const [limit, setLimit] = useState(PAGE_SIZE);
 
   const setFilter = useCallback(
     (key: (typeof FILTER_KEYS)[number], value: string) => {
@@ -104,12 +107,17 @@ export function LibraryPage() {
 
   const load = useCallback(() => {
     setLoadState((current) => (current === "ready" ? "ready" : "loading"));
-    listLibraryEntries(filters)
+    listLibraryEntries(filters, limit)
       .then((result) => {
         setList(result);
         setLoadState("ready");
       })
       .catch(() => setLoadState("error"));
+  }, [filters, limit]);
+
+  // A new search or filter starts from the first page again.
+  useEffect(() => {
+    setLimit(PAGE_SIZE);
   }, [filters]);
 
   useEffect(() => {
@@ -140,6 +148,7 @@ export function LibraryPage() {
 
   const entries = list?.items ?? [];
   const total = list?.total ?? 0;
+  const matched = list?.matched ?? 0;
   const filtered = FILTER_KEYS.some((key) => filters[key]);
   const ownerName = (ownerId: string) => {
     const row = list?.items.find((entry) => entry.candidate.ownerId === ownerId);
@@ -199,7 +208,7 @@ export function LibraryPage() {
         </div>
         {loadState === "ready" && (
           <span className="tiny muted" data-testid="library-count">
-            {state.lang === "zh" ? `共 ${total} 位候选人中的 ${entries.length} 位` : `${entries.length} of ${total} candidates`}
+            {state.lang === "zh" ? `共 ${total} 位候选人中的 ${matched} 位` : `${matched} of ${total} candidates`}
           </span>
         )}
       </div>
@@ -380,6 +389,14 @@ export function LibraryPage() {
           </tbody>
         </table>
       </div>
+      {loadState === "ready" && entries.length < matched && (
+        <div className="flex items-center gap-12" style={{ justifyContent: "center", marginTop: 12 }}>
+          <span className="tiny muted">{state.lang === "zh" ? `已显示 ${entries.length} / ${matched} 位` : `Showing ${entries.length} of ${matched}`}</span>
+          <Button variant="secondary" size="sm" onClick={() => setLimit((n) => n + PAGE_SIZE)} data-testid="show-more">
+            {t("Show more")}
+          </Button>
+        </div>
+      )}
       {confirmingDeleteId && (
         <ConfirmDialog
           open

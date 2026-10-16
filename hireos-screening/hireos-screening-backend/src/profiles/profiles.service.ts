@@ -578,11 +578,16 @@ type ParsedForProfile = {
 export function withConfirmedIdentity<T extends ParsedForProfile>(parsed: T, confirmed: ConfirmedIdentity | null): T {
   if (!confirmed) return parsed;
   const evidence = { source: 'user_confirmed' };
+  const parsedLocation = parsed.location as { value?: unknown } | null;
+  // The location as read stays as read (with its country and city) when the user confirmed it unchanged; only a
+  // location the user typed differently replaces it, marked as theirs.
+  const unchanged = !!confirmed.location && typeof parsedLocation?.value === 'string'
+    && parsedLocation.value.trim().toLowerCase() === confirmed.location.trim().toLowerCase();
   return {
     ...parsed,
     displayName: confirmed.displayName,
     email: confirmed.email || parsed.email,
-    ...(confirmed.location
+    ...(confirmed.location && !unchanged
       ? { location: { value: confirmed.location, status: 'known', evidence }, missingFields: parsed.missingFields.filter((f) => f !== 'location') }
       : {}),
   };

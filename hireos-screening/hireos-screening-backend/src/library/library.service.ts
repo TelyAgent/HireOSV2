@@ -4,6 +4,7 @@ import { CandidatesService } from './candidates.service';
 import { DiscoveryService } from '../discovery/discovery.service';
 import type { Identity } from '../auth/workspace.guard';
 import { z } from 'zod';
+import type { Prisma } from '@prisma/client';
 import { invalidSchemaFromZod } from '../http/invalid-schema';
 
 @Injectable()
@@ -15,78 +16,133 @@ export class LibraryService {
   ) {}
 
   /**
-   * The Resume Library (F04): every candidate in the workspace, searched by name, email or tag (#171) and
-   * filtered by tag, latest source, owner, match status and date added (#172). `total` is the whole library,
-   * so the page can say "N of M"; `facets` are the values the filters can offer.
+   * The Resume Library (F04): candidates searched by name, email or tag (#171) and filtered by tag, latest
+   * source, owner, match status and date added (#172). Everything but the match status is filtered in the
+   * database, so no candidate is out of reach however large the library; the match status is worked out for
+   * the candidates left. `matched` is how many fit, `items` the first `limit` of them, `total` the whole library,
+   * and `facets` the values the filters can offer.
    */
   async list(identity: Identity, raw: unknown = {}) {
     const parsed = libraryQuerySchema.safeParse(raw);
     if (!parsed.success) throw invalidSchemaFromZod(parsed.error);
     const filters = parsed.data;
-    const candidates = await this.db.candidate.findMany({
-      where: { workspaceId: identity.workspaceId },
-      orderBy: { createdAt: 'desc' },
-      take: 1000,
-      include: {
-        libraryEntry: true,
-        profiles: { orderBy: { version: 'desc' }, take: 1 },
-        resumeVersions: {
-          orderBy: { uploadedAt: 'desc' },
-          take: 1,
-          include: { material: { select: { name: true } } },
+    const workspaceId = identity.workspaceId;
+    const and: Prisma.CandidateWhereInput[] = [];
+    if (filters.q) {
+      const tagIds = await this.candidateIdsWithTag(workspaceId, filters.q, 'contains');
+      and.push({ OR: [
+        { displayName: { contains: filters.q, mode: 'insensitive' } },
+        { email: { contains: filters.q, mode: 'insensitive' } },
+        { id: { in: tagIds } },
+      ] });
+    }
+    if (filters.tag) and.push({ id: { in: await this.candidateIdsWithTag(workspaceId, filters.tag, 'equals') } });
+    if (filters.source) {
+      and.push(filters.source === 'structured_entry' ? { resumeVersions: { none: {} } } : { resumeVersions: { some: { isLatest: true, source: filters.source } } });
+    }
+    if (filters.owner) and.push({ ownerId: filters.owner });
+    if (filters.addedFrom) and.push({ createdAt: { gte: startOfDay(filters.addedFrom) } });
+    if (filters.addedTo) and.push({ createdAt: { lt: startOfDay(filters.addedTo, 1) } });
+    const where: Prisma.CandidateWhereInput = { workspaceId, ...(and.length ? { AND: and } : {}) };
+
+    let ids = (await this.db.candidate.findMany({ where, orderBy: { createdAt: 'desc' }, select: { id: true } })).map((c) => c.id);
+    if (filters.matchStatus) {
+      const statuses = await this.matchStatusesOf(workspaceId, ids);
+      ids = ids.filter((id) => statuses.get(id)?.matchStatus === filters.matchStatus);
+    }
+    const pageIds = ids.slice(0, filters.limit);
+    const [candidates, total, facets] = await Promise.all([
+      this.db.candidate.findMany({
+        where: { workspaceId, id: { in: pageIds } },
+        include: {
+          libraryEntry: true,
+          profiles: { orderBy: { version: 'desc' }, take: 1 },
+          resumeVersions: { orderBy: { uploadedAt: 'desc' }, take: 1, include: { material: { select: { name: true } } } },
+          applications: { select: { jobId: true, status: true } },
         },
-        applications: { select: { jobId: true, status: true } },
-      },
-    });
-    const candidateIds = candidates.map((candidate) => candidate.id);
-    const [recommendations, matchingStatuses] = await Promise.all([
-      this.db.candidateJobRecommendation.findMany({
-        where: { workspaceId: identity.workspaceId, candidateId: { in: candidateIds } },
-        select: { candidateId: true, status: true },
       }),
-      this.discovery.getMatchingStatuses(identity.workspaceId, candidateIds),
+      this.db.candidate.count({ where: { workspaceId } }),
+      this.facets(workspaceId),
     ]);
-    const rows = candidates.map((candidate) => {
-      const pending = recommendations.filter((item) => item.candidateId === candidate.id && item.status === 'proposed').length;
+    const statuses = await this.matchStatusesOf(workspaceId, pageIds);
+    const byId = new Map(candidates.map((c) => [c.id, c]));
+    const items = pageIds.map((id) => byId.get(id)).filter((c): c is NonNullable<typeof c> => !!c).map((candidate) => {
+      const status = statuses.get(candidate.id)!;
       // Linked roles: the distinct jobs this candidate has a current application for (#174).
       const linkedJobs = new Set(candidate.applications.filter((a) => a.status !== 'withdrawn').map((a) => a.jobId));
-      const matching = matchingStatuses.get(candidate.id) ?? { isMatching: false, lastRun: null };
       return {
         candidate: this.candidates.toFrontendCandidate(candidate, candidate.profiles[0]),
         latestSource: candidate.resumeVersions[0]?.source || 'structured_entry',
-        matchStatus: matchStatusOf(matching, pending),
-        matchReason: (matching.lastRun?.reason as { message?: string } | null)?.message ?? undefined,
-        isMatching: matching.isMatching,
+        matchStatus: status.matchStatus,
+        matchReason: status.matchReason,
+        isMatching: status.isMatching,
         linkedRoleCount: linkedJobs.size,
-        pendingRecommendationCount: pending,
-        addedAt: candidate.createdAt,
+        pendingRecommendationCount: status.pending,
       };
     });
-    const q = filters.q?.toLowerCase();
-    const items = rows.filter(({ candidate, latestSource, matchStatus, addedAt }) => {
-      const tags = candidate.tags.map((tag) => tag.toLowerCase());
-      if (q && !(
-        candidate.displayName.toLowerCase().includes(q)
-        || (candidate.contact.email ?? '').toLowerCase().includes(q)
-        || tags.some((tag) => tag.includes(q))
-      )) return false;
-      if (filters.tag && !tags.includes(filters.tag.toLowerCase())) return false;
-      if (filters.source && latestSource !== filters.source) return false;
-      if (filters.owner && candidate.ownerId !== filters.owner) return false;
-      if (filters.matchStatus && matchStatus !== filters.matchStatus) return false;
-      if (filters.addedFrom && addedAt < startOfDay(filters.addedFrom)) return false;
-      if (filters.addedTo && addedAt >= startOfDay(filters.addedTo, 1)) return false;
-      return true;
-    }).map(({ addedAt: _addedAt, ...row }) => row);
+    return { items, matched: ids.length, total, facets };
+  }
+
+  /** Candidates whose latest profile has a skill equal to, or containing, the text (case-insensitive). */
+  private async candidateIdsWithTag(workspaceId: string, text: string, mode: 'equals' | 'contains'): Promise<string[]> {
+    const needle = text.trim().toLowerCase();
+    const pattern = mode === 'equals' ? needle : `%${needle.replace(/[\\%_]/g, (c) => `\\${c}`)}%`;
+    const rows = await this.db.$queryRaw<Array<{ candidateId: string }>>`
+      SELECT latest."candidateId" FROM (
+        SELECT DISTINCT ON ("candidateId") "candidateId", "skills" FROM "CandidateProfile"
+        WHERE "workspaceId" = ${workspaceId} ORDER BY "candidateId", "version" DESC
+      ) latest
+      WHERE EXISTS (
+        SELECT 1 FROM jsonb_array_elements(CASE WHEN jsonb_typeof(latest."skills") = 'array' THEN latest."skills" ELSE '[]'::jsonb END) AS skill
+        WHERE lower(CASE WHEN jsonb_typeof(skill) = 'object' THEN skill->>'name' ELSE skill#>>'{}' END) LIKE ${pattern}
+      )`;
+    return rows.map((row) => row.candidateId);
+  }
+
+  /** The F06 matching state of each candidate, from their current recommendations and latest matching run. */
+  private async matchStatusesOf(workspaceId: string, ids: string[]) {
+    const [pending, matching] = await Promise.all([
+      ids.length
+        ? this.db.candidateJobRecommendation.groupBy({ by: ['candidateId'], where: { workspaceId, candidateId: { in: ids }, status: 'proposed' }, _count: { _all: true } })
+        : Promise.resolve([] as Array<{ candidateId: string; _count: { _all: number } }>),
+      this.discovery.getMatchingStatuses(workspaceId, ids),
+    ]);
+    const pendingOf = new Map(pending.map((p) => [p.candidateId, p._count._all]));
+    return new Map(ids.map((id) => {
+      const run = matching.get(id) ?? { isMatching: false, lastRun: null };
+      const count = pendingOf.get(id) ?? 0;
+      return [id, {
+        matchStatus: matchStatusOf(run, count),
+        matchReason: (run.lastRun?.reason as { message?: string } | null)?.message ?? undefined,
+        isMatching: run.isMatching,
+        pending: count,
+      }];
+    }));
+  }
+
+  /** The values the filters offer, counted over the whole library. */
+  private async facets(workspaceId: string) {
+    const [tags, sources, withoutResume, owners] = await Promise.all([
+      this.db.$queryRaw<Array<{ value: string; count: bigint }>>`
+        SELECT tag AS value, count(*) AS count FROM (
+          SELECT DISTINCT ON ("candidateId") "candidateId", "skills" FROM "CandidateProfile"
+          WHERE "workspaceId" = ${workspaceId} ORDER BY "candidateId", "version" DESC
+        ) latest,
+        LATERAL (
+          SELECT DISTINCT CASE WHEN jsonb_typeof(skill) = 'object' THEN skill->>'name' ELSE skill#>>'{}' END AS tag
+          FROM jsonb_array_elements(CASE WHEN jsonb_typeof(latest."skills") = 'array' THEN latest."skills" ELSE '[]'::jsonb END) AS skill
+        ) tags
+        WHERE tag IS NOT NULL AND tag <> ''
+        GROUP BY tag ORDER BY count(*) DESC, tag LIMIT 200`,
+      this.db.resumeVersion.groupBy({ by: ['source'], where: { workspaceId, isLatest: true }, _count: { _all: true } }),
+      this.db.candidate.count({ where: { workspaceId, resumeVersions: { none: {} } } }),
+      this.db.candidate.groupBy({ by: ['ownerId'], where: { workspaceId }, _count: { _all: true } }),
+    ]);
+    const sorted = (rows: Array<{ value: string; count: number }>) => rows.filter((r) => r.value && r.count > 0).sort((a, b) => b.count - a.count || a.value.localeCompare(b.value));
     return {
-      items,
-      total: rows.length,
-      facets: {
-        tags: countBy(rows.flatMap((row) => row.candidate.tags)),
-        sources: countBy(rows.map((row) => row.latestSource)),
-        owners: countBy(rows.map((row) => row.candidate.ownerId)),
-        matchStatuses: countBy(rows.map((row) => row.matchStatus)),
-      },
+      tags: tags.map((t) => ({ value: t.value, count: Number(t.count) })),
+      sources: sorted([...sources.map((s) => ({ value: s.source, count: s._count._all })), { value: 'structured_entry', count: withoutResume }]),
+      owners: sorted(owners.map((o) => ({ value: o.ownerId, count: o._count._all }))),
     };
   }
 }
@@ -120,6 +176,8 @@ const libraryQuerySchema = z.object({
   matchStatus: z.enum(MATCH_STATUSES).optional(),
   addedFrom: day.optional(),
   addedTo: day.optional(),
+  // How many of the matching candidates to return; the page asks for more ("Show more").
+  limit: z.coerce.number().int().min(1).max(500).default(100),
 });
 
 /** Midnight UTC of a YYYY-MM-DD day, optionally some days later. */
@@ -129,8 +187,3 @@ function startOfDay(value: string, plusDays = 0) {
   return date;
 }
 
-function countBy(values: string[]) {
-  const counts = new Map<string, number>();
-  for (const value of values) if (value) counts.set(value, (counts.get(value) ?? 0) + 1);
-  return [...counts].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0])).map(([value, count]) => ({ value, count }));
-}
