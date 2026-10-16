@@ -1,4 +1,5 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import { currentContact } from './current-contact';
 import { normalizeContent } from './identity-scoring';
 import { PrismaService } from '../persistence/prisma.service';
 import { displayNameFromFileName, ImportsService } from '../intake/imports.service';
@@ -28,7 +29,7 @@ export class DuplicatesService {
               take: 1,
               include: { material: { select: { name: true, createdAt: true, segments: true } } },
             },
-            profiles: { orderBy: { version: 'desc' }, take: 1, select: { employmentHistory: true, education: true, location: true } },
+            profiles: { orderBy: { version: 'desc' }, take: 1, select: { employmentHistory: true, education: true, location: true, contact: true } },
           },
         },
       },
@@ -62,8 +63,9 @@ export class DuplicatesService {
         ? {
             candidateId: check.existingCandidate.id,
             name: check.existingCandidate.displayName,
-            email: check.existingCandidate.email || undefined,
-            phone: check.existingCandidate.phone || undefined,
+            // As the latest version gives them, the same contact the check scored against (#151 review).
+            email: currentContact(check.existingCandidate, check.existingCandidate.profiles[0]).email || undefined,
+            phone: currentContact(check.existingCandidate, check.existingCandidate.profiles[0]).phone || undefined,
             fileName: existingVersion?.material.name || 'No resume version',
             uploadedAt: (existingVersion?.material.createdAt || check.existingCandidate.createdAt).toISOString(),
             source: existingVersion?.source || 'Resume Library',

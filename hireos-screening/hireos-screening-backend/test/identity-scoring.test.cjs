@@ -162,3 +162,43 @@ test('#151 AC-1/AC-2 (review): every candidate is scored — the best match is f
   assert.equal(byContent?.candidate.id, 'c500');
   assert.ok(byContent.basis.signals.some((s) => s.key === 'content') && byContent.basis.signals.some((s) => s.key === 'employment'), JSON.stringify(byContent.basis.signals));
 });
+
+test('#151 AC-1/AC-2 (review): the check compares the latest version\'s email and phone, not the record\'s first ones', async () => {
+  const { ImportsService } = require('../dist/intake/imports.service');
+  const moved = {
+    id: 'c-1', displayName: 'Nina Torres', email: 'nina.old@example.com', phone: '+1 415 555 0000',
+    profiles: [{ employmentHistory: [], education: [], contact: { email: 'nina.new@example.com', phone: '+1 415 555 0134' } }],
+    resumeVersions: [{ material: { id: 'm-1', text: 'An unrelated résumé about warehouse logistics and forklift safety training.' } }],
+  };
+  const db = { candidate: { findMany: async ({ cursor }) => (cursor ? [] : [moved]) } };
+  const found = await new ImportsService(db, {}, {}, {})['findPossibleDuplicate'](
+    'ws-1', { id: 'm-new', name: 'new.pdf', normalizedTextHash: null, text: 'Nina Torres\nnina.new@example.com\n+1 415 555 0134' },
+    { displayName: 'Nina Torres', email: 'nina.new@example.com', phone: '+1 415 555 0134' },
+  );
+  assert.equal(found?.candidate.id, 'c-1');
+  assert.deepEqual(found.basis.signals.map((s) => `${s.key}:${s.points}`), ['email:40', 'phone:30', 'name_exact:15']);
+  assert.equal(found.kind, 'new_resume_version');
+  // A version from before contacts were recorded falls back to the record.
+  const legacy = { ...moved, email: 'nina.new@example.com', profiles: [{ employmentHistory: [], education: [], contact: null }] };
+  const db2 = { candidate: { findMany: async ({ cursor }) => (cursor ? [] : [legacy]) } };
+  const again = await new ImportsService(db2, {}, {}, {})['findPossibleDuplicate'](
+    'ws-1', { id: 'm-new', name: 'new.pdf', normalizedTextHash: null, text: 'x' }, { displayName: 'Nina Torres', email: 'nina.new@example.com', phone: null },
+  );
+  assert.ok(again.basis.signals.some((s) => s.key === 'email'));
+});
+
+test('#151 AC-1 (review): months are compared whole and an entry ends at its first dated line', () => {
+  const nina = (employment) => existing({ employment });
+  // 2021-01 and 2018-01 are not 2021-10 and 2018-11.
+  const months = scoreIdentity({ name: 'Nina Torres', email: null, phone: null, text: 'Engineer, Alpha — 2021-10 to present\nAnalyst, Beta — 2018-11 to 2021-09' },
+    nina([{ company: 'Alpha', title: 'Engineer', start: '2021-01' }, { company: 'Beta', title: 'Analyst', start: '2018-01' }]));
+  assert.ok(!keys(months).includes('employment:20'), keys(months).join(','));
+  // One line's title and dates with the next line's company are not a job.
+  const adjacent = scoreIdentity({ name: 'Nina Torres', email: null, phone: null, text: 'Engineer, Alpha — 2021-03 to present\nAnalyst, Beta — 2018-07 to 2021-02' },
+    nina([{ company: 'Beta', title: 'Engineer', start: '2021-03' }, { company: 'Beta', title: 'Analyst', start: '2018-07' }]));
+  assert.ok(!keys(adjacent).includes('employment:20'), keys(adjacent).join(','));
+  // The real two jobs, in either layout, still count.
+  const same = scoreIdentity({ name: 'Nina Torres', email: null, phone: null, text: 'Engineer, Alpha — 2021-03 to present\nAnalyst, Beta — 2018-07 to 2021-02' },
+    nina([{ company: 'Alpha', title: 'Engineer', start: '2021-03' }, { company: 'Beta', title: 'Analyst', start: '2018-07' }]));
+  assert.ok(keys(same).includes('employment:20'), keys(same).join(','));
+});
