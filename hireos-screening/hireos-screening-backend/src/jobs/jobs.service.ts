@@ -1,4 +1,5 @@
-import { BadRequestException, Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Injectable, Logger, NotFoundException, UnprocessableEntityException } from '@nestjs/common';
+import { requirementProblem } from './requirement-policy';
 import { randomUUID } from 'node:crypto';
 import { z } from 'zod';
 import { PrismaService } from '../persistence/prisma.service';
@@ -12,7 +13,7 @@ const DEFAULT_DIMENSIONS = [
   { id: 'dim-skills', name: 'Skills', weight: 0.25, rubric: 'How closely the candidate skills match the role.' },
   { id: 'dim-relexp', name: 'Relevant Experience', weight: 0.25, rubric: 'How closely prior work maps to the role.' },
   { id: 'dim-seniority', name: 'Seniority', weight: 0.25, rubric: 'Whether the candidate level matches the role.' },
-  { id: 'dim-complocation', name: 'Compensation & Location Fit', weight: 0.25, rubric: 'Whether location and authorization fit the role.' },
+  { id: 'dim-complocation', name: 'Compensation & Location Fit', weight: 0.25, rubric: 'Whether the salary expectation and the work location (country + city) fit the role.' },
 ];
 
 @Injectable()
@@ -172,18 +173,32 @@ export class JobsService {
    * it right away as a quick_start job -- no one has to publish it in JD first, since Screening
    * can be sold and used on its own. Its criteria are reviewed and confirmed here, as for any job.
    */
+  /**
+   * Step one of "New job" (#178): the model reads the JD and suggests title, team and location for the
+   * recruiter to check; nothing is created. A JD already used opens its job instead.
+   */
+  async quickStartPreview(identity: Identity, raw: unknown) {
+    const parsed = z.object({ text: z.string().trim().min(1).max(150000) }).strict().safeParse(raw);
+    if (!parsed.success) throw invalidSchemaFromZod(parsed.error);
+    if (!this.criteriaFacade.isRemote()) {
+      // Mock mode (no JD service): nothing reads the JD, so the recruiter types title and team.
+      return { title: '', team: null, location: null, duplicateOf: null };
+    }
+    return this.criteriaFacade.previewFromText(identity, parsed.data.text);
+  }
+
   async quickStart(identity: Identity, raw: unknown, idempotencyKey?: string) {
     const parsed = quickStartSchema.safeParse(raw);
+    // Title and team are required and checked one by one, before anything is created (#178 AC-1).
     if (!parsed.success) throw invalidSchemaFromZod(parsed.error);
-    const { text } = parsed.data;
+    const { text, title: confirmedTitle, team: confirmedTeam } = parsed.data;
     if (!this.criteriaFacade.isRemote()) {
       // Mock mode (no Core Record / JD): a local-only job, as before Core Record existed.
-      const title = (text.split('\n').map((line) => line.trim()).find(Boolean) || text).slice(0, 200);
       const id = randomUUID();
-      await this.createLocalJob(identity, { id, title, jdText: text, origin: 'quick_start', status: 'open' }, null);
+      await this.createLocalJob(identity, { id, title: confirmedTitle, team: confirmedTeam, jdText: text, origin: 'quick_start', status: 'open' }, null);
       return { job: await this.get(identity, id), duplicate: false };
     }
-    const created = await this.criteriaFacade.createFromText(identity, text, `screening.quick-start:${idempotencyKey?.trim() || randomUUID()}`);
+    const created = await this.criteriaFacade.createFromText(identity, text, `screening.quick-start:${idempotencyKey?.trim() || randomUUID()}`, { title: confirmedTitle, team: confirmedTeam });
     const existing = await this.db.job.findFirst({ where: { id: created.coreJobId, workspaceId: identity.workspaceId } });
     if (existing) {
       // Already in Screening (published earlier, or created here before). A job that went back to
@@ -275,6 +290,7 @@ export class JobsService {
 
   async updateCriteria(identity: Identity, id: string, raw: unknown) {
     const input = validate(criteriaSchema, raw);
+    assertAllowedRequirements(input.requirements);
     const job = await this.find(identity.workspaceId, id);
     if (job.criteriaStatus === 'confirmed') {
       throw new BadRequestException({ code: 'CRITERIA_CONFIRMED', message: 'Reopen criteria before editing.' });
@@ -298,6 +314,8 @@ export class JobsService {
       requirements: asArray(draft.requirements),
       dimensions: asArray(draft.dimensions),
     }) as CriteriaInput;
+    // Checked again at confirmation: a draft written before this rule, or by another path, can't be confirmed (#179).
+    assertAllowedRequirements(input.requirements);
     const weightSum = input.dimensions.reduce((sum, dimension) => sum + dimension.weight, 0);
     if (Math.abs(weightSum - 1) > 0.001) {
       throw new BadRequestException({ code: 'WEIGHTS_NOT_100' });
@@ -458,7 +476,11 @@ export function jobRequiresAssessment(job: { assessmentRequired: boolean; title:
   return job.assessmentRequired || job.title.toLowerCase().includes('assessment-required');
 }
 
-const quickStartSchema = z.object({ text: z.string().trim().min(1).max(150000) }).strict();
+const quickStartSchema = z.object({
+  text: z.string().trim().min(1, 'Provide a job description.').max(150000),
+  title: z.string().trim().min(1, 'Enter the job title.').max(200),
+  team: z.string().trim().min(1, 'Enter the team or function.').max(200),
+}).strict();
 
 /**
  * Screening's own view of a Core Record job status. A quick_start job is a JD draft that Screening
@@ -564,4 +586,22 @@ function toFrontendJob(job: {
     applicantCount: job.applicantCount,
     assessmentRequired: job.assessmentRequired,
   };
+}
+
+/**
+ * F05 FR-7 / BR-5 (#179): no requirement may use a protected attribute or a proxy for one, or be a judgement no
+ * résumé could verify. Rejected before anything is written, so the draft, any confirmed version and existing
+ * matches stay exactly as they were.
+ */
+function assertAllowedRequirements(requirements: Array<{ id: string; label: string }>) {
+  const problems = requirements
+    .map((requirement) => ({ requirementId: requirement.id, label: requirement.label, problem: requirementProblem(requirement.label) }))
+    .filter((item) => item.problem);
+  if (problems.length) {
+    throw new UnprocessableEntityException({
+      code: 'REQUIREMENT_NOT_ALLOWED',
+      message: 'A requirement uses a protected attribute or can\'t be verified from a résumé.',
+      problems: problems.map(({ requirementId, label, problem }) => ({ requirementId, label, ...problem })),
+    });
+  }
 }

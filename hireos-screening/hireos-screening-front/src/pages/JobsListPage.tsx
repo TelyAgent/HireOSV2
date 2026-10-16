@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
+import { sourceLabel } from "../features/imports/sources";
 import { useNavigate } from "react-router-dom";
 import { useStore } from "../store/StoreContext";
 import { listJobs } from "../data/api/jobs";
@@ -7,7 +8,6 @@ import { Badge, Button, PageHeader } from "../components/ui/Primitives";
 import { Icon } from "../components/ui/Icons";
 import { NewJobModal } from "../features/jobs/NewJobModal";
 
-const SOURCE_LABEL: Record<string, string> = { manual_upload: "Local upload", email: "Email", folder: "Folder", api: "API" };
 
 /** An open job whose rubric isn't confirmed can't match resumes yet, so it isn't shown as plainly "Open". */
 function JobStatusBadge({ status, criteriaStatus }: { status: JobStatus; criteriaStatus: Job["criteriaStatus"] }) {
@@ -37,7 +37,7 @@ function SourceChips({ sources }: { sources: JobFunnel["sources"] }) {
   return (
     <div className="source-chips">
       {sources.map(({ source, count }) => {
-        const label = SOURCE_LABEL[source] ? t(SOURCE_LABEL[source]) : source;
+        const label = t(sourceLabel(source));
         return (
           <span className="source-chip" key={source} title={label}>
             {label} <b>{count}</b>

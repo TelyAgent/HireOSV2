@@ -55,8 +55,21 @@ export class JobCriteriaFacade {
   }
 
   /** Screening's "New job" entry: creates the job (a draft) in JD + Core Record, or finds the one with the same JD text. */
-  async createFromText(identity: Identity, text: string, idempotencyKey: string): Promise<{ coreJobId: string; title: string; jdText: string; duplicate: boolean }> {
-    const response = await this.request('/intake/jobs', identity, 'POST', { text }, idempotencyKey);
+  /** The model's reading of a JD — title, team, location — or the job it already created; nothing is created (#178). */
+  async previewFromText(identity: Identity, text: string): Promise<{ title: string; team: string | null; location: string | null; duplicateOf: { coreJobId: string; title: string } | null }> {
+    const response = await this.request('/intake/jobs/preview', identity, 'POST', { text }, `screening.quick-start.preview:${hash({ text })}`);
+    const body = await parseBody(response);
+    if (!response.ok) throw this.toException(response.status, body);
+    return body as { title: string; team: string | null; location: string | null; duplicateOf: { coreJobId: string; title: string } | null };
+  }
+
+  async createFromText(
+    identity: Identity,
+    text: string,
+    idempotencyKey: string,
+    confirmed?: { title: string; team: string },
+  ): Promise<{ coreJobId: string; title: string; jdText: string; duplicate: boolean }> {
+    const response = await this.request('/intake/jobs', identity, 'POST', { text, ...(confirmed ?? {}) }, idempotencyKey);
     const body = await parseBody(response);
     if (!response.ok) throw this.toException(response.status, body);
     return body as { coreJobId: string; title: string; jdText: string; duplicate: boolean };
