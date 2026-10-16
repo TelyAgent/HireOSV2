@@ -46,3 +46,9 @@ test('#192 AC-1/AC-2: evidence carries its source, version and location, or says
 test('#192 AC-3: an evaluation without evidence returns none (no reference is counted on its own)', async () => {
   assert.deepEqual(await service([])['evidenceOf']('ws-1', { evidenceItems: [] }), []);
 });
+
+test('#192 (review): an evidence quote is located only if all of it is in the source', () => {
+  const segs = [{ id: 's1', text: 'Built pricing dashboards in SQL and Python for 120 stores across three regions.' }];
+  assert.equal(locateQuote(segs, 'Built pricing dashboards in SQL and Python for 120 stores across three regions. Managed a team of 500 engineers.'), null);
+  assert.equal(locateQuote(segs, 'built pricing dashboards in SQL and Python for 120 stores')?.segmentId, 's1');
+});
