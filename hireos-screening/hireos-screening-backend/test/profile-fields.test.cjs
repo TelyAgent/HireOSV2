@@ -183,6 +183,28 @@ test('#155 AC-2: each value of a list field is located on its own — one found 
   assert.equal(fields.skills.evidenceUnavailable, null);
 });
 
+test('#155 AC-2 (review): two jobs with the same title at different companies each point at their own paragraph', () => {
+  const segments = [
+    { id: 'p1', text: 'Senior Software Engineer at Acme, 2019-01 to 2021-06', page: 1 },
+    { id: 'p2', text: 'Senior Software Engineer at Beta, 2021-07 to present', page: 2 },
+  ];
+  const jobs = [
+    { company: 'Acme', title: 'Senior Software Engineer', start: '2019-01', end: '2021-06' },
+    { company: 'Beta', title: 'Senior Software Engineer', start: '2021-07', end: 'present' },
+  ];
+  const f = byField(profileFields({ displayName: 'A', employmentHistory: jobs }, { displayName: 'A', email: null, phone: null }, source(segments))).employment_history;
+  assert.deepEqual(f.evidence.map((e) => [e.segmentId, e.page]), [['p1', 1], ['p2', 2]]);
+  assert.deepEqual(f.unlocatedValues, []);
+  // A job whose company and title never appear together isn't pinned on some other line: it's named as not found.
+  const g = byField(profileFields({ displayName: 'A', employmentHistory: [...jobs, { company: 'Gamma', title: 'Senior Software Engineer', start: '2018-01', end: '2018-12' }] },
+    { displayName: 'A', email: null, phone: null }, source(segments))).employment_history;
+  assert.deepEqual(g.unlocatedValues, ['Senior Software Engineer · Gamma (2018-01 – 2018-12)']);
+  // Without a company the title is what there is to go on.
+  const h = byField(profileFields({ displayName: 'A', employmentHistory: [{ company: '', title: 'Senior Software Engineer', start: '2019-01', end: '2021-06' }] },
+    { displayName: 'A', email: null, phone: null }, source(segments))).employment_history;
+  assert.equal(h.evidence[0].segmentId, 'p1');
+});
+
 test('#155 AC-1: a location confirmed unchanged on paste keeps its country and city; one the user typed is theirs', () => {
   const { withConfirmedIdentity } = require('../dist/profiles/profiles.service');
   const parsed = { displayName: 'A', email: null, location: { value: 'Ho Chi Minh City, Vietnam', status: 'known', country: 'Vietnam', city: 'Ho Chi Minh City' }, missingFields: [] };

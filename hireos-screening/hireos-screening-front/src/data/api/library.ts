@@ -47,9 +47,11 @@ export interface LibraryList {
   facets: Record<"tags" | "sources" | "owners", Array<{ value: string; count: number }>>;
 }
 
-export async function listLibraryEntries(filters: LibraryFilters = {}, limit = 100): Promise<LibraryList> {
+/** One page of the library for the search and filters; `offset` is how many are already shown. */
+export async function listLibraryEntries(filters: LibraryFilters = {}, offset = 0, limit = 100): Promise<LibraryList> {
   const params = new URLSearchParams(Object.entries(filters).filter((entry): entry is [string, string] => !!entry[1]?.trim()));
   params.set("limit", String(limit));
+  params.set("offset", String(offset));
   const suffix = params.toString() ? `?${params}` : "";
   return apiFetch<LibraryList>(`/library${suffix}`);
 }

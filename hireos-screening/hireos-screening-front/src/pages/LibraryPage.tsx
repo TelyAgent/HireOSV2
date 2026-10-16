@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { sourceLabel } from "../features/imports/sources";
 import { MATCH_STATUS_BADGE } from "../features/library/matchStatus";
+import { PAGE_SIZE, appendPage, nextPage } from "../features/library/paging";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { useStore } from "../store/StoreContext";
 import { deleteCandidate, listLibraryEntries, MATCH_STATUSES, runMatchAgain, type LibraryEntry, type LibraryFilters, type LibraryList } from "../data/api/library";
@@ -27,7 +28,6 @@ function MatchStatusBadge({ entry }: { entry: LibraryEntry }) {
 
 const FILTER_KEYS = ["q", "tag", "source", "owner", "matchStatus", "addedFrom", "addedTo"] as const;
 const SCROLL_KEY = "screening.library.scroll";
-const PAGE_SIZE = 100;
 const SEARCH_KEY = "screening.library.search";
 
 function savedSearch(): string {
@@ -80,8 +80,7 @@ export function LibraryPage() {
   const [confirmingDeleteId, setConfirmingDeleteId] = useState<string | null>(null);
   const [importTab, setImportTab] = useState<ImportTab | null>(null);
   const restoredScroll = useRef(false);
-  // How many matching candidates to show; "Show more" asks for the next page.
-  const [limit, setLimit] = useState(PAGE_SIZE);
+  const [loadingMore, setLoadingMore] = useState(false);
 
   const setFilter = useCallback(
     (key: (typeof FILTER_KEYS)[number], value: string) => {
@@ -107,18 +106,28 @@ export function LibraryPage() {
 
   const load = useCallback(() => {
     setLoadState((current) => (current === "ready" ? "ready" : "loading"));
-    listLibraryEntries(filters, limit)
+    listLibraryEntries(filters, 0, PAGE_SIZE)
       .then((result) => {
         setList(result);
         setLoadState("ready");
       })
       .catch(() => setLoadState("error"));
-  }, [filters, limit]);
-
-  // A new search or filter starts from the first page again.
-  useEffect(() => {
-    setLimit(PAGE_SIZE);
   }, [filters]);
+
+  /** The next page, appended to what is shown; a failure leaves the list as it was (#172 review). */
+  const loadMore = async () => {
+    if (!list || loadingMore) return;
+    setLoadingMore(true);
+    try {
+      const { offset, limit } = nextPage(list.items.length);
+      const next = await listLibraryEntries(filters, offset, limit);
+      setList((current) => (current ? appendPage<LibraryEntry, LibraryList>(current, next, (entry) => entry.candidate.id) : next));
+    } catch {
+      say(t("Couldn't load more candidates. Try again."), { type: "error" });
+    } finally {
+      setLoadingMore(false);
+    }
+  };
 
   useEffect(() => {
     if (!restoring) load();
@@ -392,7 +401,7 @@ export function LibraryPage() {
       {loadState === "ready" && entries.length < matched && (
         <div className="flex items-center gap-12" style={{ justifyContent: "center", marginTop: 12 }}>
           <span className="tiny muted">{state.lang === "zh" ? `已显示 ${entries.length} / ${matched} 位` : `Showing ${entries.length} of ${matched}`}</span>
-          <Button variant="secondary" size="sm" onClick={() => setLimit((n) => n + PAGE_SIZE)} data-testid="show-more">
+          <Button variant="secondary" size="sm" onClick={() => void loadMore()} disabled={loadingMore} data-testid="show-more">
             {t("Show more")}
           </Button>
         </div>

@@ -138,6 +138,11 @@ test('#171 (review): search runs in the database, so the 1,001st candidate is fo
   assert.deepEqual(ids(await s.list(identity, { q: 'rust' })), ['c-1100']);
   const all = await s.list(identity, { limit: '50' });
   assert.deepEqual([all.items.length, all.matched, all.total], [50, 1200, 1200]);
+  // Paging by offset reaches the end in bounded pages.
+  const page12 = await s.list(identity, { offset: '1100', limit: '100' });
+  assert.deepEqual([page12.items.length, page12.items[0].candidate.id, page12.matched], [100, 'c-1100', 1200]);
+  const last = await s.list(identity, { offset: '1150', limit: '100' });
+  assert.equal(last.items.length, 50);
   assert.ok(s.queries.every((q) => q.take === undefined), 'no query caps the candidates searched');
   await assert.rejects(s.list(identity, { limit: '5000' }), (e) => e.getStatus() === 422);
 });

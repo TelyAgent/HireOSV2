@@ -19,7 +19,7 @@ export class LibraryService {
    * The Resume Library (F04): candidates searched by name, email or tag (#171) and filtered by tag, latest
    * source, owner, match status and date added (#172). Everything but the match status is filtered in the
    * database, so no candidate is out of reach however large the library; the match status is worked out for
-   * the candidates left. `matched` is how many fit, `items` the first `limit` of them, `total` the whole library,
+   * the candidates left. `matched` is how many fit, `items` the page of them from `offset`, `total` the whole library,
    * and `facets` the values the filters can offer.
    */
   async list(identity: Identity, raw: unknown = {}) {
@@ -50,7 +50,7 @@ export class LibraryService {
       const statuses = await this.matchStatusesOf(workspaceId, ids);
       ids = ids.filter((id) => statuses.get(id)?.matchStatus === filters.matchStatus);
     }
-    const pageIds = ids.slice(0, filters.limit);
+    const pageIds = ids.slice(filters.offset, filters.offset + filters.limit);
     const [candidates, total, facets] = await Promise.all([
       this.db.candidate.findMany({
         where: { workspaceId, id: { in: pageIds } },
@@ -176,8 +176,9 @@ const libraryQuerySchema = z.object({
   matchStatus: z.enum(MATCH_STATUSES).optional(),
   addedFrom: day.optional(),
   addedTo: day.optional(),
-  // How many of the matching candidates to return; the page asks for more ("Show more").
+  // One page of the matching candidates: "Show more" asks for the next one by offset, each at most 500.
   limit: z.coerce.number().int().min(1).max(500).default(100),
+  offset: z.coerce.number().int().min(0).default(0),
 });
 
 /** Midnight UTC of a YYYY-MM-DD day, optionally some days later. */

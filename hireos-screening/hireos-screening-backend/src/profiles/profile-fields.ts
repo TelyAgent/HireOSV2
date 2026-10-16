@@ -42,7 +42,8 @@ export const PROFILE_FIELDS = [
 
 type Segment = { id: string; text: string; page?: number };
 type Source = { resumeVersionId: string; resumeVersion: number; materialId: string; readable: boolean; segments: Segment[] };
-type Item = { value: string; needles: string[]; incomplete?: string[] };
+/** `together`: texts that must all be in the same paragraph (a job's company and title), tried before `needles`. */
+type Item = { value: string; needles: string[]; together?: string[]; incomplete?: string[] };
 
 export function profileFields(
   profile: Record<string, unknown> | null | undefined,
@@ -77,7 +78,9 @@ export function profileFields(
       const [company, title, start, end] = [text(e.company), text(e.title), text(e.start), text(e.end)];
       return {
         value: [title, company].filter(Boolean).join(' · ') + (start || end ? ` (${start || '?'} – ${end || '?'})` : ''),
-        needles: [company, title],
+        // Company and title in the same paragraph: two jobs with the same title at different companies each find
+        // their own paragraph; a title alone is used only when there is no company (#155 review).
+        ...(company && title ? { together: [company, title], needles: [] } : { needles: [company || title] }),
         // Dates read as YYYY-MM (or present); anything else is kept as written and the entry counts as partly read.
         incomplete: [...(!company ? ['company'] : []), ...(!title ? ['title'] : []), ...(!formatMonth(start) || !(isPresent(end) || formatMonth(end)) ? ['dates'] : [])],
       };
@@ -126,7 +129,7 @@ export function profileFields(
     const incomplete = [...new Set(list.flatMap((item) => item.incomplete ?? []))];
     const fromCorrection = (!!correctedField[field] && corrected.has(correctedField[field]!)) || (field === 'location' && confirmedLocation);
     // Each value is located on its own, so one found value can't hide another that wasn't (#155 AC-2).
-    const located = source?.readable ? list.map((item) => ({ item, at: locate(item.needles, paragraphs, source) })) : [];
+    const located = source?.readable ? list.map((item) => ({ item, at: locateItem(item, paragraphs, source) })) : [];
     const evidence = dedupe(located.map((l) => l.at).filter((e): e is FieldEvidence => !!e));
     const unlocatedValues = located.length && evidence.length ? located.filter((l) => !l.at).map((l) => l.item.value) : [];
     // A name the résumé text doesn't contain came from the file name: it stands until someone confirms it (§4.1).
@@ -159,6 +162,28 @@ function numberParagraphs(segments: Segment[]) {
 }
 
 /** The first paragraph containing one of the value's texts (a long one by its opening words). */
+function locateItem(item: Item, paragraphs: ReturnType<typeof numberParagraphs>, source: Source): FieldEvidence | null {
+  if (item.together?.length) {
+    const parts = item.together.map(normalize).filter(Boolean);
+    const hit = paragraphs.find((p) => parts.every((part) => p.normalized.includes(part)));
+    if (hit) return evidenceAt(hit, parts[0], source);
+  }
+  return locate(item.needles, paragraphs, source);
+}
+
+function evidenceAt(hit: ReturnType<typeof numberParagraphs>[number], probe: string, source: Source): FieldEvidence {
+  const at = hit.segment.text.toLowerCase().indexOf(probe.split(' ')[0]);
+  return {
+    resumeVersionId: source.resumeVersionId,
+    resumeVersion: source.resumeVersion,
+    materialId: source.materialId,
+    segmentId: hit.segment.id,
+    page: hit.page,
+    paragraph: hit.paragraph,
+    quote: hit.segment.text.slice(Math.max(0, at - 40), Math.max(0, at - 40) + 160).replace(/\s+/g, ' ').trim(),
+  };
+}
+
 function locate(needles: string[], paragraphs: ReturnType<typeof numberParagraphs>, source: Source): FieldEvidence | null {
   // The most specific text first: a project's description over its name, which may appear in other lines too.
   for (const needle of needles.map(normalize).filter((n) => n.length >= 2).sort((a, b) => b.length - a.length)) {
@@ -166,18 +191,7 @@ function locate(needles: string[], paragraphs: ReturnType<typeof numberParagraph
     // A phone number is stored in E.164 but written with spaces or dashes: compare its digits.
     const phone = /^\+?\d{7,15}$/.test(needle) ? needle.replace('+', '') : null;
     const hit = paragraphs.find((p) => (phone ? p.digits.includes(phone) : p.normalized.includes(probe)));
-    if (hit) {
-      const at = hit.segment.text.toLowerCase().indexOf(probe.split(' ')[0]);
-      return {
-        resumeVersionId: source.resumeVersionId,
-        resumeVersion: source.resumeVersion,
-        materialId: source.materialId,
-        segmentId: hit.segment.id,
-        page: hit.page,
-        paragraph: hit.paragraph,
-        quote: hit.segment.text.slice(Math.max(0, at - 40), Math.max(0, at - 40) + 160).replace(/\s+/g, ' ').trim(),
-      };
-    }
+    if (hit) return evidenceAt(hit, probe, source);
   }
   return null;
 }
