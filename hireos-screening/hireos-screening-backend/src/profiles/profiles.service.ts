@@ -1,4 +1,5 @@
-import { BadRequestException, Injectable, NotFoundException, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
+import { BadRequestException, Injectable, Logger, NotFoundException, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
+import { guardedPoll } from '../shared/guarded-poll';
 import { readAvailability, storedPhone } from './field-formats';
 import { CORRECTION_REASON_TYPES, referencedProfileFields } from './correction-rules';
 import { confirmedIdentityOf, type ConfirmedIdentity } from '../intake/confirmed-identity';
@@ -27,6 +28,7 @@ export const COMPENSATION_CURRENCIES = ['CNY', 'USD', 'HKD', 'EUR', 'GBP', 'SGD'
 
 @Injectable()
 export class ProfilesService implements OnModuleInit, OnModuleDestroy {
+  private readonly logger = new Logger(ProfilesService.name);
   private timer?: ReturnType<typeof globalThis.setInterval>;
   private running = false;
 
@@ -38,7 +40,8 @@ export class ProfilesService implements OnModuleInit, OnModuleDestroy {
   ) {}
 
   onModuleInit() {
-    this.timer = globalThis.setInterval(() => void this.processQueued(), 250);
+    // Guarded: an error in a round is logged and the next round runs; it never ends the process (#116).
+    this.timer = globalThis.setInterval(() => void guardedPoll(this.logger, 'Résumé parsing', () => this.processQueued()), 250);
     this.timer.unref();
   }
 

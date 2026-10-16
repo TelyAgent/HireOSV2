@@ -1,4 +1,5 @@
-import { BadRequestException, Injectable, NotFoundException, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
+import { BadRequestException, Injectable, Logger, NotFoundException, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
+import { guardedPoll } from '../shared/guarded-poll';
 import { currentContact } from '../duplicates/current-contact';
 import { IDENTITY_POLICY, scoreIdentity, type ExistingSide, type IdentityScore } from '../duplicates/identity-scoring';
 import { randomUUID } from 'node:crypto';
@@ -39,6 +40,7 @@ type CandidateCreationJobInput = {
 
 @Injectable()
 export class ImportsService implements OnModuleInit, OnModuleDestroy {
+  private readonly logger = new Logger(ImportsService.name);
   private timer?: ReturnType<typeof globalThis.setInterval>;
   private running = false;
 
@@ -50,7 +52,8 @@ export class ImportsService implements OnModuleInit, OnModuleDestroy {
   ) {}
 
   onModuleInit() {
-    this.timer = globalThis.setInterval(() => void this.processQueuedCandidateJobs(), 250);
+    // Guarded: an error in a round is logged and the next round runs; it never ends the process (#116).
+    this.timer = globalThis.setInterval(() => void guardedPoll(this.logger, 'Candidate creation', () => this.processQueuedCandidateJobs()), 250);
     this.timer.unref();
   }
 

@@ -1,4 +1,5 @@
 import { Injectable, Logger, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
+import { describe, guardedPoll } from '../shared/guarded-poll';
 import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../persistence/prisma.service';
 
@@ -37,12 +38,17 @@ export class InterviewHandoffDispatcherService implements OnModuleInit, OnModule
   ) {}
 
   onModuleInit() {
-    this.timer = globalThis.setInterval(() => void this.dispatchPending(), POLL_INTERVAL_MS);
+    this.timer = globalThis.setInterval(() => void this.tick(), POLL_INTERVAL_MS);
     this.timer.unref();
   }
 
   onModuleDestroy() {
     if (this.timer) globalThis.clearInterval(this.timer);
+  }
+
+  /** One round; never rejects, so a failing database can't end the process (#116). */
+  tick() {
+    return guardedPoll(this.logger, 'Interview/assessment handoff', () => this.dispatchPending());
   }
 
   private async dispatchPending() {
@@ -55,7 +61,12 @@ export class InterviewHandoffDispatcherService implements OnModuleInit, OnModule
         take: BATCH_SIZE,
       });
       for (const event of events) {
-        await this.dispatchOne(event);
+        // One event's failure — even failing to record that it failed — doesn't stop the others (#116).
+        try {
+          await this.dispatchOne(event);
+        } catch (error) {
+          this.logger.error(`Handoff event ${event.id} (${event.eventType}) could not be dispatched or its failure recorded: ${describe(error)}`);
+        }
       }
     } finally {
       this.running = false;

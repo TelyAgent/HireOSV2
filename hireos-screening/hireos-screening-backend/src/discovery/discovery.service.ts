@@ -1,4 +1,5 @@
-import { BadRequestException, ConflictException, Injectable, NotFoundException, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
+import { BadRequestException, ConflictException, Injectable, Logger, NotFoundException, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
+import { guardedPoll } from '../shared/guarded-poll';
 import { randomUUID } from 'node:crypto';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../persistence/prisma.service';
@@ -38,6 +39,7 @@ const CANDIDATE_MATCH_INCLUDE = {
 
 @Injectable()
 export class DiscoveryService implements OnModuleInit, OnModuleDestroy {
+  private readonly logger = new Logger(DiscoveryService.name);
   private timer?: ReturnType<typeof globalThis.setInterval>;
   private running = false;
 
@@ -47,7 +49,8 @@ export class DiscoveryService implements OnModuleInit, OnModuleDestroy {
   ) {}
 
   onModuleInit() {
-    this.timer = globalThis.setInterval(() => void this.processQueuedMatchJobs(), 250);
+    // Guarded: an error in a round is logged and the next round runs; it never ends the process (#116).
+    this.timer = globalThis.setInterval(() => void guardedPoll(this.logger, 'Job matching', () => this.processQueuedMatchJobs()), 250);
     this.timer.unref();
   }
 
