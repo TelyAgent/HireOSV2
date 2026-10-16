@@ -1,6 +1,8 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import { normalizeContent } from './identity-scoring';
 import { PrismaService } from '../persistence/prisma.service';
 import { displayNameFromFileName, ImportsService } from '../intake/imports.service';
+import { confirmedIdentityOf } from '../intake/confirmed-identity';
 import type { Identity } from '../auth/workspace.guard';
 import type { DuplicateResolutionOutcome } from './duplicates.types';
 import { ProfilesService } from '../profiles/profiles.service';
@@ -17,15 +19,16 @@ export class DuplicatesService {
     const check = await this.db.duplicateCheck.findFirst({
       where: { id, workspaceId: identity.workspaceId },
       include: {
-        material: { select: { id: true, name: true, segments: true, createdAt: true, readStatus: true, errorCode: true } },
+        material: { select: { id: true, name: true, segments: true, createdAt: true, readStatus: true, errorCode: true, confirmedIdentity: true, sourceType: true } },
         existingCandidate: {
           select: {
             id: true, displayName: true, email: true, phone: true, createdAt: true,
             resumeVersions: {
               where: { isLatest: true },
               take: 1,
-              include: { material: { select: { name: true, createdAt: true } } },
+              include: { material: { select: { name: true, createdAt: true, segments: true } } },
             },
+            profiles: { orderBy: { version: 'desc' }, take: 1, select: { employmentHistory: true, education: true, location: true } },
           },
         },
       },
@@ -35,7 +38,7 @@ export class DuplicatesService {
     // The uploaded side has no Candidate yet (that's the whole question this review is
     // answering), so its email/phone/location can only come from re-reading the material.
     const uploadedSignals = check.material.readStatus === 'available'
-      ? this.profiles.extractIdentitySignals(check.material.id, check.material.segments, displayNameFromFileName(check.material.name))
+      ? this.profiles.extractIdentitySignals(check.material.id, check.material.segments, (confirmedIdentityOf(check.material)?.displayName || displayNameFromFileName(check.material.name)))
       : null;
     return {
       id: check.id,
@@ -45,12 +48,15 @@ export class DuplicatesService {
       uploaded: {
         fileName: check.material.name,
         uploadedAt: check.material.createdAt.toISOString(),
-        source: 'Manual upload',
+        source: check.material.sourceType,
         uploadedBy: 'emma',
-        name: uploadedSignals?.displayName || displayNameFromFileName(check.material.name),
+        // A name confirmed on paste is the upload's name; otherwise what the text gives, then the file name.
+        name: confirmedIdentityOf(check.material)?.displayName || uploadedSignals?.displayName || displayNameFromFileName(check.material.name),
         email: uploadedSignals?.email || undefined,
         phone: uploadedSignals?.phone || undefined,
         location: uploadedSignals?.location || undefined,
+        // What this upload would become if it is the same person: the next résumé version.
+        version: existingVersion ? existingVersion.version + 1 : 1,
       },
       existing: check.existingCandidate
         ? {
@@ -61,6 +67,10 @@ export class DuplicatesService {
             fileName: existingVersion?.material.name || 'No resume version',
             uploadedAt: (existingVersion?.material.createdAt || check.existingCandidate.createdAt).toISOString(),
             source: existingVersion?.source || 'Resume Library',
+            version: existingVersion?.version,
+            location: locationValue(check.existingCandidate.profiles[0]?.location),
+            employment: asList(check.existingCandidate.profiles[0]?.employmentHistory),
+            education: asList(check.existingCandidate.profiles[0]?.education),
           }
         : {
             candidateId: '',
@@ -68,7 +78,9 @@ export class DuplicatesService {
             uploadedAt: check.material.createdAt.toISOString(),
             source: 'Resume Library',
           },
-      basis: Array.isArray(check.basis) ? check.basis as string[] : [],
+      ...describeBasis(check.basis),
+      // Paragraph-level differences between the two résumés (#151 AC-3).
+      differences: paragraphDiff(check.material.segments, existingVersion?.material.segments),
       resolutionOutcome: check.resolutionOutcome || undefined,
       resolutionNote: check.resolutionNote || undefined,
       resolutionBy: check.resolvedBy || undefined,
@@ -101,7 +113,46 @@ export class DuplicatesService {
       return this.get(identity, id);
     }
 
-    const { closedBatch, targetJobId } = await this.db.$transaction(async (tx) => {
+    // The claim below is a compare-and-set inside the transaction: of two concurrent or repeated confirmations
+    // only one gets the row; the other finds it resolved and gets the outcome that stands, with nothing
+    // written a second time (#152 AC-4).
+    let settled: { closedBatch: { batchId: string; operationId: string | null } | null; targetJobId: string | undefined };
+    try {
+      settled = await this.resolveOnce(identity, id, check, outcome, note);
+    } catch (error) {
+      if ((error as { response?: { code?: string } }).response?.code === 'ALREADY_RESOLVED') {
+        return { ...(await this.get(identity, id)), alreadyResolved: true };
+      }
+      throw error;
+    }
+    const { closedBatch, targetJobId } = settled;
+
+    if (outcome === 'same_person_new_version' || outcome === 'different_person') {
+      const version = await this.db.resumeVersion.findUnique({
+        where: { materialId: check.materialId },
+        select: { id: true, candidateId: true },
+      });
+      if (version) {
+        await this.profiles.enqueue(identity.workspaceId, version.candidateId, version.id, check.materialId, targetJobId);
+      }
+    }
+    if (closedBatch) {
+      // The batch's rolled-up status was computed while this item was still
+      // "needs_review"; refresh it now that the review has a real outcome, otherwise the
+      // batch view keeps showing "partial"/"processing" after everything is actually done.
+      await this.imports.finalizeBatch(identity.workspaceId, identity.actorId, closedBatch.operationId || '', closedBatch.batchId);
+    }
+    return { ...(await this.get(identity, id)), alreadyResolved: false };
+  }
+
+  private async resolveOnce(
+    identity: Identity,
+    id: string,
+    check: { existingCandidateId: string | null; materialId: string; material: { readStatus: string; sourceType: string; name: string; confirmedIdentity: unknown } },
+    outcome: Exclude<DuplicateResolutionOutcome, 'defer' | 'needs_more_information'>,
+    note?: string,
+  ) {
+    return this.db.$transaction(async (tx) => {
       let resolvedCandidateId: string | null = null;
       let closedBatch: { batchId: string; operationId: string | null } | null = null;
       const claim = await tx.duplicateCheck.updateMany({
@@ -128,7 +179,8 @@ export class DuplicatesService {
             candidateId: check.existingCandidateId,
             materialId: check.materialId,
             version: (latest?.version || 0) + 1,
-            source: 'manual_upload',
+            // The channel the file actually came in through, e.g. a paste (#161).
+            source: check.material.sourceType,
             parseStatus: 'pending',
           },
         });
@@ -151,7 +203,7 @@ export class DuplicatesService {
         const candidate = await tx.candidate.create({
           data: {
             workspaceId: identity.workspaceId,
-            displayName: displayNameFromFileName(check.material.name),
+            displayName: (confirmedIdentityOf(check.material)?.displayName || displayNameFromFileName(check.material.name)),
             ownerId: identity.actorId,
           },
         });
@@ -168,7 +220,8 @@ export class DuplicatesService {
             candidateId: candidate.id,
             materialId: check.materialId,
             version: 1,
-            source: 'manual_upload',
+            // The channel the file actually came in through, e.g. a paste (#161).
+            source: check.material.sourceType,
             parseStatus: 'pending',
           },
         });
@@ -242,23 +295,6 @@ export class DuplicatesService {
       });
       return { closedBatch, targetJobId: item?.batch.targetJobId ?? undefined };
     });
-
-    if (outcome === 'same_person_new_version' || outcome === 'different_person') {
-      const version = await this.db.resumeVersion.findUnique({
-        where: { materialId: check.materialId },
-        select: { id: true, candidateId: true },
-      });
-      if (version) {
-        await this.profiles.enqueue(identity.workspaceId, version.candidateId, version.id, check.materialId, targetJobId);
-      }
-    }
-    if (closedBatch) {
-      // The batch's rolled-up status was computed while this item was still
-      // "needs_review"; refresh it now that the review has a real outcome, otherwise the
-      // batch view keeps showing "partial"/"processing" after everything is actually done.
-      await this.imports.finalizeBatch(identity.workspaceId, identity.actorId, closedBatch.operationId || '', closedBatch.batchId);
-    }
-    return this.get(identity, id);
   }
 }
 
@@ -266,4 +302,51 @@ function defaultResolutionNote(outcome: Exclude<DuplicateResolutionOutcome, 'def
   if (outcome === 'reuse_file') return 'Existing file content was reused; this source remains in import history.';
   if (outcome === 'same_person_new_version') return 'Saved as a new resume version for the existing candidate.';
   return 'Created a separate candidate. No identities were merged.';
+}
+
+/**
+ * A check's basis: the score breakdown with its policy version (#151), or — for checks made before scoring —
+ * just the readable lines.
+ */
+function describeBasis(basis: unknown) {
+  if (Array.isArray(basis)) return { basis: basis.map(String), scoring: null };
+  const record = basis && typeof basis === 'object' ? (basis as Record<string, unknown>) : {};
+  return {
+    basis: Array.isArray(record.lines) ? record.lines.map(String) : [],
+    scoring: typeof record.policyVersion === 'string'
+      ? {
+          policyVersion: record.policyVersion,
+          total: Number(record.total ?? 0),
+          band: String(record.band ?? ''),
+          signals: Array.isArray(record.signals) ? record.signals : [],
+          contentSimilarity: typeof record.contentSimilarity === 'number' ? record.contentSimilarity : null,
+          contact: record.contact ?? null,
+        }
+      : null,
+  };
+}
+
+/** Paragraphs only in the upload (added) and only in the existing résumé (removed), compared as normalized text. */
+function paragraphDiff(uploaded: unknown, existing: unknown) {
+  const texts = (value: unknown) => (Array.isArray(value) ? value : [])
+    .map((segment) => (segment && typeof segment === 'object' ? String((segment as { text?: unknown }).text ?? '') : ''))
+    .filter((text) => text.trim());
+  const [a, b] = [texts(uploaded), texts(existing)];
+  if (!a.length || !b.length) return null;
+  const key = (text: string) => normalizeContent(text);
+  const [ka, kb] = [new Set(a.map(key)), new Set(b.map(key))];
+  return {
+    added: a.filter((text) => !kb.has(key(text))),
+    removed: b.filter((text) => !ka.has(key(text))),
+    unchanged: a.filter((text) => kb.has(key(text))).length,
+  };
+}
+
+function asList(value: unknown) {
+  return Array.isArray(value) ? value : [];
+}
+
+function locationValue(value: unknown) {
+  const record = value && typeof value === 'object' ? (value as { value?: unknown; status?: unknown }) : null;
+  return record?.status === 'known' && typeof record.value === 'string' && record.value ? record.value : undefined;
 }
