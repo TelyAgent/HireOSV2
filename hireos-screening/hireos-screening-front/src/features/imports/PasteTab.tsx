@@ -51,12 +51,26 @@ export function PasteTab({ jobId, onChanged }: { jobId?: string; onChanged?: () 
     const input = {
       text: text.trim(),
       displayName,
-      ...(confirm.email.trim() ? { email: confirm.email.trim() } : {}),
-      ...(confirm.location.trim() ? { location: confirm.location.trim() } : {}),
+      // Sent even when empty: a value the user cleared is saved as none, not refilled from the text (#167).
+      email: confirm.email.trim(),
+      location: confirm.location.trim(),
     };
-    setText("");
-    setConfirm(null);
-    void startBatch(() => runPasteImport(input, { jobId }), 1).catch(() => say(t("Could not add this candidate."), { type: "error" }));
+    // The text and the confirmed values stay until the import is accepted, so a failed request can be sent again
+    // as it is (#160 review).
+    setBusy(true);
+    void startBatch(async () => {
+      try {
+        const batch = await runPasteImport(input, { jobId });
+        setText("");
+        setConfirm(null);
+        return batch;
+      } catch (error) {
+        say(t("Could not add this candidate."), { type: "error" });
+        throw error;
+      } finally {
+        setBusy(false);
+      }
+    }, 1);
   };
 
   const set = (field: keyof Confirm) => (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -106,10 +120,10 @@ export function PasteTab({ jobId, onChanged }: { jobId?: string; onChanged?: () 
               <input id="paste-location" type="text" value={confirm.location} onChange={set("location")} />
             </div>
             <div className="flex" style={{ gap: 8 }}>
-              <Button variant="primary" icon="add" onClick={submit} disabled={!confirm.displayName.trim()}>
-                {t("Add to library")}
+              <Button variant="primary" icon="add" onClick={submit} disabled={!confirm.displayName.trim() || busy}>
+                {busy ? t("Adding…") : t("Add to library")}
               </Button>
-              <Button variant="secondary" onClick={() => setConfirm(null)}>
+              <Button variant="secondary" onClick={() => setConfirm(null)} disabled={busy}>
                 {t("Back to text")}
               </Button>
             </div>
