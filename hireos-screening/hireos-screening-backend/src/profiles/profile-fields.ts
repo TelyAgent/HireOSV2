@@ -121,7 +121,9 @@ export function profileFields(
       return {
         value: statement + (period ? ` (${period})` : ''),
         ...(school
-          ? { together: [school], spans: 2, dateForms: (period.match(/\d{4}/g) ?? []).slice(0, 1), endForms: (period.match(/\d{4}/g) ?? []).slice(1, 2), ambiguous: sameSchool, needles: [] }
+          // The degree and major as well as the school: a job at the same university in the same years is not
+          // where the degree is (#155 review).
+          ? { together: [school, ...(degree ? [degree] : []), ...(major ? [major] : [])], spans: 2, dateForms: (period.match(/\d{4}/g) ?? []).slice(0, 1), endForms: (period.match(/\d{4}/g) ?? []).slice(1, 2), ambiguous: sameSchool, needles: [] }
           : { needles: [text(e.statement), major] }),
         // §4.1: school, degree, major and dates, each on its own.
         incomplete: [...(!school ? ['school'] : []), ...(!degree ? ['degree'] : []), ...(!major ? ['major'] : []), ...(!period ? ['dates'] : [])],
@@ -237,7 +239,17 @@ function locateItem(item: Item, paragraphs: ReturnType<typeof numberParagraphs>,
  */
 function locateSpanning(item: Item, parts: string[], paragraphs: ReturnType<typeof numberParagraphs>, source: Source): FieldEvidence | null {
   const span = item.spans ?? 0;
-  const run = (i: number) => paragraphs.slice(i, i + 1 + span).map((q) => q.normalized).join(' ');
+  // A run ends at its first dated paragraph: a paragraph with its own dates is a whole entry, so the parts of one
+  // entry aren't picked up from the next ("Research Assistant at Example University, 2020 – 2022" is not where the
+  // MSc below it is).
+  const run = (i: number) => {
+    const taken: string[] = [];
+    for (const q of paragraphs.slice(i, i + 1 + span)) {
+      taken.push(q.normalized);
+      if (/(^|\D)(19|20)\d{2}(\D|$)/.test(q.normalized)) break;
+    }
+    return taken.join(' ');
+  };
   let starts = paragraphs
     .map((_p, i) => i)
     .filter((i) => parts.some((part) => containsTerm(paragraphs[i].normalized, part)) && parts.every((part) => containsTerm(run(i), part)));
