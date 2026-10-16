@@ -26,3 +26,11 @@ export function requestGate() {
     isLatest: (id: number) => id === latest,
   };
 }
+
+/**
+ * "Show more" extends only the list of the search on screen, once its first page is there: while a new search's
+ * first page is on its way, or the list belongs to an earlier search, there is nothing to extend (#172 review).
+ */
+export function canLoadMore(state: { hasList: boolean; loadingMore: boolean; refreshing: boolean; listKey: string | null; filtersKey: string }): boolean {
+  return state.hasList && !state.loadingMore && !state.refreshing && state.listKey === state.filtersKey;
+}

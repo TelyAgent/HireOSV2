@@ -292,6 +292,25 @@ test('#155 (review): a parse records the version\'s contact; a correction carrie
   assert.deepEqual(created[0].contact, { email: 'mai@example.test', phone: '+84 90 111 2222' });
 });
 
+test('#155 (review): correcting one contact on a version from before contacts were recorded keeps the other one', async () => {
+  const created = [];
+  const legacy = { id: 'p-1', version: 1, resumeVersionId: 'rv-1', displayName: 'Mai', dataStatus: 'complete', parserVersion: 'x', parseStatus: 'succeeded', sourceEntries: [],
+    resumeVersionRefs: [], employmentHistory: [], skills: [], education: [], certifications: [], languages: [], projects: [], location: null, workAuthorization: null,
+    compensationExpectation: null, missingFields: [], corrections: [], contact: null };
+  const db = {
+    candidate: { findFirst: async () => ({ id: 'c-1', displayName: 'Mai', email: 'mai@example.test', phone: '+84 90 123 4567', profiles: [legacy] }), update: async () => ({}) },
+    candidateJobRecommendation: { findFirst: async () => null }, screeningEvaluation: { findFirst: async () => null },
+    candidateProfile: { create: async ({ data }) => { created.push(data); return { id: 'p-2', ...data }; } },
+    auditRecord: { create: async () => ({}) },
+  };
+  db.$transaction = async (fn) => fn(db);
+  await new ProfilesService(db, {}, {}, {}).correct({ workspaceId: 'ws-1', actorId: 'hr-1', roles: [] }, 'c-1', { email: 'mai.tran@example.test' });
+  assert.deepEqual(created[0].contact, { email: 'mai.tran@example.test', phone: '+84 90 123 4567' }, 'the phone the page showed stays');
+  const shown = byField(profileFields({ ...created[0], corrections: created[0].corrections }, { displayName: 'Mai', email: 'mai.tran@example.test', phone: '+84 90 123 4567' }, null));
+  assert.deepEqual([shown.phone.status, shown.phone.values], ['known', ['+84 90 123 4567']]);
+  assert.equal(shown.email.source, 'correction');
+});
+
 test('#155 AC-1: a location confirmed unchanged on paste keeps its country and city; one the user typed is theirs', () => {
   const { withConfirmedIdentity } = require('../dist/profiles/profiles.service');
   const parsed = { displayName: 'A', email: null, location: { value: 'Ho Chi Minh City, Vietnam', status: 'known', country: 'Vietnam', city: 'Ho Chi Minh City' }, missingFields: [] };

@@ -278,8 +278,10 @@ export class ProfilesService implements OnModuleInit, OnModuleDestroy {
           // This version's contact: the correction where there is one, otherwise what the previous version had.
           ...(current.contact || changed.email || changed.phone
             ? { contact: toJson({
-                email: changed.email ? data.email || null : (asRecord(current.contact)?.email ?? null),
-                phone: changed.phone ? data.phone || null : (asRecord(current.contact)?.phone ?? null),
+                // An unchanged one keeps what this version showed: its own value, or — on a version from before
+                // contacts were recorded — the candidate's record (#155 review).
+                email: changed.email ? data.email || null : (current.contact ? (asRecord(current.contact)?.email ?? null) : (candidate.email ?? null)),
+                phone: changed.phone ? data.phone || null : (current.contact ? (asRecord(current.contact)?.phone ?? null) : (candidate.phone ?? null)),
               }) }
             : {}),
           ...(nextCompensation ? { compensationExpectation: toJson(nextCompensation) } : {}),

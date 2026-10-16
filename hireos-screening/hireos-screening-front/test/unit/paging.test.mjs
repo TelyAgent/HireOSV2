@@ -1,7 +1,7 @@
 // #172 (review on PR #345) -- "Show more" pages by offset, one bounded page at a time, and appends without repeats.
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { PAGE_SIZE, appendPage, nextPage, requestGate } from "../../src/features/library/paging.ts";
+import { PAGE_SIZE, appendPage, canLoadMore, nextPage, requestGate } from "../../src/features/library/paging.ts";
 
 test("every page request stays within the server's limit, however far the user scrolls", () => {
   for (const shown of [0, 100, 500, 900, 1100]) {
@@ -29,4 +29,13 @@ test("a late response for an earlier search or page is dropped; only the latest 
   const another = gate.start();
   assert.equal(gate.isLatest(newSearch), false, "nor is a first page overtaken by a later one");
   assert.equal(gate.isLatest(another), true);
+});
+
+test("\"Show more\" waits for the new search's first page and never extends a list from an earlier search", () => {
+  const base = { hasList: true, loadingMore: false, refreshing: false, listKey: '{"q":"sql"}', filtersKey: '{"q":"sql"}' };
+  assert.equal(canLoadMore(base), true);
+  assert.equal(canLoadMore({ ...base, refreshing: true }), false, "the new first page is still on its way");
+  assert.equal(canLoadMore({ ...base, filtersKey: '{"q":"java"}' }), false, "the list on screen is for the old search");
+  assert.equal(canLoadMore({ ...base, loadingMore: true }), false);
+  assert.equal(canLoadMore({ ...base, hasList: false }), false);
 });

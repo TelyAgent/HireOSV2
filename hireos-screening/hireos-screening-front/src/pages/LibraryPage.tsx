@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { sourceLabel } from "../features/imports/sources";
 import { MATCH_STATUS_BADGE } from "../features/library/matchStatus";
-import { PAGE_SIZE, appendPage, nextPage, requestGate } from "../features/library/paging";
+import { PAGE_SIZE, appendPage, canLoadMore, nextPage, requestGate } from "../features/library/paging";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { useStore } from "../store/StoreContext";
 import { deleteCandidate, listLibraryEntries, MATCH_STATUSES, runMatchAgain, type LibraryEntry, type LibraryFilters, type LibraryList } from "../data/api/library";
@@ -83,6 +83,11 @@ export function LibraryPage() {
   const [loadingMore, setLoadingMore] = useState(false);
   // Each request's number: a response for an earlier search or page is dropped when it arrives late (#172 review).
   const gate = useRef(requestGate()).current;
+  // The search the list on screen belongs to, and whether its first page is still on its way: "Show more" only
+  // extends the list of the current search, once that list is there (#172 review).
+  const [listKey, setListKey] = useState<string | null>(null);
+  const [refreshing, setRefreshing] = useState(false);
+  const filtersKey = JSON.stringify(filters);
 
   const setFilter = useCallback(
     (key: (typeof FILTER_KEYS)[number], value: string) => {
@@ -109,20 +114,26 @@ export function LibraryPage() {
   const load = useCallback(() => {
     setLoadState((current) => (current === "ready" ? "ready" : "loading"));
     const id = gate.start();
+    const key = JSON.stringify(filters);
+    setRefreshing(true);
     listLibraryEntries(filters, 0, PAGE_SIZE)
       .then((result) => {
         if (!gate.isLatest(id)) return;
         setList(result);
+        setListKey(key);
         setLoadState("ready");
       })
       .catch(() => {
         if (gate.isLatest(id)) setLoadState("error");
+      })
+      .finally(() => {
+        if (gate.isLatest(id)) setRefreshing(false);
       });
   }, [filters, gate]);
 
   /** The next page, appended to what is shown; a failure leaves the list as it was (#172 review). */
   const loadMore = async () => {
-    if (!list || loadingMore) return;
+    if (!list || !canLoadMore({ hasList: !!list, loadingMore, refreshing, listKey, filtersKey })) return;
     const id = gate.start();
     setLoadingMore(true);
     try {
@@ -409,7 +420,7 @@ export function LibraryPage() {
       {loadState === "ready" && entries.length < matched && (
         <div className="flex items-center gap-12" style={{ justifyContent: "center", marginTop: 12 }}>
           <span className="tiny muted">{state.lang === "zh" ? `已显示 ${entries.length} / ${matched} 位` : `Showing ${entries.length} of ${matched}`}</span>
-          <Button variant="secondary" size="sm" onClick={() => void loadMore()} disabled={loadingMore} data-testid="show-more">
+          <Button variant="secondary" size="sm" onClick={() => void loadMore()} disabled={!canLoadMore({ hasList: !!list, loadingMore, refreshing, listKey, filtersKey })} data-testid="show-more">
             {t("Show more")}
           </Button>
         </div>
