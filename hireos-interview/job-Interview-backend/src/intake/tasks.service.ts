@@ -462,7 +462,7 @@ export class TasksService {
     if (!task) throw new NotFoundException({ code: 'NOT_FOUND' });
     if (task.decision !== 'recommend_offer') throw new BadRequestException({ code: 'DECISION_NOT_RECOMMEND_OFFER' });
     if (!task.hrConfirmedAt || !task.hmConfirmedAt) throw new BadRequestException({ code: 'PACKAGE_NOT_CONFIRMED' });
-    if (task.offerState === 'acknowledged') throw new ConflictException({ code: 'ALREADY_SENT' });
+    if (task.offerState === 'acknowledged' || task.offerState === 'sent') throw new ConflictException({ code: 'ALREADY_SENT' });
     if (task.offerState === 'pending' && task.offerSentAt && Date.now() - task.offerSentAt.getTime() < 5 * 60 * 1000) throw new ConflictException({ code: 'OFFER_PENDING' });
     if (task.offerState === 'pending') await this.db.interviewTask.update({ where: { id: taskId }, data: { offerState: 'failed', offerError: 'OFFER_ACK_TIMEOUT' } });
     const attemptId = randomUUID();

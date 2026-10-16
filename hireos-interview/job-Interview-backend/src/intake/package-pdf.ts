@@ -4,7 +4,7 @@ function pdfText(value: unknown) {
   return Buffer.from(String(value ?? ''), 'utf16le').swap16().toString('hex');
 }
 
-function wrap(value: unknown, width = 86): string[] {
+function wrap(value: unknown, width = 50): string[] {
   const text = String(value ?? '').replace(/\s+/g, ' ').trim();
   if (!text) return [''];
   const lines: string[] = [];
@@ -63,7 +63,7 @@ export function packagePdfLines(data: {
   for (const item of data.evidence) {
     for (const line of wrap(`${item.requirement} | score: ${item.score == null ? 'Unknown' : `${item.score}/5`} | round: ${item.roundName ?? 'None'}`)) lines.push({ text: line });
     for (const line of wrap(`Reason: ${item.note}`)) lines.push({ text: line });
-    for (const ref of item.sourceRefs) for (const line of wrap(`Evidence ${ref.segmentId}: ${ref.quote}`, 80)) lines.push({ text: line });
+    for (const ref of item.sourceRefs) for (const line of wrap(`Evidence ${ref.segmentId}: ${ref.quote}`)) lines.push({ text: line });
   }
   lines.push({ text: '' }, { text: 'Human review', bold: true });
   lines.push({ text: `HR: ${data.hrConfirmedBy ?? 'Not confirmed'} | ${data.hrConfirmedAt?.toISOString() ?? 'No confirmation time'}` });

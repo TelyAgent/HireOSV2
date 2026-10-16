@@ -122,7 +122,7 @@ model InterviewTask {
   decisionSourceJobId  String?   // which ParseJob's draft is materialized above
   // Evaluation Package: HR / Hiring Manager sign-off, independent of `decision` and of each
   // other. `offerState` is a local handoff record only — no real Offer module exists in this
-  // codebase to call, so "sent" is this state machine's own terminal state, not a live ack.
+  // codebase to call. Legacy "sent" rows are normalized to "acknowledged" by migration.
   hrConfirmedBy        String?
   hrConfirmedAt        DateTime?
   hrConfirmationNote   String?
