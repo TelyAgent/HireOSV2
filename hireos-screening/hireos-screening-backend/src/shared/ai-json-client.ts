@@ -40,43 +40,52 @@ export async function callAiForJson<T>(
 ): Promise<T> {
   if (!isAiConfigured(config)) throw new AiCallError('AI_NOT_CONFIGURED');
 
+  // One budget for the whole exchange (#120): the request, the response headers and reading the full body. A
+  // provider that sends headers quickly and then trickles the body is cut off at the same limit. Aborting stops
+  // this client only; the provider may still finish its own work.
   const controller = new AbortController();
   const timeout = globalThis.setTimeout(() => controller.abort(), aiTimeoutMs(config));
+  const failure = (error: unknown, fallback: string) =>
+    controller.signal.aborted ? new AiCallError('AI_TIMEOUT', error) : new AiCallError(error instanceof Error ? error.message : fallback, error);
   let response: Response;
+  let body: { choices?: { message?: { content?: string }; finish_reason?: string }[] };
   try {
-    response = await globalThis.fetch(`${aiBaseUrl(config).replace(/\/$/, '')}/chat/completions`, {
-      method: 'POST',
-      signal: controller.signal,
-      headers: { 'content-type': 'application/json', authorization: `Bearer ${aiApiKey(config)}` },
-      body: JSON.stringify({
-        model: aiModel(config),
-        response_format: { type: 'json_object' },
-        messages: [
-          { role: 'system', content: systemPrompt },
-          { role: 'user', content: userPrompt },
-        ],
-        // This model spends part of its completion budget on hidden reasoning tokens
-        // before writing visible output -- at default effort, a full evaluation prompt
-        // exhausted the whole budget on reasoning and returned empty content
-        // (finish_reason: "length"). Capping effort keeps room for the actual answer.
-        reasoning_effort: 'low',
-        max_completion_tokens: opts?.maxCompletionTokens ?? 6000,
-      }),
-    });
-  } catch (error) {
-    throw new AiCallError(error instanceof Error ? error.message : 'AI_REQUEST_FAILED', error);
+    try {
+      response = await globalThis.fetch(`${aiBaseUrl(config).replace(/\/$/, '')}/chat/completions`, {
+        method: 'POST',
+        signal: controller.signal,
+        headers: { 'content-type': 'application/json', authorization: `Bearer ${aiApiKey(config)}` },
+        body: JSON.stringify({
+          model: aiModel(config),
+          response_format: { type: 'json_object' },
+          messages: [
+            { role: 'system', content: systemPrompt },
+            { role: 'user', content: userPrompt },
+          ],
+          // This model spends part of its completion budget on hidden reasoning tokens
+          // before writing visible output -- at default effort, a full evaluation prompt
+          // exhausted the whole budget on reasoning and returned empty content
+          // (finish_reason: "length"). Capping effort keeps room for the actual answer.
+          reasoning_effort: 'low',
+          max_completion_tokens: opts?.maxCompletionTokens ?? 6000,
+        }),
+      });
+    } catch (error) {
+      throw failure(error, 'AI_REQUEST_FAILED');
+    }
+
+    if (!response.ok) {
+      const text = await response.text().catch(() => '');
+      if (controller.signal.aborted) throw new AiCallError('AI_TIMEOUT');
+      throw new AiCallError(`AI_HTTP_${response.status}: ${text.slice(0, 300)}`);
+    }
+
+    body = (await response.json().catch((error) => {
+      throw controller.signal.aborted ? new AiCallError('AI_TIMEOUT', error) : new AiCallError('AI_INVALID_RESPONSE_BODY', error);
+    })) as typeof body;
   } finally {
     globalThis.clearTimeout(timeout);
   }
-
-  if (!response.ok) {
-    const text = await response.text().catch(() => '');
-    throw new AiCallError(`AI_HTTP_${response.status}: ${text.slice(0, 300)}`);
-  }
-
-  const body = (await response.json().catch((error) => {
-    throw new AiCallError('AI_INVALID_RESPONSE_BODY', error);
-  })) as { choices?: { message?: { content?: string }; finish_reason?: string }[] };
   const choice = body.choices?.[0];
   const content = choice?.message?.content;
   if (!content) {
