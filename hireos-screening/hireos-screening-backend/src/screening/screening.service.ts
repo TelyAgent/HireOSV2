@@ -261,11 +261,14 @@ export class ScreeningService {
     to: string,
     entry: Record<string, unknown>,
   ) {
-    const history = [...(Array.isArray(concern.resolutionHistory) ? concern.resolutionHistory : []), entry];
+    const read = Array.isArray(concern.resolutionHistory) ? concern.resolutionHistory : [];
+    const history = [...read, entry];
     const updated = await this.db.$transaction(async (tx) => {
-      // Compare-and-set on the status read: a concurrent change makes this one a no-op that reports the conflict.
+      // Compare-and-set on the status and the history read: the history only grows, so it is the concern's version.
+      // A change in between — even one that went open → handled → open again — makes this one a no-op that
+      // reports the conflict, instead of writing the old history back over it (#193 review).
       const claim = await tx.screeningConcern.updateMany({
-        where: { id: concern.id, workspaceId: identity.workspaceId, status: from },
+        where: { id: concern.id, workspaceId: identity.workspaceId, status: from, resolutionHistory: { equals: json(read) } },
         data: { status: to, resolution: to === 'open' ? null : to, resolutionHistory: json(history) },
       });
       if (claim.count !== 1) throw new ConflictException({ code: 'CONCERN_CHANGED', message: 'This concern was changed in the meantime. Reload and try again.' });

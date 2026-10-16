@@ -67,7 +67,10 @@ export function NewJobModal({ open, onClose, onCreated }: { open: boolean; onClo
       const result = await readJdFile(file);
       if (g !== fileGeneration.current) return;
       if (result.errorCode || !result.text.trim()) setError(result.errorCode || "NO_EXTRACTABLE_TEXT");
-      else setText(result.text);
+      else {
+        // A different JD: what was read and confirmed for the previous one no longer applies (#178 review).
+        setText(result.text); setPreview(null); setTitle(""); setTeam(""); setFieldErrors({});
+      }
     } catch (e) { if (g === fileGeneration.current) setError(e instanceof ApiError ? e.code : "REQUEST_FAILED"); }
     finally { if (g === fileGeneration.current) setFileBusy(false); }
   }
@@ -115,11 +118,13 @@ export function NewJobModal({ open, onClose, onCreated }: { open: boolean; onClo
       <div style={{ marginTop: 20 }}>
         <label htmlFor="screeningJdText" style={{ display: "block", fontSize: 13, fontWeight: 600, color: "var(--text)" }}>{t("Job description")}</label>
         <div style={{ marginTop: 3, fontSize: 11, fontWeight: 700, color: "var(--danger-text)" }}>{t("Required")}</div>
-        <textarea id="screeningJdText" value={text} readOnly={!!preview} onChange={(e) => setText(e.target.value)} placeholder={t("Paste the job description here…")}
+        <textarea id="screeningJdText" value={text} readOnly={!!preview || reading} onChange={(e) => setText(e.target.value)} placeholder={t("Paste the job description here…")}
           style={{ marginTop: 8, width: "100%", height: 170, border: "1px solid var(--border-strong)", borderRadius: 11, padding: "12px 14px", fontSize: 13, color: "var(--text-secondary)", background: "var(--surface)", lineHeight: 1.55, resize: "none", boxSizing: "border-box", outline: "none", fontFamily: "inherit" }} />
         <label htmlFor="screeningJdFile"
-          style={{ marginTop: 14, width: "100%", display: "flex", alignItems: "center", gap: 12, padding: "14px 16px", border: "1px dashed var(--border-strong)", borderRadius: 12, background: "var(--surface-alt)", cursor: fileBusy ? "progress" : "pointer", boxSizing: "border-box" }}>
-          <input id="screeningJdFile" type="file" accept=".pdf,.docx,.txt" disabled={fileBusy} style={{ display: "none" }}
+          style={{ marginTop: 14, width: "100%", display: "flex", alignItems: "center", gap: 12, padding: "14px 16px", border: "1px dashed var(--border-strong)", borderRadius: 12, background: "var(--surface-alt)", cursor: fileBusy ? "progress" : busy || preview ? "not-allowed" : "pointer", opacity: preview ? 0.6 : 1, boxSizing: "border-box" }}>
+          {/* The JD is fixed once AI reads it, so the job is created from the text that was previewed (#178 review): go
+              "Back to JD" to change it. */}
+          <input id="screeningJdFile" type="file" accept=".pdf,.docx,.txt" disabled={busy || !!preview} style={{ display: "none" }}
             onChange={(e) => { const f = e.target.files?.[0]; if (f) void pickFile(f); e.target.value = ""; }} />
           <Icon name="description" style={{ color: "var(--accent-600)" }} />
           <div style={{ minWidth: 0 }}>

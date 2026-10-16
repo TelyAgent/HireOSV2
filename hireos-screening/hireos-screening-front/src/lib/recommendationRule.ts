@@ -49,6 +49,18 @@ export function recommend(
   return { outcome: band, cappedBy: [] };
 }
 
+/**
+ * How a page shows the recommendation, from the rule's result alone so every page shows the same: the outcome's
+ * badge, worded "Review (insufficient evidence)" only when too little coverage is what made it a review — a
+ * candidate who is not eligible is "do not advance" even when the evidence is also thin (#194 review).
+ */
+export function recommendationDisplay(
+  rec: { outcome: InferredRecommendation; cappedBy: RecommendationCap[] } | null,
+): { outcome: InferredRecommendation; insufficientEvidence: boolean } | null {
+  if (!rec) return null;
+  return { outcome: rec.outcome, insufficientEvidence: rec.cappedBy.includes("insufficient_coverage") };
+}
+
 export function inferRecommendation(ev: RecommendationInput | null | undefined, concerns: ConcernForRule[] = []): InferredRecommendation | null {
   return recommend(ev, concerns)?.outcome ?? null;
 }

@@ -17,6 +17,7 @@ function setup(status = 'open') {
       findUniqueOrThrow: async () => ({ ...concern }),
       updateMany: async ({ where, data }) => {
         if (concern.status !== where.status) return { count: 0 };
+        if (where.resolutionHistory && JSON.stringify(concern.resolutionHistory) !== JSON.stringify(where.resolutionHistory.equals)) return { count: 0 };
         Object.assign(concern, data);
         return { count: 1 };
       },
@@ -76,4 +77,20 @@ test('#193 AC-4: a mistaken handling is reopened with a note, and the earlier ha
   assert.deepEqual(reopened.history.map((h) => [h.action, h.fromStatus, h.toStatus]), [['resolve', 'open', 'confirmed'], ['reopen', 'confirmed', 'open']]);
   assert.deepEqual(audits.map((a) => a.action), ['screening_concern_resolved', 'screening_concern_reopened']);
   await assert.rejects(service.reopenConcern(identity, 'k-1', { note: 'again' }), (e) => e.response.code === 'CONCERN_ALREADY_OPEN');
+});
+
+test('#193 (review): a handling read before another went open → confirmed → open again is a conflict, and that history stays', async () => {
+  const { service, concern, audits } = setup('open');
+  const stale = { ...concern, resolutionHistory: [] };
+  // B handles and reopens it while A still holds what it read.
+  await service.resolveConcern(identity, 'k-1', { resolution: 'confirmed', note: 'Checked with the candidate.' });
+  await service.reopenConcern(identity, 'k-1', { note: 'Confirmed by mistake.' });
+  assert.equal(concern.status, 'open');
+  const historyAfterB = concern.resolutionHistory.map((h) => h.action);
+  // A resumes with the open concern it read earlier.
+  service.db.screeningConcern.findFirst = async () => ({ ...stale });
+  await assert.rejects(service.resolveConcern(identity, 'k-1', { resolution: 'dismissed', note: 'Not relevant.' }), (e) => e.getStatus() === 409 && e.response.code === 'CONCERN_CHANGED');
+  assert.deepEqual(concern.resolutionHistory.map((h) => h.action), historyAfterB, 'B\'s handling and reopening are still there');
+  assert.deepEqual(historyAfterB, ['resolve', 'reopen']);
+  assert.equal(audits.length, 2, 'nothing recorded for A');
 });

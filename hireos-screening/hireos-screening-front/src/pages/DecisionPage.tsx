@@ -10,7 +10,8 @@ import type { Decision, DecisionOutcome } from "../data/fixtures/decisions";
 import type { ConcernSeverity } from "../data/fixtures/concerns";
 import { fmtDateTime } from "../lib/format";
 import { inferRecommendation } from "../lib/scoring";
-import { Badge, Button, EligibilityBadge, EmptyState, PageHeader, RecommendationBadge, ScoreRing, scoreDisplay } from "../components/ui/Primitives";
+import { AiRecommendationBadge, Badge, Button, EligibilityBadge, EmptyState, PageHeader, RecommendationBadge, scoreDisplay, ScoreRing } from "../components/ui/Primitives";
+import { recommend, recommendationDisplay } from "../lib/recommendationRule";
 import { ConfirmDialog, Modal } from "../components/ui/Overlays";
 import { PageSkeleton } from "../components/ui/PageSkeleton";
 import { useFieldValidation } from "../lib/useFieldValidation";
@@ -383,7 +384,7 @@ export function DecisionPage() {
             {t("Eligibility:")} {ev ? <EligibilityBadge status={ev.eligibilityStatus} /> : "—"}
           </p>
           <p className="tiny">
-            {t("AI recommendation:")} {aiRec ? <RecommendationBadge outcome={aiRec} /> : "—"}
+            {t("AI recommendation:")} {aiRec ? <AiRecommendationBadge display={recommendationDisplay(recommend(ev, getConcerns(app.id)))} /> : "—"}
           </p>
           <p className="tiny">
             {t("Assessment:")} {app.assessmentStatus === "completed" ? t("Completed") : t("Not administered")}

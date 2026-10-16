@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import { CONCERN_STATUS_LABEL, ConcernResolveModal } from "../features/screening/ConcernResolveModal";
 import { evaluatedBy } from "../features/screening/evaluatedBy";
 import { decisionDiffersFromAi, effectiveDecision, humanStatus } from "../features/screening/humanStatus";
-import { CAP_REASON, recommend } from "../lib/recommendationRule";
+import { CAP_REASON, recommend, recommendationDisplay } from "../lib/recommendationRule";
 import { Link, useParams } from "react-router-dom";
 import { useStore } from "../store/StoreContext";
 import {
@@ -20,15 +20,15 @@ import type { Concern } from "../data/fixtures/concerns";
 import type { VerificationItem } from "../data/fixtures/verificationItems";
 import { fmtDateTime, pct } from "../lib/format";
 import {
+  AiRecommendationBadge,
   Badge,
   Button,
   CoverageBar,
   EligibilityBadge,
   EmptyState,
   PageHeader,
-  RecommendationBadge,
-  ScoreRing,
   scoreDisplay,
+  ScoreRing,
 } from "../components/ui/Primitives";
 import { EvidenceCard } from "../components/ui/EvidenceCard";
 import { Icon } from "../components/ui/Icons";
@@ -669,11 +669,7 @@ export function ScreeningDetailPage() {
           </div>
           <div data-testid="ai-recommendation">
             <div className="tiny">{t("AI recommendation — advice only")}</div>
-            {evaluation.evaluationStatus === "insufficient_evidence" ? (
-              <Badge tone="warning">{t("Review (insufficient evidence)")}</Badge>
-            ) : (
-              <RecommendationBadge outcome={aiRecommendation?.outcome} />
-            )}
+            <AiRecommendationBadge display={recommendationDisplay(aiRecommendation)} />
             <div className="tiny muted">
               {t("Generated")} {fmtDateTime(evaluation.completedAt, state.lang)}
             </div>

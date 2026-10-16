@@ -55,3 +55,12 @@ test("#196 AC-1/AC-2: AI 'do not advance' vs a person's 'strong advance' is call
   assert.equal(decisionDiffersFromAi("do_not_advance", null), false, "no decision: nothing is in effect yet");
   assert.equal(decisionDiffersFromAi("do_not_advance", { outcome: "strong_advance", withdrawnAt: "x" }), false);
 });
+
+test("#194 (review): every page shows the rule's outcome — not eligible stays 'do not advance' even with thin evidence", async () => {
+  const { recommend, recommendationDisplay } = await import("../../src/lib/recommendationRule.ts");
+  const show = (ev, concerns = []) => recommendationDisplay(recommend(ev, concerns));
+  assert.deepEqual(show({ eligibilityStatus: "not_eligible", evaluationStatus: "insufficient_evidence", overall: null }), { outcome: "do_not_advance", insufficientEvidence: false });
+  assert.deepEqual(show({ eligibilityStatus: "eligible", evaluationStatus: "insufficient_evidence", overall: null }), { outcome: "review", insufficientEvidence: true });
+  assert.deepEqual(show({ eligibilityStatus: "needs_verification", evaluationStatus: "completed", overall: 90 }), { outcome: "review", insufficientEvidence: false });
+  assert.equal(show(null), null);
+});

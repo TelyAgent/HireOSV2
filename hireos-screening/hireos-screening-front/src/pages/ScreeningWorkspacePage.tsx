@@ -15,6 +15,7 @@ import { Icon } from "../components/ui/Icons";
 import { ResumeImportModal, type ImportTab } from "../features/imports/ResumeImportPanel";
 import { confidenceLabel, inferRecommendation } from "../lib/scoring";
 import {
+  AiRecommendationBadge,
   BackButton,
   Badge,
   Button,
@@ -22,10 +23,10 @@ import {
   CoverageBar,
   EligibilityBadge,
   EmptyState,
-  RecommendationBadge,
-  ScoreRing,
   scoreDisplay,
+  ScoreRing,
 } from "../components/ui/Primitives";
+import { recommend, recommendationDisplay } from "../lib/recommendationRule";
 import { PageSkeleton } from "../components/ui/PageSkeleton";
 import { WithDisabledReason } from "../components/ui/DisabledReason";
 
@@ -89,11 +90,7 @@ function WorkspaceRow({ app, ev, openConcerns, concerns }: WorkspaceRowData) {
       </td>
       <td>{ev ? <EligibilityBadge status={ev.eligibilityStatus} /> : <Badge tone="outline">{t("Not run")}</Badge>}</td>
       <td className="secondary-col">
-        {!ev ? null : ev.evaluationStatus === "insufficient_evidence" ? (
-          <Badge tone="warning">{t("Review (insufficient evidence)")}</Badge>
-        ) : (
-          <RecommendationBadge outcome={aiOutcome} />
-        )}
+        {!ev ? null : <AiRecommendationBadge display={recommendationDisplay(recommend(ev, concerns))} />}
       </td>
       <td>{humanStatusCell}</td>
       <td className="text-right">
