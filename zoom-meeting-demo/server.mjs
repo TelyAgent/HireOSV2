@@ -23,6 +23,7 @@ import { randomBytes, createHmac, timingSafeEqual } from 'node:crypto';
 import { join, extname } from 'node:path';
 import rtms from '@zoom/rtms';
 import { saveAccount, loadAccount, getFreshAccessToken } from './crypto-store.mjs';
+import { resolveStaticPath } from './static-files.mjs';
 
 const PORT = Number(process.env.PORT || 3101);
 const env = { ...process.env };
@@ -172,12 +173,15 @@ function handleWebhookBody(body, req, res) {
 
 // ---- static file serving for the tiny frontend ----
 const MIME = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css' };
+// Only files inside public/ are served, by the URL's path alone (#126); anything else is a plain 404.
 async function serveStatic(req, res) {
-  const path = req.url === '/' ? '/index.html' : req.url;
+  const pathname = new URL(req.url, 'http://localhost').pathname;
+  const file = await resolveStaticPath(join(process.cwd(), 'public'), pathname);
+  if (!file) { res.writeHead(404); res.end('Not found'); return; }
   try {
-    const file = await readFile(join(process.cwd(), 'public', path));
-    res.writeHead(200, { 'Content-Type': MIME[extname(path)] || 'application/octet-stream' });
-    res.end(file);
+    const body = await readFile(file);
+    res.writeHead(200, { 'Content-Type': MIME[extname(file)] || 'application/octet-stream' });
+    res.end(body);
   } catch {
     res.writeHead(404); res.end('Not found');
   }
@@ -387,6 +391,8 @@ const server = createServer(async (req, res) => {
   return serveStatic(req, res);
 });
 
+// Listens on 127.0.0.1 only: this is a local test harness, reached from outside only through a tunnel the
+// developer starts for Zoom's webhooks. Don't bind it to a public interface (#126).
 server.listen(PORT, '127.0.0.1', () => {
   log(`zoom-meeting-demo listening on http://127.0.0.1:${PORT}`);
   log('webhook secret configured:', env.ZM_RTMS_WEBHOOK_SECRET ? 'yes' : 'NO');

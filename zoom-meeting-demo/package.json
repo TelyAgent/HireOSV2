@@ -5,7 +5,8 @@
   "description": "Minimal, dependency-free (besides @zoom/rtms) closed-loop RTMS test harness. No NestJS, no Prisma, no app code — isolates whether RTMS failures are ours or Zoom's.",
   "type": "module",
   "scripts": {
-    "start": "node server.mjs"
+    "start": "node server.mjs",
+    "test": "node --test static-files.test.mjs"
   },
   "dependencies": {
     "@zoom/rtms": "^1.1.0"
