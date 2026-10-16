@@ -82,6 +82,8 @@ export const scheduleRoundSchema = z.object({
   // calendar or meeting-provider integration is wired to this field; that's out of scope
   // for the scheduling step itself (see meetings/ for the separate, real Zoom host flow).
   meetingLink: z.string().trim().max(2000),
+  /** The language the interview is held in, for its transcript (#230); left out, the round keeps its own. */
+  interviewLanguage: z.enum(['zh', 'en', 'auto']).optional(),
 }).strict();
 // Review: one human score for one capability card in one round. `score` null means
 // explicitly marked Unknown (distinct from never having been touched).

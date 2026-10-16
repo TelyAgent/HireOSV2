@@ -4,8 +4,8 @@ import { ConfigService } from '@nestjs/config';
 import rtms, { type JoinParams } from '@zoom/rtms';
 import { PrismaService } from '../persistence/prisma.service';
 import { ZoomHostService } from './zoom-host.service';
+import { transcriptParamsFor } from './transcript-language';
 
-const RTMS_TRANSCRIPT_CHINESE_SIMPLIFIED = 4;
 
 // Zoom RTMS webhook payload. Only the fields this service reads are typed; Zoom sends
 // more (server_urls, signature, ...) which are passed through to the SDK untouched.
@@ -277,7 +277,7 @@ export class RtmsService {
     let meetingId = String(inner.id ?? inner.meeting_id ?? object.id ?? '');
     if (!meetingId && meetingUuid) meetingId = await this.resolveMeetingId(meetingUuid);
     const round = meetingId
-      ? await this.db.interviewRound.findFirst({ where: { meetingLink: { contains: `/j/${meetingId}` } }, select: { id: true, workspaceId: true } })
+      ? await this.db.interviewRound.findFirst({ where: { meetingLink: { contains: `/j/${meetingId}` } }, select: { id: true, workspaceId: true, interviewLanguage: true } })
       : null;
     if (!round) { this.logger.warn(`rtms_started: no round matched (meetingId="${meetingId}", uuid="${meetingUuid}"). Raw payload: ${JSON.stringify(inner)}`); return; }
     const rtmsClient = this.config.get<string>('ZM_RTMS_CLIENT')?.trim();
@@ -285,6 +285,14 @@ export class RtmsService {
     if (!rtmsClient || !rtmsSecret) {
       this.logger.error(`RTMS join skipped for round ${round.id}: RTMS client credentials are incomplete`);
       await this.markStreamError(round.id, 'RTMS_CREDENTIALS_REQUIRED');
+      return;
+    }
+    // The interview's own language, not anyone's interface language (#230). A value the transcript can't be asked
+    // for is a recoverable error on the round — fix the round's language and restart — and no stream is opened.
+    const transcriptParams = transcriptParamsFor(round.interviewLanguage);
+    if (!transcriptParams) {
+      this.logger.error(`RTMS join skipped for round ${round.id}: unsupported interview language "${round.interviewLanguage}"`);
+      await this.markStreamError(round.id, 'TRANSCRIPT_LANGUAGE_UNSUPPORTED');
       return;
     }
     await this.db.interviewRound.update({ where: { id: round.id }, data: { transcriptStatus: 'connecting', transcriptError: null } });
@@ -322,12 +330,7 @@ export class RtmsService {
       // Explicitly enable transcript delivery before joining the stream.
       const transcriptConfigured = (client as unknown as {
         setTranscriptParams: (params: { srcLanguage: number; enableLid: boolean }) => boolean;
-      }).setTranscriptParams({
-        // @zoom/rtms exposes this as TranscriptLanguage.CHINESE_SIMPLIFIED, but
-        // the package's default export type omits that constant.
-        srcLanguage: RTMS_TRANSCRIPT_CHINESE_SIMPLIFIED,
-        enableLid: false,
-      });
+      }).setTranscriptParams(transcriptParams);
       if (!transcriptConfigured) {
         this.logger.error(`RTMS transcript configuration rejected for round ${round.id}`);
         this.clients.delete(streamId);

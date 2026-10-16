@@ -54,6 +54,7 @@ export function SchedulePage() {
   const [draftAt, setDraftAt] = useState("");
   const [draftTz, setDraftTz] = useState("UTC+8");
   const [draftLink, setDraftLink] = useState("");
+  const [draftLanguage, setDraftLanguage] = useState<"zh" | "en" | "auto">("zh");
   const [saving, setSaving] = useState(false);
   // mode 's2s': the backend uses a Server-to-Server app on a fixed host account — nothing to authorize.
   type ZoomConnection = { mode?: "oauth" | "s2s"; connected: boolean; name: string | null; pending: boolean; error: string | null };
@@ -126,6 +127,7 @@ export function SchedulePage() {
     setDraftAt(r.scheduledAt ? toDatetimeLocal(r.scheduledAt) : "");
     setDraftTz(r.timezone || "UTC+8");
     setDraftLink(r.meetingLink || "");
+    setDraftLanguage(r.interviewLanguage ?? "zh");
   };
   const closeDrawer = () => setOpenRoundId(null);
 
@@ -171,6 +173,7 @@ export function SchedulePage() {
     try {
       await api(`/rounds/${round.id}/schedule`, { method: "POST", body: JSON.stringify({
         version: round.version, scheduledAt: new Date(draftAt).toISOString(), timezone: draftTz.trim() || "UTC", meetingLink: draftLink.trim(),
+        interviewLanguage: draftLanguage,
       }) });
       say(zh ? `${round.name} 已排期。` : `${round.name} scheduled.`);
       closeDrawer();
@@ -418,6 +421,19 @@ export function SchedulePage() {
               className="h-10 w-full rounded-[9px] border border-[var(--line-strong)] bg-[var(--surface)] px-[11px] text-[13px] text-[var(--ink)]"
             />
             <div className="mt-[5px] text-[11px] text-[var(--ink-3)]">{t.scheduleTimezoneHint}</div>
+          </label>
+          <label className="block">
+            <div className="mb-1.5 text-[11.5px] font-semibold text-[var(--ink-2)]">{t.scheduleLanguageLabel}</div>
+            <select
+              value={draftLanguage}
+              onChange={(e) => setDraftLanguage(e.target.value as "zh" | "en" | "auto")}
+              className="h-10 w-full rounded-[9px] border border-[var(--line-strong)] bg-[var(--surface)] px-[11px] text-[13px] text-[var(--ink)]"
+            >
+              <option value="zh">{t.scheduleLanguageZh}</option>
+              <option value="en">{t.scheduleLanguageEn}</option>
+              <option value="auto">{t.scheduleLanguageAuto}</option>
+            </select>
+            <div className="mt-[5px] text-[11px] text-[var(--ink-3)]">{t.scheduleLanguageHint}</div>
           </label>
           <label className="block">
             <div className="mb-1.5 text-[11.5px] font-semibold text-[var(--ink-2)]">{t.scheduleMeetingLinkLabel}</div>

@@ -179,6 +179,9 @@ model InterviewRound {
   scheduledAt   DateTime?
   timezone      String?
   meetingLink   String?
+  // The language the interview is held in — not anyone's interface language — and so the language its live
+  // transcript is requested in (#230): zh | en | auto (mixed; Zoom identifies the language).
+  interviewLanguage String @default("zh")
   // Zoom RTMS live-transcript connection state for this round's meeting; "idle" until
   // Zoom's meeting.rtms_started webhook fires. See RtmsService.
   transcriptStatus String @default("idle") // idle | connecting | live | ended | error

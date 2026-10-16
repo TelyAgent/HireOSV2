@@ -21,6 +21,8 @@ export type Round = {
   competencies: string; questions: number; mandatory: number; notes: string;
   status: 'Planned' | 'completed'; version: number; createdAt: string;
   scheduledAt: string | null; timezone: string | null; meetingLink: string | null;
+  /** The language the interview is held in, for its transcript (#230). */
+  interviewLanguage?: 'zh' | 'en' | 'auto';
   briefSnapshotAt: string | null; briefSnapshotRubricVersion: number | null;
   transcriptStatus: string; transcriptError: string | null;
   completedAt: string | null; recommendation: Recommendation | null;

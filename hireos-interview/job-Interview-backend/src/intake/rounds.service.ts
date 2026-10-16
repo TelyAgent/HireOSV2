@@ -11,7 +11,7 @@ import type { Identity } from './workspace.guard';
 const ROUND_SELECT = {
   id: true, taskId: true, sequence: true, name: true, format: true, duration: true,
   competencies: true, questions: true, mandatory: true, notes: true, status: true, version: true,
-  scheduledAt: true, timezone: true, meetingLink: true,
+  scheduledAt: true, timezone: true, meetingLink: true, interviewLanguage: true,
   transcriptStatus: true, transcriptError: true, completedAt: true, briefSnapshotAt: true, briefSnapshotRubricVersion: true, recommendation: true,
   createdAt: true, interviewer: { select: { id: true, name: true, title: true } },
 } satisfies Prisma.InterviewRoundSelect;
@@ -103,7 +103,7 @@ export class RoundsService {
     const rubric = await this.db.rubricVersion.findFirst({ where: { workspaceId: identity.workspaceId, jobId: existing.task.jobId, status: 'confirmed' }, orderBy: { versionNumber: 'desc' }, select: { versionNumber: true } });
     const updated = await this.db.interviewRound.updateMany({
       where: { id: roundId, workspaceId: identity.workspaceId, version: input.version },
-      data: { scheduledAt: new Date(input.scheduledAt), timezone: input.timezone, meetingLink: input.meetingLink || null, briefSnapshotAt: existing.briefSnapshotAt ?? new Date(), briefSnapshotRubricVersion: existing.briefSnapshotRubricVersion ?? rubric?.versionNumber ?? null, version: { increment: 1 } },
+      data: { scheduledAt: new Date(input.scheduledAt), timezone: input.timezone, meetingLink: input.meetingLink || null, ...(input.interviewLanguage ? { interviewLanguage: input.interviewLanguage } : {}), briefSnapshotAt: existing.briefSnapshotAt ?? new Date(), briefSnapshotRubricVersion: existing.briefSnapshotRubricVersion ?? rubric?.versionNumber ?? null, version: { increment: 1 } },
     });
     if (!updated.count) throw new ConflictException({ code: 'VERSION_CONFLICT' });
     await advanceTaskStatus(this.db, identity.workspaceId, existing.taskId, 'interview_in_progress');
