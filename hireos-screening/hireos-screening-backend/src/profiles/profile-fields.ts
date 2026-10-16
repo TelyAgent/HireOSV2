@@ -121,7 +121,9 @@ export function profileFields(
       return {
         value: statement + (period ? ` (${period})` : ''),
         ...(school
-          ? { together: [school], spans: 2, dateForms: (period.match(/\d{4}/g) ?? []).slice(0, 1), endForms: (period.match(/\d{4}/g) ?? []).slice(1, 2), ambiguous: sameSchool, needles: [] }
+          // The degree and major as well as the school: a job at the same university in the same years is not
+          // where the degree is (#155 review).
+          ? { together: [school, ...(degree ? [degree] : []), ...(major ? [major] : [])], spans: 2, dateForms: (period.match(/\d{4}/g) ?? []).slice(0, 1), endForms: (period.match(/\d{4}/g) ?? []).slice(1, 2), ambiguous: sameSchool, needles: [] }
           : { needles: [text(e.statement), major] }),
         // §4.1: school, degree, major and dates, each on its own.
         incomplete: [...(!school ? ['school'] : []), ...(!degree ? ['degree'] : []), ...(!major ? ['major'] : []), ...(!period ? ['dates'] : [])],
@@ -237,7 +239,17 @@ function locateItem(item: Item, paragraphs: ReturnType<typeof numberParagraphs>,
  */
 function locateSpanning(item: Item, parts: string[], paragraphs: ReturnType<typeof numberParagraphs>, source: Source): FieldEvidence | null {
   const span = item.spans ?? 0;
-  const run = (i: number) => paragraphs.slice(i, i + 1 + span).map((q) => q.normalized).join(' ');
+  // A run ends at its first dated paragraph: a paragraph with its own dates is a whole entry, so the parts of one
+  // entry aren't picked up from the next ("Research Assistant at Example University, 2020 – 2022" is not where the
+  // MSc below it is).
+  const run = (i: number) => {
+    const taken: string[] = [];
+    for (const q of paragraphs.slice(i, i + 1 + span)) {
+      taken.push(q.normalized);
+      if (/(^|\D)(19|20)\d{2}(\D|$)/.test(q.normalized)) break;
+    }
+    return taken.join(' ');
+  };
   let starts = paragraphs
     .map((_p, i) => i)
     .filter((i) => parts.some((part) => containsTerm(paragraphs[i].normalized, part)) && parts.every((part) => containsTerm(run(i), part)));
@@ -287,7 +299,7 @@ const SALARY_CONTEXT = /salary|compensation|expected\s+(pay|package|income|ctc)|
 const PRESENT_FORMS = ['present', 'now', 'current', 'today', '至今', '现在', '目前'];
 
 /** Where a date form occurs as a whole: "2017-1" is not found inside "2017-10", nor "2017" inside "12017". */
-function dateAt(text: string, form: string, from = 0): number {
+export function dateAt(text: string, form: string, from = 0): number {
   for (let at = text.indexOf(form, from); at !== -1; at = text.indexOf(form, at + 1)) {
     const before = at > 0 ? text[at - 1] : '';
     const after = text[at + form.length] ?? '';
@@ -309,7 +321,7 @@ function startsThenEnds(text: string, starts: string[], ends: string[]): boolean
 }
 
 /** How a YYYY-MM month may be written in a résumé, lower-cased: 2015-01, 2015/01, 2015.01, 2015年1月, 01/2015, jan 2015… */
-function monthForms(month: string | null): string[] {
+export function monthForms(month: string | null): string[] {
   if (!month) return [];
   const [year, mm] = month.split('-');
   const m = String(Number(mm));

@@ -1,4 +1,5 @@
 import { BadRequestException, Injectable, NotFoundException, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
+import { currentContact } from '../duplicates/current-contact';
 import { IDENTITY_POLICY, scoreIdentity, type ExistingSide, type IdentityScore } from '../duplicates/identity-scoring';
 import { randomUUID } from 'node:crypto';
 import { Prisma } from '@prisma/client';
@@ -801,7 +802,7 @@ export class ImportsService implements OnModuleInit, OnModuleDestroy {
         ...(cursor ? { cursor: { id: cursor }, skip: 1 } : {}),
         select: {
           id: true, displayName: true, email: true, phone: true,
-          profiles: { orderBy: { version: 'desc' }, take: 1, select: { employmentHistory: true, education: true } },
+          profiles: { orderBy: { version: 'desc' }, take: 1, select: { employmentHistory: true, education: true, contact: true } },
           resumeVersions: { where: { isLatest: true }, take: 1, select: { material: { select: { id: true, text: true } } } },
         },
       });
@@ -809,10 +810,12 @@ export class ImportsService implements OnModuleInit, OnModuleDestroy {
         // The upload itself, once linked (a retried item), is not its own duplicate.
         if (candidate.resumeVersions[0]?.material.id === material.id) continue;
         const profile = candidate.profiles[0];
+        // The contact the latest version gives, as the candidate page shows it — not the record's first values.
+        const contact = currentContact(candidate, profile);
         const score = scoreIdentity(
           { name: signals.displayName, email: signals.email, phone: signals.phone, text: uploadedText },
           {
-            name: candidate.displayName, email: candidate.email, phone: candidate.phone,
+            name: candidate.displayName, email: contact.email, phone: contact.phone,
             text: candidate.resumeVersions[0]?.material.text ?? null,
             employment: Array.isArray(profile?.employmentHistory) ? (profile.employmentHistory as ExistingSide['employment']) : [],
             education: Array.isArray(profile?.education) ? (profile.education as ExistingSide['education']) : [],

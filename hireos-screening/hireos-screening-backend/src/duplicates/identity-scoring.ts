@@ -5,6 +5,7 @@
  * Weights and thresholds live in the policy, whose version is stored with every check.
  */
 import { formatMonth } from '../profiles/experience';
+import { dateAt, monthForms } from '../profiles/profile-fields';
 
 export const IDENTITY_POLICY = {
   version: 'f03-identity-2026-10-16',
@@ -144,25 +145,39 @@ function editDistanceAtMostOne(a: string, b: string) {
   return edits + (a.length - i) + (b.length - j) <= 1;
 }
 
-/** The uploaded text line by line, each normalized as CNT-1 does for the whole text. */
+/** The uploaded text line by line: as written (lower case, spaces collapsed) for dates, and normalized for names. */
 function contentLines(text: string) {
-  return text.split(/\r?\n/).map((line) => normalizeContent(line)).filter(Boolean);
+  return text
+    .split(/\r?\n/)
+    .map((line) => ({ raw: line.normalize('NFKC').toLowerCase().replace(/\s+/g, ' ').trim(), normalized: normalizeContent(line) }))
+    .filter((line) => line.normalized);
 }
+type Line = ReturnType<typeof contentLines>[number];
+
+const YEAR = /(^|\D)((19|20)\d{2})(?=\D|$)/;
 
 /**
- * One entry of the résumé — a few lines starting where one of its names is — holds every part, and its first date is
- * the entry's start (#151 review). Parts found in different entries ("Example Retail" in one, its start month in
- * another) don't make it shared.
+ * Whether one entry of the résumé holds every part, with `startForms` as its first date (#151 review). An entry starts
+ * at a line naming it and runs to its first dated line (at most three lines: a company above its title and dates is
+ * common), so the next job's company, title or dates never count for this one. Dates are compared whole, as written:
+ * "2021-1" is not found in "2021-10".
  */
-function entryInLines(lines: string[], names: string[], parts: string[], startForms: string[], year: string) {
+function entryInLines(lines: Line[], names: string[], parts: string[], startForms: string[], year: string) {
   for (let i = 0; i < lines.length; i++) {
-    if (!names.some((name) => lines[i].includes(name))) continue;
-    const block = lines.slice(i, i + ENTRY_LINES).join('');
-    if (!parts.every((part) => block.includes(part))) continue;
-    const firstYear = block.search(/(19|20)\d{2}/);
-    if (firstYear === -1) continue;
+    if (!names.some((name) => lines[i].normalized.includes(name))) continue;
+    const entry: Line[] = [];
+    for (const line of lines.slice(i, i + ENTRY_LINES)) {
+      entry.push(line);
+      if (YEAR.test(line.raw)) break;
+    }
+    const normalized = entry.map((line) => line.normalized).join('');
+    if (!parts.every((part) => normalized.includes(part))) continue;
+    const raw = entry.map((line) => line.raw).join(' ');
+    const first = YEAR.exec(raw);
+    if (!first) continue;
+    const firstYearAt = first.index + first[1].length;
     if (startForms.some((form) => {
-      for (let at = block.indexOf(form); at !== -1; at = block.indexOf(form, at + 1)) if (at + form.indexOf(year) === firstYear) return true;
+      for (let at = dateAt(raw, form); at !== -1; at = dateAt(raw, form, at + 1)) if (at + form.indexOf(year) === firstYearAt) return true;
       return false;
     })) return true;
   }
@@ -170,7 +185,7 @@ function entryInLines(lines: string[], names: string[], parts: string[], startFo
 }
 
 /** A job counts as shared when one entry has its company, title and — as that entry's start — its start month. */
-function jobInText(job: ExistingSide['employment'][number], lines: string[]) {
+function jobInText(job: ExistingSide['employment'][number], lines: Line[]) {
   const company = normalizeContent(str(job.company));
   const title = normalizeContent(str(job.title));
   const month = formatMonth(job.start);
@@ -179,7 +194,7 @@ function jobInText(job: ExistingSide['employment'][number], lines: string[]) {
 }
 
 /** Education counts when one entry has its school, major (if recorded) and years, starting with its first year. */
-function educationInText(entry: ExistingSide['education'][number], lines: string[]) {
+function educationInText(entry: ExistingSide['education'][number], lines: Line[]) {
   const school = normalizeContent(str(entry.school));
   const major = normalizeContent(str(entry.major));
   const years = str(entry.period).match(/\d{4}/g) ?? [];
@@ -188,17 +203,8 @@ function educationInText(entry: ExistingSide['education'][number], lines: string
   return entryInLines(lines, [school], [school, ...(major ? [major] : []), ...years], [first], first);
 }
 
-/** An entry is its first line and the next two: company on one line, title and dates on the next is common. */
+/** An entry is at most its first line and the next two, up to its first dated line. */
 const ENTRY_LINES = 3;
-
-/** "2021-03" as it may be written once punctuation is gone: 202103, 20213, 2021年3月, 032021, mar2021. */
-function monthForms(month: string) {
-  const [year, mm] = month.split('-');
-  const m = String(Number(mm));
-  const short = ['jan', 'feb', 'mar', 'apr', 'may', 'jun', 'jul', 'aug', 'sep', 'oct', 'nov', 'dec'][Number(mm) - 1];
-  const long = ['january', 'february', 'march', 'april', 'may', 'june', 'july', 'august', 'september', 'october', 'november', 'december'][Number(mm) - 1];
-  return [`${year}${mm}`, `${year}${m}月`, `${year}年${m}月`, `${year}年${mm}月`, `${mm}${year}`, `${year}${m}`, `${short}${year}`, `${long}${year}`];
-}
 
 function compare(a: string, b: string): ContactComparison {
   if (!a && !b) return 'missing_both';
