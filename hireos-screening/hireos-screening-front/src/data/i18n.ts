@@ -265,6 +265,7 @@ export const ZH: Record<string, string> = {
   "Paste a summary, LinkedIn profile text, or notes from a conversation":
     "粘贴一段简介、LinkedIn 档案文字，或对话记录",
   "Add to library": "加入简历库",
+  "From the candidate record — this version didn't record it": "取自候选人记录（该版本未单独记录）",
   "Couldn't load more candidates. Try again.": "无法加载更多候选人，请重试。",
   "Show more": "显示更多",
   "Not found in the source:": "原文中未找到：",

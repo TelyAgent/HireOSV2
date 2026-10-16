@@ -370,6 +370,9 @@ model CandidateProfile {
   languages               Json
   // When the candidate can start, as the résumé states it (#155); null when it doesn't.
   availability            Json?
+  // The email and phone this version's résumé gives (or a person corrected), apart from the candidate's identity
+  // record, which keeps its first values (#155 review). Null on versions made before it was recorded.
+  contact                 Json?
   compensationExpectation Json?
   missingFields           Json
   corrections             Json

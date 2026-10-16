@@ -26,8 +26,9 @@ export type ProfileField = {
   values: string[];
   /** What is missing from a partly read field, e.g. the dates of a job. */
   incomplete: string[];
-  /** Where the values come from: the résumé, or a person (a correction, or what was confirmed on a paste). */
-  source: 'resume' | 'correction';
+  /** Where the values come from: the résumé, a person (a correction, or what was confirmed on a paste), or — for a
+   * profile version made before contacts were recorded per version — the candidate's record. */
+  source: 'resume' | 'correction' | 'record';
   evidence: FieldEvidence[];
   /** Why there is no source location: the source text can't be read, or the value wasn't found in it. */
   evidenceUnavailable: 'source_unavailable' | 'not_located' | null;
@@ -70,11 +71,13 @@ export function profileFields(
   const confirmedLocation = record(location.evidence).source === 'user_confirmed';
   const availability = record(p.availability);
   const compensation = record(p.compensationExpectation);
+  const contact = p.contact && typeof p.contact === 'object' ? record(p.contact) : null;
 
   const items: Record<ProfileField['field'], Item[]> = {
     name: one(text(p.displayName) || candidate.displayName),
-    email: one(candidate.email ?? ''),
-    phone: one(candidate.phone ?? ''),
+    // The contact this version recorded; older versions without one fall back to the candidate's record (#155 review).
+    email: one(contact ? text(contact.email) : (candidate.email ?? '')),
+    phone: one(contact ? text(contact.phone) : (candidate.phone ?? '')),
     location: location.status === 'known' && text(location.value)
       ? [{
           value: text(location.value),
@@ -160,7 +163,7 @@ export function profileFields(
       status,
       values: list.map((item) => item.value),
       incomplete,
-      source: fromCorrection ? 'correction' : 'resume',
+      source: fromCorrection ? 'correction' : !contact && (field === 'email' || field === 'phone') ? 'record' : 'resume',
       evidence,
       evidenceUnavailable: !list.length ? null : !source?.readable ? 'source_unavailable' : evidence.length ? null : 'not_located',
       unlocatedValues,

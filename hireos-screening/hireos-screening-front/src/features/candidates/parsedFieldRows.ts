@@ -54,6 +54,8 @@ export type ParsedFieldRow = {
   status: { label: string; badge: string };
   missing: string[];
   correctedByPerson: boolean;
+  /** Shown from the candidate's record: this profile version didn't record its own value. */
+  fromRecord: boolean;
   links: Array<{ label: string; evidence: FieldEvidence }>;
   /** Shown instead of (or after) the links: why a location is missing. */
   notes: Array<{ text: string; values?: string[] }>;
@@ -67,6 +69,7 @@ export function parsedFieldRows(fields: ProfileField[], lang: string): ParsedFie
     status: STATUS[f.status],
     missing: f.status === "partial" ? f.incomplete.map((i) => INCOMPLETE_LABELS[i] ?? i) : [],
     correctedByPerson: f.source === "correction",
+    fromRecord: f.source === "record",
     links: f.evidence.map((e) => ({ label: evidenceLabel(e, lang), evidence: e })),
     notes: [
       ...(f.evidenceUnavailable === "source_unavailable" ? [{ text: "Source text unavailable" }] : []),

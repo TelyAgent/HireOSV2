@@ -14,3 +14,15 @@ export function appendPage<T, P extends Page<T>>(current: P, next: P, key: (item
   const seen = new Set(current.items.map(key));
   return { ...next, items: [...current.items, ...next.items.filter((item) => !seen.has(key(item)))] };
 }
+
+/**
+ * Only the latest request counts: each start gets a number, and a response whose number is no longer the
+ * latest (an earlier search, or a page for a search since replaced) is dropped (#172, review on PR #345).
+ */
+export function requestGate() {
+  let latest = 0;
+  return {
+    start: () => ++latest,
+    isLatest: (id: number) => id === latest,
+  };
+}

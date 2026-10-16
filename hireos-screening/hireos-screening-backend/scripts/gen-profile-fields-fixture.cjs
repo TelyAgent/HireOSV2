@@ -25,8 +25,10 @@ const answer = {
 };
 (async () => {
   const ai = { isConfigured: () => true, parse: async () => answer };
-  const full = await new ProfilesService({}, {}, ai, {}).parseWithAi({ id: 'm-1', text: read('complete.txt') }, 'x');
-  const sparse = new ProfileParserService().parse('m-1', segs(read('sparse.txt')), 'fallback');
+  // As stored: a parse records the version's contact next to the fields.
+  const asStored = (parsed) => ({ ...parsed, contact: { email: parsed.email ?? null, phone: parsed.phone ?? null } });
+  const full = asStored(await new ProfilesService({}, {}, ai, {}).parseWithAi({ id: 'm-1', text: read('complete.txt') }, 'x'));
+  const sparse = asStored(new ProfileParserService().parse('m-1', segs(read('sparse.txt')), 'fallback'));
   const out = {
     complete: profileFields(full, { displayName: full.displayName, email: full.email, phone: full.phone }, src(read('complete.txt'))),
     sparse: profileFields(sparse, { displayName: sparse.displayName, email: null, phone: null }, src(read('sparse.txt'))),

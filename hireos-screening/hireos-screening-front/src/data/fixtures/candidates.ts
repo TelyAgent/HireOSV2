@@ -39,7 +39,7 @@ export interface ProfileField {
   status: "known" | "missing" | "partial";
   values: string[];
   incomplete: string[];
-  source: "resume" | "correction";
+  source: "resume" | "correction" | "record";
   evidence: FieldEvidence[];
   evidenceUnavailable: "source_unavailable" | "not_located" | null;
   /** Values of a list field that couldn't be found in the source while others could. */

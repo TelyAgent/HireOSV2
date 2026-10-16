@@ -265,6 +265,33 @@ test('#155 AC-2 (review): back-to-back stints and consecutive degrees — the pr
   assert.deepEqual(k.evidence.map((e) => e.segmentId), ['o2', 'o1']);
 });
 
+test('#155 AC-1/AC-2 (review): email and phone are this version\'s, not the identity record\'s first values', () => {
+  const text = 'Linh Pham\nnew.mail@example.test';
+  const candidate = { displayName: 'Linh Pham', email: 'old@example.test', phone: '+84901234567' };
+  const fields = byField(profileFields({ displayName: 'Linh Pham', contact: { email: 'new.mail@example.test', phone: null } }, candidate, source(segmentsOf(text))));
+  assert.deepEqual([fields.email.values, fields.email.source, fields.email.evidence.length], [['new.mail@example.test'], 'resume', 1]);
+  assert.deepEqual([fields.phone.status, fields.phone.values], ['missing', []], 'this résumé gives no phone: not the record\'s old one');
+  // A version from before contacts were recorded shows the record's values and says that's where they came from.
+  const legacy = byField(profileFields({ displayName: 'Linh Pham' }, candidate, source(segmentsOf(text))));
+  assert.deepEqual([legacy.email.values, legacy.email.source], [['old@example.test'], 'record']);
+});
+
+test('#155 (review): a parse records the version\'s contact; a correction carries it into the next version', async () => {
+  const created = [];
+  const profile = { id: 'p-1', version: 1, resumeVersionId: 'rv-1', displayName: 'Mai', dataStatus: 'complete', parserVersion: 'x', parseStatus: 'succeeded', sourceEntries: [],
+    resumeVersionRefs: [], employmentHistory: [], skills: [], education: [], certifications: [], languages: [], projects: [], location: null, workAuthorization: null,
+    compensationExpectation: null, missingFields: [], corrections: [], contact: { email: 'mai@example.test', phone: null } };
+  const db = {
+    candidate: { findFirst: async () => ({ id: 'c-1', displayName: 'Mai', email: 'mai@example.test', phone: null, profiles: [profile] }), update: async () => ({}) },
+    candidateJobRecommendation: { findFirst: async () => null }, screeningEvaluation: { findFirst: async () => null },
+    candidateProfile: { create: async ({ data }) => { created.push(data); return { id: 'p-2', ...data }; } },
+    auditRecord: { create: async () => ({}) },
+  };
+  db.$transaction = async (fn) => fn(db);
+  await new ProfilesService(db, {}, {}, {}).correct({ workspaceId: 'ws-1', actorId: 'hr-1', roles: [] }, 'c-1', { phone: '+84 90 111 2222' });
+  assert.deepEqual(created[0].contact, { email: 'mai@example.test', phone: '+84 90 111 2222' });
+});
+
 test('#155 AC-1: a location confirmed unchanged on paste keeps its country and city; one the user typed is theirs', () => {
   const { withConfirmedIdentity } = require('../dist/profiles/profiles.service');
   const parsed = { displayName: 'A', email: null, location: { value: 'Ho Chi Minh City, Vietnam', status: 'known', country: 'Vietnam', city: 'Ho Chi Minh City' }, missingFields: [] };
@@ -288,6 +315,11 @@ test('#155 AC-1: availability with a decimal is read whole — 1.5 months is 45 
   assert.equal(readAvailability('不能立即到岗').days, undefined);
   assert.equal(readAvailability('Available immediately').days, 0);
   assert.equal(readAvailability('随时到岗').days, 0);
+  // Amounts in several units add up; a bare month or day is a date, not a duration.
+  assert.equal(readAvailability('1 month and 2 weeks notice').days, 44);
+  assert.equal(readAvailability('1个月零10天').days, 40);
+  assert.equal(readAvailability('可于3月到岗').days, undefined);
+  assert.equal(readAvailability('15日后到岗').days, undefined);
 });
 
 test('#155 AC-3: the candidate API returns the same fields, statuses and locations on every read', async () => {

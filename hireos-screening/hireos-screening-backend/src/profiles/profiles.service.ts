@@ -275,6 +275,13 @@ export class ProfilesService implements OnModuleInit, OnModuleDestroy {
           workAuthorization: toJson(current.workAuthorization),
           languages: toJson(current.languages),
           ...(current.availability ? { availability: toJson(current.availability) } : {}),
+          // This version's contact: the correction where there is one, otherwise what the previous version had.
+          ...(current.contact || changed.email || changed.phone
+            ? { contact: toJson({
+                email: changed.email ? data.email || null : (asRecord(current.contact)?.email ?? null),
+                phone: changed.phone ? data.phone || null : (asRecord(current.contact)?.phone ?? null),
+              }) }
+            : {}),
           ...(nextCompensation ? { compensationExpectation: toJson(nextCompensation) } : {}),
           missingFields: toJson(asArray(current.missingFields).filter((field) => !(
             (field === 'location' && changed.location) || (field === 'compensation_expectation' && changed.compensation)
@@ -422,6 +429,7 @@ export class ProfilesService implements OnModuleInit, OnModuleDestroy {
             workAuthorization: parsed.workAuthorization || { value: '', status: 'unknown' },
             languages: parsed.languages,
             ...(parsed.availability ? { availability: parsed.availability } : {}),
+            contact: { email: parsed.email ?? null, phone: parsed.phone ?? null },
             ...(parsed.compensationExpectation ? { compensationExpectation: parsed.compensationExpectation } : {}),
             missingFields: parsed.missingFields,
             corrections: [],

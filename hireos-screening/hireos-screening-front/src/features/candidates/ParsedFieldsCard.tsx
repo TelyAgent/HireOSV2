@@ -48,6 +48,7 @@ export function ParsedFieldsCard({ fields }: { fields: ProfileField[] }) {
                   </div>
                 )}
                 {row.correctedByPerson && <div className="tiny">{t("Corrected by a person")}</div>}
+                {row.fromRecord && <div className="tiny">{t("From the candidate record — this version didn't record it")}</div>}
               </td>
               <td>
                 {row.links.map((link) => (

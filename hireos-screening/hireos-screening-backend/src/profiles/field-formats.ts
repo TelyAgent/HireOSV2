@@ -20,12 +20,10 @@ export function storedPhone(phone: string | null | undefined): string | null {
 
 export type Availability = { value: string; status: 'known'; days?: number; date?: string };
 
-// The whole number, decimals included ("1.5 months" is 45 days, not 5 months).
-const UNIT_DAYS: Array<[RegExp, number]> = [
-  [/(\d+(?:\.\d+)?)\s*(?:days?|天|日)/i, 1],
-  [/(\d+(?:\.\d+)?)\s*(?:weeks?|周|星期)/i, 7],
-  [/(\d+(?:\.\d+)?)\s*(?:months?|个月|月)/i, 30],
-];
+// Every stated amount, decimals included and added up: "1.5 months" is 45 days, "1 month and 2 weeks" 44.
+// A bare 月 or 日 is a date ("3月到岗"), not a duration, so only 个月 and 天 count.
+const DURATION = /(\d+(?:\.\d+)?)\s*(days?|天|weeks?|周|个?星期|months?|个月)/gi;
+const UNIT_DAYS = (unit: string) => (/^(day|天)/i.test(unit) ? 1 : /^(week|周|个?星期)/i.test(unit) ? 7 : 30);
 
 /** "1 month notice" → 30 days, "随时到岗" → 0, "available from 2026-11-01" → that date; otherwise the text alone. */
 export function readAvailability(value: string): Availability {
@@ -38,9 +36,9 @@ export function readAvailability(value: string): Availability {
     }
   }
   // A stated notice period wins over any other wording ("Not immediately available; 2 months notice" is 60 days).
-  for (const [pattern, days] of UNIT_DAYS) {
-    const match = text.match(pattern);
-    if (match) return { value: text, status: 'known', days: Math.round(Number(match[1]) * days) };
+  const amounts = [...text.matchAll(DURATION)];
+  if (amounts.length) {
+    return { value: text, status: 'known', days: Math.round(amounts.reduce((sum, m) => sum + Number(m[1]) * UNIT_DAYS(m[2]), 0)) };
   }
   // "Immediately" counts only when nothing negates it; otherwise the text is kept as written.
   const negated = /\b(not|no|isn't|cannot|can't|unable)\b[^.;,]{0,24}(immediate|right away)|(不能|无法|不可|非)\s*(随时|立即|马上)/i.test(text);

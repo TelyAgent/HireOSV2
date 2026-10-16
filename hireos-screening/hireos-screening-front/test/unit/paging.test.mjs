@@ -1,7 +1,7 @@
 // #172 (review on PR #345) -- "Show more" pages by offset, one bounded page at a time, and appends without repeats.
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { PAGE_SIZE, appendPage, nextPage } from "../../src/features/library/paging.ts";
+import { PAGE_SIZE, appendPage, nextPage, requestGate } from "../../src/features/library/paging.ts";
 
 test("every page request stays within the server's limit, however far the user scrolls", () => {
   for (const shown of [0, 100, 500, 900, 1100]) {
@@ -18,4 +18,15 @@ test("a page is appended after what is shown, without repeating anyone, with the
   const merged = appendPage(current, next, (x) => x.id);
   assert.deepEqual(merged.items.map((x) => x.id), ["a", "b", "c", "d"]);
   assert.deepEqual([merged.matched, merged.total], [4, 10]);
+});
+
+test("a late response for an earlier search or page is dropped; only the latest request counts", () => {
+  const gate = requestGate();
+  const morePage = gate.start(); // "Show more" for the old search
+  const newSearch = gate.start(); // the user changes a filter
+  assert.equal(gate.isLatest(newSearch), true);
+  assert.equal(gate.isLatest(morePage), false, "the old page arriving after the new search is not appended");
+  const another = gate.start();
+  assert.equal(gate.isLatest(newSearch), false, "nor is a first page overtaken by a later one");
+  assert.equal(gate.isLatest(another), true);
 });

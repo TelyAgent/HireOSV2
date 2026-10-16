@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { sourceLabel } from "../features/imports/sources";
 import { MATCH_STATUS_BADGE } from "../features/library/matchStatus";
-import { PAGE_SIZE, appendPage, nextPage } from "../features/library/paging";
+import { PAGE_SIZE, appendPage, nextPage, requestGate } from "../features/library/paging";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { useStore } from "../store/StoreContext";
 import { deleteCandidate, listLibraryEntries, MATCH_STATUSES, runMatchAgain, type LibraryEntry, type LibraryFilters, type LibraryList } from "../data/api/library";
@@ -81,6 +81,8 @@ export function LibraryPage() {
   const [importTab, setImportTab] = useState<ImportTab | null>(null);
   const restoredScroll = useRef(false);
   const [loadingMore, setLoadingMore] = useState(false);
+  // Each request's number: a response for an earlier search or page is dropped when it arrives late (#172 review).
+  const gate = useRef(requestGate()).current;
 
   const setFilter = useCallback(
     (key: (typeof FILTER_KEYS)[number], value: string) => {
@@ -106,24 +108,30 @@ export function LibraryPage() {
 
   const load = useCallback(() => {
     setLoadState((current) => (current === "ready" ? "ready" : "loading"));
+    const id = gate.start();
     listLibraryEntries(filters, 0, PAGE_SIZE)
       .then((result) => {
+        if (!gate.isLatest(id)) return;
         setList(result);
         setLoadState("ready");
       })
-      .catch(() => setLoadState("error"));
-  }, [filters]);
+      .catch(() => {
+        if (gate.isLatest(id)) setLoadState("error");
+      });
+  }, [filters, gate]);
 
   /** The next page, appended to what is shown; a failure leaves the list as it was (#172 review). */
   const loadMore = async () => {
     if (!list || loadingMore) return;
+    const id = gate.start();
     setLoadingMore(true);
     try {
       const { offset, limit } = nextPage(list.items.length);
       const next = await listLibraryEntries(filters, offset, limit);
+      if (!gate.isLatest(id)) return;
       setList((current) => (current ? appendPage<LibraryEntry, LibraryList>(current, next, (entry) => entry.candidate.id) : next));
     } catch {
-      say(t("Couldn't load more candidates. Try again."), { type: "error" });
+      if (gate.isLatest(id)) say(t("Couldn't load more candidates. Try again."), { type: "error" });
     } finally {
       setLoadingMore(false);
     }
