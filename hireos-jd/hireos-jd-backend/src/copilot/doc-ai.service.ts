@@ -1,4 +1,4 @@
-import { Injectable, Logger, ServiceUnavailableException } from '@nestjs/common';
+import { ConflictException, Injectable, Logger, ServiceUnavailableException } from '@nestjs/common';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { z } from 'zod';
@@ -180,8 +180,16 @@ export class DocAiService {
     };
   }
 
-  async analyze(identity: Identity, jobId: string, raw: unknown) {
+  async analyze(identity: Identity, jobId: string, audience: string, raw: unknown) {
     const input = analyzeInputSchema.parse(raw);
+    const document = await this.db.jobDocument.findUnique({
+      where: { workspaceId_jobId_audience: { workspaceId: identity.workspaceId, jobId, audience } },
+      select: { revision: true, blocks: true },
+    });
+    if (!document) throw new ConflictException({ code: 'DOCUMENT_NOT_SAVED', message: '请先保存文档再分析。' });
+    if (JSON.stringify(document.blocks) !== JSON.stringify(input.blocks)) {
+      throw new ConflictException({ code: 'DOCUMENT_CHANGED', message: '文档已更新，请保存后重新分析。' });
+    }
     const system = [
       '你是 HireOS 的 JD 审核助手。请严格按照下面的 JD 完整性标准检查一份 JD，找出质量问题、跨项一致性问题（第 3 节）、分级与合规问题（第 4 节）和语言质量问题（第 5 节）。',
       '',
@@ -206,7 +214,7 @@ export class DocAiService {
 
     const output = await this.run(identity, jobId, 'jd_doc_analyze', system, user, analyzeOutputSchema);
     const known = new Set(input.blocks.map((b) => b.id));
-    return {
+    const result = {
       verdict: output.verdict,
       summary: output.summary.trim(),
       items: output.items
@@ -219,6 +227,11 @@ export class DocAiService {
           blockId: x.blockId && known.has(x.blockId) ? x.blockId : null,
         })),
     };
+    await this.db.jobDocument.update({
+      where: { workspaceId_jobId_audience: { workspaceId: identity.workspaceId, jobId, audience } },
+      data: { aiAnalysis: json(result), aiAnalysisRevision: document.revision },
+    });
+    return result;
   }
 
   private async run<T>(identity: Identity, jobId: string, capabilityCode: string, system: string, user: string, schema: z.ZodType<T>): Promise<T> {

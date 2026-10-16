@@ -14,7 +14,7 @@ const blocks = [
 const state = (versions?: { versionNo: number; blocks: typeof blocks }[], aiRun?: unknown) =>
   ({
     wsVersions: versions ? { j1: { jdCode: 'JD-1', versions } } : {},
-    wsAiAnalysis: aiRun ? { j1: aiRun } : {},
+    wsAiAnalysis: aiRun ? { j1: aiRun } : versions ? { j1: { at: 1, revision: 1, result: { verdict: 'ready', summary: '', items: [] } } } : {},
     drafts: { [docKey('j1')]: { id: 'doc-j1', jobId: 'j1', audience: 'internal', language: 'en', revision: 1, saveState: 'saved', blocks } },
     jobs: {},
   }) as unknown as AppState;
@@ -80,7 +80,7 @@ describe('describeAiAnalysis', () => {
   it('says an older result is outdated instead of repeating it, and says when none ran', () => {
     expect(describeAiAnalysis(state([], run(0)), 'j1')).toMatch(/outdated/);
     expect(describeAiAnalysis(state([], run(0)), 'j1')).not.toContain('blocked');
-    expect(describeAiAnalysis(state([]), 'j1')).toMatch(/has not been run/);
+    expect(describeAiAnalysis(state(), 'j1')).toMatch(/has not been run/);
   });
 
 
