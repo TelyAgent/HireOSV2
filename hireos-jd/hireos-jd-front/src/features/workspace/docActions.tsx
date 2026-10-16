@@ -134,7 +134,9 @@ export function useDocActions(jobId: string) {
         location: val(j?.location),
         department: val(j?.department),
         headcount: j?.headcount,
+        // The document's language for what goes into it; the interface's for explanations to the user (#232).
         language: detectLanguage(blocks) ?? undefined,
+        uiLanguage: state.lang === "zh" ? ("zh" as const) : ("en" as const),
       };
     };
 

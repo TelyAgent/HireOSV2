@@ -24,7 +24,10 @@ const contextSchema = z.object({
   location: z.string().max(300).optional(),
   department: z.string().max(300).optional(),
   headcount: z.number().int().optional(),
+  /** The document's language: what is written into the document follows it. */
   language: z.enum(['zh', 'en']).optional(),
+  /** The interface language: explanations to the user (explain, reason, summary) follow it (#232). */
+  uiLanguage: z.enum(['zh', 'en']).optional(),
 });
 
 const blockSchema = z.object({
@@ -84,10 +87,20 @@ function standard(): string {
   return standardText;
 }
 
-function languageRule(lang?: 'zh' | 'en') {
-  return lang === 'en'
-    ? '- 文档是英文的：输出内容用英文；explain / reason / suggestion 等说明文字用中文。'
-    : '- 输出语言与文档一致（中文文档用中文输出）。';
+const LANGUAGE_NAME = { zh: '中文', en: '英文' } as const;
+
+/**
+ * Two languages, kept apart (#232): what goes into the document is in the document's language; what explains it to
+ * the user is in the interface language. A caller that doesn't send the interface language (older clients) gets
+ * explanations in Chinese, as before.
+ */
+export function languageRules(context: { language?: 'zh' | 'en'; uiLanguage?: 'zh' | 'en' }) {
+  const doc = context.language ? LANGUAGE_NAME[context.language] : null;
+  const ui = LANGUAGE_NAME[context.uiLanguage ?? 'zh'];
+  return {
+    content: doc ? `- 写进文档的内容（items、suggestion）用${doc}，与文档一致；不要翻译文档原文。` : '- 写进文档的内容（items、suggestion）与文档原文的语言一致；不要翻译文档原文。',
+    explanation: ui,
+  };
 }
 
 function documentText(blocks: z.infer<typeof blockSchema>[]) {
@@ -131,7 +144,7 @@ export class DocAiService {
       '- 不要加入职位信息和文档里都没有的技能、工具、证书、职级、岗位称谓、经验年限或薪资（例如原文只提 SQL 时不要补“熟练使用电子表格软件”，不要把职位改称为别的名称）。确实值得补充的，写进 toConfirm，由人工确认，不要写进 items。',
       '- 不要出现年龄、性别、婚育、民族、宗教、国籍等限制条件。',
       '- 不要输出 HTML 或 markdown 标记。',
-      languageRule(input.context.language),
+      languageRules(input.context).content,
       input.list
         ? '- 这是一个列表章节：输出列表项数组，每项一句、只写一件事。职责以动词开头；任职要求每条单一、可验证。条数符合标准（一般 3–8 条，加分项不超过 5 条）。'
         : '- 这是一段文字：items 数组只放 1 个元素，即完整段落。',
@@ -139,7 +152,7 @@ export class DocAiService {
       '## 输出格式',
       '只输出一个 JSON 对象（不要包含其他文字或代码块标记）：',
       '- items: string[] — 新的章节内容',
-      '- explain: string — 一句话说明你写了什么 / 改了什么（用中文）',
+      `- explain: string — 一句话说明你写了什么 / 改了什么（用${languageRules(input.context).explanation}）`,
       '- toConfirm: string[] — 你认为值得补充、但原文没有依据、需要人工确认的内容（没有就给空数组）',
     ].join('\n');
     const user = [
@@ -202,7 +215,8 @@ export class DocAiService {
       '- 只报告真实存在的问题，不要为了凑数报告；没有问题的条目不用输出。最多 12 条，按严重程度排序。',
       '- evidence 必须是文档中原文的一段（逐字摘录，便于定位）；blockId 填该原文所在块的 id，找不到对应块时为 null。',
       '- suggestion 给出可以直接替换 evidence 的改写文本（不要写“建议……”之类的说明），无法给出替换文本时留空。',
-      '- reason、summary 用中文。suggestion 的语言与文档一致。',
+      `- reason、summary 是给用户看的说明，用${languageRules(input.context).explanation}。`,
+      languageRules(input.context).content,
       '',
       '## 输出格式',
       '只输出一个 JSON 对象（不要包含其他文字或代码块标记）：',
