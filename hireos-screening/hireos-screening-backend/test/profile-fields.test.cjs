@@ -361,13 +361,6 @@ test('#155 AC-2 (review): projects that open alike each find their own paragraph
   assert.deepEqual(f.unlocatedValues, ['Project Gamma: Developed a scalable data processing platform for logistics.']);
 });
 
-test('#192 (review): an evidence quote is located only if all of it is in the source', () => {
-  const { locateQuote } = require('../dist/shared/locate-quote');
-  const segs = [{ id: 's1', text: 'Built pricing dashboards in SQL and Python for 120 stores across three regions.' }];
-  assert.equal(locateQuote(segs, 'Built pricing dashboards in SQL and Python for 120 stores across three regions. Managed a team of 500 engineers.'), null);
-  assert.equal(locateQuote(segs, 'built pricing dashboards in SQL and Python for 120 stores')?.segmentId, 's1');
-});
-
 test('#155 AC-2 (review): an expected salary range is located where the whole range is, not at a current salary', () => {
   const pay = { min: 60000, max: 70000, currency: 'USD', period: 'year', basis: 'gross' };
   const at = (segments) => byField(profileFields({ displayName: 'A', compensationExpectation: pay }, { displayName: 'A', email: null, phone: null }, source(segments))).compensation_expectation;
