@@ -374,7 +374,7 @@ export class TasksService {
   private async packageEvidence(workspaceId: string, taskId: string, jobId: string) {
     const rubric = await this.db.rubricVersion.findFirst({
       where: { workspaceId, jobId, status: 'confirmed' }, orderBy: { versionNumber: 'desc' },
-      select: { cards: { orderBy: { createdAt: 'asc' }, select: { id: true, requirement: true, cardPriority: true, weight: true, sourceRefs: true } } },
+      select: { cards: { orderBy: { createdAt: 'asc' }, select: { id: true, requirement: true, cardPriority: true, weight: true } } },
     });
     const cards = rubric?.cards ?? [];
     if (!cards.length) return [];
@@ -383,7 +383,7 @@ export class TasksService {
     const scores = await this.db.cardScore.findMany({
       where: { roundId: { in: rounds.map((r) => r.id) }, cardId: { in: cards.map((c) => c.id) } },
       orderBy: { updatedAt: 'desc' },
-      select: { cardId: true, roundId: true, score: true, note: true, aiScore: true, aiRationale: true },
+      select: { cardId: true, roundId: true, score: true, note: true, aiScore: true, aiRationale: true, aiQuoteSegmentId: true, aiQuote: true },
     });
     const latest = new Map<string, (typeof scores)[number]>();
     for (const s of scores) if (!latest.has(s.cardId)) latest.set(s.cardId, s);
@@ -396,7 +396,7 @@ export class TasksService {
         : 'medium' as const;
       return {
         cardId: card.id, requirement: card.requirement, cardPriority: card.cardPriority, weight: card.weight,
-        sourceRefs: card.sourceRefs as { segmentId: string; quote: string }[],
+        sourceRefs: s?.aiQuoteSegmentId && s.aiQuote ? [{ segmentId: s.aiQuoteSegmentId, quote: s.aiQuote }] : [],
         roundName: s ? byRound.get(s.roundId) ?? s.roundId : null,
         score, note: s?.note ?? '', aiScore: s?.aiScore ?? null, aiRationale: s?.aiRationale ?? null, tag,
       };
@@ -430,7 +430,7 @@ export class TasksService {
       hmConfirmationNote: task.hmConfirmationNote,
       published: decision.decision != null && task.hrConfirmedAt != null && task.hmConfirmedAt != null,
       offerState: task.offerState, offerSentAt: task.offerSentAt,
-      offerAckAt: task.offerAckAt, offerAttemptId: task.offerAttemptId, offerPackageVersion: task.offerPackageVersion, offerError: task.offerError,
+      offerAckAt: task.offerAckAt, offerPackageVersion: task.offerPackageVersion, offerError: task.offerError,
     };
   }
 
@@ -458,11 +458,13 @@ export class TasksService {
    * to call, so this is a local, deterministic state transition — not a live downstream ack. */
   async sendOffer(identity: Identity, taskId: string) {
     const task = await this.db.interviewTask.findFirst({ where: { id: taskId, workspaceId: identity.workspaceId },
-      select: { decision: true, version: true, hrConfirmedAt: true, hmConfirmedAt: true, offerState: true } });
+      select: { decision: true, version: true, hrConfirmedAt: true, hmConfirmedAt: true, offerState: true, offerSentAt: true } });
     if (!task) throw new NotFoundException({ code: 'NOT_FOUND' });
     if (task.decision !== 'recommend_offer') throw new BadRequestException({ code: 'DECISION_NOT_RECOMMEND_OFFER' });
     if (!task.hrConfirmedAt || !task.hmConfirmedAt) throw new BadRequestException({ code: 'PACKAGE_NOT_CONFIRMED' });
-    if (task.offerState === 'pending' || task.offerState === 'acknowledged') throw new ConflictException({ code: 'ALREADY_SENT' });
+    if (task.offerState === 'acknowledged') throw new ConflictException({ code: 'ALREADY_SENT' });
+    if (task.offerState === 'pending' && task.offerSentAt && Date.now() - task.offerSentAt.getTime() < 5 * 60 * 1000) throw new ConflictException({ code: 'OFFER_PENDING' });
+    if (task.offerState === 'pending') await this.db.interviewTask.update({ where: { id: taskId }, data: { offerState: 'failed', offerError: 'OFFER_ACK_TIMEOUT' } });
     const attemptId = randomUUID();
     await this.db.interviewTask.update({ where: { id: taskId }, data: { offerState: 'pending', offerSentAt: new Date(), offerAckAt: null, offerAttemptId: attemptId, offerPackageVersion: task.version, offerError: null } });
     return this.package(identity.workspaceId, taskId);
@@ -471,6 +473,7 @@ export class TasksService {
   /** Offer's idempotent delivery callback. A stale attempt can never overwrite a newer one. */
   async acknowledgeOffer(identity: Identity, taskId: string, raw: unknown) {
     const input = validate(offerAckSchema, raw);
+    if (identity.kind !== 'service') throw new BadRequestException({ code: 'SERVICE_AUTH_REQUIRED' });
     const task = await this.db.interviewTask.findFirst({ where: { id: taskId, workspaceId: identity.workspaceId }, select: { offerAttemptId: true, offerState: true } });
     if (!task) throw new NotFoundException({ code: 'NOT_FOUND' });
     if (task.offerAttemptId !== input.attemptId) throw new ConflictException({ code: 'STALE_OFFER_ATTEMPT' });

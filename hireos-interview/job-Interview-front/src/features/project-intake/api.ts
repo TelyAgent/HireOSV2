@@ -155,7 +155,7 @@ export type PackageState = {
   hrConfirmedBy: string | null; hrConfirmedAt: string | null; hrConfirmationNote: string | null;
   hmConfirmedBy: string | null; hmConfirmedAt: string | null; hmConfirmationNote: string | null;
   published: boolean;
-  offerState: 'none' | 'pending' | 'acknowledged' | 'failed'; offerSentAt: string | null; offerAckAt: string | null; offerAttemptId: string | null; offerPackageVersion: number | null; offerError: string | null;
+  offerState: 'none' | 'pending' | 'acknowledged' | 'failed'; offerSentAt: string | null; offerAckAt: string | null; offerPackageVersion: number | null; offerError: string | null;
 };
 
 // GET/POST /jobs/:id/brief-questions — one STAR (Situation/Task/Action/Result) follow-up
@@ -188,8 +188,8 @@ export async function api<T>(path: string, init?: RequestInit): Promise<T> {
 export async function downloadApi(path: string): Promise<Blob> {
   let response: Response;
   try { response = await authFetch(`${API_BASE_URL}api${path}`); }
-  catch { throw new ApiError('DOWNLOAD_FAILED'); }
-  if (!response.ok) throw new ApiError(response.status >= 500 ? 'EXPORT_FAILED' : 'DOWNLOAD_FAILED');
+  catch { throw new ApiError('EXPORT_FAILED'); }
+  if (!response.ok) throw new ApiError('EXPORT_FAILED');
   try { return await response.blob(); } catch { throw new ApiError('DOWNLOAD_FAILED'); }
 }
 export async function uploadMaterial(file: File) {

@@ -64,7 +64,8 @@ export function PackagePage() {
       const code = e instanceof Error ? e.message : "REQUEST_FAILED";
       setActionError(code === "DECISION_NOT_RECOMMEND_OFFER" ? (zh ? "当前决定不是「推荐发放 Offer」，无法发送。" : "The recorded decision isn't \"Recommend for offer\" — can't send.")
         : code === "PACKAGE_NOT_CONFIRMED" ? (zh ? "需要 HR 和招聘经理都确认后才能发送。" : "Both HR and Hiring Manager must confirm first.")
-        : code === "ALREADY_SENT" ? (zh ? "该版本已在交接中或已被 Offer 接收。" : "This package version is already pending or acknowledged.")
+        : code === "ALREADY_SENT" ? (zh ? "该版本已被 Offer 接收。" : "This package version was already acknowledged by Offer.")
+        : code === "OFFER_PENDING" ? (zh ? "正在等待 Offer 确认，超时后可重试。" : "Waiting for Offer ACK; retry will be available after timeout.")
         : code);
     } finally { setSendingOffer(false); }
   };
@@ -74,10 +75,12 @@ export function PackagePage() {
     setExporting(true); setExportError("");
     try {
       const blob = await downloadApi(`/tasks/${taskId}/package.pdf`);
-      const url = URL.createObjectURL(blob);
-      const anchor = document.createElement("a");
-      anchor.href = url; anchor.download = `evaluation-package-${taskId}.pdf`;
-      document.body.appendChild(anchor); anchor.click(); anchor.remove(); URL.revokeObjectURL(url);
+      try {
+        const url = URL.createObjectURL(blob);
+        const anchor = document.createElement("a");
+        anchor.href = url; anchor.download = `evaluation-package-${taskId}.pdf`;
+        document.body.appendChild(anchor); anchor.click(); anchor.remove(); URL.revokeObjectURL(url);
+      } catch { throw new Error("DOWNLOAD_FAILED"); }
     } catch (e) {
       const code = e instanceof Error ? e.message : "DOWNLOAD_FAILED";
       setExportError(code === "EXPORT_FAILED" ? (zh ? "PDF 生成失败，请稍后重试。" : "PDF generation failed. Please retry.") : (zh ? "PDF 已生成，但下载失败，请重试。" : "The PDF was generated, but the download failed. Please retry."));
