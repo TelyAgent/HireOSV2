@@ -1,6 +1,24 @@
 import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { randomUUID } from 'node:crypto';
+
+export type OfferTimeline = {
+  decision: string | null;
+  decisionAt: Date | null;
+  hrConfirmedAt: Date | null;
+  hmConfirmedAt: Date | null;
+  offerSentAt: Date | null;
+};
+
+export function offerTimelineIssue(timeline: OfferTimeline): string | null {
+  if (!timeline.offerSentAt) return null;
+  if (timeline.decision !== 'recommend_offer' || !timeline.decisionAt || !timeline.hrConfirmedAt || !timeline.hmConfirmedAt) return 'OFFER_PREREQUISITES_INCOMPLETE';
+  const handoffAt = timeline.offerSentAt.getTime();
+  if (handoffAt <= timeline.decisionAt.getTime()) return 'OFFER_BEFORE_DECISION';
+  if (handoffAt <= timeline.hrConfirmedAt.getTime()) return 'OFFER_BEFORE_HR_CONFIRMATION';
+  if (handoffAt <= timeline.hmConfirmedAt.getTime()) return 'OFFER_BEFORE_HM_CONFIRMATION';
+  return null;
+}
 import { PrismaService } from '../persistence/prisma.service';
 import { attachTaskMaterialSchema, confirmPackageSchema, confirmPlanSchema, createTaskSchema, reviewTaskSchema, setDecisionSchema, offerAckSchema, validate, type ParseInput } from './contracts';
 import { CandidatesService } from './candidates.service';
@@ -429,6 +447,7 @@ export class TasksService {
       hmConfirmedBy: task.hmConfirmedBy, hmConfirmedAt: task.hmConfirmedAt,
       hmConfirmationNote: task.hmConfirmationNote,
       published: decision.decision != null && task.hrConfirmedAt != null && task.hmConfirmedAt != null,
+      offerTimelineIssue: offerTimelineIssue({ decision: decision.decision, decisionAt: decision.decisionAt, hrConfirmedAt: task.hrConfirmedAt, hmConfirmedAt: task.hmConfirmedAt, offerSentAt: task.offerSentAt }),
       offerState: task.offerState, offerSentAt: task.offerSentAt,
       offerAckAt: task.offerAckAt, offerAttemptId: undefined, offerPackageVersion: task.offerPackageVersion, offerError: task.offerError,
     };
@@ -458,12 +477,14 @@ export class TasksService {
    * to call, so this is a local, deterministic state transition — not a live downstream ack. */
   async sendOffer(identity: Identity, taskId: string) {
     const task = await this.db.interviewTask.findFirst({ where: { id: taskId, workspaceId: identity.workspaceId },
-      select: { decision: true, version: true, hrConfirmedAt: true, hmConfirmedAt: true, offerState: true, offerSentAt: true } });
+      select: { decision: true, decisionAt: true, version: true, hrConfirmedAt: true, hmConfirmedAt: true, offerState: true, offerSentAt: true } });
     if (!task) throw new NotFoundException({ code: 'NOT_FOUND' });
     if (task.decision !== 'recommend_offer') throw new BadRequestException({ code: 'DECISION_NOT_RECOMMEND_OFFER' });
-    if (!task.hrConfirmedAt || !task.hmConfirmedAt) throw new BadRequestException({ code: 'PACKAGE_NOT_CONFIRMED' });
+    if (!task.decisionAt || !task.hrConfirmedAt || !task.hmConfirmedAt) throw new BadRequestException({ code: 'PACKAGE_NOT_CONFIRMED' });
     const attemptId = randomUUID();
     const now = new Date();
+    const orderIssue = offerTimelineIssue({ ...task, offerSentAt: now });
+    if (orderIssue) throw new BadRequestException({ code: orderIssue });
     const timeoutBefore = new Date(now.getTime() - 5 * 60 * 1000);
     const claimed = await this.db.interviewTask.updateMany({
       where: { id: taskId, workspaceId: identity.workspaceId, OR: [

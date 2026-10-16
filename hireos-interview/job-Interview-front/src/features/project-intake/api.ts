@@ -157,6 +157,7 @@ export type PackageState = {
   hrConfirmedBy: string | null; hrConfirmedAt: string | null; hrConfirmationNote: string | null;
   hmConfirmedBy: string | null; hmConfirmedAt: string | null; hmConfirmationNote: string | null;
   published: boolean;
+  offerTimelineIssue: string | null;
   offerState: 'none' | 'pending' | 'acknowledged' | 'failed' | 'sent'; offerSentAt: string | null; offerAckAt: string | null; offerAttemptId?: string; offerPackageVersion: number | null; offerError: string | null;
 };
 
