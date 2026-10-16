@@ -4,6 +4,8 @@ import { useStore } from "../store/StoreContext";
 import { Button } from "../components/ui/Primitives";
 import { DeadlineBanner, InvitationLetterCard } from "../components/InvitationLetterCard";
 import { fetchPublicInvitation, submitPublicInvitation, type PublicInvitation } from "../data/writtenApi";
+import { formatDateTime } from "../utils/calendar";
+import { TZ } from "../data/fixtures";
 
 /**
  * The candidate-facing side of "send to candidate" — reached from the emailed /apply/:token link,
@@ -13,7 +15,8 @@ import { fetchPublicInvitation, submitPublicInvitation, type PublicInvitation } 
  */
 export function CandidateApplyPage() {
   const { token = "" } = useParams();
-  const { t } = useStore();
+  const { t, state: app } = useStore();
+  const lang = app.lang === "zh" ? "zh" : "en";
   const [state, setState] = useState<{ status: "loading" } | { status: "error" } | { status: "ready"; data: PublicInvitation }>({ status: "loading" });
   const [answers, setAnswers] = useState<Record<string, string>>({});
   const [submitting, setSubmitting] = useState(false);
@@ -88,7 +91,7 @@ export function CandidateApplyPage() {
             {timedDue && !deadlinePassed && (
               <div className="banner warning" style={{ marginBottom: 16 }} data-testid="timed-due">
                 {t("Time limit: answers are due by %time (%left minutes left). The clock started when you first opened this page.")
-                  .replace("%time", timedDue.toLocaleString())
+                  .replace("%time", `${formatDateTime(timedDue.toISOString(), lang, TZ)} (${t("Beijing time")})`)
                   .replace("%left", String(Math.max(0, Math.ceil((timedDue.getTime() - now) / 60_000))))}
               </div>
             )}
@@ -108,7 +111,7 @@ export function CandidateApplyPage() {
                   ? `${t("Timed")} · ${state.data.durationMin} ${t("min timed")}`
                   : t("Deadline only")}
                 {/* Without a letter (older backend) the deadline banner isn't shown, so keep it here. */}
-                {!state.data.letter && state.data.deadline && <> · {t("deadline")} {new Date(state.data.deadline).toLocaleString()}</>}
+                {!state.data.letter && state.data.deadline && <> · {t("deadline")} {formatDateTime(state.data.deadline, lang, TZ)} ({t("Beijing time")})</>}
               </div>
             </div>
 

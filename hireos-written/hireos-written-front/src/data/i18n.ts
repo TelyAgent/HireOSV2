@@ -524,6 +524,8 @@ export const ZH: Record<string, string> = {
   // #239: names read out by screen readers.
   "Primary navigation": "主导航",
   "Breadcrumb": "面包屑导航",
+  // #237: the zone is said with the time.
+  "Beijing time": "北京时间",
 };
 
 export function translate(lang: "en" | "zh", source: string): string {

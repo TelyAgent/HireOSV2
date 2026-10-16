@@ -1,3 +1,4 @@
+import { formatDate, formatDateTime, relativeTime, type DisplayLang } from "../utils/calendar";
 /**
  * Seed fixture data, ported from docs/hireos-assessment-prototype.html's
  * `freshSeed()`. No backend exists yet for this subsystem (hireos-written,
@@ -156,21 +157,18 @@ export function nowISO(clockOffsetMin: number): string {
   const base = new Date(DEMO_CLOCK_BASE).getTime() + clockOffsetMin * 60000;
   return new Date(base).toISOString();
 }
+/** The interface language dates are written in (#237) — set by LocaleSync from the app's language. */
+let displayLang: DisplayLang = "en";
+export function setDisplayLang(lang: DisplayLang) {
+  displayLang = lang;
+}
+// Times are shown in the demo's fixed zone (TZ, as the spec requires), written in the interface language.
 export function fmtDate(iso: string | null | undefined): string {
-  if (!iso) return "—";
-  return new Date(iso).toLocaleString("en-US", { month: "short", day: "numeric", year: "numeric", hour: "numeric", minute: "2-digit", timeZone: TZ });
+  return formatDateTime(iso, displayLang, TZ);
 }
 export function fmtDateShort(iso: string | null | undefined): string {
-  if (!iso) return "—";
-  return new Date(iso).toLocaleString("en-US", { month: "short", day: "numeric", year: "numeric", timeZone: TZ });
+  return formatDate(iso, displayLang, TZ);
 }
 export function timeAgo(iso: string, clockOffsetMin: number): string {
-  if (!iso) return "—";
-  const diff = new Date(nowISO(clockOffsetMin)).getTime() - new Date(iso).getTime();
-  const mins = Math.round(diff / 60000);
-  if (mins < 1) return "just now";
-  if (mins < 60) return mins + "m ago";
-  const hrs = Math.round(mins / 60);
-  if (hrs < 24) return hrs + "h ago";
-  return Math.round(hrs / 24) + "d ago";
+  return relativeTime(iso, nowISO(clockOffsetMin), displayLang);
 }

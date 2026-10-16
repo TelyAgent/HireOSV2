@@ -11,22 +11,23 @@ import { isWrittenTestTask, taskCountsFor, writtenTaskJob, writtenTaskStatus, wr
 import { fetchCaseAiContext } from "../data/writtenApi";
 import {
   PROJECT, INVITATIONS, MAIL, RESULTS, EVALUATIONS, TASKS, CASES, CORE_CANDIDATES, CORE_JOBS, COMPARISONS,
-  fmtDateShort, nowISO, type CoreCandidate, type CoreJob, type Task,
+  fmtDateShort, nowISO, TZ, type CoreCandidate, type CoreJob, type Task,
 } from "../data/fixtures";
 import { latestResultForCase } from "../data/realPlanItemsMerge";
 import { CreateWrittenTaskModal } from "../components/CreateWrittenTaskModal";
 import type { QuickStartResult } from "../data/writtenApi";
 import { initials } from "../lib/initials";
+import { sameDayIn } from "../utils/calendar";
 
 function candidateOf(caseId: string): CoreCandidate | null {
   const c = CASES[caseId];
   return c ? CORE_CANDIDATES[c.candidateId] : null;
 }
 
+/** Due on today's date in the zone task dates are shown in (TZ), the same day the list shows (#352). */
 function isDueToday(iso: string, clockOffsetMin: number) {
   if (!iso) return false;
-  const d = new Date(iso), n = new Date(nowISO(clockOffsetMin));
-  return d.getUTCFullYear() === n.getUTCFullYear() && d.getUTCMonth() === n.getUTCMonth() && d.getUTCDate() === n.getUTCDate();
+  return sameDayIn(iso, nowISO(clockOffsetMin), TZ);
 }
 
 /** Mirrors ComparisonDetailPage's unexported comparableCells() gate: only candidates that
