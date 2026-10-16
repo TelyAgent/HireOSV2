@@ -94,7 +94,7 @@ export const ZH: Record<string, string> = {
   "Claim": "认领", "Start": "开始", "Wait": "等待", "Open →": "打开 →", "Due": "截止",
   "Waiting:": "等待原因：", "Source:": "来源：", "Assigned to": "负责人：", "Last handled by": "最近处理人：",
   "Startup Team Access: any valid employee can open and directly work these tasks — no claiming or manager approval required. The original assignee stays on record and is notified when you act.":
-    "初创团队权限：任何在职员工都可以直接打开并处理这些任务——无需认领或经理审批。原负责人仍会保留在记录中，你操作时会收到通知。",
+    "初创团队权限：任何在职员工都可以直接打开并处理这些任务——无需认领或经理审批。原负责人仍会保留在记录中；你执行操作时，系统会通知原负责人。",
 
   "All tasks": "全部任务", "Task list": "任务列表", "Cluster by JD": "按岗位聚合", "Role & project": "岗位与项目",
   "Link candidate": "关联候选人", "candidates": "位候选人", "Round": "轮次", "Created": "创建时间",
@@ -128,7 +128,7 @@ export const ZH: Record<string, string> = {
   "No questions match these filters.": "没有符合当前筛选条件的题目。",
   "ZIP file": "ZIP 文件",
   "On confirm, this demo will show a parsed preview: 1 prompt, 2 materials, 1 internal answer key. Old candidate submissions found inside a ZIP are never re-exported.":
-    "确认后，本演示会展示解析预览：1 个题目、2 份材料、1 份内部评分标准。ZIP 中发现的旧候选人提交内容不会被重新导出。",
+    "确认后，本演示会展示解析预览：1 个题目、2 份材料、1 份内部参考答案。ZIP 中发现的旧候选人提交内容不会被重新导出。",
   "Parse (demo)": "解析（演示）",
 
   "Question not found.": "未找到该题目。", "Preview candidate view": "预览候选人视图",
@@ -136,7 +136,7 @@ export const ZH: Record<string, string> = {
   "Required deliverables": "要求提交的内容", "None specified": "未指定",
   "No materials attached.": "未附加材料。", "Candidate-visible materials": "候选人可见的材料", "Preview": "预览",
   "Reviewer only — never shown to candidates.": "仅评审可见 — 候选人永远看不到。",
-  "of overall": "占总分比例", "Internal answer key": "内部评分标准", "(Reviewer only):": "（仅评审可见）：",
+  "of overall": "占总分比例", "Internal answer key": "内部参考答案", "(Reviewer only):": "（仅评审可见）：",
   "Used in cases": "已用于案例数", "Candidates who have seen this version": "已看到此版本的候选人数",
   "Role mappings": "关联岗位数", "Mapped roles:": "关联岗位：",
   "Current": "当前版本", "Earlier revision": "历史版本", "Superseded": "已被取代",
@@ -272,7 +272,7 @@ export const ZH: Record<string, string> = {
     "从已验证邮箱回复到统一收件箱。从已验证邮箱在正确邮件串中发送的完整答案可自动提交至：",
   "(From/Reply-To — simulated only, no real mail is sent).": "（发件人/回复地址 —— 仅为模拟，不会发送真实邮件）。",
   "Score + summary": "分数 + 摘要", "Summary only (no numeric score)": "仅摘要（不含具体分数）",
-  "Never includes internal ranking, reviewer notes, or the internal answer key.": "不包含内部排名、评审备注或内部评分标准。",
+  "Never includes internal ranking, reviewer notes, or the internal answer key.": "不包含内部排名、评审备注或内部参考答案。",
   "Preview shown per recipient: template, question package version, estimated workload, timezone":
     "以下按收件人展示预览：模板、题目包版本、预计工作量、时区",
   "and Reply-To.": "及回复地址。",
@@ -342,7 +342,7 @@ export const ZH: Record<string, string> = {
   "This submission is incomplete — resolve the missing deliverable before scoring.": "该提交尚不完整 —— 请先补齐缺失的交付物再评分。",
   "Evidence has not finished processing.": "证据尚未处理完成。",
   "evaluation": "评估", "Overall (human)": "总分（人工）", "Any missing required criterion → Unknown": "任一评分项未填 → 未知",
-  "Overall (AI)": "总分（AI 建议）", "Draft only, not a hiring probability": "仅供参考，不计入最终结果",
+  "Overall (AI)": "总分（AI 建议）", "Draft only, not a hiring probability": "仅为草稿，不代表录用概率",
   "Coverage / Confidence": "覆盖度 / 置信度", "Full": "完整", "Partial": "部分", "Shown separately from score": "与分数分开展示",
   "Criteria": "评分项", "max": "满分", "Human": "人工", "Confidence:": "置信度：", "Coverage:": "覆盖度：",
   "High": "高", "Medium": "中", "Low": "低",
@@ -382,7 +382,7 @@ export const ZH: Record<string, string> = {
   "Write feedback on this candidate's answers.": "请填写针对该候选人作答的反馈。",
   "Pre-filled from the AI evaluation of these answers — check it reads well for the candidate before publishing.": "已根据 AI 对本次作答的评估预填，发布前请确认内容适合给候选人看。",
   "No AI summary for these answers — please write the feedback yourself.": "本次作答没有 AI 评估摘要，请手动填写反馈。",
-  "Never includes: internal ranking, reviewer notes, or the internal answer key.": "绝不包含：内部排名、评审备注或内部评分标准。",
+  "Never includes: internal ranking, reviewer notes, or the internal answer key.": "绝不包含：内部排名、评审备注或内部参考答案。",
   "Approve & publish": "批准并发布", "Internal review complete": "内部评审已完成",
   "Disclosure content approved for release": "披露内容已批准发布", "Finalize & publish result": "定稿并发布结果",
   "Published": "已发布",

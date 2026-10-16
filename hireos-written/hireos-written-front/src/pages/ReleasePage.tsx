@@ -95,13 +95,9 @@ export function ReleaseContent({
       outcomeText: outcomeText.trim(), feedbackText: feedbackText.trim(), nextStepText: nextStepText.trim(),
       publishedAt: new Date().toISOString(),
     };
-    RELEASES[relId] = rel;
-    result!.status = "published";
-    result!.releaseId = relId;
-    // Releasing an older round leaves the case where its latest round is (#48).
-    if (isLatestRound) c.status = "released";
     // Real cases persist the published result -- that is what moves the task list to "Written
-    // completed" and keeps it after a reload. Fixture-only demo cases stay in-memory only.
+    // completed" and keeps it after a reload. Fixture-only demo cases stay in-memory only. Saved first: a
+    // failed save leaves the result unpublished and says so, never followed by "published" (#357).
     if (result!.invitationId) {
       const { overall, showScore, outcomeText, feedbackText, nextStepText } = rel;
       setBusy(true);
@@ -109,10 +105,16 @@ export function ReleaseContent({
         await releaseCaseResult(caseId, { overall, showScore, outcomeText, feedbackText, nextStepText, invitationId: result!.invitationId });
       } catch {
         say(t("Could not save to the server. Please refresh and try again."), { type: "danger" });
+        return;
       } finally {
         setBusy(false);
       }
     }
+    RELEASES[relId] = rel;
+    result!.status = "published";
+    result!.releaseId = relId;
+    // Releasing an older round leaves the case where its latest round is (#48).
+    if (isLatestRound) c.status = "released";
     forceTick();
     onChanged?.();
     say(t("Result finalized and published. Candidate portal and notification queued."), { type: "success" });
