@@ -598,12 +598,17 @@ export function withConfirmedIdentity<T extends ParsedForProfile>(parsed: T, con
   // location the user typed differently replaces it, marked as theirs.
   const unchanged = !!confirmed.location && typeof parsedLocation?.value === 'string'
     && parsedLocation.value.trim().toLowerCase() === confirmed.location.trim().toLowerCase();
+  // Cleared on the form (null): there is none, whatever the text says. Not sent (undefined): as read.
+  const clearedLocation = confirmed.location === null;
   return {
     ...parsed,
     displayName: confirmed.displayName,
-    email: confirmed.email || parsed.email,
+    email: confirmed.email === undefined ? parsed.email : confirmed.email,
     ...(confirmed.location && !unchanged
       ? { location: { value: confirmed.location, status: 'known', evidence }, missingFields: parsed.missingFields.filter((f) => f !== 'location') }
+      : {}),
+    ...(clearedLocation
+      ? { location: { value: '', status: 'unknown', evidence }, missingFields: [...new Set([...parsed.missingFields, 'location'])] }
       : {}),
   };
 }

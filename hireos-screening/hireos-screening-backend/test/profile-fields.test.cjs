@@ -463,3 +463,46 @@ test('#155 AC-3: the candidate API returns the same fields, statuses and locatio
   assert.deepEqual(first.map((f) => f.field), [...PROFILE_FIELDS]);
   assert.equal(first.find((f) => f.field === 'availability').evidence[0].resumeVersionId, 'rv-2');
 });
+
+test('#155 AC-2 (review): a project with its name on one line and the description below is located at the name', () => {
+  const segments = [
+    { id: 'p1', text: 'Projects', page: 1 },
+    { id: 'p2', text: 'Pricing dashboard', page: 1 },
+    { id: 'p3', text: 'Weekly price-elasticity dashboard for 120 stores.', page: 1 },
+    { id: 'p4', text: 'Stock forecaster', page: 2 },
+    { id: 'p5', text: 'Daily stock forecasts for the same stores.', page: 2 },
+  ];
+  const projects = [
+    { name: 'Pricing dashboard', description: 'Weekly price-elasticity dashboard for 120 stores.' },
+    { name: 'Stock forecaster', description: 'Daily stock forecasts for the same stores.' },
+  ];
+  const f = byField(profileFields({ displayName: 'A', projects }, { displayName: 'A', email: null, phone: null }, source(segments))).projects;
+  assert.deepEqual(f.evidence.map((e) => [e.segmentId, e.page]), [['p2', 1], ['p4', 2]]);
+  assert.deepEqual(f.unlocatedValues, []);
+  // A description that isn't anywhere after the name still isn't pinned.
+  const g = byField(profileFields({ displayName: 'A', projects: [{ name: 'Pricing dashboard', description: 'Churn model for loyalty members.' }] },
+    { displayName: 'A', email: null, phone: null }, source(segments))).projects;
+  assert.deepEqual(g.evidence, []);
+});
+
+test('#155 AC-2 (review): a company on one line with the title and dates below it is located there', () => {
+  const segments = [
+    { id: 'p1', text: 'Acme Corp', page: 1 },
+    { id: 'p2', text: 'Senior Software Engineer, 2021-07 – present', page: 1 },
+    { id: 'p3', text: 'Led the pricing platform.', page: 1 },
+    { id: 'p4', text: 'Beta Ltd', page: 1 },
+    { id: 'p5', text: 'Senior Software Engineer, 2019-01 – 2021-06', page: 1 },
+    { id: 'p6', text: 'Built reporting pipelines.', page: 1 },
+  ];
+  const jobs = [
+    { company: 'Acme Corp', title: 'Senior Software Engineer', start: '2021-07', end: 'present' },
+    { company: 'Beta Ltd', title: 'Senior Software Engineer', start: '2019-01', end: '2021-06' },
+  ];
+  const f = byField(profileFields({ displayName: 'A', employmentHistory: jobs }, { displayName: 'A', email: null, phone: null }, source(segments))).employment_history;
+  assert.deepEqual(f.evidence.map((e) => e.segmentId), ['p1', 'p4']);
+  assert.deepEqual(f.unlocatedValues, []);
+  // A company named on its own far from any matching title is not pinned on a nearby line.
+  const g = byField(profileFields({ displayName: 'A', employmentHistory: [{ company: 'Acme Corp', title: 'Data Analyst', start: '2015-01', end: '2016-01' }] },
+    { displayName: 'A', email: null, phone: null }, source(segments))).employment_history;
+  assert.deepEqual(g.evidence, []);
+});

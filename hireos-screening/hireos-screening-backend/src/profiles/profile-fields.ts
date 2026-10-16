@@ -57,6 +57,8 @@ type Item = {
   matches?: (paragraph: string) => boolean;
   /** Another item has the same company and title, so they alone can't tell which paragraph is this one. */
   ambiguous?: boolean;
+  /** The rest of `together` may run on into this many following paragraphs (a project's description under its name). */
+  spans?: number;
   incomplete?: string[];
 };
 
@@ -101,7 +103,8 @@ export function profileFields(
         value: [title, company].filter(Boolean).join(' · ') + (start || end ? ` (${start || '?'} – ${end || '?'})` : ''),
         // Company and title in the same paragraph: two jobs with the same title at different companies each find
         // their own paragraph; a title alone is used only when there is no company (#155 review).
-        ...(company && title ? { together: [company, title], needles: [] } : { needles: [company || title] }),
+        // On separate lines ("Acme Corp" above "Senior Engineer, 2019-01 – 2021-06") they count when close together.
+        ...(company && title ? { together: [company, title], spans: 2, needles: [] } : { needles: [company || title] }),
         // Dates read as YYYY-MM (or present); anything else is kept as written and the entry counts as partly read.
         incomplete: [...(!company ? ['company'] : []), ...(!title ? ['title'] : []), ...(!formatMonth(start) || !(isPresent(end) || formatMonth(end)) ? ['dates'] : [])],
       };
@@ -131,7 +134,8 @@ export function profileFields(
       return {
         value: [name, description].filter(Boolean).join(': '),
         // Name and description in the same paragraph, so projects that read alike each find their own.
-        ...(name && description ? { together: [name, description], needles: [] } : { needles: [name || description] }),
+        // A description under the name, in the next paragraphs, counts too.
+        ...(name && description ? { together: [name, description], spans: 3, needles: [] } : { needles: [name || description] }),
         incomplete: description ? [] : ['description'],
       };
     }),
@@ -207,6 +211,7 @@ function locateItem(item: Item, paragraphs: ReturnType<typeof numberParagraphs>,
     if (dated) return evidenceAt(dated, parts[0], source);
     // Without a matching month, company + title must point at one paragraph and one job; otherwise it isn't pinned.
     if (candidates.length === 1 && !item.ambiguous) return evidenceAt(candidates[0], parts[0], source);
+    if (!candidates.length && item.spans) return locateSpanning(item, parts, paragraphs, source);
     return null;
   }
   if (item.context) {
@@ -220,7 +225,30 @@ function locateItem(item: Item, paragraphs: ReturnType<typeof numberParagraphs>,
   return locate(item.needles, paragraphs, source);
 }
 
-const SALARY_CONTEXT = /salary|compensation|expected\s+(pay|package|income|ctc)|pay\s+expectation|\bctc\b|remuneration|薪资|薪酬|期望薪|月薪|年薪|待遇|薪水|工资/i;
+/**
+ * The parts spread over a few consecutive paragraphs (#155 review): a company on one line with the title and dates
+ * below it, a project's name with its description underneath. The run starts at a paragraph holding one of the
+ * parts and must hold them all (and, when known, the start followed by the end). Starts within one run are the
+ * same place; only a single place pins the value, at its first paragraph.
+ */
+function locateSpanning(item: Item, parts: string[], paragraphs: ReturnType<typeof numberParagraphs>, source: Source): FieldEvidence | null {
+  const span = item.spans ?? 0;
+  const run = (i: number) => paragraphs.slice(i, i + 1 + span).map((q) => q.normalized).join(' ');
+  let starts = paragraphs
+    .map((_p, i) => i)
+    .filter((i) => parts.some((part) => containsTerm(paragraphs[i].normalized, part)) && parts.every((part) => containsTerm(run(i), part)));
+  if (item.dateForms?.length) {
+    const dated = starts.filter((i) => startsThenEnds(run(i), item.dateForms!, item.endForms ?? []));
+    if (dated.length) starts = dated;
+    else if (item.ambiguous) return null;
+  }
+  const places = starts.filter((i, k) => k === 0 || i - starts[k - 1] > span);
+  if (places.length !== 1) return null;
+  const at = paragraphs[places[0]];
+  return evidenceAt(at, parts.find((part) => containsTerm(at.normalized, part)) ?? parts[0], source);
+}
+
+const SALARY_CONTEXT =/salary|compensation|expected\s+(pay|package|income|ctc)|pay\s+expectation|\bctc\b|remuneration|薪资|薪酬|期望薪|月薪|年薪|待遇|薪水|工资/i;
 
 const PRESENT_FORMS = ['present', 'now', 'current', 'today', '至今', '现在', '目前'];
 

@@ -524,6 +524,7 @@ export const ZH: Record<string, string> = {
   "Go to Settings": "前往设置",
   never: "从未",
   "Reading…": "读取中…",
+  "Adding…": "正在添加…",
   "Unified intake": "统一收件箱",
   "— every channel, most recent first": "— 全部渠道，最新在前",
   "Nothing imported yet": "暂无导入内容",

@@ -153,7 +153,13 @@ export class ImportsService implements OnModuleInit, OnModuleDestroy {
       size: buffer.length,
       buffer,
     } as MulterFile;
-    const confirmed: ConfirmedIdentity = { displayName, email: email || null, location: location || null };
+    // A field the user cleared is null — they said there is none, so what parsing reads doesn't come back; one
+    // not sent at all (older clients) leaves parsing to fill it in.
+    const confirmed: ConfirmedIdentity = {
+      displayName,
+      ...(email !== undefined ? { email: email || null } : {}),
+      ...(location !== undefined ? { location: location || null } : {}),
+    };
     return this.createBatch(identity, [file], 'paste', idempotencyKey, targetJobId, confirmed);
   }
 
@@ -543,7 +549,7 @@ export class ImportsService implements OnModuleInit, OnModuleDestroy {
     // What the user confirmed on a paste is the identity checked for duplicates, not a guess from the text.
     const confirmedSignals = confirmedIdentityOf(material);
     const signals = confirmedSignals
-      ? { ...parsedSignals, displayName: confirmedSignals.displayName, email: confirmedSignals.email || parsedSignals.email }
+      ? { ...parsedSignals, displayName: confirmedSignals.displayName, email: confirmedSignals.email === undefined ? parsedSignals.email : (confirmedSignals.email ?? null) }
       : parsedSignals;
     const match = await this.findPossibleDuplicate(identity.workspaceId, material, signals);
     if (match) {
