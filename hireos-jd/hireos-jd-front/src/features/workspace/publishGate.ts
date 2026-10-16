@@ -27,7 +27,7 @@ export function statusContext(gate: string, analysis: string): string {
 
 export type PublishGate =
   | { kind: "loading" }
-  | { kind: "issues"; count: number; missing: string[]; revise: string[]; blockers: string[] }
+  | { kind: "issues"; count: number; missing: string[]; revise: string[]; blockers: string[]; analysis: string[] }
   | { kind: "no_changes"; versionNo: number }
   | { kind: "ready" };
 
@@ -49,7 +49,18 @@ export function publishGate(state: AppState, jobId: string, ev: Evaluation | nul
         ...ev.flags.filter((f) => f.severity === "warning").map(say),
       ],
       blockers: ev.flags.filter((f) => f.severity === "blocker").map(say),
+      analysis: [],
     };
+  }
+  const doc = selectDraft(state, jobId);
+  const run = state.wsAiAnalysis[jobId];
+  const analysisIssues = !run
+    ? ["AI Analyze has not been run on the current saved revision."]
+    : run.revision !== doc.revision || doc.saveState !== "saved"
+      ? ["The current saved revision needs a fresh AI Analyze result."]
+      : run.result.items.filter((item) => item.severity !== "suggestion").map((item) => `${item.id || "AI"}: ${item.reason}`);
+  if (analysisIssues.length) {
+    return { kind: "issues", count: count + analysisIssues.length, missing: [], revise: [], blockers: [], analysis: analysisIssues };
   }
   const latest = versionInfo.versions[versionInfo.versions.length - 1];
   if (latest && !diffBlocks(latest.blocks, selectDraft(state, jobId).blocks).count) return { kind: "no_changes", versionNo: latest.versionNo };
@@ -65,6 +76,7 @@ export function describePublishGate(gate: PublishGate, unsaved: boolean): string
     if (gate.missing.length) lines.push(`Missing: ${listOf(gate.missing, ", ")}.`);
     if (gate.revise.length) lines.push(`To revise: ${listOf(gate.revise, "; ")}.`);
     if (gate.blockers.length) lines.push(`Blocking issues: ${listOf(gate.blockers, "; ")}.`);
+    if (gate.analysis.length) lines.push(`AI Analyze: ${listOf(gate.analysis, "; ")}.`);
   }
   if (gate.kind === "no_changes") lines.push(`The Publish button is disabled: nothing has changed since v${gate.versionNo} was published.`);
   if (gate.kind === "ready") lines.push("The Publish button is available.");

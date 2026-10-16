@@ -79,6 +79,13 @@ export class VersionsService {
     if (doc.revision !== input.revision) {
       throw new ConflictException({ code: 'DOCUMENT_CHANGED', message: '文档在你确认之后又有更新，请重新打开发布窗口确认。' });
     }
+    const analysis = doc.aiAnalysis as { verdict?: string; items?: { severity?: string }[] } | null;
+    if (doc.aiAnalysisRevision !== doc.revision || !analysis) {
+      throw new ConflictException({ code: 'ANALYSIS_REQUIRED', message: '请先对当前已保存版本完成 AI 分析。' });
+    }
+    if ((analysis.items ?? []).some((item) => item.severity !== 'suggestion')) {
+      throw new ConflictException({ code: 'ANALYSIS_NOT_READY', message: '当前 JD 仍有需要处理的分析问题，不能发布。' });
+    }
     const latest = await this.db.jobDocumentVersion.findFirst({
       where: { workspaceId: identity.workspaceId, jobId },
       orderBy: { versionNo: 'desc' },

@@ -1,4 +1,5 @@
 import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
 import { z } from 'zod';
 import type { Identity } from '../auth/workspace.guard';
 import { PrismaService } from '../persistence/prisma.service';
@@ -65,6 +66,8 @@ export class DocumentsService {
         data: {
           blocks: json(input.blocks),
           meta: input.meta ? json(input.meta) : undefined,
+          aiAnalysis: Prisma.JsonNull,
+          aiAnalysisRevision: null,
           revision: { increment: 1 },
           updatedBy: identity.actorId,
         },
@@ -86,6 +89,7 @@ function serialize(row: {
   blocks: unknown;
   meta: unknown;
   revision: number;
+  aiAnalysisRevision: number | null;
   updatedBy: string;
   updatedAt: Date;
 }) {
@@ -95,6 +99,7 @@ function serialize(row: {
     blocks: row.blocks,
     meta: row.meta ?? null,
     revision: row.revision,
+    aiAnalysisRevision: row.aiAnalysisRevision,
     updatedBy: row.updatedBy,
     updatedAt: row.updatedAt.toISOString(),
   };

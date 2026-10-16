@@ -14,7 +14,7 @@ export class DocAiController {
   }
 
   @Post('analyze')
-  analyze(@Req() req: { identity: Identity }, @Param('jobId') jobId: string, @Body() body: unknown) {
-    return this.ai.analyze(req.identity, jobId, body);
+  analyze(@Req() req: { identity: Identity }, @Param('jobId') jobId: string, @Param('audience') audience: string, @Body() body: unknown) {
+    return this.ai.analyze(req.identity, jobId, audience, body);
   }
 }

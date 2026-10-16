@@ -123,6 +123,7 @@ export function JobWorkspacePage() {
   const latestVersion = versionInfo?.versions[versionInfo.versions.length - 1];
   const unpublished = latestVersion ? diffBlocks(latestVersion.blocks, selectDraft(state, id).blocks).count : 0;
   const gate = publishGate(state, id, completeness);
+  const approvalReady = state.approvals[id]?.status === "approved";
   const publishBlockedReason =
     gate.kind === "loading"
       ? t("Loading…")
@@ -144,7 +145,7 @@ export function JobWorkspacePage() {
     // The pending case already returned above, so this is the non-pending branch.
     if (job.collaborationStatus === "in_collaboration") {
       return (
-        <Button variant="primary" onClick={() => submitForApproval(id)}>
+        <Button variant="primary" disabled={gate.kind !== "ready"} title={gate.kind !== "ready" ? t("Resolve the current analysis and completeness issues first.") : undefined} onClick={() => submitForApproval(id)}>
           {t("Submit for approval")}
         </Button>
       );
@@ -228,8 +229,8 @@ export function JobWorkspacePage() {
             {primaryAction()}
             <Button
               variant="primary"
-              disabled={!!publishBlockedReason}
-              title={publishBlockedReason}
+              disabled={!!publishBlockedReason || !approvalReady}
+              title={!approvalReady ? t("Publish is available after approval.") : publishBlockedReason}
               onClick={() => openModal(<PublishModal jobId={id} />)}
             >
               <Icon name="public" />
