@@ -37,11 +37,15 @@ export function readAvailability(value: string): Availability {
       return { value: text, status: 'known', date: `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}` };
     }
   }
-  if (/immediate|right away|随时|立即|马上/i.test(text)) return { value: text, status: 'known', days: 0 };
+  // A stated notice period wins over any other wording ("Not immediately available; 2 months notice" is 60 days).
   for (const [pattern, days] of UNIT_DAYS) {
     const match = text.match(pattern);
     if (match) return { value: text, status: 'known', days: Math.round(Number(match[1]) * days) };
   }
+  // "Immediately" counts only when nothing negates it; otherwise the text is kept as written.
+  const negated = /\b(not|no|isn't|cannot|can't|unable)\b[^.;,]{0,24}(immediate|right away)|(不能|无法|不可|非)\s*(随时|立即|马上)/i.test(text);
+  if (!negated && /immediate|right away|随时|立即|马上/i.test(text)) return { value: text, status: 'known', days: 0 };
+  if (negated) return { value: text, status: 'known' };
   const word = text.match(/\b(one|two|three|four|six)\s+(week|month)s?\b/i);
   if (word) {
     const n = { one: 1, two: 2, three: 3, four: 4, six: 6 }[word[1].toLowerCase() as 'one'];

@@ -205,6 +205,36 @@ test('#155 AC-2 (review): two jobs with the same title at different companies ea
   assert.equal(h.evidence[0].segmentId, 'p1');
 });
 
+test('#155 AC-2 (review): two stints of the same role at the same company are told apart by their start month', () => {
+  const segments = [
+    { id: 's1', text: 'Engineer, Acme — Jan 2015 to Jan 2017', page: 1 },
+    { id: 's2', text: 'Engineer, Acme — 2021/01 to 2024/01', page: 2 },
+  ];
+  const stints = [
+    { company: 'Acme', title: 'Engineer', start: '2015-01', end: '2017-01' },
+    { company: 'Acme', title: 'Engineer', start: '2021-01', end: '2024-01' },
+  ];
+  const f = byField(profileFields({ displayName: 'A', employmentHistory: stints }, { displayName: 'A', email: null, phone: null }, source(segments))).employment_history;
+  assert.deepEqual(f.evidence.map((e) => e.segmentId), ['s1', 's2']);
+  assert.deepEqual(f.unlocatedValues, []);
+  // When the months can't be found, the same company and title can't say which paragraph is which: not pinned.
+  const undated = [{ id: 'u1', text: 'Engineer, Acme', page: 1 }, { id: 'u2', text: 'Engineer, Acme (again)', page: 2 }];
+  const g = byField(profileFields({ displayName: 'A', employmentHistory: stints }, { displayName: 'A', email: null, phone: null }, source(undated))).employment_history;
+  assert.deepEqual(g.evidence, []);
+  assert.equal(g.evidenceUnavailable, 'not_located');
+});
+
+test('#155 AC-2 (review): two degrees from the same school point at their own paragraphs by year', () => {
+  const segments = [{ id: 'e1', text: 'Fudan University — B.Sc. Computer Science, 2010 – 2014' }, { id: 'e2', text: 'Fudan University — M.Sc. Statistics, 2016 – 2018' }];
+  const degrees = [
+    { school: 'Fudan University', degree: 'B.Sc.', major: 'Computer Science', period: '2010 – 2014' },
+    { school: 'Fudan University', degree: 'M.Sc.', major: 'Statistics', period: '2016 – 2018' },
+  ];
+  const f = byField(profileFields({ displayName: 'A', education: degrees }, { displayName: 'A', email: null, phone: null }, source(segments))).education;
+  assert.deepEqual(f.evidence.map((e) => e.segmentId), ['e1', 'e2']);
+  assert.deepEqual(f.unlocatedValues, []);
+});
+
 test('#155 AC-1: a location confirmed unchanged on paste keeps its country and city; one the user typed is theirs', () => {
   const { withConfirmedIdentity } = require('../dist/profiles/profiles.service');
   const parsed = { displayName: 'A', email: null, location: { value: 'Ho Chi Minh City, Vietnam', status: 'known', country: 'Vietnam', city: 'Ho Chi Minh City' }, missingFields: [] };
@@ -222,6 +252,12 @@ test('#155 AC-1: availability with a decimal is read whole — 1.5 months is 45 
   assert.equal(readAvailability('1.5 months notice').days, 45);
   assert.equal(readAvailability('2 weeks').days, 14);
   assert.equal(readAvailability('0.5个月').days, 15);
+  // A negated "immediately" isn't zero days: the stated notice period counts, or the text alone stays.
+  assert.equal(readAvailability('Not immediately available; 2 months notice').days, 60);
+  assert.equal(readAvailability('Not immediately available').days, undefined);
+  assert.equal(readAvailability('不能立即到岗').days, undefined);
+  assert.equal(readAvailability('Available immediately').days, 0);
+  assert.equal(readAvailability('随时到岗').days, 0);
 });
 
 test('#155 AC-3: the candidate API returns the same fields, statuses and locations on every read', async () => {

@@ -43,7 +43,16 @@ export const PROFILE_FIELDS = [
 type Segment = { id: string; text: string; page?: number };
 type Source = { resumeVersionId: string; resumeVersion: number; materialId: string; readable: boolean; segments: Segment[] };
 /** `together`: texts that must all be in the same paragraph (a job's company and title), tried before `needles`. */
-type Item = { value: string; needles: string[]; together?: string[]; incomplete?: string[] };
+type Item = {
+  value: string;
+  needles: string[];
+  together?: string[];
+  /** Ways the job's start month may be written; with them, company + title + month pins the paragraph. */
+  dateForms?: string[];
+  /** Another item has the same company and title, so they alone can't tell which paragraph is this one. */
+  ambiguous?: boolean;
+  incomplete?: string[];
+};
 
 export function profileFields(
   profile: Record<string, unknown> | null | undefined,
@@ -73,10 +82,13 @@ export function profileFields(
           incomplete: confirmedLocation ? [] : [...(!text(location.country) ? ['country'] : []), ...(!text(location.city) ? ['city'] : [])],
         }]
       : [],
-    employment_history: asArray(p.employmentHistory).map((entry) => {
+    employment_history: asArray(p.employmentHistory).map((entry, _i, all) => {
       const e = record(entry);
       const [company, title, start, end] = [text(e.company), text(e.title), text(e.start), text(e.end)];
+      const sameRole = all.filter((other) => normalize(text(record(other).company)) === normalize(company) && normalize(text(record(other).title)) === normalize(title)).length > 1;
       return {
+        dateForms: monthForms(formatMonth(start)),
+        ambiguous: sameRole,
         value: [title, company].filter(Boolean).join(' · ') + (start || end ? ` (${start || '?'} – ${end || '?'})` : ''),
         // Company and title in the same paragraph: two jobs with the same title at different companies each find
         // their own paragraph; a title alone is used only when there is no company (#155 review).
@@ -85,14 +97,18 @@ export function profileFields(
         incomplete: [...(!company ? ['company'] : []), ...(!title ? ['title'] : []), ...(!formatMonth(start) || !(isPresent(end) || formatMonth(end)) ? ['dates'] : [])],
       };
     }),
-    education: asArray(p.education).map((entry) => {
+    education: asArray(p.education).map((entry, _i, all) => {
       const e = record(entry);
       const [school, degree, major, period] = [text(e.school), text(e.degree), text(e.major), text(e.period)];
       const split = [school, degree, major].filter(Boolean).join(' · ');
       const statement = split || text(e.statement);
+      // Two degrees from one school are told apart by their start year, as two stints of a job are (#155 review).
+      const sameSchool = !!school && all.filter((other) => normalize(text(record(other).school)) === normalize(school)).length > 1;
       return {
         value: statement + (period ? ` (${period})` : ''),
-        needles: [school, text(e.statement), major],
+        ...(school
+          ? { together: [school], dateForms: (period.match(/\d{4}/) ?? []).slice(0, 1), ambiguous: sameSchool, needles: [] }
+          : { needles: [text(e.statement), major] }),
         // §4.1: school, degree, major and dates, each on its own.
         incomplete: [...(!school ? ['school'] : []), ...(!degree ? ['degree'] : []), ...(!major ? ['major'] : []), ...(!period ? ['dates'] : [])],
       };
@@ -165,10 +181,27 @@ function numberParagraphs(segments: Segment[]) {
 function locateItem(item: Item, paragraphs: ReturnType<typeof numberParagraphs>, source: Source): FieldEvidence | null {
   if (item.together?.length) {
     const parts = item.together.map(normalize).filter(Boolean);
-    const hit = paragraphs.find((p) => parts.every((part) => p.normalized.includes(part)));
-    if (hit) return evidenceAt(hit, parts[0], source);
+    const candidates = paragraphs.filter((p) => parts.every((part) => p.normalized.includes(part)));
+    // The start month tells two stints of the same role apart (#155 review).
+    const dated = item.dateForms?.length ? candidates.find((p) => item.dateForms!.some((form) => p.normalized.includes(form))) : undefined;
+    if (dated) return evidenceAt(dated, parts[0], source);
+    // Without a matching month, company + title must point at one paragraph and one job; otherwise it isn't pinned.
+    if (candidates.length === 1 && !item.ambiguous) return evidenceAt(candidates[0], parts[0], source);
+    return null;
   }
   return locate(item.needles, paragraphs, source);
+}
+
+/** How a YYYY-MM month may be written in a résumé, lower-cased: 2015-01, 2015/01, 2015.01, 2015年1月, 01/2015, jan 2015… */
+function monthForms(month: string | null): string[] {
+  if (!month) return [];
+  const [year, mm] = month.split('-');
+  const m = String(Number(mm));
+  const names = ['jan', 'feb', 'mar', 'apr', 'may', 'jun', 'jul', 'aug', 'sep', 'oct', 'nov', 'dec'];
+  const full = ['january', 'february', 'march', 'april', 'may', 'june', 'july', 'august', 'september', 'october', 'november', 'december'];
+  const i = Number(mm) - 1;
+  return [`${year}-${mm}`, `${year}/${mm}`, `${year}.${mm}`, `${year}-${m}`, `${year}/${m}`, `${year}.${m}`, `${year}年${m}月`, `${year}年${mm}月`,
+    `${mm}/${year}`, `${m}/${year}`, `${names[i]} ${year}`, `${names[i]}. ${year}`, `${full[i]} ${year}`];
 }
 
 function evidenceAt(hit: ReturnType<typeof numberParagraphs>[number], probe: string, source: Source): FieldEvidence {
