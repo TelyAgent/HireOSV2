@@ -55,20 +55,28 @@ export class AuthService {
   async requestCode(rawEmail: string, localeHint: string | undefined, meta: RequestMeta) {
     const email = normalizeEmail(rawEmail);
     if (!isValidEmail(email)) throw new BadRequestException({ code: 'INVALID_EMAIL', message: 'Enter a valid email address.' });
-    await this.enforceRateLimits(email, meta.ip ?? null);
-
+    const ip = meta.ip ?? null;
     const user = await this.signInEligibleUser(email);
-    await this.db.authEvent.create({
-      data: { type: 'code_requested', email, userId: user?.id ?? null, ip: meta.ip ?? null, userAgent: meta.userAgent ?? null, detail: { eligible: Boolean(user) } },
-    });
 
-    // Every request gets a fresh code and supersedes the previous one. For an uninvited email the code
-    // is a decoy that is never sent, so verifying behaves exactly like for a member (AC-4).
+    // Checking the limits, recording the request and replacing the code happen as one step per email and per IP
+    // (#133): a database lock held to the end of the transaction makes concurrent requests — from any number of
+    // processes — take turns, so they can't all read the same remaining allowance, and the newest code is the only
+    // valid one. Locks are always taken email first, then IP, so two requests can't wait on each other.
     const code = generateCode();
-    const now = new Date();
-    await this.db.loginCode.updateMany({ where: { email, consumedAt: null, supersededAt: null }, data: { supersededAt: now } });
-    const record = await this.db.loginCode.create({
-      data: { email, codeHash: hashCode(code, this.config.loginCodeSecret), expiresAt: new Date(now.getTime() + CODE_TTL_MS), requestIp: meta.ip ?? null },
+    const record = await this.db.$transaction(async (tx) => {
+      await tx.$queryRaw`SELECT 1 FROM (SELECT pg_advisory_xact_lock(hashtextextended(${`login-code:email:${email}`}, 0))) AS locked`;
+      if (ip) await tx.$queryRaw`SELECT 1 FROM (SELECT pg_advisory_xact_lock(hashtextextended(${`login-code:ip:${ip}`}, 0))) AS locked`;
+      await this.enforceRateLimits(tx, email, ip);
+      await tx.authEvent.create({
+        data: { type: 'code_requested', email, userId: user?.id ?? null, ip, userAgent: meta.userAgent ?? null, detail: { eligible: Boolean(user) } },
+      });
+      // Every request gets a fresh code and supersedes the previous one. For an uninvited email the code
+      // is a decoy that is never sent, so verifying behaves exactly like for a member (AC-4).
+      const now = new Date();
+      await tx.loginCode.updateMany({ where: { email, consumedAt: null, supersededAt: null }, data: { supersededAt: now } });
+      return tx.loginCode.create({
+        data: { email, codeHash: hashCode(code, this.config.loginCodeSecret), expiresAt: new Date(now.getTime() + CODE_TTL_MS), requestIp: ip },
+      });
     });
     if (user) {
       try {
@@ -165,9 +173,9 @@ export class AuthService {
     return membership ? user : null;
   }
 
-  private async enforceRateLimits(email: string, ip: string | null) {
+  private async enforceRateLimits(tx: Pick<PrismaService, 'authEvent'>, email: string, ip: string | null) {
     const now = Date.now();
-    const recent = await this.db.authEvent.findMany({
+    const recent = await tx.authEvent.findMany({
       where: { type: 'code_requested', email, createdAt: { gt: new Date(now - DAY_MS) } },
       orderBy: { createdAt: 'asc' },
       select: { createdAt: true },
@@ -184,7 +192,7 @@ export class AuthService {
       throw rateLimited((recent[0].createdAt.getTime() + DAY_MS - now) / 1000);
     }
     if (ip) {
-      const fromIp = await this.db.authEvent.findMany({
+      const fromIp = await tx.authEvent.findMany({
         where: { type: 'code_requested', ip, createdAt: { gt: new Date(now - HOUR_MS) } },
         orderBy: { createdAt: 'asc' },
         select: { createdAt: true },
