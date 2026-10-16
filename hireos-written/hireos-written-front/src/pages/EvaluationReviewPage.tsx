@@ -159,7 +159,6 @@ export function EvaluationReviewContent({
       finalizeCaseEvaluation(att.caseId, {
         overall,
         invitationId: att.invitationId,
-        finalizedBy: state.currentUser,
         criteria: ev.criteria.map((c) => ({ name: c.name, max: c.max, ai: c.ai, human: c.human as number, overridden: c.overridden, overrideReason: c.overrideReason })),
       }).catch(() => say(t("Could not save to the server. Please refresh and try again."), { type: "danger" }));
     }

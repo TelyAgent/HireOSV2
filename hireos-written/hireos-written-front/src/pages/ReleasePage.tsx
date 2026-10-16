@@ -179,7 +179,7 @@ export function ReleaseContent({
             </div>
           ))}
           <div className="tiny" style={{ marginTop: 8 }}>
-            {t("Finalized by")} {evaluation.finalizedBy ? getUser(evaluation.finalizedBy as UserId)?.name : "—"} · {fmtDate(evaluation.finalizedAt)}
+            {t("Finalized by")} {evaluation.finalizedBy ? (getUser(evaluation.finalizedBy as UserId)?.name ?? evaluation.finalizedBy) : "—"} · {fmtDate(evaluation.finalizedAt)}
           </div>
         </div>
 

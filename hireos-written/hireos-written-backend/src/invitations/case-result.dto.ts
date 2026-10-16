@@ -32,6 +32,10 @@ export class FinalizeEvaluationDto {
   @Type(() => FinalCriterionDto)
   criteria!: FinalCriterionDto[];
 
+  /**
+   * Ignored (#134): who finalized is always the signed-in caller (or the user a trusted service acts for), never a
+   * name sent in the body. Still accepted so older clients that send it keep working.
+   */
   @IsOptional()
   @IsString()
   finalizedBy?: string;

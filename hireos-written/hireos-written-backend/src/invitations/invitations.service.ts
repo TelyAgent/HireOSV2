@@ -137,7 +137,8 @@ export class InvitationsService {
       where: { id: submission.id },
       data: {
         finalEvaluation: { overall: dto.overall, criteria: dto.criteria } as unknown as object,
-        finalizedBy: dto.finalizedBy,
+        // The authenticated actor, never the body's finalizedBy (#134).
+        finalizedBy: identity.actorId,
         finalizedAt: new Date(),
       },
     });

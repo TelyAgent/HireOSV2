@@ -200,7 +200,8 @@ export interface RealSubmission {
 /** Persists the finalized scoring on the case's latest submission. Throws on a fixture-only demo case (404). */
 export async function finalizeCaseEvaluation(
   caseId: string,
-  input: { overall: number; criteria: RealFinalCriterion[]; finalizedBy?: string; invitationId?: string },
+  // Who finalized is recorded by the server from the session (#134); the client doesn't name it.
+  input: { overall: number; criteria: RealFinalCriterion[]; invitationId?: string },
 ): Promise<{ finalizedAt: string }> {
   const response = await authFetch(`${BASE}/cases/${encodeURIComponent(caseId)}/result/finalize`, {
     method: "POST",
