@@ -940,6 +940,14 @@ a:focus-visible, button:focus-visible, [tabindex]:focus-visible, input:focus-vis
 .gm-title-confirm{ margin-top:10px; padding:10px 12px; border:1px solid var(--warning-border); border-radius:8px; background:var(--warning-bg); }
 .gm-title-confirm-head{ font-size:var(--fs-sm); display:flex; gap:8px; align-items:baseline; flex-wrap:wrap; }
 .gm-ai-tag{ font-size:var(--fs-xs); font-weight:600; color:var(--warning-text); white-space:nowrap; }
+/* #68: per-field source / confirmation on a Quick Start draft; AI suggestions stay highlighted until confirmed. */
+.gm-field-mark{ display:inline-flex; align-items:center; gap:6px; margin-left:8px; vertical-align:middle; font-weight:400; }
+.gm-user-tag{ font-size:var(--fs-xs); font-weight:600; color:var(--success-text); white-space:nowrap; }
+.gm-field-rev{ font-size:var(--fs-xs); color:var(--text-tertiary); font-family:var(--font-mono); }
+.gm-field-mark .req-link{ font-size:var(--fs-xs); }
+.gm-ws-doc .gm-pending{ background:var(--warning-bg); border-radius:6px; padding:4px 8px; margin-left:-8px; box-shadow:inset 3px 0 0 var(--warning-border); }
+.gm-ws-note.gm-pending-note{ color:var(--warning-text); background:var(--warning-bg); border-color:var(--warning-border); }
+.gm-pending-note .req-link{ margin-left:auto; }
 .gm-title-confirm-row{ display:flex; gap:8px; margin-top:8px; }
 .gm-title-confirm-row input{ flex:1; min-width:0; padding:6px 8px; border:1px solid var(--border-strong); border-radius:6px; background:var(--surface); color:var(--text); font:inherit; font-size:var(--fs-sm); }
 .ai-diff{ display:flex; flex-direction:column; gap:4px; font-size:var(--fs-sm); }

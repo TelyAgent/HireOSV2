@@ -187,6 +187,8 @@ export function findSection(secs: DocSection[], item: ReqItem, blocks: DocBlock[
 export function filledBlocks(sec: DocSection | null, item: ReqItem) {
   if (!sec) return [];
   return sec.blocks.filter((b) => {
+    // Group sub-headings (e.g. "1.基础条件", #86) organise a list; they are not items of it.
+    if (item.list && b.kind === "h3") return false;
     const t = plain(b);
     return isFilled(t) && !(item.lead && META_LINE.test(t)) && !(item.publicOnly && blockLevel(b) !== "public");
   });

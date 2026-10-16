@@ -1,4 +1,5 @@
 import type { MoneyRange } from "../../lib/format";
+import type { FieldMetaMap } from "../../store/types";
 /**
  * Thin client for the real `hireos-jd-backend` Copilot endpoints
  * (`/api/copilot/conversations/...`). Used by GeminiPanel's "create a job"
@@ -44,6 +45,9 @@ export interface CopilotJdFields {
   responsibilities?: string[];
   mustHave?: string[];
   niceToHave?: string[];
+  /** Group heading of each mustHave / niceToHave item ("" when ungrouped); set by the manual form (#86). */
+  mustHaveGroups?: string[];
+  niceToHaveGroups?: string[];
   /** Public salary range; only set when the user (or source material) gave one — never AI-estimated. */
   publicCompensation?: MoneyRange;
   /** Optional internal sections of the editor template. */
@@ -73,6 +77,8 @@ export interface CopilotConversationDto {
   phase: "intake" | "drafting" | "ready_to_confirm" | "completed";
   fields: CopilotJdFields;
   missingFields: string[];
+  /** Per-field source / revision / confirmation status (#68). */
+  fieldMeta?: FieldMetaMap;
   stateRevision: number;
   createdAt: string;
   updatedAt: string;
@@ -301,6 +307,16 @@ export function refineCopilotVariants(
 }
 
 /** Saves user-authored (manual form) or user-picked (title variant) fields as-is; the conversation becomes ready to confirm. */
+/** Confirm AI-suggested draft fields as they are (#68); confirming `title` also lifts the title check (#66). */
+export function confirmCopilotFields(conversationId: string, fields: string[], revisions: Record<string, number>): Promise<CopilotConversationDto> {
+  return request(`${BASE}/${conversationId}/fields/confirm`, {
+    method: "POST",
+    // The revision of each field as the user saw it; a field changed since is refused (#68).
+    body: JSON.stringify({ fields, revisions }),
+    idempotencyKey: idempotencyKey("copilot-confirm-fields"),
+  });
+}
+
 export function setCopilotFields(conversationId: string, fields: CopilotJdFields, label: string): Promise<CopilotConversationDto> {
   return request(`${BASE}/${conversationId}/fields`, {
     method: "POST",

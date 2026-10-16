@@ -165,6 +165,12 @@ export class CopilotController {
     return this.copilot.setFields(req.identity, id, body, meta(headers));
   }
 
+  /** Confirm AI-suggested draft fields as they are (#68). */
+  @Post(':id/fields/confirm')
+  confirmFields(@Req() req: { identity: Identity }, @Param('id') id: string, @Body() body: unknown) {
+    return this.copilot.confirmFields(req.identity, id, body);
+  }
+
   @Post(':id/attachments')
   @UseFilters(AttachmentTooLargeFilter)
   @UseInterceptors(FileInterceptor('file', { limits: { fileSize: MAX_ATTACHMENT_BYTES } }))

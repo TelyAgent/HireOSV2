@@ -23,6 +23,10 @@ export const jdFieldsSchema = z
     responsibilities: z.array(z.string().trim().min(1)).optional(),
     mustHave: z.array(z.string().trim().min(1)).optional(),
     niceToHave: z.array(z.string().trim().min(1)).optional(),
+    // Group heading of each requirement as the user typed it (e.g. "1.基础条件"), "" when ungrouped; one entry per
+    // item of mustHave / niceToHave. Only the manual form sets these (#86).
+    mustHaveGroups: z.array(z.string().trim().max(200)).optional(),
+    niceToHaveGroups: z.array(z.string().trim().max(200)).optional(),
     publicCompensation: compensationSchema.optional(),
     // Optional internal sections of the editor template (business problem, expected outcomes, success criteria).
     businessProblem: z.string().trim().min(1).optional(),
@@ -76,12 +80,17 @@ export const sendMessageInputSchema = z
   })
   .strict();
 
-export function computeMissingFields(fields: JdFields): string[] {
+/**
+ * Required fields still missing for a ready draft. Lists need two items, except those in `fromSource`: what the
+ * user's own material says is enough as it is, and is not padded out by AI to reach a count (#79 review).
+ */
+export function computeMissingFields(fields: JdFields, fromSource: Array<'responsibilities' | 'mustHave'> = []): string[] {
   const missing: string[] = [];
+  const enough = (key: 'responsibilities' | 'mustHave') => (fields[key]?.length ?? 0) >= (fromSource.includes(key) ? 1 : 2);
   if (!fields.title) missing.push('title');
   if (!fields.roleSummary) missing.push('roleSummary');
-  if (!fields.responsibilities || fields.responsibilities.length < 2) missing.push('responsibilities');
-  if (!fields.mustHave || fields.mustHave.length < 2) missing.push('mustHave');
+  if (!enough('responsibilities')) missing.push('responsibilities');
+  if (!enough('mustHave')) missing.push('mustHave');
   return missing;
 }
 
@@ -165,3 +174,12 @@ export function computeMissingAuthoredFields(fields: JdFields): string[] {
   if (!fields.mustHave || fields.mustHave.length < 1) missing.push('mustHave');
   return missing;
 }
+
+export const confirmFieldsInputSchema = z
+  .object({
+    fields: z.array(z.enum(Object.keys(jdFieldsSchema.shape) as [string, ...string[]])).min(1).max(30),
+    /** The revision of each field the user reviewed (#68): a newer value isn't confirmed unseen. */
+    revisions: z.record(z.string(), z.number().int().nonnegative()),
+  })
+  .strict()
+  .refine((input) => input.fields.every((field) => input.revisions[field] !== undefined), { message: 'Each field needs the revision that was reviewed.' });

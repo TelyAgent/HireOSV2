@@ -1,10 +1,11 @@
-import { BadRequestException, ConflictException, Injectable } from '@nestjs/common';
+import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { z } from 'zod';
 import type { Identity } from '../auth/workspace.guard';
 import { CoreRecordClient } from '../core/core-record.client';
 import { PrismaService } from '../persistence/prisma.service';
 import { json } from '../records';
+import { draftToBlocks } from './baseline-blocks';
 
 /**
  * JD identity and versions (completeness standard I2 / I6): every job gets one JD ID
@@ -14,13 +15,29 @@ import { json } from '../records';
 
 const DOC_AUDIENCE = 'internal';
 
+/** Author of everything the #96 baseline migration writes; also how a baseline v1 is recognised. */
+export const MIGRATION_ACTOR = 'system:jd-baseline-migration';
+const BASELINE_NOTE = '迁移基线：此职位在版本功能上线前已发布，原发布快照、审批和发布时间未知；v1 为迁移时的 JD 内容。';
+
+export type BaselineOutcome = {
+  jobId: string;
+  result: 'created' | 'would_create' | 'has_versions' | 'not_published' | 'job_not_found' | 'no_content';
+  source?: 'saved_document' | 'draft';
+};
+
 const publishSchema = z.object({
   /** One-line version note (I6). */
   note: z.string().trim().max(1000).default(''),
   /** Revision of the saved document the user reviewed — refuses to publish anything else. */
   revision: z.number().int().positive(),
-  /** App-level person id shown as the publisher. */
-  publishedBy: z.string().trim().min(1).max(200).optional(),
+  /** App-level person id shown as the publisher; `system:` ids are reserved for the service itself (#96 review). */
+  publishedBy: z
+    .string()
+    .trim()
+    .min(1)
+    .max(200)
+    .refine((id) => !id.toLowerCase().startsWith('system:'), { message: 'publishedBy may not be a system id.' })
+    .optional(),
 });
 
 type VersionRow = {
@@ -66,6 +83,7 @@ export class VersionsService {
       where: { workspaceId: identity.workspaceId, jobId },
       orderBy: { versionNo: 'desc' },
     });
+    // Checked again under the job's version lock below; this early check just avoids touching Core.
     if (latest && sameContent(latest.blocks, doc.blocks)) {
       throw new ConflictException({ code: 'NO_CHANGES', message: `与 v${latest.versionNo} 相比没有改动，无需发布。` });
     }
@@ -76,21 +94,28 @@ export class VersionsService {
       job = await this.core.updateJob(identity, jobId, { status: 'open', reason: 'published' }, `jd-publish-${jobId}-${doc.revision}`);
     }
 
-    const versionNo = (latest?.versionNo ?? 0) + 1;
     try {
-      const row = await this.db.jobDocumentVersion.create({
-        data: {
-          workspaceId: identity.workspaceId,
-          jobId,
-          versionNo,
-          code: `${jdCode}@v${versionNo}`,
-          title: job.title,
-          blocks: json(doc.blocks),
-          meta: doc.meta === null ? undefined : json(doc.meta),
-          note: input.note,
-          publishedBy: input.publishedBy ?? identity.actorId,
-          createdBy: identity.actorId,
-        },
+      const row = await this.db.$transaction(async (tx) => {
+        await lockJobVersions(tx, identity.workspaceId, jobId);
+        const current = await tx.jobDocumentVersion.findFirst({ where: { workspaceId: identity.workspaceId, jobId }, orderBy: { versionNo: 'desc' } });
+        if (current && sameContent(current.blocks, doc.blocks)) {
+          throw new ConflictException({ code: 'NO_CHANGES', message: `与 v${current.versionNo} 相比没有改动，无需发布。` });
+        }
+        const versionNo = (current?.versionNo ?? 0) + 1;
+        return tx.jobDocumentVersion.create({
+          data: {
+            workspaceId: identity.workspaceId,
+            jobId,
+            versionNo,
+            code: `${jdCode}@v${versionNo}`,
+            title: job.title,
+            blocks: json(doc.blocks),
+            meta: doc.meta === null ? undefined : json(doc.meta),
+            note: input.note,
+            publishedBy: input.publishedBy ?? identity.actorId,
+            createdBy: identity.actorId,
+          },
+        });
       });
       return { version: serialize(row), job };
     } catch (error) {
@@ -99,6 +124,98 @@ export class VersionsService {
       }
       throw error;
     }
+  }
+
+  /**
+   * Gives a job published before JD versions existed its v1 (#96, PD-M8-02). The original publish snapshot
+   * isn't kept anywhere, so v1 is the job's JD content at migration time: its saved document, or — for a job
+   * whose document was never saved — the document its draft shows, which is then saved too so the editor and
+   * v1 hold the same content. v1 is marked as a migration baseline; its time is the migration time, and the
+   * original approval and publish time stay unknown rather than invented. Idempotent: a job that already has
+   * any version, or isn't published, is left alone.
+   */
+  async backfillBaseline(identity: Identity, jobId: string, options: { apply: boolean }): Promise<BaselineOutcome> {
+    const where = { workspaceId: identity.workspaceId, jobId };
+    if (await this.db.jobDocumentVersion.findFirst({ where })) return { jobId, result: 'has_versions' };
+    // JD content can outlive its job: a job deleted in Core leaves its draft rows here.
+    const job = await this.core.getJob(identity, jobId).catch((error: unknown) => {
+      if (error instanceof NotFoundException) return null;
+      throw error;
+    });
+    if (!job) return { jobId, result: 'job_not_found' };
+    if (job.status !== 'open') return { jobId, result: 'not_published' };
+
+    const doc = await this.db.jobDocument.findUnique({
+      where: { workspaceId_jobId_audience: { workspaceId: identity.workspaceId, jobId, audience: DOC_AUDIENCE } },
+    });
+    const draft = doc ? null : await this.db.jobDraft.findFirst({ where, orderBy: { revision: 'desc' } });
+    if (!doc && !draft) return { jobId, result: 'no_content' };
+    const source = doc ? 'saved_document' : 'draft';
+    if (!options.apply) return { jobId, result: 'would_create', source };
+
+    const blocks = doc ? doc.blocks : draftToBlocks(job.title, draft!, jobId);
+    const migratedAt = new Date();
+    const baseline = { kind: 'migration_baseline', source, migratedAt: migratedAt.toISOString(), originalPublishedAt: null, originalApproval: null };
+    const jdCode = await this.ensureCode(identity, jobId);
+    try {
+      const created = await this.db.$transaction(async (tx) => {
+        await lockJobVersions(tx, identity.workspaceId, jobId);
+        // A Publish may have landed since the check above.
+        if (await tx.jobDocumentVersion.findFirst({ where })) return false;
+        if (!doc) {
+          await tx.jobDocument.create({
+            data: { workspaceId: identity.workspaceId, jobId, audience: DOC_AUDIENCE, blocks: json(blocks), revision: 1, updatedBy: MIGRATION_ACTOR },
+          });
+        }
+        await tx.jobDocumentVersion.create({
+          data: {
+            workspaceId: identity.workspaceId,
+            jobId,
+            versionNo: 1,
+            code: `${jdCode}@v1`,
+            title: job.title,
+            blocks: json(blocks),
+            // Keeps the document-meta shape ({ values, shown }) the editor reads when a version is restored.
+            meta: json({ values: {}, shown: [], ...asRecord(doc?.meta), baseline }),
+            note: BASELINE_NOTE,
+            publishedBy: MIGRATION_ACTOR,
+            createdBy: MIGRATION_ACTOR,
+            publishedAt: migratedAt,
+          },
+        });
+        return true;
+      });
+      if (!created) return { jobId, result: 'has_versions' };
+    } catch (error) {
+      // A concurrent run (or a real Publish) got there first: the job has its v1.
+      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') return { jobId, result: 'has_versions' };
+      throw error;
+    }
+    return { jobId, result: 'created', source };
+  }
+
+  /**
+   * Undoes `backfillBaseline` for one job: removes the baseline v1 — and the document it saved from the draft,
+   * if nobody has edited that since — but only while v1 is still the job's only version.
+   */
+  async rollbackBaseline(identity: Identity, jobId: string): Promise<'removed' | 'kept' | 'none'> {
+    const where = { workspaceId: identity.workspaceId, jobId };
+    // Decided and done under the job's version lock, so a Publish can't add v2 between the check and the delete.
+    return this.db.$transaction(async (tx) => {
+      await lockJobVersions(tx, identity.workspaceId, jobId);
+      const versions = await tx.jobDocumentVersion.findMany({ where });
+      // Only what the migration itself wrote: createdBy is set by the service, never by a client (#96 review).
+      const v1 = versions.find(
+        (v) => v.versionNo === 1 && v.createdBy === MIGRATION_ACTOR && v.publishedBy === MIGRATION_ACTOR && asRecord(asRecord(v.meta).baseline).kind === 'migration_baseline',
+      );
+      if (!v1) return 'none' as const;
+      if (versions.length > 1) return 'kept' as const;
+      await tx.jobDocumentVersion.delete({ where: { id: v1.id } });
+      if (asRecord(asRecord(v1.meta).baseline).source === 'draft') {
+        await tx.jobDocument.deleteMany({ where: { ...where, audience: DOC_AUDIENCE, updatedBy: MIGRATION_ACTOR, revision: 1 } });
+      }
+      return 'removed' as const;
+    });
   }
 
   /** Returns the job's JD ID, assigning the next free number for the current year on first use. */
@@ -148,4 +265,16 @@ function serialize(row: VersionRow) {
     publishedBy: row.publishedBy,
     publishedAt: row.publishedAt.toISOString(),
   };
+}
+
+function asRecord(value: unknown): Record<string, unknown> {
+  return value && typeof value === 'object' && !Array.isArray(value) ? (value as Record<string, unknown>) : {};
+}
+
+/**
+ * Serialises everything that writes or removes a job's versions — Publish, the baseline migration and its
+ * rollback (#96 review) — for the rest of the transaction. A Postgres advisory lock, so no table is locked.
+ */
+async function lockJobVersions(tx: Prisma.TransactionClient, workspaceId: string, jobId: string) {
+  await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${`jd-versions:${workspaceId}:${jobId}`}, 0))`;
 }

@@ -69,6 +69,7 @@ test('#71 AC-3: creating with the selected version stores exactly its facts — 
     copilotConversation: {
       findFirst: async () => conv,
       update: async ({ data }) => { for (const [k, v] of Object.entries(data)) if (k !== 'stateRevision') conv[k] = v; return conv; },
+      updateMany: async ({ data }) => { for (const [k, v] of Object.entries(data)) if (k !== 'stateRevision') conv[k] = v; return { count: 1 }; },
     },
     copilotMessage: {
       findFirst: async () => messages[messages.length - 1] ?? null,

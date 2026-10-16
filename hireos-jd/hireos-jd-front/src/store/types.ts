@@ -42,6 +42,14 @@ export type CopilotMsg =
     }
   | { kind: "suggestion"; suggestion: Suggestion; explain: string };
 
+/** Where a draft field came from and whether it still awaits the user's confirmation (#68). */
+export interface FieldMeta {
+  source: "user" | "ai";
+  revision: number;
+  status: "confirmed" | "pending";
+}
+export type FieldMetaMap = Record<string, FieldMeta>;
+
 export interface GeminiDraft {
   title: string;
   department: string;
@@ -94,6 +102,8 @@ export type GeminiMsg =
       draft: GeminiDraft;
       /** The job title is an AI suggestion the user must confirm or edit before creating (#66). */
       titlePending?: boolean;
+      /** Per-field source / revision / confirmation status (#68), keyed by the backend field name. */
+      fieldMeta?: FieldMetaMap;
       prev?: GeminiDraft;
       origin?: GeminiOrigin;
       superseded?: boolean;
