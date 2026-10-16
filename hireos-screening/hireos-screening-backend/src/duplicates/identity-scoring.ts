@@ -69,7 +69,8 @@ export function scoreIdentity(uploaded: UploadedSide, existing: ExistingSide): I
 
   const [a, b] = [normalizeName(uploaded.name), normalizeName(existing.name)];
   if (a && b && a === b) signals.push({ key: 'name_exact', points: P.name_exact, detail: `Same name: ${existing.name}` });
-  else if (a && b && Math.min(a.length, b.length) >= 3 && editDistanceAtMostOne(a, b)) {
+  // §4.2: one character apart, short names included ("王芳" / "王芬"); a one-character name is too short to compare.
+  else if (a && b && Math.min(a.length, b.length) >= 2 && editDistanceAtMostOne(a, b)) {
     signals.push({ key: 'name_close', points: P.name_close, detail: `Similar name (one character apart): ${uploaded.name} / ${existing.name}` });
   }
 

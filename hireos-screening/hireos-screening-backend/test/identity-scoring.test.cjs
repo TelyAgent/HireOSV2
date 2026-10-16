@@ -202,3 +202,16 @@ test('#151 AC-1 (review): months are compared whole and an entry ends at its fir
     nina([{ company: 'Alpha', title: 'Engineer', start: '2021-03' }, { company: 'Beta', title: 'Analyst', start: '2018-07' }]));
   assert.ok(keys(same).includes('employment:20'), keys(same).join(','));
 });
+
+test('#151 AC-1/AC-2 (review): two-character names one character apart are a close name — a review, not a silent import', () => {
+  const close = scoreIdentity({ name: '王芳', email: null, phone: null, text: '' }, existing({ name: '王芬', email: null, phone: null, text: null, employment: [], education: [] }));
+  assert.deepEqual(keys(close), ['name_close:8']);
+  // With two shared jobs and similar content it crosses into review: 20 + 15 + 8.
+  const jobs = 'Wang Fang\nSenior Data Analyst, Example Retail — 2021-03 to present\nBuilt pricing dashboards in SQL and Python for 120 stores and cut weekly reporting time by half.\nData Analyst, Sample Bank — 2018-07 to 2021-02\nMaintained credit risk reports and automated the monthly reconciliation of 40 branch ledgers.\n';
+  const score = scoreIdentity({ name: '王芳', email: null, phone: null, text: jobs + 'Led the pricing guild.' },
+    existing({ name: '王芬', email: null, phone: null, text: jobs + 'Mentored two junior analysts.', education: [] }));
+  assert.deepEqual(keys(score).sort(), ['content:15', 'employment:20', 'name_close:8']);
+  assert.equal(score.band, 'possible_same_person');
+  // One-character names are not compared.
+  assert.deepEqual(keys(scoreIdentity({ name: '王', email: null, phone: null, text: '' }, existing({ name: '李', email: null, phone: null, text: null, employment: [], education: [] }))), []);
+});
