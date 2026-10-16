@@ -1,4 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
+import { decisionDiffersFromAi, humanStatus } from "../features/screening/humanStatus";
+import type { Concern } from "../data/fixtures/concerns";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { useStore } from "../store/StoreContext";
 import { getJobDetail, listJobBelowThreshold, runJobMatch, type BelowThresholdCandidate } from "../data/api/jobs";
@@ -8,12 +10,12 @@ import { createComparison, refreshComparison } from "../data/api/comparisons";
 import { db } from "../data/db";
 import type { Job } from "../data/fixtures/jobs";
 import type { Evaluation } from "../data/fixtures/evaluations";
-import type { DecisionOutcome } from "../data/fixtures/decisions";
 import type { EligibilityStatus } from "../lib/scoring";
 import { Icon } from "../components/ui/Icons";
 import { ResumeImportModal, type ImportTab } from "../features/imports/ResumeImportPanel";
 import { confidenceLabel, inferRecommendation } from "../lib/scoring";
 import {
+  AiRecommendationBadge,
   BackButton,
   Badge,
   Button,
@@ -21,41 +23,42 @@ import {
   CoverageBar,
   EligibilityBadge,
   EmptyState,
-  RecommendationBadge,
-  ScoreRing,
   scoreDisplay,
+  ScoreRing,
 } from "../components/ui/Primitives";
+import { recommend, recommendationDisplay } from "../lib/recommendationRule";
 import { PageSkeleton } from "../components/ui/PageSkeleton";
 import { WithDisabledReason } from "../components/ui/DisabledReason";
 
 type EligFilter = "all" | EligibilityStatus;
 
-type WorkspaceRowData = { app: ApplicationWithNames; ev: Evaluation | undefined; openConcerns: number };
+type WorkspaceRowData = { app: ApplicationWithNames; ev: Evaluation | undefined; openConcerns: number; concerns: Concern[] };
 
-const DECISION_LABEL: Record<DecisionOutcome, string> = {
-  strong_advance: "Strong advance",
-  advance: "Advance",
-  hold: "Hold",
-  do_not_advance: "Do not advance",
-  request_information: "Request Information",
-};
 
-function cap(s: string): string {
-  return s ? s.charAt(0).toUpperCase() + s.slice(1) : s;
-}
 
-function WorkspaceRow({ app, ev, openConcerns }: WorkspaceRowData) {
+function WorkspaceRow({ app, ev, openConcerns, concerns }: WorkspaceRowData) {
   const { t } = useStore();
   const navigate = useNavigate();
   const decision = db.decisions[app.id];
-  const humanStatus = decision ? (
-    <Badge tone="success">
-      {t("Decided —")} {t(DECISION_LABEL[decision.outcome] || cap(decision.outcome))}
-    </Badge>
-  ) : app.screeningStatus === "review_pending" ? (
-    <Badge tone="info">{t("Review pending")}</Badge>
+  // The person's status, separate from the AI's columns: decided, or awaiting the next step (#187).
+  const status = humanStatus(decision);
+  const aiOutcome = ev ? inferRecommendation(ev, concerns) : null;
+  const differs = decisionDiffersFromAi(aiOutcome, decision);
+  const humanStatusCell = status.decided ? (
+    <span className="flex-col" style={{ gap: 2 }}>
+      <Badge tone="success">
+        {t("Decided —")} {t(status.label)}
+      </Badge>
+      {differs && (
+        <Link className="tiny" to={`/applications/${app.id}/decision`} onClick={(e) => e.stopPropagation()} title={t("A person decided differently from the AI recommendation. The person's decision is the one in effect.")}>
+          {t("Differs from AI — see why")}
+        </Link>
+      )}
+    </span>
   ) : (
-    <Badge tone="outline">{t(cap((app.screeningStatus || "not started").replace(/_/g, " ")))}</Badge>
+    <span title={t(status.detail)}>
+      <Badge tone="info">{t(status.label)}</Badge>
+    </span>
   );
 
   return (
@@ -87,13 +90,9 @@ function WorkspaceRow({ app, ev, openConcerns }: WorkspaceRowData) {
       </td>
       <td>{ev ? <EligibilityBadge status={ev.eligibilityStatus} /> : <Badge tone="outline">{t("Not run")}</Badge>}</td>
       <td className="secondary-col">
-        {!ev ? null : ev.evaluationStatus === "insufficient_evidence" ? (
-          <Badge tone="warning">{t("Review (insufficient evidence)")}</Badge>
-        ) : (
-          <RecommendationBadge outcome={inferRecommendation(ev)} />
-        )}
+        {!ev ? null : <AiRecommendationBadge display={recommendationDisplay(recommend(ev, concerns))} />}
       </td>
-      <td>{humanStatus}</td>
+      <td>{humanStatusCell}</td>
       <td className="text-right">
         <Link className="btn btn-sm btn-secondary" to={`/applications/${app.id}`} onClick={(e) => e.stopPropagation()}>
           {t("Open", "Open (action)")}
@@ -171,6 +170,7 @@ export function ScreeningWorkspacePage() {
           app,
           ev: details[i]?.evaluation || undefined,
           openConcerns: (details[i]?.concerns || []).filter((c) => c.status === "open").length,
+          concerns: details[i]?.concerns || [],
         })),
       );
     } catch {
@@ -366,7 +366,7 @@ export function ScreeningWorkspacePage() {
           </thead>
           <tbody>
             {visibleRows.length ? (
-              visibleRows.map((r) => <WorkspaceRow key={r.app.id} app={r.app} ev={r.ev} openConcerns={r.openConcerns} />)
+              visibleRows.map((r) => <WorkspaceRow key={r.app.id} app={r.app} ev={r.ev} openConcerns={r.openConcerns} concerns={r.concerns} />)
             ) : (
               <tr>
                 <td colSpan={9}>

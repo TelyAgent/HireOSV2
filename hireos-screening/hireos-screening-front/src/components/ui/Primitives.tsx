@@ -83,6 +83,14 @@ const REC_LABEL: Record<string, string> = {
   hold: "Hold",
   do_not_advance: "Do not advance",
 };
+/** The AI recommendation as every page shows it (F08 BR-6): the shared rule's outcome, with "insufficient
+ * evidence" said only when that is the reason. */
+export function AiRecommendationBadge({ display }: { display: { outcome: string; insufficientEvidence: boolean } | null }) {
+  const { t } = useStore();
+  if (display?.insufficientEvidence) return <Badge tone="warning">{t("Review (insufficient evidence)")}</Badge>;
+  return <RecommendationBadge outcome={display?.outcome} />;
+}
+
 export function RecommendationBadge({ outcome }: { outcome?: string | null }) {
   const { t } = useStore();
   if (!outcome) return <Badge tone="neutral">—</Badge>;

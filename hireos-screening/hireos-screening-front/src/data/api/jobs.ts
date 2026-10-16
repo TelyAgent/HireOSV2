@@ -65,11 +65,25 @@ export async function runJobMatch(id: string): Promise<{ status: "queued"; candi
 }
 
 /** "New job": pasted JD text -> a draft job in JD + Core Record that Screening uses right away. */
-export async function quickStartJob(text: string, idempotencyKey: string): Promise<{ job: Job; duplicate: boolean }> {
+export interface JdPreview {
+  title: string;
+  team: string | null;
+  location: string | null;
+  /** This JD already created a job; creating would open it. */
+  duplicateOf: { coreJobId: string; title: string } | null;
+}
+
+/** "New job", step one: AI reads the JD and suggests title, team and location; nothing is created (#178). */
+export async function previewJobFromJd(text: string): Promise<JdPreview> {
+  return apiFetch<JdPreview>("/jobs/quick-start/preview", { method: "POST", body: JSON.stringify({ text }) });
+}
+
+/** Step two: create the job with the title and team the recruiter confirmed (both required). */
+export async function quickStartJob(input: { text: string; title: string; team: string }, idempotencyKey: string): Promise<{ job: Job; duplicate: boolean }> {
   const result = await apiFetch<{ job: Job; duplicate: boolean }>("/jobs/quick-start", {
     method: "POST",
     headers: { "Idempotency-Key": idempotencyKey },
-    body: JSON.stringify({ text }),
+    body: JSON.stringify(input),
   });
   db.jobs[result.job.id] = result.job;
   return result;

@@ -1,36 +1,38 @@
 import { useCallback, useEffect, useState } from "react";
+import { CONCERN_STATUS_LABEL, ConcernResolveModal } from "../features/screening/ConcernResolveModal";
+import { evaluatedBy } from "../features/screening/evaluatedBy";
+import { decisionDiffersFromAi, effectiveDecision, humanStatus } from "../features/screening/humanStatus";
+import { CAP_REASON, recommend, recommendationDisplay } from "../lib/recommendationRule";
 import { Link, useParams } from "react-router-dom";
 import { useStore } from "../store/StoreContext";
 import {
   assignVerificationItemToMe,
   getApplicationDetail,
   refreshEvaluation,
-  resolveConcern,
   resolveVerificationItem,
   runScreening,
   saveHumanOverride,
   type ApplicationDetail,
 } from "../data/api/screening";
-import { db, getCandidate, getJob, getPerson } from "../data/db";
+import { db, getCandidate, getEvidenceById, getJob, getPerson } from "../data/db";
 import type { DimensionScore } from "../data/fixtures/evaluations";
-import type { Concern, ConcernStatus } from "../data/fixtures/concerns";
+import type { Concern } from "../data/fixtures/concerns";
 import type { VerificationItem } from "../data/fixtures/verificationItems";
 import { fmtDateTime, pct } from "../lib/format";
-import { inferRecommendation } from "../lib/scoring";
 import {
+  AiRecommendationBadge,
   Badge,
   Button,
   CoverageBar,
   EligibilityBadge,
   EmptyState,
   PageHeader,
-  RecommendationBadge,
-  ScoreRing,
   scoreDisplay,
+  ScoreRing,
 } from "../components/ui/Primitives";
 import { EvidenceCard } from "../components/ui/EvidenceCard";
 import { Icon } from "../components/ui/Icons";
-import { ConfirmDialog, Drawer, Modal } from "../components/ui/Overlays";
+import { Drawer, Modal } from "../components/ui/Overlays";
 import { useBoundedPolling } from "../lib/usePolling";
 import { StillProcessingNotice } from "../components/ui/StillProcessing";
 import { PageSkeleton } from "../components/ui/PageSkeleton";
@@ -60,9 +62,10 @@ function severityTone(sev: Concern["severity"]): "danger" | "warning" | "outline
 
 function EvidenceDrawer({ dimension, onClose }: { dimension: DimensionScore; onClose: () => void }) {
   const { t } = useStore();
+  // Only evidence that can actually be shown counts (#192 AC-1/AC-3).
   const items: { id: string; rel: "Supports" | "Contradicts" }[] = [
-    ...dimension.supporting.map((id) => ({ id, rel: "Supports" as const })),
-    ...dimension.counter.map((id) => ({ id, rel: "Contradicts" as const })),
+    ...dimension.supporting.filter((id) => getEvidenceById(id)).map((id) => ({ id, rel: "Supports" as const })),
+    ...dimension.counter.filter((id) => getEvidenceById(id)).map((id) => ({ id, rel: "Contradicts" as const })),
   ];
   return (
     <Drawer open onClose={onClose} title={`${dimension.name} — ${t("evidence")}`}>
@@ -86,7 +89,8 @@ function EvidenceDrawer({ dimension, onClose }: { dimension: DimensionScore; onC
 
 function DimensionRow({ dimension, onOpenEvidence }: { dimension: DimensionScore; onOpenEvidence: () => void }) {
   const { t } = useStore();
-  const evCount = dimension.supporting.length + dimension.counter.length;
+  // The count is the evidence that can be shown, not the references (#192 AC-1/AC-3).
+  const evCount = [...dimension.supporting, ...dimension.counter].filter((id) => getEvidenceById(id)).length;
   return (
     <div className="card-pad" style={{ borderBottom: "1px solid var(--border)" }}>
       <div className="flex items-center gap-16 flex-wrap">
@@ -112,20 +116,40 @@ function DimensionRow({ dimension, onOpenEvidence }: { dimension: DimensionScore
             <Badge tone="outline">{dimension.status === "unknown" ? t("Unknown") : t(cap(dimension.status.replace(/_/g, " ")))}</Badge>
           )}
         </div>
-        <Button variant="secondary" size="sm" disabled={!evCount} onClick={onOpenEvidence}>
-          {t("Evidence")} ({evCount})
-        </Button>
+        {evCount ? (
+          <Button variant="secondary" size="sm" onClick={onOpenEvidence}>
+            {t("Evidence")} ({evCount})
+          </Button>
+        ) : (
+          <span className="tiny muted" data-testid="no-evidence">{t("No evidence")}</span>
+        )}
       </div>
     </div>
   );
 }
 
-function ConcernRow({ concern, onResolve }: { concern: Concern; onResolve: (id: string, outcome: ConcernStatus) => void }) {
+function ConcernRow({
+  applicationId,
+  concern,
+  materials,
+  openVerificationCount,
+  onChanged,
+}: {
+  applicationId: string;
+  concern: Concern;
+  materials: Array<{ materialId: string; label: string }>;
+  openVerificationCount: number;
+  onChanged: (concern: Concern) => void;
+}) {
   const { t, state } = useStore();
-  const [acceptRiskOpen, setAcceptRiskOpen] = useState(false);
+  // Which change is being reviewed before it is recorded (#193); nothing is written until "Record".
+  const [pending, setPending] = useState<{ mode: "resolve" | "reopen"; resolution?: "dismissed" | "confirmed" | "accepted_risk" } | null>(null);
+  const [showHistory, setShowHistory] = useState(false);
   const restricted = concern.restricted && !RESTRICTED_VIEWERS.includes(state.currentUser);
+  const history = concern.history ?? [];
+  const last = history[history.length - 1];
   return (
-    <div className="card-pad" id={`concern-${concern.id}`} style={{ borderBottom: "1px solid var(--border)" }}>
+    <div className="card-pad" id={`concern-${concern.id}`} style={{ borderBottom: "1px solid var(--border)" }} data-testid="concern-row" data-status={concern.status}>
       <div className="flex items-center justify-between flex-wrap gap-8">
         <div>
           <div style={{ fontWeight: 500, fontSize: "var(--fs-sm)" }}>
@@ -133,35 +157,70 @@ function ConcernRow({ concern, onResolve }: { concern: Concern; onResolve: (id: 
             <Badge tone={severityTone(concern.severity)}>{t(cap(concern.severity))}</Badge>
           </div>
           <div className="tiny">
-            {t(cap(concern.type.replace(/_/g, " ")))} · {t("basis:")} {t(cap(concern.basis.replace(/_/g, " ")))} · {t("status:")} {t(cap(concern.status.replace(/_/g, " ")))}
+            {t(cap(concern.type.replace(/_/g, " ")))} · {t("basis:")} {t(cap(concern.basis.replace(/_/g, " ")))} · {t("status:")} {t(CONCERN_STATUS_LABEL[concern.status] ?? concern.status)}
           </div>
+          {concern.status !== "open" && last?.action === "resolve" && (
+            <div className="tiny" data-testid="concern-resolution">
+              {t("Note:")} {last.note} · {getPerson(last.actorId)?.name ?? last.actorId} · {fmtDateTime(last.at, state.lang)}
+              {last.evidenceRefs.length > 0 && ` · ${t("material:")} ${last.evidenceRefs.map((r) => r.label || r.materialId).join(", ")}`}
+            </div>
+          )}
         </div>
-        {concern.status === "open" && !restricted ? (
-          <div className="flex gap-6">
-            <Button variant="secondary" size="sm" onClick={() => onResolve(concern.id, "dismissed")}>
-              {t("Dismiss")}
-            </Button>
-            <Button variant="secondary" size="sm" onClick={() => onResolve(concern.id, "confirmed")}>
-              {t("Confirm")}
-            </Button>
-            {concern.severity === "blocker" && (
-              <Button variant="secondary" size="sm" onClick={() => setAcceptRiskOpen(true)}>
-                {t("Accept risk (needs approval)")}
+        {!restricted && (
+          <div className="flex gap-6 items-center">
+            {concern.status === "open" ? (
+              <>
+                <Button variant="secondary" size="sm" onClick={() => setPending({ mode: "resolve", resolution: "dismissed" })}>
+                  {t("Dismiss")}
+                </Button>
+                <Button variant="secondary" size="sm" onClick={() => setPending({ mode: "resolve", resolution: "confirmed" })}>
+                  {t("Confirm")}
+                </Button>
+                {concern.severity === "blocker" && (
+                  <Button variant="secondary" size="sm" onClick={() => setPending({ mode: "resolve", resolution: "accepted_risk" })}>
+                    {t("Accept risk (needs approval)")}
+                  </Button>
+                )}
+              </>
+            ) : (
+              <>
+                <Badge tone="outline">{t(CONCERN_STATUS_LABEL[concern.status] ?? concern.status)}</Badge>
+                <Button variant="text" size="sm" onClick={() => setPending({ mode: "reopen" })} data-testid="concern-reopen">
+                  {t("Reopen")}
+                </Button>
+              </>
+            )}
+            {history.length > 0 && (
+              <Button variant="text" size="sm" onClick={() => setShowHistory((v) => !v)}>
+                {t("History")} ({history.length})
               </Button>
             )}
           </div>
-        ) : concern.status !== "open" ? (
-          <Badge tone="outline">{t(cap(concern.status.replace(/_/g, " ")))}</Badge>
-        ) : null}
+        )}
       </div>
-      {acceptRiskOpen && (
-        <ConfirmDialog
-          open
-          onClose={() => setAcceptRiskOpen(false)}
-          title={t("Accept risk — requires HR + HM approval")}
-          body={t("This blocker requires approval from both an HR and a Hiring Manager approver before it can be accepted. In this demo, confirming records both approvals.")}
-          confirmLabel={t("Record HR + HM approval")}
-          onConfirm={() => onResolve(concern.id, "accepted_risk")}
+      {showHistory && (
+        <ul className="tiny" style={{ margin: "8px 0 0", paddingLeft: 18 }} data-testid="concern-history">
+          {history.map((h, i) => (
+            <li key={i}>
+              {fmtDateTime(h.at, state.lang)} · {getPerson(h.actorId)?.name ?? h.actorId} · {t(CONCERN_STATUS_LABEL[h.fromStatus] ?? h.fromStatus)} →{" "}
+              {t(CONCERN_STATUS_LABEL[h.toStatus] ?? h.toStatus)} · {h.note}
+            </li>
+          ))}
+        </ul>
+      )}
+      {pending && (
+        <ConcernResolveModal
+          applicationId={applicationId}
+          concern={concern}
+          mode={pending.mode}
+          resolution={pending.resolution}
+          materials={materials}
+          openVerificationCount={openVerificationCount}
+          onClose={() => setPending(null)}
+          onDone={(updated) => {
+            setPending(null);
+            onChanged(updated);
+          }}
         />
       )}
     </div>
@@ -218,14 +277,13 @@ function VerificationRow({
 /** How a score was produced (#19): the model (and which one), or the local rules — never implied. */
 function EvaluatedBy({ evaluation }: { evaluation: Pick<Evaluation, "evaluationMode" | "modelVersion"> }) {
   const { t } = useStore();
-  if (evaluation.evaluationMode === "ai")
-    return (
-      <Badge tone="info">
-        {t("AI")} · {evaluation.modelVersion || t("model not recorded")}
-      </Badge>
-    );
-  if (evaluation.evaluationMode === "rules") return <Badge tone="warning">{t("Rule-based (no AI)")}</Badge>;
-  return <Badge tone="outline">{t("Not recorded")}</Badge>;
+  const by = evaluatedBy(evaluation);
+  return (
+    <Badge tone={by.tone}>
+      {t(by.label)}
+      {by.model ? ` · ${by.model}` : ""}
+    </Badge>
+  );
 }
 
 /** Every snapshot, newest first; any of them can be opened as it was generated (#19 AC-1/AC-2). */
@@ -437,6 +495,11 @@ export function ScreeningDetailPage() {
   const candidate = getCandidate(application.candidateId)!;
   const job = getJob(application.jobId)!;
   const decision = db.decisions[application.id];
+  // AI advice and the person's decision are shown side by side, never merged (#187 #194 #196).
+  const currentDecision = effectiveDecision(decision);
+  const status = humanStatus(decision);
+  const aiRecommendation = recommend(evaluation, concerns);
+  const differs = decisionDiffersFromAi(aiRecommendation?.outcome, decision);
   const humanAssessments = db.humanAssessments[application.id] || [];
 
   /** Verifiable outcome (#19 AC-3): the snapshot count comes from the server, the same list the history shows. */
@@ -486,15 +549,21 @@ export function ScreeningDetailPage() {
       </Button>
     </div>
   );
-  const handleResolveConcern = async (concernId: string, outcome: ConcernStatus) => {
-    await resolveConcern(application.id, concernId, outcome as "dismissed" | "confirmed" | "accepted_risk");
-    if (outcome === "accepted_risk") {
-      say(t("Risk accepted — original evidence and status are kept, not overwritten"), { type: "success" });
-    } else {
-      say(`${t("Concern marked")} ${t(cap(outcome.replace(/_/g, " ")))}`, { type: "success" });
-    }
+  const handleConcernChanged = (concern: Concern) => {
+    say(
+      concern.status === "open"
+        ? t("Concern reopened — the earlier handling stays in its history")
+        : `${t("Concern marked")} ${t(CONCERN_STATUS_LABEL[concern.status] ?? concern.status)}`,
+      { type: "success" },
+    );
     load();
   };
+  // The candidate's résumé versions a handling can point to (#193), and which linked checks are still open.
+  const concernMaterials = (db.resumeVersions[application.candidateId] ?? [])
+    .filter((v) => v.materialId)
+    .map((v) => ({ materialId: v.materialId!, label: `${v.fileName} (v${v.version})` }));
+  const openVerificationsFor = (concern: Concern) =>
+    concern.verificationItemIds.filter((id) => verificationItems.some((item) => item.id === id && item.status !== "resolved")).length;
   const handleAssignVerification = async (itemId: string) => {
     await assignVerificationItemToMe(itemId, state.currentUser);
     say(t("Assigned to you"));
@@ -580,7 +649,7 @@ export function ScreeningDetailPage() {
       {/* LEVEL 1: Decision */}
       <div className="card card-pad" style={{ marginBottom: 20 }}>
         <div className="eyebrow" style={{ marginBottom: 10 }}>
-          {t("Decision")}
+          {t("AI assessment and human decision")}
         </div>
         <div className="flex items-center gap-20 flex-wrap">
           <div className="flex items-center gap-12">
@@ -598,29 +667,51 @@ export function ScreeningDetailPage() {
             <div className="tiny">{t("Eligibility")}</div>
             <EligibilityBadge status={evaluation.eligibilityStatus} />
           </div>
-          <div>
-            <div className="tiny">{t("AI recommendation")}</div>
-            {evaluation.evaluationStatus === "insufficient_evidence" ? (
-              <Badge tone="warning">{t("Review (insufficient evidence)")}</Badge>
-            ) : (
-              <RecommendationBadge outcome={inferRecommendation(evaluation)} />
-            )}
+          <div data-testid="ai-recommendation">
+            <div className="tiny">{t("AI recommendation — advice only")}</div>
+            <AiRecommendationBadge display={recommendationDisplay(aiRecommendation)} />
+            <div className="tiny muted">
+              {t("Generated")} {fmtDateTime(evaluation.completedAt, state.lang)}
+            </div>
+            {aiRecommendation?.cappedBy
+              .filter((cap) => cap === "open_high_concern" || cap === "needs_verification")
+              .map((cap) => (
+                <div className="tiny" key={cap} style={{ color: "var(--warning-text)" }} data-testid="recommendation-cap">
+                  {t(CAP_REASON[cap])}
+                </div>
+              ))}
           </div>
           <div>
             <div className="tiny">{t("Scored by")}</div>
             <EvaluatedBy evaluation={evaluation} />
           </div>
-          <div>
-            <div className="tiny">{t("Human status")}</div>
-            {decision ? (
-              <Badge tone="success">
-                {t("Decided —")} {t(cap(decision.outcome.replace(/_/g, " ")))}
-              </Badge>
+          <div data-testid="human-status">
+            <div className="tiny">{t("Human decision — the one in effect")}</div>
+            {status.decided && currentDecision ? (
+              <>
+                <Badge tone="success">
+                  {t("Decided —")} {t(status.label)}
+                </Badge>
+                <div className="tiny muted">
+                  {getPerson(currentDecision.decidedBy)?.name ?? currentDecision.decidedBy} · {fmtDateTime(currentDecision.decidedAt, state.lang)} ·{" "}
+                  <Link to={`/applications/${application.id}/decision`}>{t("View decision and reason")}</Link>
+                </div>
+              </>
             ) : (
-              <Badge tone="info">{t("Awaiting human review")}</Badge>
+              <>
+                <Badge tone="info">{t(status.label)}</Badge>
+                <div className="tiny muted">{t(status.detail)}</div>
+              </>
             )}
           </div>
         </div>
+        {differs && (
+          <div className="info-inline" style={{ marginTop: 12 }} data-testid="ai-human-differ">
+            <Icon name="info" />
+            {t("A person decided differently from the AI recommendation. The person's decision is the one in effect; the AI recommendation stays on record as it was generated.")}{" "}
+            <Link to={`/applications/${application.id}/decision`}>{t("See the reason")}</Link>
+          </div>
+        )}
         {evaluation.evaluationStatus === "insufficient_evidence" && (
           <p className="tiny" style={{ marginTop: 10, color: "var(--warning-text)" }}>
             {t("Coverage ({c}) is below the {t} threshold — overall is intentionally left blank rather than guessed.")
@@ -679,7 +770,16 @@ export function ScreeningDetailPage() {
         <div className="section-title">{t("Concerns")}</div>
         <div className="card">
           {concerns.length ? (
-            concerns.map((c) => <ConcernRow key={c.id} concern={c} onResolve={handleResolveConcern} />)
+            concerns.map((c) => (
+              <ConcernRow
+                key={c.id}
+                applicationId={application.id}
+                concern={c}
+                materials={concernMaterials}
+                openVerificationCount={openVerificationsFor(c)}
+                onChanged={handleConcernChanged}
+              />
+            ))
           ) : (
             <div className="card-pad tiny muted">{t("No concerns raised.")}</div>
           )}

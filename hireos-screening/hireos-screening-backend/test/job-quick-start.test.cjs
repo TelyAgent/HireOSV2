@@ -39,7 +39,7 @@ const identity = { workspaceId: 'ws-1', actorId: 'hr-1', roles: [] };
 
 test('a new JD becomes an open quick_start job in Screening, backed by a JD draft', async () => {
   const { service, jobs, versions, intakeCalls } = setup();
-  const result = await service.quickStart(identity, { text: 'Payments Engineer\n\nOwn the ledger.' }, 'key-1');
+  const result = await service.quickStart(identity, { text: 'Payments Engineer\n\nOwn the ledger.', title: 'Payments Engineer', team: 'Finance Platform' }, 'key-1');
   assert.deepEqual(intakeCalls, [{ text: 'Payments Engineer\n\nOwn the ledger.', key: 'screening.quick-start:key-1' }]);
   assert.equal(result.duplicate, false);
   const job = jobs.get('core-job-1');
@@ -53,16 +53,16 @@ test('a new JD becomes an open quick_start job in Screening, backed by a JD draf
 test('the same JD again returns the job Screening already has, flagged as a duplicate', async () => {
   const existing = { id: 'core-job-9', workspaceId: 'ws-1', title: 'Payments Engineer', team: 'Unassigned', location: 'Unspecified', employmentType: 'Unspecified', seniority: 'Unspecified', status: 'open', origin: 'jd_published', criteriaStatus: 'draft', criteriaVersion: 0, confirmedBy: null, confirmedAt: null, openings: 1, applicantCount: 0, assessmentRequired: false };
   const { service, jobs, versions } = setup({ existing, duplicate: true });
-  const result = await service.quickStart(identity, { text: 'Payments Engineer' });
+  const result = await service.quickStart(identity, { text: 'Payments Engineer', title: 'Payments Engineer', team: 'Finance Platform' });
   assert.equal(result.duplicate, true); assert.equal(result.job.id, 'core-job-9');
   assert.equal(jobs.get('core-job-9').origin, 'jd_published', 'a published job stays as it was');
   assert.equal(versions.length, 0);
 });
 
-test('empty text is rejected; mock mode creates a local-only job without calling JD', async () => {
-  await assert.rejects(setup().service.quickStart(identity, { text: '   ' }), (e) => e.getStatus() === 422 && e.response?.code === 'INVALID_SCHEMA');
+test('empty text is rejected; mock mode creates a local-only job (with the confirmed title, #178) without calling JD', async () => {
+  await assert.rejects(setup().service.quickStart(identity, { text: '   ', title: 'X', team: 'Y' }), (e) => e.getStatus() === 422 && e.response?.code === 'INVALID_SCHEMA');
   const { service, jobs, intakeCalls } = setup({ remote: false });
-  const result = await service.quickStart(identity, { text: 'Local Role\n\nDo things.' });
+  const result = await service.quickStart(identity, { text: 'Local Role\n\nDo things.', title: 'Local Role', team: 'Ops' });
   assert.equal(intakeCalls.length, 0);
   assert.equal(jobs.get(result.job.id).title, 'Local Role'); assert.equal(jobs.get(result.job.id).status, 'open');
 });

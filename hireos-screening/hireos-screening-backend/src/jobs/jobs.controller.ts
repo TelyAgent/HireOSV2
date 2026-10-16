@@ -12,6 +12,12 @@ export class JobsController {
     return this.jobs.list(req.identity);
   }
 
+  /** "New job", step one: the model reads the JD and suggests title, team and location; nothing is created (#178). */
+  @Post('quick-start/preview')
+  quickStartPreview(@Req() req: { identity: Identity }, @Body() body: unknown) {
+    return this.jobs.quickStartPreview(req.identity, body);
+  }
+
   /** "New job": pasted JD text -> a draft job in JD + Core Record that Screening uses right away. */
   @Post('quick-start')
   quickStart(@Req() req: { identity: Identity }, @Headers('idempotency-key') key: string | undefined, @Body() body: unknown) {

@@ -17,7 +17,25 @@ const CAPABILITY = 'jd_intake_extract';
 const intakeSchema = z.object({
   text: z.string().trim().min(1).max(150000),
   coreMaterialId: z.string().trim().min(1).max(200).optional(),
+  // What the recruiter confirmed after reading the preview (#178); they win over the model's reading.
+  title: z.string().trim().min(1).max(200).optional(),
+  team: z.string().trim().min(1).max(200).optional(),
 }).strict();
+
+const previewSchema = z.object({ text: z.string().trim().min(1).max(150000) }).strict();
+
+export type IntakePreview = {
+  title: string;
+  team: string | null;
+  location: string | null;
+  /** The same JD already created this job; creating again would open it. */
+  duplicateOf: { coreJobId: string; title: string } | null;
+};
+
+/** A reading kept briefly so "create" right after "preview" doesn't ask the model again. */
+const PREVIEW_TTL_MS = 30 * 60 * 1000;
+/** Readings kept at most; the oldest go first. */
+const PREVIEW_MAX_ENTRIES = 500;
 
 export type IntakeJobResult = { coreJobId: string; title: string; jdText: string; duplicate: boolean };
 
@@ -43,6 +61,34 @@ export class IntakeService {
     private readonly prompts: PromptRegistry,
   ) {}
 
+  private readonly readings = new Map<string, { fields: JdFields; at: number }>();
+
+  /**
+   * Keeps a preview's reading for the create that follows. A preview that is never created from would otherwise
+   * stay: expired readings are dropped on every new one, and there are never more than PREVIEW_MAX_ENTRIES.
+   */
+  private rememberReading(key: string, fields: JdFields) {
+    const now = Date.now();
+    for (const [k, v] of this.readings) if (now - v.at >= PREVIEW_TTL_MS) this.readings.delete(k);
+    this.readings.delete(key);
+    this.readings.set(key, { fields, at: now });
+    while (this.readings.size > PREVIEW_MAX_ENTRIES) this.readings.delete(this.readings.keys().next().value as string);
+  }
+
+  /**
+   * Read a JD without creating anything (#178): the model's title, team and location for the recruiter to
+   * check, or the job this same JD already created. Failures are the same as for createJob.
+   */
+  async previewJob(identity: Identity, raw: unknown): Promise<IntakePreview> {
+    const input = previewSchema.parse(raw);
+    const contentHash = `sha256:${createHash('sha256').update(normalize(input.text)).digest('hex')}`;
+    const existing = await this.findExisting(identity, contentHash);
+    if (existing) return { title: existing.title, team: null, location: null, duplicateOf: { coreJobId: existing.coreJobId, title: existing.title } };
+    const fields = await this.extract(identity, input.text);
+    this.rememberReading(`${identity.workspaceId}:${contentHash}`, fields);
+    return { title: fields.title!, team: fields.department?.trim() || null, location: fields.location?.trim() || null, duplicateOf: null };
+  }
+
   async createJob(identity: Identity, raw: unknown, meta: RequestMeta & { sourceService?: string }): Promise<IntakeJobResult> {
     const input = intakeSchema.parse(raw); // invalid -> 422 INVALID_SCHEMA via ZodExceptionFilter
     const key = meta.idempotencyKey?.trim();
@@ -52,7 +98,10 @@ export class IntakeService {
     const existing = await this.findExisting(identity, contentHash);
     if (existing) return existing;
 
-    const fields = await this.extract(identity, input.text);
+    const cached = this.readings.get(`${identity.workspaceId}:${contentHash}`);
+    const read = cached && Date.now() - cached.at < PREVIEW_TTL_MS ? cached.fields : await this.extract(identity, input.text);
+    this.readings.delete(`${identity.workspaceId}:${contentHash}`);
+    const fields: JdFields = { ...read, ...(input.title ? { title: input.title } : {}), ...(input.team ? { department: input.team } : {}) };
     const sourceService = meta.sourceService?.trim() || 'unknown';
     // Keys derived from the caller's Idempotency-Key: a retry after a partial failure reuses the
     // same Core job and draft (same pattern as CopilotService.confirmDraft).

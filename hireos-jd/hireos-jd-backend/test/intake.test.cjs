@@ -114,6 +114,21 @@ test('intake: a JD becomes a Core job + structured draft only once AI has read i
       await assert.rejects(post({ text: 'x', extra: 1 }), (e) => e.name === 'ZodError');
       await assert.rejects(intake.createJob(identity, { text: 'Another role' }, {}), (e) => e.getStatus() === 400);
     });
+    await t.test('#178: preview reads the JD without creating anything; create right after reuses that reading with the confirmed title and team', async () => {
+      const text = `Platform role ${randomUUID()}\n负责招聘平台的前后端开发。`;
+      llmMode = 'ok';
+      const [jobsBefore, callsBefore] = [jobs.size, llmCalls];
+      const preview = await intake.previewJob(identity, { text });
+      assert.deepEqual(preview, { title: '全栈工程师', team: '招聘平台研发部', location: '上海', duplicateOf: null });
+      assert.equal(jobs.size, jobsBefore, 'nothing is created by a preview');
+      assert.equal(llmCalls, callsBefore + 1);
+      const created = await post({ text, title: 'Senior Full-stack Engineer', team: 'Platform Engineering' });
+      assert.equal(llmCalls, callsBefore + 1, 'creating right after the preview does not ask the model again');
+      const job = jobs.get(created.coreJobId);
+      assert.deepEqual([job.title, job.team, job.location], ['Senior Full-stack Engineer', 'Platform Engineering', '上海'], 'what the recruiter confirmed wins; the rest is the reading');
+      const again = await intake.previewJob(identity, { text });
+      assert.deepEqual(again.duplicateOf, { coreJobId: created.coreJobId, title: 'Senior Full-stack Engineer' }, 'the same JD points at the job it created');
+    });
   } finally {
     await db.$disconnect();
     await setupDb.$executeRawUnsafe(`DROP SCHEMA "${schema}" CASCADE`);

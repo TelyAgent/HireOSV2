@@ -37,8 +37,15 @@ const AiMatchResultSchema = z.object({
     requirementId: z.string(),
     met: z.boolean(),
     evidence: cappedString(600),
+    // A short excerpt copied word for word from the résumé, so it can be found there again (#183).
+    quote: cappedString(400).optional().default(''),
   })),
   gaps: z.array(cappedString(300)),
+  // Only what the résumé explicitly says that rules the role out (#181); missing information is never a conflict.
+  conflicts: z.array(z.object({
+    requirement: cappedString(200),
+    quote: cappedString(400),
+  })).max(10).optional().default([]),
 });
 export type AiMatchResult = z.infer<typeof AiMatchResultSchema>;
 
@@ -56,6 +63,8 @@ Rules:
 - overallScore (0-100) must reflect the weighted combination of dimension scores together with whether hard requirements are met, not just a raw average.
 - coverage (0-1) is the fraction of requirements (weighted toward must_have) that are met.
 - confidence (0-1) should be lower when the resume is sparse, ambiguous, or the evidence is indirect -- not just when the candidate looks weak.
+- requirementFindings[].quote: for a met requirement, copy the supporting résumé excerpt word for word (same language, no paraphrase, at most two sentences); "evidence" is your explanation.
+- conflicts: list a conflict only when the resume explicitly states something that rules this job out -- e.g. the job is on-site in Beijing and the resume says the candidate can only work remotely from Singapore and cannot relocate. Quote the resume sentence verbatim in "quote" and name the requirement or "Job location" in "requirement". A requirement the resume simply doesn't mention is NOT a conflict; leave conflicts empty then.
 - Respond with a single JSON object only, matching exactly this shape:
 {
   "overallScore": number,
@@ -63,8 +72,9 @@ Rules:
   "confidence": number,
   "rationale": string,
   "dimensionScores": [{ "dimensionId": string, "score": number, "rationale": string }],
-  "requirementFindings": [{ "requirementId": string, "met": boolean, "evidence": string }],
-  "gaps": [string]
+  "requirementFindings": [{ "requirementId": string, "met": boolean, "evidence": string, "quote": string }],
+  "gaps": [string],
+  "conflicts": [{ "requirement": string, "quote": string }]
 }
 Include one entry in dimensionScores for every dimension given, and one entry in requirementFindings for every requirement given, using their exact ids.`;
 
