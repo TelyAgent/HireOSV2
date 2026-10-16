@@ -22,7 +22,7 @@ type CandidateForMatch = {
   id: string;
   displayName: string;
   profiles: ProfileForMatch[];
-  resumeVersions: { material: { text: string } }[];
+  resumeVersions: { material: { id?: string; text: string } }[];
 };
 type CriteriaForMatch = { version: number; requirements: unknown; dimensions: unknown };
 type JobForMatch = { id: string; title: string; team: string; seniority: string; location: string; criteriaVersions: CriteriaForMatch[] };
@@ -32,7 +32,7 @@ const CANDIDATE_MATCH_INCLUDE = {
   resumeVersions: {
     where: { isLatest: true },
     take: 1,
-    include: { material: { select: { text: true } } },
+    include: { material: { select: { id: true, text: true } } },
   },
 };
 
@@ -163,7 +163,7 @@ export class DiscoveryService implements OnModuleInit, OnModuleDestroy {
     const recommendations = await this.db.candidateJobRecommendation.findMany({
       where: { workspaceId: identity.workspaceId, jobId, status: 'proposed' },
       orderBy: { createdAt: 'desc' },
-      include: { candidate: { select: { displayName: true } } },
+      include: { candidate: { select: { displayName: true } }, prelinkEvaluation: true },
     });
     return recommendations.map((r) => ({ ...toFrontendRecommendation(r), candidateName: r.candidate.displayName }));
   }
@@ -210,8 +210,9 @@ export class DiscoveryService implements OnModuleInit, OnModuleDestroy {
     const recommendations = await this.db.candidateJobRecommendation.findMany({
       where: { workspaceId: identity.workspaceId, candidateId },
       orderBy: { createdAt: 'desc' },
+      include: { prelinkEvaluation: true },
     });
-    return recommendations.map(toFrontendRecommendation);
+    return recommendations.map((r) => toFrontendRecommendation(r));
   }
 
   async dismiss(identity: Identity, id: string) {
@@ -355,7 +356,8 @@ export class DiscoveryService implements OnModuleInit, OnModuleDestroy {
 
   private async runMatchForCandidate(workspaceId: string, candidate: CandidateForMatch, jobId?: string) {
     const openJobs = await this.db.job.findMany({
-      where: { workspaceId, status: 'open', ...(jobId ? { id: jobId } : {}) },
+      // Only roles whose criteria are confirmed can be matched: a new role waits for its rubric (#178 AC-3).
+      where: { workspaceId, status: 'open', criteriaVersions: { some: { status: 'confirmed' } }, ...(jobId ? { id: jobId } : {}) },
       include: { criteriaVersions: { where: { status: 'confirmed' }, orderBy: { version: 'desc' }, take: 1 } },
     });
     const run = await this.db.jobDiscoveryRun.create({
@@ -444,7 +446,12 @@ export class DiscoveryService implements OnModuleInit, OnModuleDestroy {
       gaps: string[];
       evidence: Prisma.InputJsonValue;
       proposalSource: string;
+      eligibility?: 'eligible' | 'not_eligible';
+      conflicts?: Array<{ requirement: string; quote: string }>;
     };
+    // What the evidence and conflicts are checked against: the text this match actually read (#183).
+    const sourceMaterialId = candidate.resumeVersions[0]?.material.id ?? null;
+    const labelOf = new Map(requirements.map((r) => [String(r.id), String(r.label || '')]));
 
     if (this.aiMatcher.isConfigured() && resumeText) {
       try {
@@ -463,11 +470,24 @@ export class DiscoveryService implements OnModuleInit, OnModuleDestroy {
           confidence: ai.confidence,
           rationale: ai.rationale,
           gaps: ai.gaps,
+          // Each quote is checked against the text the match read: a quote that isn't there is kept but marked
+          // unverified, never presented as found (#183 AC-1).
           evidence: ai.requirementFindings
             .filter((f) => f.met)
-            .map((f) => ({ requirementId: f.requirementId, evidence: f.evidence })),
+            .map((f) => ({
+              requirementId: f.requirementId,
+              requirementLabel: labelOf.get(f.requirementId) ?? '',
+              // The verbatim excerpt when the model gave one; its explanation otherwise.
+              evidence: f.quote || f.evidence,
+              explanation: f.evidence,
+              sourceMaterialId,
+              verified: quoteInText(f.quote || f.evidence, resumeText),
+            })),
           proposalSource: 'ai',
+          // A conflict counts only with a quote that really is in the résumé (#181).
+          conflicts: ai.conflicts.filter((c) => quoteInText(c.quote, resumeText)),
         };
+        evaluation.eligibility = evaluation.conflicts!.length ? 'not_eligible' : 'eligible';
       } catch (error) {
         const detail = error instanceof AiMatchError ? error.message : 'AI_REQUEST_FAILED';
         console.error(`[DiscoveryService] AI match failed for candidate ${candidate.id} / job ${job.id}: ${detail}`);
@@ -477,7 +497,8 @@ export class DiscoveryService implements OnModuleInit, OnModuleDestroy {
       evaluation = localRuleMatch(requirements, dimensions, profile);
     }
 
-    const status = evaluation.overallScore >= RECOMMENDATION_THRESHOLD ? 'recommendations_ready' : 'no_match';
+    // F06 FR-5: a recommendation the résumé rules out is still shown (marked not eligible), whatever its score.
+    const status = evaluation.overallScore >= RECOMMENDATION_THRESHOLD || evaluation.eligibility === 'not_eligible' ? 'recommendations_ready' : 'no_match';
     if (runId && status === 'recommendations_ready') {
       const staleRecommendations = await this.db.candidateJobRecommendation.findMany({
         where: { workspaceId, candidateId: candidate.id, jobId: job.id, status: 'proposed' },
@@ -505,6 +526,8 @@ export class DiscoveryService implements OnModuleInit, OnModuleDestroy {
             rationale: evaluation.rationale,
             gaps: evaluation.gaps,
             evidence: evaluation.evidence,
+            eligibility: evaluation.eligibility ?? null,
+            conflicts: (evaluation.conflicts ?? []) as Prisma.InputJsonValue,
           },
         });
         const created = await tx.candidateJobRecommendation.create({
@@ -540,6 +563,8 @@ export class DiscoveryService implements OnModuleInit, OnModuleDestroy {
           rationale: evaluation.rationale,
           gaps: evaluation.gaps,
           evidence: evaluation.evidence,
+          eligibility: evaluation.eligibility ?? null,
+          conflicts: (evaluation.conflicts ?? []) as Prisma.InputJsonValue,
         },
       });
     }
@@ -598,12 +623,12 @@ function skillNames(skills: unknown): string[] {
     .filter(Boolean);
 }
 
-function profileCorpus(profile: ProfileForMatch) {
+export function profileCorpus(profile: ProfileForMatch) {
   const skills = skillNames(profile.skills).map((s) => s.toLowerCase());
-  const workAuth = String(asRecord(profile.workAuthorization)?.value || '').toLowerCase();
+  // Work authorization is left out: it is not a matching factor (F02 WA-2, #157 AC-3).
   const location = String(asRecord(profile.location)?.value || '').toLowerCase();
   const employmentText = employmentHistoryText(profile.employmentHistory).toLowerCase();
-  return `${skills.join(' ')} ${workAuth} ${location} ${employmentText}`.toLowerCase();
+  return `${skills.join(' ')} ${location} ${employmentText}`.toLowerCase();
 }
 
 function employmentHistoryText(employmentHistory: unknown): string {
@@ -652,7 +677,23 @@ function asRecord(value: unknown): JsonRecord | null {
   return value && typeof value === 'object' && !Array.isArray(value) ? value as JsonRecord : null;
 }
 
-function toFrontendRecommendation(recommendation: {
+type PrelinkForRecommendation = {
+  profileVersion: number | null;
+  criteriaVersion: number;
+  discoveryRunId: string | null;
+  createdAt: Date;
+  evidence: unknown;
+  eligibility: string | null;
+  conflicts: unknown;
+};
+
+/**
+ * A recommendation as the pages see it. With its match evaluation it also says whether the candidate is
+ * eligible and what rules them out (#181), and what it was based on — profile version, criteria version and
+ * matching run — with the résumé quotes behind it and whether each was found in that text (#183). A stale
+ * recommendation keeps pointing at the versions it was made from.
+ */
+export function toFrontendRecommendation(recommendation: {
   id: string;
   candidateId: string;
   jobId: string;
@@ -664,7 +705,10 @@ function toFrontendRecommendation(recommendation: {
   staleReason: string | null;
   proposalSource: string;
   applicationRef: string | null;
+  discoveryRunId?: string | null;
+  prelinkEvaluation?: PrelinkForRecommendation | null;
 }) {
+  const evaluation = recommendation.prelinkEvaluation;
   return {
     id: recommendation.id,
     candidateId: recommendation.candidateId,
@@ -677,7 +721,36 @@ function toFrontendRecommendation(recommendation: {
     staleReason: recommendation.staleReason || undefined,
     proposalSource: recommendation.proposalSource,
     applicationRef: recommendation.applicationRef || undefined,
+    ...(evaluation
+      ? {
+          eligibility: (evaluation.eligibility as 'eligible' | 'not_eligible' | null) ?? undefined,
+          conflicts: asArray(evaluation.conflicts).map((c) => ({ requirement: String(c.requirement ?? ''), quote: String(c.quote ?? '') })),
+          basis: {
+            profileVersion: evaluation.profileVersion ?? undefined,
+            criteriaVersion: evaluation.criteriaVersion || undefined,
+            discoveryRunId: evaluation.discoveryRunId ?? recommendation.discoveryRunId ?? undefined,
+            evaluatedAt: evaluation.createdAt.toISOString(),
+          },
+          evidence: asArray(evaluation.evidence)
+            .filter((e) => typeof e.evidence === 'string' && e.evidence)
+            .map((e) => ({
+              requirementId: String(e.requirementId ?? ''),
+              requirementLabel: typeof e.requirementLabel === 'string' && e.requirementLabel ? e.requirementLabel : undefined,
+              quote: String(e.evidence),
+              sourceMaterialId: typeof e.sourceMaterialId === 'string' ? e.sourceMaterialId : undefined,
+              // Recorded on newer matches; older ones were never checked and say so.
+              verification: e.verified === true ? 'found' : e.verified === false ? 'not_found' : 'unchecked',
+            })),
+        }
+      : {}),
   };
+}
+
+/** Whether a quote appears in the text, ignoring case, spacing and punctuation. */
+export function quoteInText(quote: string, text: string): boolean {
+  const norm = (value: string) => value.normalize('NFKC').toLowerCase().replace(/[\s\p{P}\p{S}]/gu, '');
+  const q = norm(quote);
+  return q.length >= 4 && norm(text).includes(q.length > 60 ? q.slice(0, 60) : q);
 }
 
 function serializeRun(run: {
