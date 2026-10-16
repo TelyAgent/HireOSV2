@@ -16,6 +16,7 @@ import {
 import { latestResultForCase } from "../data/realPlanItemsMerge";
 import { CreateWrittenTaskModal } from "../components/CreateWrittenTaskModal";
 import type { QuickStartResult } from "../data/writtenApi";
+import { initials } from "../lib/initials";
 
 function candidateOf(caseId: string): CoreCandidate | null {
   const c = CASES[caseId];
@@ -26,10 +27,6 @@ function isDueToday(iso: string, clockOffsetMin: number) {
   if (!iso) return false;
   const d = new Date(iso), n = new Date(nowISO(clockOffsetMin));
   return d.getUTCFullYear() === n.getUTCFullYear() && d.getUTCMonth() === n.getUTCMonth() && d.getUTCDate() === n.getUTCDate();
-}
-
-function initials(name: string): string {
-  return name.split(/\s+/).map((x) => x[0]).join("").slice(0, 2).toUpperCase();
 }
 
 /** Mirrors ComparisonDetailPage's unexported comparableCells() gate: only candidates that

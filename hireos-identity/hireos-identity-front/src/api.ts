@@ -1,3 +1,4 @@
+import { initials } from "./lib/initials";
 export type Role = "admin" | "hr" | "interviewer";
 
 export type Me = {
@@ -52,8 +53,4 @@ export const api = {
   devLogin: (email: string, returnTo: string | null) => post<Me & { returnTo: string | null }>("/auth/dev-login", { email, returnTo: returnTo ?? undefined }),
 };
 
-export function initials(name: string) {
-  const parts = name.trim().split(/\s+/).filter(Boolean);
-  if (parts.length >= 2) return (parts[0][0] + parts[1][0]).toUpperCase();
-  return name.trim().slice(0, 2).toUpperCase();
-}
+export { initials };

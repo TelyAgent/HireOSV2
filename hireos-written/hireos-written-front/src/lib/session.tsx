@@ -1,5 +1,6 @@
 import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
 import { Dropdown } from "antd";
+import { initials } from "./initials";
 
 /*
  * Shared HireOS sign-in for the front ends. The same file lives in every front end (interview,
@@ -79,10 +80,6 @@ export function useSessionUser() {
   return useContext(SessionContext);
 }
 
-function initials(name: string) {
-  const parts = name.trim().split(/\s+/).filter(Boolean);
-  return (parts.length >= 2 ? parts[0][0] + parts[1][0] : name.trim().slice(0, 2)).toUpperCase();
-}
 
 /** Top-bar pill for the signed-in user: who is signed in, and sign out. */
 export function UserMenu({ user, labels }: { user: SessionUser; labels: { signOut: string } }) {

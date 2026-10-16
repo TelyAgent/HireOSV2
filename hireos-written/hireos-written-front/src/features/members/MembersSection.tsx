@@ -5,6 +5,7 @@ import { Button } from "../../components/ui/Primitives";
 import { useStore } from "../../store/StoreContext";
 import { ACCOUNT_URL, authFetch, useSessionUser } from "../../lib/session";
 import { SettingsHead } from "../../components/SettingsHead";
+import { initials } from "../../lib/initials";
 
 /*
  * Workspace members — the shared HireOS accounts in hireos-identity (invite-only sign-in). Every
@@ -52,10 +53,6 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   return body as T;
 }
 
-function initials(name: string) {
-  const parts = name.trim().split(/\s+/).filter(Boolean);
-  return (parts.length >= 2 ? parts[0][0] + parts[1][0] : name.trim().slice(0, 2)).toUpperCase();
-}
 
 type InviteForm = { email: string; displayName: string; roles: Role[]; sendEmail: boolean };
 

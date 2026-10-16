@@ -1,3 +1,5 @@
+import { initials } from "../../lib/initials";
+
 export type PersonId = "emma" | "daniel" | "morgan";
 
 export interface Person {
@@ -45,11 +47,7 @@ export function getPerson(id: PersonId | string | null | undefined): Person | nu
   return (PEOPLE as Record<string, Person>)[id] ?? null;
 }
 
+/** Avatar initials by whole characters (#240) — see lib/initials. */
 export function initialsOf(name: string): string {
-  return (name || "?")
-    .split(/\s+/)
-    .map((w) => w[0])
-    .slice(0, 2)
-    .join("")
-    .toUpperCase();
+  return initials(name);
 }

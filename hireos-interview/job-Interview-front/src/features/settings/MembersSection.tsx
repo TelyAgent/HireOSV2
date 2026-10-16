@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { App as AntApp, Button, Checkbox, Form, Input, Modal, Select, Tag } from "antd";
 import { ACCOUNT_URL, authFetch, useSessionUser } from "../../lib/session";
 import { useSettingsT } from "./i18n";
+import { initials } from "../../lib/initials";
 
 const icon = (name: string) => <span className="material-symbols-rounded" style={{ fontSize: 18 }}>{name}</span>;
 
@@ -51,10 +52,6 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   return body as T;
 }
 
-function initials(name: string) {
-  const parts = name.trim().split(/\s+/).filter(Boolean);
-  return (parts.length >= 2 ? parts[0][0] + parts[1][0] : name.trim().slice(0, 2)).toUpperCase();
-}
 
 type InviteForm = { email: string; displayName: string; roles: Role[]; sendEmail: boolean };
 

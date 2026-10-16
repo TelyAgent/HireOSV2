@@ -17,12 +17,14 @@ import {
   PauseSvg,
   TrendSvg,
 } from "../components/ui/Icons";
+import { characters, initials } from "../lib/initials";
 
+// By whole characters, never half of one (#240).
 function initialsFromTitle(title: string) {
-  return title.slice(0, 2).toUpperCase();
+  return characters(title).slice(0, 2).join("").toLocaleUpperCase();
 }
 function initialsFromName(name: string) {
-  return name.split(/\s+/).filter(Boolean).slice(0, 2).map((w) => w[0]).join("").toUpperCase();
+  return initials(name);
 }
 
 export function HomePage() {
@@ -833,7 +835,7 @@ function homeProjects(state: any, roleKey: string, set: (p: any) => void, say: (
 
   if (state.draftCreated) {
     const newRoleTitle = (state.jdText.split("\n").map((s: string) => s.trim()).find((s: string) => s.length > 0) || "New role").slice(0, 60);
-    const newRoleInitials = newRoleTitle.split(/\s+/).filter(Boolean).slice(0, 2).map((w: string) => w[0]).join("").toUpperCase() || "NP";
+    const newRoleInitials = newRoleTitle.split(/\s+/).filter(Boolean).slice(0, 2).map((w: string) => characters(w)[0]).join("").toLocaleUpperCase() || "NP";
     const statusBadge = state.decRecorded
       ? "Package published"
       : state.followUpRounds.length > 0
