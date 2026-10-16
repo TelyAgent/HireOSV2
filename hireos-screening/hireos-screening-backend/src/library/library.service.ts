@@ -29,10 +29,13 @@ export class LibraryService {
     const workspaceId = identity.workspaceId;
     const and: Prisma.CandidateWhereInput[] = [];
     if (filters.q) {
-      const tagIds = await this.candidateIdsWithTag(workspaceId, filters.q, 'contains');
+      const [tagIds, emailIds] = await Promise.all([
+        this.candidateIdsWithTag(workspaceId, filters.q, 'contains'),
+        this.candidateIdsWithEmail(workspaceId, filters.q),
+      ]);
       and.push({ OR: [
         { displayName: { contains: filters.q, mode: 'insensitive' } },
-        { email: { contains: filters.q, mode: 'insensitive' } },
+        { id: { in: emailIds } },
         { id: { in: tagIds } },
       ] });
     }
@@ -96,6 +99,22 @@ export class LibraryService {
         SELECT 1 FROM jsonb_array_elements(CASE WHEN jsonb_typeof(latest."skills") = 'array' THEN latest."skills" ELSE '[]'::jsonb END) AS skill
         WHERE lower(CASE WHEN jsonb_typeof(skill) = 'object' THEN skill->>'name' ELSE skill#>>'{}' END) LIKE ${pattern}
       )`;
+    return rows.map((row) => row.candidateId);
+  }
+
+  /**
+   * Candidates whose shown email contains the text: the latest profile version's own email, or — for versions
+   * from before contacts were recorded — the candidate's record (#171, review on PR #345).
+   */
+  private async candidateIdsWithEmail(workspaceId: string, text: string): Promise<string[]> {
+    const pattern = `%${text.trim().toLowerCase().replace(/[\\%_]/g, (c) => `\\${c}`)}%`;
+    const rows = await this.db.$queryRaw<Array<{ candidateId: string }>>`
+      SELECT c."id" AS "candidateId" FROM "Candidate" c
+      LEFT JOIN LATERAL (
+        SELECT p."contact" FROM "CandidateProfile" p WHERE p."candidateId" = c."id" ORDER BY p."version" DESC LIMIT 1
+      ) latest ON true
+      WHERE c."workspaceId" = ${workspaceId}
+        AND lower(CASE WHEN latest."contact" IS NULL THEN coalesce(c."email", '') ELSE coalesce(latest."contact"->>'email', '') END) LIKE ${pattern}`;
     return rows.map((row) => row.candidateId);
   }
 

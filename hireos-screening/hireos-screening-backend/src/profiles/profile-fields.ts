@@ -126,7 +126,12 @@ export function profileFields(
     projects: asArray(p.projects).map((entry) => {
       const e = record(entry);
       const [name, description] = [text(e.name), text(e.description)];
-      return { value: [name, description].filter(Boolean).join(': '), needles: [name, description], incomplete: description ? [] : ['description'] };
+      return {
+        value: [name, description].filter(Boolean).join(': '),
+        // Name and description in the same paragraph, so projects that read alike each find their own.
+        ...(name && description ? { together: [name, description], needles: [] } : { needles: [name || description] }),
+        incomplete: description ? [] : ['description'],
+      };
     }),
     compensation_expectation: compensation.min != null || compensation.max != null
       ? [{
@@ -260,7 +265,8 @@ function evidenceAt(hit: ReturnType<typeof numberParagraphs>[number], probe: str
 function locate(needles: string[], paragraphs: ReturnType<typeof numberParagraphs>, source: Source): FieldEvidence | null {
   // The most specific text first: a project's description over its name, which may appear in other lines too.
   for (const needle of needles.map(normalize).filter((n) => n.length >= 2).sort((a, b) => b.length - a.length)) {
-    const probe = needle.length > 40 ? needle.slice(0, 32) : needle;
+    // The whole text, however long: two projects that open alike must not share a paragraph (#155 review).
+    const probe = needle;
     // A phone number is stored in E.164 but written with spaces or dashes: compare its digits.
     const phone = /^\+?\d{7,15}$/.test(needle) ? needle.replace('+', '') : null;
     const hit = paragraphs.find((p) => (phone ? p.digits.includes(phone) : p.normalized.includes(probe)));

@@ -1,7 +1,7 @@
 /**
  * Where a quote sits in a stored material (#155 #192): the paragraph that contains it, with its page (PDFs) and
  * its paragraph number, counted within the page when there is one. Case, spacing and punctuation are ignored,
- * and a long quote is matched on its opening words. Null when the text doesn't contain it.
+ * and the whole quote must be there. Null when the text doesn't contain it.
  */
 export type Segment = { id: string; text: string; page?: number };
 export type QuoteLocation = { segmentId: string; page: number | null; paragraph: number };
@@ -17,7 +17,8 @@ export function asSegments(value: unknown): Segment[] {
 }
 
 export function locateQuote(segments: Segment[], quote: string): QuoteLocation | null {
-  const probe = normalizeForMatch(quote).slice(0, 60);
+  // The whole quote: an opening that matches can't vouch for an ending that isn't there (#192 review).
+  const probe = normalizeForMatch(quote);
   if (probe.length < 4) return null;
   const perPage = new Map<number, number>();
   let index = 0;

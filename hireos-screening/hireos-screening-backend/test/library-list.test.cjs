@@ -56,6 +56,14 @@ function service(list = people) {
     resumeVersion: { groupBy: async () => ['manual_upload', 'paste', 'email'].map((source) => ({ source, _count: { _all: list.filter((c) => c.resumeVersions[0]?.source === source).length } })) },
     // The two raw queries: candidates by skill (LIKE pattern), and skill counts.
     $queryRaw: async (strings, ...values) => {
+      if (strings.join('').includes('"contact"')) {
+        // The shown email: the latest profile's own, or the record's when that version didn't record one.
+        const needle = values[1].slice(1, -1);
+        return list.filter((c) => {
+          const contact = c.profiles[0].contact;
+          return (contact ? contact.email ?? '' : c.email ?? '').toLowerCase().includes(needle);
+        }).map((c) => ({ candidateId: c.id }));
+      }
       if (strings.join('').includes('GROUP BY tag')) {
         const counts = new Map();
         for (const c of list) for (const s of new Set(c.profiles[0].skills.map((x) => (typeof x === 'string' ? x : x.name)))) counts.set(s, (counts.get(s) ?? 0) + 1);
@@ -145,4 +153,13 @@ test('#171 (review): search runs in the database, so the 1,001st candidate is fo
   assert.equal(last.items.length, 50);
   assert.ok(s.queries.every((q) => q.take === undefined), 'no query caps the candidates searched');
   await assert.rejects(s.list(identity, { limit: '5000' }), (e) => e.getStatus() === 422);
+});
+
+test('#171 (review): email search finds the email the list shows — the latest profile\'s, not the record\'s first one', async () => {
+  const moved = person('c-moved', 'Mai Tran', 'old@example.test', ['SQL'], 'paste', 'hr-1', '2026-10-12');
+  moved.profiles[0].contact = { email: 'new@example.test', phone: null };
+  const s = service([...people, moved]);
+  assert.deepEqual(ids(await s.list(identity, { q: 'new@example' })), ['c-moved']);
+  assert.deepEqual(ids(await s.list(identity, { q: 'old@example' })), [], 'the replaced address is no longer what the list shows');
+  assert.deepEqual(ids(await s.list(identity, { q: 'nina@' })), ['c-nina'], 'older versions without a contact still match the record');
 });
