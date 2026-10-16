@@ -84,6 +84,18 @@ export interface MoneyRange {
   basis?: string;
 }
 
+/** English names of the supported currencies, for an English interface (#353). */
+export const CURRENCY_EN: Record<string, string> = {
+  CNY: "Chinese yuan",
+  USD: "US dollar",
+  SGD: "Singapore dollar",
+  HKD: "Hong Kong dollar",
+  EUR: "Euro",
+  GBP: "British pound",
+  JPY: "Japanese yen",
+  VND: "Vietnamese dong",
+};
+
 export const CURRENCY_ZH: Record<string, string> = {
   CNY: "人民币",
   USD: "美元",
@@ -113,8 +125,10 @@ export function salaryText(range: MoneyRange, lang: "zh" | "en"): string {
   const amount = `${k(range.min)}–${k(range.max)}`;
   const period = range.period === "year" ? (zh ? "年" : "year") : range.period === "hour" ? (zh ? "小时" : "hour") : zh ? "月" : "month";
   const basis = range.basis === "gross" ? (zh ? "税前" : "gross") : range.basis === "net" ? (zh ? "税后" : "net") : range.basis;
-  const currency = range.currency || (zh ? "CNY" : "USD");
-  const parts = [zh ? `${amount}/${period}` : `${amount} / ${period}`, basis, zh ? (CURRENCY_ZH[currency] ?? currency) : currency];
+  // A missing currency is said to be missing — never filled in from the interface language, which would make the
+  // same amount read as yuan in Chinese and dollars in English (#236).
+  const currency = range.currency ? (zh ? (CURRENCY_ZH[range.currency] ?? range.currency) : range.currency) : zh ? "币种未提供" : "currency not given";
+  const parts = [zh ? `${amount}/${period}` : `${amount} / ${period}`, basis, currency];
   return parts.filter(Boolean).join(" · ");
 }
 

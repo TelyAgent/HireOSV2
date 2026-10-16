@@ -8,16 +8,27 @@ import { InputNumber, Radio, Select } from "antd";
 import { Button } from "../../components/ui/Primitives";
 import { CancelButton, ModalBody, ModalFooter, ModalHeader } from "../../components/ui/Overlays";
 import { useStore } from "../../store/StoreContext";
-import { CURRENCY_ZH, salaryText } from "../../lib/format";
+import { CURRENCY_EN, CURRENCY_ZH, salaryText } from "../../lib/format";
 import { SALARY_TAX, currencyOf, detectLanguage, filledBlocks, findSection, parseMoney, REQ_ITEMS } from "./completeness";
 import { blockPlainText, groupSections, selectDraft } from "./docHelpers";
 import { useDocActions } from "./docActions";
 
 export const CURRENCIES = ["CNY", "USD", "SGD", "HKD", "EUR", "GBP", "JPY", "VND"];
 
-/** The standard line, in the document's language. Amounts are in thousands (K). */
-export function salaryLine(o: { min: number; max: number; currency: string; period: "month" | "year"; tax: "gross" | "net" }, lang: "zh" | "en") {
-  return salaryText({ min: o.min * 1000, max: o.max * 1000, currency: o.currency, period: o.period, basis: o.tax }, lang);
+export type SalaryPeriod = "hour" | "month" | "year";
+
+/** How the inputs are entered: monthly and yearly pay in thousands (K), an hourly rate as it is (#351). */
+export const inputUnit = (period: SalaryPeriod) => (period === "hour" ? 1 : 1000);
+
+/** The standard line, in the document's language. */
+export function salaryLine(o: { min: number; max: number; currency: string; period: SalaryPeriod; tax: "gross" | "net" }, lang: "zh" | "en") {
+  const unit = inputUnit(o.period);
+  return salaryText({ min: o.min * unit, max: o.max * unit, currency: o.currency, period: o.period, basis: o.tax }, lang);
+}
+
+/** A currency option's label in the interface language, ISO code first (#353). */
+export function currencyLabel(code: string, uiLang: "zh" | "en") {
+  return `${code} · ${(uiLang === "zh" ? CURRENCY_ZH : CURRENCY_EN)[code] ?? code}`;
 }
 
 export function SalaryModal({ jobId }: { jobId: string }) {
@@ -32,14 +43,18 @@ export function SalaryModal({ jobId }: { jobId: string }) {
   const text = existing ? blockPlainText(existing) : "";
   const parsed = text ? parseMoney(text) : null;
   const amounts = parsed?.amounts ?? [];
-  const [min, setMin] = useState<number | null>(amounts.length ? Math.min(...amounts) / 1000 : null);
-  const [max, setMax] = useState<number | null>(amounts.length > 1 ? Math.max(...amounts) / 1000 : null);
-  const [currency, setCurrency] = useState(currencyOf(text) ?? (lang === "zh" ? "CNY" : "USD"));
-  const [period, setPeriod] = useState<"month" | "year">(parsed?.period ?? "month");
+  const [period, setPeriod] = useState<SalaryPeriod>(parsed?.period ?? "month");
+  // Pre-filled in the unit the period is entered in, so an hourly 26 stays 26 (#351).
+  const startUnit = inputUnit(parsed?.period ?? "month");
+  const [min, setMin] = useState<number | null>(amounts.length ? Math.min(...amounts) / startUnit : null);
+  const [max, setMax] = useState<number | null>(amounts.length > 1 ? Math.max(...amounts) / startUnit : null);
+  // Only what the line states, never a default from the language: the user picks it otherwise (#236).
+  const [currency, setCurrency] = useState<string | null>(currencyOf(text));
+  const uiLang = state.lang === "zh" ? "zh" : "en";
   const [tax, setTax] = useState<"gross" | "net">(SALARY_TAX.test(text) && /税后|net\b|after-?tax/i.test(text) ? "net" : "gross");
 
-  const valid = min != null && max != null && min > 0 && max >= min;
-  const line = valid ? salaryLine({ min, max, currency, period, tax }, lang) : "";
+  const valid = min != null && max != null && min > 0 && max >= min && !!currency;
+  const line = valid ? salaryLine({ min, max, currency: currency!, period, tax }, lang) : "";
 
   return (
     <>
@@ -52,16 +67,24 @@ export function SalaryModal({ jobId }: { jobId: string }) {
               <InputNumber min={0} value={min} onChange={(v) => setMin(v)} placeholder={t("Min")} />
               <span>–</span>
               <InputNumber min={0} value={max} onChange={(v) => setMax(v)} placeholder={t("Max")} />
-              <span className="salary-unit">K</span>
+              {period !== "hour" && <span className="salary-unit">K</span>}
             </div>
           </div>
           <div className="field">
             <label>{t("Currency")}</label>
-            <Select value={currency} style={{ width: 200 }} onChange={setCurrency} options={CURRENCIES.map((c) => ({ value: c, label: `${c} · ${CURRENCY_ZH[c]}` }))} />
+            <Select
+              value={currency ?? undefined}
+              placeholder={t("Choose a currency")}
+              style={{ width: 220 }}
+              onChange={setCurrency}
+              options={CURRENCIES.map((c) => ({ value: c, label: currencyLabel(c, uiLang) }))}
+            />
+            {!currency && <div className="tiny">{t("The salary line doesn't say which currency. Choose one — it isn't guessed from the language.")}</div>}
           </div>
           <div className="field">
             <label>{t("Pay period")}</label>
             <Radio.Group value={period} onChange={(e) => setPeriod(e.target.value)} optionType="button">
+              <Radio.Button value="hour">{t("Hourly")}</Radio.Button>
               <Radio.Button value="month">{t("Monthly")}</Radio.Button>
               <Radio.Button value="year">{t("Yearly")}</Radio.Button>
             </Radio.Group>
@@ -75,7 +98,7 @@ export function SalaryModal({ jobId }: { jobId: string }) {
           </div>
           <div className="field">
             <label>{t("Preview")}</label>
-            <div className="salary-preview">{line || <span className="tiny">{t("Enter a min and max (max ≥ min).")}</span>}</div>
+            <div className="salary-preview">{line || <span className="tiny">{currency ? t("Enter a min and max (max ≥ min).") : t("Choose a currency, then enter a min and max (max ≥ min).")}</span>}</div>
           </div>
         </div>
       </ModalBody>

@@ -1176,6 +1176,11 @@ export const ZH: Record<string, string> = {
   "Primary navigation": "主导航",
   "Resize Copilot sidebar": "调整 Copilot 侧栏宽度",
   "Drag to resize": "拖动以调整宽度",
+  // #236 #351: the salary editor no longer guesses a currency, and takes hourly rates.
+  "Choose a currency": "选择币种",
+  "The salary line doesn't say which currency. Choose one — it isn't guessed from the language.": "薪资行没有写明币种，请选择一种（不会根据界面语言自动推断）。",
+  "Hourly": "按小时",
+  "Choose a currency, then enter a min and max (max ≥ min).": "请先选择币种，再填写最低和最高金额（最高 ≥ 最低）。",
 };
 
 /**

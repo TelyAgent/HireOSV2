@@ -293,7 +293,7 @@ function salaryWeak(text: string, L: Say): string {
  * (same currency, convertible period); anything ambiguous is skipped rather than guessed.
  */
 
-export type Period = "month" | "year" | null;
+export type Period = "hour" | "month" | "year" | null;
 interface Money {
   amounts: number[];
   currency: string | null;
@@ -303,20 +303,46 @@ interface Money {
 const AMOUNT = /(\d+(?:[.,]\d+)*)\s*([kK千wW万])?/g;
 const CEILING_HINT = /ceiling|budget|上限|预算/i;
 
+/**
+ * The currency a salary line states (#350). Names that end in 元 (美元, 新加坡元, 港元, 欧元, 日元) are their own
+ * currency, so they are recognised — and taken out — before a bare 元 counts as yuan. Two different currencies in one
+ * line is ambiguous and gives null rather than one of them; a bare "$" with nothing more specific is US dollars.
+ */
+const CURRENCY_PATTERNS: [string, RegExp][] = [
+  ["USD", /\bUSD\b|美元|US\$/gi],
+  ["SGD", /\bSGD\b|新加坡元|新币|S\$/gi],
+  ["HKD", /\bHKD\b|港币|港元|HK\$/gi],
+  ["EUR", /\bEUR\b|欧元|€/gi],
+  ["GBP", /\bGBP\b|英镑|£/gi],
+  ["JPY", /\bJPY\b|日元|円/gi],
+  ["VND", /\bVND\b|越南盾|₫/gi],
+  ["AUD", /\bAUD\b|澳元|A\$/gi],
+  ["CAD", /\bCAD\b|加元|C\$/gi],
+  ["MYR", /\bMYR\b|马币|林吉特/gi],
+  ["THB", /\bTHB\b|泰铢/gi],
+  ["IDR", /\bIDR\b|印尼盾/gi],
+  ["PHP", /\bPHP\b|菲律宾比索/gi],
+  ["INR", /\bINR\b|卢比/gi],
+  ["CNY", /\b(CNY|RMB)\b|人民币|元|¥|￥/gi],
+];
 export function currencyOf(text: string): string | null {
-  if (/\b(CNY|RMB)\b|人民币|元|¥|￥/i.test(text)) return "CNY";
-  if (/\bUSD\b|美元|US\$/i.test(text)) return "USD";
-  const code = text.match(/\b(SGD|HKD|EUR|GBP|JPY|VND|AUD|CAD|MYR|THB|IDR|PHP|INR)\b/i);
-  if (code) return code[1].toUpperCase();
-  if (/€/.test(text)) return "EUR";
-  if (/£/.test(text)) return "GBP";
-  if (/\$/.test(text)) return "USD";
-  return null;
+  let rest = text;
+  const found = new Set<string>();
+  for (const [code, pattern] of CURRENCY_PATTERNS) {
+    if (pattern.test(rest)) found.add(code);
+    pattern.lastIndex = 0;
+    rest = rest.replace(pattern, " ");
+  }
+  if (!found.size && /\$/.test(rest)) found.add("USD");
+  return found.size === 1 ? [...found][0] : null;
 }
 export function periodOf(text: string): Period {
+  const hour = /\bhour(ly)?\b|\/\s*h(r)?\b|per hour|时薪|每小时|\/\s*小时/i.test(text);
   const month = /month|monthly|\/\s*mo\b|月/i.test(text);
   const year = /year|yearly|annual|annum|\/\s*yr\b|年薪|每年|\/年/i.test(text);
-  return month === year ? null : month ? "month" : "year";
+  // One period stated, or none we can be sure of (#351).
+  const stated = [hour && "hour", month && "month", year && "year"].filter(Boolean) as Exclude<Period, null>[];
+  return stated.length === 1 ? stated[0] : null;
 }
 export function parseMoney(text: string): Money | null {
   const raw = [...text.matchAll(AMOUNT)]
@@ -327,8 +353,10 @@ export function parseMoney(text: string): Money | null {
   // "25-35k": a unit written once applies to the whole range.
   const shared = raw.find((x) => x.unit)?.unit ?? "";
   const scale = (u: string) => (u === "k" || u === "千" ? 1e3 : u === "w" || u === "万" ? 1e4 : 1);
-  const amounts = raw.map((x) => x.n * scale(x.unit || shared)).filter((n) => n >= 100);
-  return amounts.length ? { amounts, currency: currencyOf(text), period: periodOf(text) } : null;
+  const period = periodOf(text);
+  // Small counts ("3 年以上") aren't salaries — but an hourly rate is small by nature: 26–36 / hour (#351).
+  const amounts = raw.map((x) => x.n * scale(x.unit || shared)).filter((n) => n >= (period === "hour" ? 1 : 100));
+  return amounts.length ? { amounts, currency: currencyOf(text), period } : null;
 }
 function monthly(amount: number, period: Period) {
   return period === "year" ? amount / 12 : amount;
@@ -345,6 +373,8 @@ function checkCeiling(sections: DocSection[], blocks: DocBlock[], L: Say): Compl
   if (pub.currency && cap.currency && pub.currency !== cap.currency) return [];
   // Different stated periods convert. When only one side states it, assume the same period only if the
   // amounts are of the same magnitude (a month/year mix-up is a ×12 gap); otherwise don't guess.
+  // An hourly rate isn't compared with a monthly or yearly figure: hours per month aren't known (#351).
+  if ((pub.period === "hour") !== (cap.period === "hour")) return [];
   let pubPeriod = pub.period;
   let capPeriod = cap.period;
   if ((pubPeriod === null) !== (capPeriod === null)) {
