@@ -1,5 +1,5 @@
 import { BadRequestException, Injectable, NotFoundException, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
-import { IDENTITY_POLICY, normalizeName as normalizeIdentityName, scoreIdentity, type ExistingSide, type IdentityScore } from '../duplicates/identity-scoring';
+import { IDENTITY_POLICY, scoreIdentity, type ExistingSide, type IdentityScore } from '../duplicates/identity-scoring';
 import { randomUUID } from 'node:crypto';
 import { Prisma } from '@prisma/client';
 import { decodeOriginalFileName, MaterialsService } from './materials.service';
@@ -789,66 +789,53 @@ export class ImportsService implements OnModuleInit, OnModuleDestroy {
     signals: { displayName: string; email: string | null; phone: string | null },
   ): Promise<DuplicateMatch | null> {
     const uploadedText = material.text ?? (await this.db.material.findUnique({ where: { id: material.id }, select: { text: true } }))?.text ?? '';
-    const ids = new Set<string>();
-    if (material.normalizedTextHash) {
-      const same = await this.db.material.findMany({
-        where: { workspaceId, normalizedTextHash: material.normalizedTextHash, id: { not: material.id } },
-        select: { resumeVersion: { select: { candidateId: true } } },
-      });
-      for (const row of same) if (row.resumeVersion?.candidateId) ids.add(row.resumeVersion.candidateId);
-    }
-    if (signals.email) {
-      const byEmail = await this.db.candidate.findMany({
-        where: { workspaceId, email: { equals: signals.email, mode: 'insensitive' } },
-        select: { id: true },
-      });
-      for (const row of byEmail) ids.add(row.id);
-    }
-    const phone = onlyDigits(signals.phone ?? '');
-    const uploadedName = normalizeIdentityName(signals.displayName);
-    const everyone = await this.db.candidate.findMany({ where: { workspaceId }, select: { id: true, displayName: true, phone: true } });
-    for (const row of everyone) {
-      if (phone.length >= 7 && onlyDigits(row.phone ?? '') === phone) ids.add(row.id);
-      const name = normalizeIdentityName(row.displayName);
-      if (uploadedName && name && (name === uploadedName || scoreIdentity(
-        { name: signals.displayName, email: null, phone: null, text: '' },
-        { name: row.displayName, email: null, phone: null, text: null, employment: [], education: [] },
-      ).signals.some((signal) => signal.key === 'name_close'))) ids.add(row.id);
-    }
-    if (!ids.size) return null;
-
-    const candidates = await this.db.candidate.findMany({
-      where: { workspaceId, id: { in: [...ids].slice(0, 50) } },
-      select: {
-        id: true, displayName: true, email: true, phone: true,
-        profiles: { orderBy: { version: 'desc' }, take: 1, select: { employmentHistory: true, education: true } },
-        resumeVersions: { where: { isLatest: true }, take: 1, select: { material: { select: { text: true } } } },
-      },
-    });
+    // Every candidate in the workspace is scored, not just those an email, phone or name points at: similar
+    // content, shared jobs and the same education reach the review band on their own (#151 review). Read in
+    // pages so a large library isn't loaded at once.
     let best: DuplicateMatch | null = null;
-    for (const candidate of candidates) {
-      const profile = candidate.profiles[0];
-      const score = scoreIdentity(
-        { name: signals.displayName, email: signals.email, phone: signals.phone, text: uploadedText },
-        {
-          name: candidate.displayName, email: candidate.email, phone: candidate.phone,
-          text: candidate.resumeVersions[0]?.material.text ?? null,
-          employment: Array.isArray(profile?.employmentHistory) ? (profile.employmentHistory as ExistingSide['employment']) : [],
-          education: Array.isArray(profile?.education) ? (profile.education as ExistingSide['education']) : [],
+    for (let cursor: string | undefined; ;) {
+      const page = await this.db.candidate.findMany({
+        where: { workspaceId },
+        orderBy: { id: 'asc' },
+        take: DUPLICATE_SCAN_PAGE,
+        ...(cursor ? { cursor: { id: cursor }, skip: 1 } : {}),
+        select: {
+          id: true, displayName: true, email: true, phone: true,
+          profiles: { orderBy: { version: 'desc' }, take: 1, select: { employmentHistory: true, education: true } },
+          resumeVersions: { where: { isLatest: true }, take: 1, select: { material: { select: { id: true, text: true } } } },
         },
-      );
-      // CNT-4: the same content in another format is its own finding, whatever the identity score.
-      const sameContent = score.contentSimilarity != null && score.contentSimilarity >= IDENTITY_POLICY.content.same;
-      const kind = sameContent ? 'same_content' : score.band;
-      if (kind === 'none') continue;
-      const rank = sameContent ? 101 : score.total;
-      if (!best || rank > best.rank) {
-        best = { candidate: { id: candidate.id, displayName: candidate.displayName }, kind, confidence: score.total / 100, basis: toBasis(score, kind), rank };
+      });
+      for (const candidate of page) {
+        // The upload itself, once linked (a retried item), is not its own duplicate.
+        if (candidate.resumeVersions[0]?.material.id === material.id) continue;
+        const profile = candidate.profiles[0];
+        const score = scoreIdentity(
+          { name: signals.displayName, email: signals.email, phone: signals.phone, text: uploadedText },
+          {
+            name: candidate.displayName, email: candidate.email, phone: candidate.phone,
+            text: candidate.resumeVersions[0]?.material.text ?? null,
+            employment: Array.isArray(profile?.employmentHistory) ? (profile.employmentHistory as ExistingSide['employment']) : [],
+            education: Array.isArray(profile?.education) ? (profile.education as ExistingSide['education']) : [],
+          },
+        );
+        // CNT-4: the same content in another format is its own finding, whatever the identity score.
+        const sameContent = score.contentSimilarity != null && score.contentSimilarity >= IDENTITY_POLICY.content.same;
+        const kind = sameContent ? 'same_content' : score.band;
+        if (kind === 'none') continue;
+        const rank = sameContent ? 101 : score.total;
+        if (!best || rank > best.rank) {
+          best = { candidate: { id: candidate.id, displayName: candidate.displayName }, kind, confidence: score.total / 100, basis: toBasis(score, kind), rank };
+        }
       }
+      if (page.length < DUPLICATE_SCAN_PAGE) break;
+      cursor = page[page.length - 1].id;
     }
     return best;
   }
 }
+
+/** Candidates read per query while looking for a duplicate. */
+const DUPLICATE_SCAN_PAGE = 100;
 
 type DuplicateMatch = {
   candidate: { id: string; displayName: string };
@@ -865,10 +852,6 @@ function toBasis(score: IdentityScore, kind: DuplicateMatch['kind']): DuplicateB
   const lines = score.signals.map((signal) => `${signal.detail} (${signal.points > 0 ? '+' : ''}${signal.points})`);
   if (kind === 'same_content') lines.unshift(`Same résumé content in another format (${Math.round((score.contentSimilarity ?? 1) * 100)}% similar)`);
   return { ...score, kind, lines };
-}
-
-function onlyDigits(value: string) {
-  return value.replace(/\D+/g, '');
 }
 
 function serializeItem(item: {

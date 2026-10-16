@@ -60,8 +60,8 @@ export function scoreIdentity(uploaded: UploadedSide, existing: ExistingSide): I
   if (contact.email === 'same') signals.push({ key: 'email', points: P.email, detail: `Same email: ${lower(uploaded.email)}` });
   if (contact.phone === 'same') signals.push({ key: 'phone', points: P.phone, detail: `Same phone number: ${uploaded.phone}` });
 
-  const uploadedText = normalizeContent(uploaded.text);
-  const jobs = existing.employment.filter((job) => jobInText(job, uploadedText));
+  const uploadedLines = contentLines(uploaded.text);
+  const jobs = existing.employment.filter((job) => jobInText(job, uploadedLines));
   if (jobs.length >= IDENTITY_POLICY.minJobsInCommon) {
     signals.push({ key: 'employment', points: P.employment, detail: `${jobs.length} jobs with the same company, title and start month: ${jobs.map((j) => `${str(j.title)} · ${str(j.company)}`).join('; ')}` });
   }
@@ -77,7 +77,7 @@ export function scoreIdentity(uploaded: UploadedSide, existing: ExistingSide): I
     signals.push({ key: 'content', points: P.content, detail: `Résumé text ${Math.round(similarity * 100)}% similar` });
   }
 
-  const schools = existing.education.filter((entry) => educationInText(entry, uploadedText));
+  const schools = existing.education.filter((entry) => educationInText(entry, uploadedLines));
   if (schools.length) {
     signals.push({ key: 'education', points: P.education, detail: `Same education: ${schools.map((e) => str(e.school) || str(e.statement)).join('; ')}` });
   }
@@ -144,29 +144,60 @@ function editDistanceAtMostOne(a: string, b: string) {
   return edits + (a.length - i) + (b.length - j) <= 1;
 }
 
-/** A job counts as shared when its company, title and start month all appear in the uploaded text. */
-function jobInText(job: ExistingSide['employment'][number], text: string) {
+/** The uploaded text line by line, each normalized as CNT-1 does for the whole text. */
+function contentLines(text: string) {
+  return text.split(/\r?\n/).map((line) => normalizeContent(line)).filter(Boolean);
+}
+
+/**
+ * One entry of the résumé — a few lines starting where one of its names is — holds every part, and its first date is
+ * the entry's start (#151 review). Parts found in different entries ("Example Retail" in one, its start month in
+ * another) don't make it shared.
+ */
+function entryInLines(lines: string[], names: string[], parts: string[], startForms: string[], year: string) {
+  for (let i = 0; i < lines.length; i++) {
+    if (!names.some((name) => lines[i].includes(name))) continue;
+    const block = lines.slice(i, i + ENTRY_LINES).join('');
+    if (!parts.every((part) => block.includes(part))) continue;
+    const firstYear = block.search(/(19|20)\d{2}/);
+    if (firstYear === -1) continue;
+    if (startForms.some((form) => {
+      for (let at = block.indexOf(form); at !== -1; at = block.indexOf(form, at + 1)) if (at + form.indexOf(year) === firstYear) return true;
+      return false;
+    })) return true;
+  }
+  return false;
+}
+
+/** A job counts as shared when one entry has its company, title and — as that entry's start — its start month. */
+function jobInText(job: ExistingSide['employment'][number], lines: string[]) {
   const company = normalizeContent(str(job.company));
   const title = normalizeContent(str(job.title));
   const month = formatMonth(job.start);
   if (!company || !title || !month) return false;
-  return text.includes(company) && text.includes(title) && monthForms(month).some((form) => text.includes(form));
+  return entryInLines(lines, [company, title], [company, title], monthForms(month), month.slice(0, 4));
 }
 
-/** Education counts when its school, major (if recorded) and years appear in the uploaded text. */
-function educationInText(entry: ExistingSide['education'][number], text: string) {
+/** Education counts when one entry has its school, major (if recorded) and years, starting with its first year. */
+function educationInText(entry: ExistingSide['education'][number], lines: string[]) {
   const school = normalizeContent(str(entry.school));
   const major = normalizeContent(str(entry.major));
   const years = str(entry.period).match(/\d{4}/g) ?? [];
-  if (!school || !years.length) return false;
-  return text.includes(school) && (!major || text.includes(major)) && years.every((year) => text.includes(year));
+  const first = years[0];
+  if (!school || !first) return false;
+  return entryInLines(lines, [school], [school, ...(major ? [major] : []), ...years], [first], first);
 }
 
-/** "2021-03" as it may be written once punctuation is gone: 202103, 20213, 2021年3月, 032021. */
+/** An entry is its first line and the next two: company on one line, title and dates on the next is common. */
+const ENTRY_LINES = 3;
+
+/** "2021-03" as it may be written once punctuation is gone: 202103, 20213, 2021年3月, 032021, mar2021. */
 function monthForms(month: string) {
   const [year, mm] = month.split('-');
   const m = String(Number(mm));
-  return [`${year}${mm}`, `${year}${m}月`, `${year}年${m}月`, `${year}年${mm}月`, `${mm}${year}`, `${year}${m}`];
+  const short = ['jan', 'feb', 'mar', 'apr', 'may', 'jun', 'jul', 'aug', 'sep', 'oct', 'nov', 'dec'][Number(mm) - 1];
+  const long = ['january', 'february', 'march', 'april', 'may', 'june', 'july', 'august', 'september', 'october', 'november', 'december'][Number(mm) - 1];
+  return [`${year}${mm}`, `${year}${m}月`, `${year}年${m}月`, `${year}年${mm}月`, `${mm}${year}`, `${year}${m}`, `${short}${year}`, `${long}${year}`];
 }
 
 function compare(a: string, b: string): ContactComparison {
