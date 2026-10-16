@@ -3,6 +3,7 @@ import { createRoot } from "react-dom/client";
 import { ConfigProvider, App as AntApp } from "antd";
 import { BrowserRouter } from "react-router-dom";
 import App from "./App";
+import { LocaleSync } from "./components/LocaleSync";
 import { StoreProvider, RouteSync } from "./store/StoreContext";
 import { API_BASE_URL } from "./utils/apiBase";
 import { SessionGate } from "./lib/session";
@@ -60,13 +61,15 @@ root.render(
       <AntApp>
         <SessionGate>
           <StoreProvider>
-            <BrowserRouter basename={API_BASE_URL}>
-              <RouteSync>
-                <ErrorBoundary>
-                  <App />
-                </ErrorBoundary>
-              </RouteSync>
-            </BrowserRouter>
+            <LocaleSync>
+              <BrowserRouter basename={API_BASE_URL}>
+                <RouteSync>
+                  <ErrorBoundary>
+                    <App />
+                  </ErrorBoundary>
+                </RouteSync>
+              </BrowserRouter>
+            </LocaleSync>
           </StoreProvider>
         </SessionGate>
       </AntApp>

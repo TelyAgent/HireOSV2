@@ -3,6 +3,7 @@ import { createRoot } from "react-dom/client";
 import { ConfigProvider, App as AntApp } from "antd";
 import { BrowserRouter } from "react-router-dom";
 import App from "./App";
+import { LocaleSync } from "./components/LocaleSync";
 import { StoreProvider } from "./store/StoreContext";
 import { API_BASE_URL } from "./utils/apiBase";
 import "./index.css";
@@ -54,11 +55,13 @@ root.render(
     >
       <AntApp>
         <StoreProvider>
-          <BrowserRouter basename={API_BASE_URL}>
-            <ErrorBoundary>
-              <App />
-            </ErrorBoundary>
-          </BrowserRouter>
+          <LocaleSync>
+            <BrowserRouter basename={API_BASE_URL}>
+              <ErrorBoundary>
+                <App />
+              </ErrorBoundary>
+            </BrowserRouter>
+          </LocaleSync>
         </StoreProvider>
       </AntApp>
     </ConfigProvider>

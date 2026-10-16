@@ -3,6 +3,7 @@ import { createRoot } from "react-dom/client";
 import { ConfigProvider, App as AntApp } from "antd";
 import { BrowserRouter } from "react-router-dom";
 import App from "./App";
+import { LocaleSync } from "./components/LocaleSync";
 import { StoreProvider, useStore } from "./store/StoreContext";
 import { SessionGate } from "./lib/session";
 import "./index.css";
@@ -89,11 +90,13 @@ root.render(
       <AntApp>
         <SessionGate>
           <StoreProvider>
-            <BrowserRouter basename={(import.meta as ImportMeta & { env?: Record<string, string | undefined> }).env?.BASE_URL || "/"}>
-              <ErrorBoundary>
-                <App />
-              </ErrorBoundary>
-            </BrowserRouter>
+            <LocaleSync>
+              <BrowserRouter basename={(import.meta as ImportMeta & { env?: Record<string, string | undefined> }).env?.BASE_URL || "/"}>
+                <ErrorBoundary>
+                  <App />
+                </ErrorBoundary>
+              </BrowserRouter>
+            </LocaleSync>
           </StoreProvider>
         </SessionGate>
       </AntApp>
