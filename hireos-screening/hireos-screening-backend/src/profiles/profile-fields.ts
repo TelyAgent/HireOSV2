@@ -161,6 +161,8 @@ export function profileFields(
           value: text(availability.value)
             + (typeof availability.days === 'number' ? ` (${availability.days} days)` : typeof availability.date === 'string' ? ` (${availability.date})` : ''),
           needles: [text(availability.value)],
+          // "1 month" could be a project's length: only a paragraph about starting or notice counts (#155 review).
+          context: AVAILABILITY_CONTEXT,
         }]
       : [],
   };
@@ -293,6 +295,8 @@ function sameCurrency(paragraph: string, currency: string | undefined): boolean 
   const aliases = CURRENCY_ALIASES[currency.toUpperCase()] ?? [currency.toLowerCase()];
   return named.some((n) => aliases.includes(n));
 }
+
+const AVAILABILITY_CONTEXT = /availab|notice|start(ing)?\s+date|can\s+start|join|immediate|到岗|入职|离职|通知期|报到|上岗/i;
 
 const SALARY_CONTEXT = /salary|compensation|expected\s+(pay|package|income|ctc)|pay\s+expectation|\bctc\b|remuneration|薪资|薪酬|期望薪|月薪|年薪|待遇|薪水|工资/i;
 

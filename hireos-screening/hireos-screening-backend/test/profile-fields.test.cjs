@@ -570,3 +570,20 @@ test('#155 AC-3: the payload the frontend renders in its tests is the candidate 
   const written = JSON.parse(fs.readFileSync(FIXTURE_PATH, 'utf8'));
   assert.deepEqual(written, JSON.parse(JSON.stringify(await profileFieldsFixture())), 'regenerate it: node scripts/gen-profile-fields-fixture.cjs');
 });
+
+test('#155 AC-2 (review): availability is located where the résumé talks about starting, not at a project of the same length', () => {
+  const f = byField(profileFields({ displayName: 'A', availability: { value: '1 month', status: 'known', days: 30 } }, { displayName: 'A', email: null, phone: null },
+    source([{ id: 's1', text: 'Project: delivered reporting dashboard in 1 month.' }, { id: 's2', text: 'Availability: 1 month notice.' }]))).availability;
+  assert.deepEqual(f.evidence.map((e) => e.segmentId), ['s2']);
+  const only = byField(profileFields({ displayName: 'A', availability: { value: '1 month', status: 'known', days: 30 } }, { displayName: 'A', email: null, phone: null },
+    source([{ id: 's1', text: 'Project: delivered reporting dashboard in 1 month.' }]))).availability;
+  assert.deepEqual([only.evidence, only.evidenceUnavailable], [[], 'not_located']);
+});
+
+test('#155 AC-1 (review): a date range or a bounded date keeps the text, never one made-up start date', () => {
+  const { readAvailability } = require('../dist/profiles/field-formats');
+  for (const text of ['Available between 2026-11-01 and 2026-12-01', 'by 2026-11-01', '2026年11月前后', 'not before 2026-11-01']) {
+    assert.deepEqual(readAvailability(text), { value: text, status: 'known' }, text);
+  }
+  assert.equal(readAvailability('available from 2026-11-01').date, '2026-11-01');
+});

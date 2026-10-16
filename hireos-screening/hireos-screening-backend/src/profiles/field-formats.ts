@@ -23,6 +23,7 @@ export type Availability = { value: string; status: 'known'; days?: number; date
 // Every stated amount, decimals included and added up: "1.5 months" is 45 days, "1 month and 2 weeks" 44.
 // A bare 月 or 日 is a date ("3月到岗"), not a duration, so only 个月 and 天 count.
 const DURATION = /(\d+(?:\.\d+)?)\s*(days?|天|weeks?|周|个?星期|months?|个月)/gi;
+const DATE_BOUND = /\b(before|by|until|till|no\s+later\s+than|not\s+before|after|between|around|approximately|approx\.?|about|earliest|latest)\b|之前|以前|前后|左右|以后|之后|最早|最晚|不晚于|不早于/i;
 const UNIT = String.raw`(?:days?|天|weeks?|周|个?星期|months?|个月)`;
 // An amount on either side of a range, in digits or still in words ("two to three weeks", "两到三周").
 const NUM = String.raw`(?:\d+(?:\.\d+)?|[一二两三四五六七八九十]+|\b(?:a|an|one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve)\b)`;
@@ -33,6 +34,10 @@ const UNIT_DAYS =(unit: string) => (/^(day|天)/i.test(unit) ? 1 : /^(week|周|�
 /** "1 month notice" → 30 days, "随时到岗" → 0, "available from 2026-11-01" → that date; otherwise the text alone. */
 export function readAvailability(value: string): Availability {
   const text = value.trim();
+  // Two dates ("between 2026-11-01 and 2026-12-01") or a bound ("before", "by", "之前") are not one start date:
+  // the text alone is kept rather than a made-up date (#155 review).
+  const dates = text.match(/\d{4}[-/.年]\d{1,2}/g) ?? [];
+  if (dates.length > 1 || (dates.length && DATE_BOUND.test(text))) return { value: text, status: 'known' };
   const date = text.match(/(\d{4})[-/.年](\d{1,2})(?:[-/.月](\d{1,2}))?/);
   if (date) {
     const [year, month, day] = [Number(date[1]), Number(date[2]), date[3] ? Number(date[3]) : 1];
