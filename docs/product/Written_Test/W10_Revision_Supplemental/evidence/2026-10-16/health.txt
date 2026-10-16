@@ -1,0 +1,8 @@
+2026-10-16 12:11 Asia/Shanghai
+Command: curl -sS -i --max-time 15 https://hireos.aipollo.me/hireos/written/api/health
+Exit code: 0
+HTTP/2 200
+content-type: application/json; charset=utf-8
+{"status":"ok","service":"hireos-written","phase":"phase-0","timestamp":"2026-10-16T04:11:55.576Z"}
+
+This confirms only health endpoint reachability. It does not establish W10 API behavior or deployed commit identity.

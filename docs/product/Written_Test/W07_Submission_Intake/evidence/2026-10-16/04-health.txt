@@ -1,0 +1,7 @@
+Command: curl -sS --max-time 15 -w '\nHTTP_STATUS:%{http_code}\n' https://hireos.aipollo.me/hireos/written/api/health
+Exit code: 0
+Observed at: 2026-10-16 12:01 Asia/Shanghai
+Response: {"status":"ok","service":"hireos-written","phase":"phase-0","timestamp":"2026-10-16T04:01:12.770Z"}
+HTTP_STATUS:200
+
+This confirms only that the health endpoint responded; it does not verify W07 business APIs.

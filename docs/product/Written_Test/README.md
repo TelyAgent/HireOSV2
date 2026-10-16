@@ -9,21 +9,21 @@
 | `User_Journey.md` 用户旅程 | 角色目的、步骤、用户判断、可见/不可见、异常恢复、交接 | 产品、设计、AI Review |
 | `User_Cases.md` 用户用例 | 按 User Journey 整理的功能测试用例：前置数据、步骤、预期结果、检查位置、追溯到闭环路径和验收标准 | 测试、AI 执行测试 |
 
-| 编号 | 文件夹 | 功能 |
-|---|---|---|
-| W01 | [W01_Question_Bank](W01_Question_Bank/PRD.md) | 题库与题目版本 |
-| W02 | [W02_Builder_AI_Generation](W02_Builder_AI_Generation/PRD.md) | 组卷 Builder 与 AI 出题 |
-| W03 | [W03_Project_Candidate_Linking](W03_Project_Candidate_Linking/PRD.md) | 测评项目与候选人关联 |
-| W04 | [W04_Assessment_Plan](W04_Assessment_Plan/PRD.md) | 候选人测评计划 |
-| W05 | [W05_Invitation_Sending](W05_Invitation_Sending/PRD.md) | 邀请与批量发送 |
-| W06 | [W06_Candidate_Portal](W06_Candidate_Portal/PRD.md) | 候选人门户：验证、接受与作答 |
-| W07 | [W07_Submission_Intake](W07_Submission_Intake/PRD.md) | 提交收件与 Submission Inbox |
-| W08 | [W08_Evaluation_Review](W08_Evaluation_Review/PRD.md) | 评分与人工复核 |
-| W09 | [W09_Result_Release](W09_Result_Release/PRD.md) | 结果发布与候选人通知 |
-| W10 | [W10_Revision_Supplemental](W10_Revision_Supplemental/PRD.md) | 修订、重考与补测 |
-| W11 | [W11_Next_Action_Handoff](W11_Next_Action_Handoff/PRD.md) | 下一步决定与交接 |
-| W12 | [W12_Candidate_Comparison](W12_Candidate_Comparison/PRD.md) | 候选人对比 |
-| W13 | [W13_My_Tasks_Statistics](W13_My_Tasks_Statistics/PRD.md) | 我的任务与首页统计 |
+| 编号 | 文件夹 | 功能 | 文档 |
+|---|---|---|---|
+| W01 | [W01_Question_Bank](W01_Question_Bank/PRD.md) | 题库与题目版本 | [PRD](W01_Question_Bank/PRD.md) · [Loop_IO](W01_Question_Bank/Loop_IO.md) · [Journey](W01_Question_Bank/User_Journey.md) · [Cases](W01_Question_Bank/User_Cases.md) |
+| W02 | [W02_Builder_AI_Generation](W02_Builder_AI_Generation/PRD.md) | 组卷 Builder 与 AI 出题 | [PRD](W02_Builder_AI_Generation/PRD.md) · [Loop_IO](W02_Builder_AI_Generation/Loop_IO.md) · [Journey](W02_Builder_AI_Generation/User_Journey.md) · [Cases](W02_Builder_AI_Generation/User_Cases.md) |
+| W03 | [W03_Project_Candidate_Linking](W03_Project_Candidate_Linking/PRD.md) | 测评项目与候选人关联 | [PRD](W03_Project_Candidate_Linking/PRD.md) · [Loop_IO](W03_Project_Candidate_Linking/Loop_IO.md) · [Journey](W03_Project_Candidate_Linking/User_Journey.md) · [Cases](W03_Project_Candidate_Linking/User_Cases.md) |
+| W04 | [W04_Assessment_Plan](W04_Assessment_Plan/PRD.md) | 候选人测评计划 | [PRD](W04_Assessment_Plan/PRD.md) · [Loop_IO](W04_Assessment_Plan/Loop_IO.md) · [Journey](W04_Assessment_Plan/User_Journey.md) · [Cases](W04_Assessment_Plan/User_Cases.md) |
+| W05 | [W05_Invitation_Sending](W05_Invitation_Sending/PRD.md) | 邀请与批量发送 | [PRD](W05_Invitation_Sending/PRD.md) · [Loop_IO](W05_Invitation_Sending/Loop_IO.md) · [Journey](W05_Invitation_Sending/User_Journey.md) · [Cases](W05_Invitation_Sending/User_Cases.md) |
+| W06 | [W06_Candidate_Portal](W06_Candidate_Portal/PRD.md) | 候选人门户：验证、接受与作答 | [PRD](W06_Candidate_Portal/PRD.md) · [Loop_IO](W06_Candidate_Portal/Loop_IO.md) · [Journey](W06_Candidate_Portal/User_Journey.md) · [Cases](W06_Candidate_Portal/User_Cases.md) |
+| W07 | [W07_Submission_Intake](W07_Submission_Intake/PRD.md) | 提交收件与 Submission Inbox | [PRD](W07_Submission_Intake/PRD.md) · [Loop_IO](W07_Submission_Intake/Loop_IO.md) · [Journey](W07_Submission_Intake/User_Journey.md) · [Cases](W07_Submission_Intake/User_Cases.md) |
+| W08 | [W08_Evaluation_Review](W08_Evaluation_Review/PRD.md) | 评分与人工复核 | [PRD](W08_Evaluation_Review/PRD.md) · [Loop_IO](W08_Evaluation_Review/Loop_IO.md) · [Journey](W08_Evaluation_Review/User_Journey.md) · [Cases](W08_Evaluation_Review/User_Cases.md) |
+| W09 | [W09_Result_Release](W09_Result_Release/PRD.md) | 结果发布与候选人通知 | [PRD](W09_Result_Release/PRD.md) · [Loop_IO](W09_Result_Release/Loop_IO.md) · [Journey](W09_Result_Release/User_Journey.md) · [Cases](W09_Result_Release/User_Cases.md) |
+| W10 | [W10_Revision_Supplemental](W10_Revision_Supplemental/PRD.md) | 修订、重考与补测 | [PRD](W10_Revision_Supplemental/PRD.md) · [Loop_IO](W10_Revision_Supplemental/Loop_IO.md) · [Journey](W10_Revision_Supplemental/User_Journey.md) · [Cases](W10_Revision_Supplemental/User_Cases.md) |
+| W11 | [W11_Next_Action_Handoff](W11_Next_Action_Handoff/PRD.md) | 下一步决定与交接 | [PRD](W11_Next_Action_Handoff/PRD.md) · [Loop_IO](W11_Next_Action_Handoff/Loop_IO.md) · [Journey](W11_Next_Action_Handoff/User_Journey.md) · [Cases](W11_Next_Action_Handoff/User_Cases.md) |
+| W12 | [W12_Candidate_Comparison](W12_Candidate_Comparison/PRD.md) | 候选人对比 | [PRD](W12_Candidate_Comparison/PRD.md) · [Loop_IO](W12_Candidate_Comparison/Loop_IO.md) · [Journey](W12_Candidate_Comparison/User_Journey.md) · [Cases](W12_Candidate_Comparison/User_Cases.md) |
+| W13 | [W13_My_Tasks_Statistics](W13_My_Tasks_Statistics/PRD.md) | 我的任务与首页统计 | [PRD](W13_My_Tasks_Statistics/PRD.md) · [Loop_IO](W13_My_Tasks_Statistics/Loop_IO.md) · [Journey](W13_My_Tasks_Statistics/User_Journey.md) · [Cases](W13_My_Tasks_Statistics/User_Cases.md) |
 
 业务顺序：W01 → W02 准备题目；W03 → W04 → W05 → W06 → W07 → W08 → W09 是单个候选人的主闭环；W09 之后进入 W10（新一轮回到 W05）或 W11。W12、W13 读取主闭环产生的结果和任务。测试时每个功能用 seed 直接造出前置数据，不依赖前一个功能真跑。
 
@@ -116,6 +116,27 @@ Received / Submitted / Evaluated / Published / Delivered 是五个独立状态�
 `Loop_IO.md` 的字段（`flow_id`、`actor`、`seed`、`entry`、`max_loop`、`external`、`nodes`、`edges`）和断言原则与 [JD_Management 闭环文档格式](../JD_Management/README_Modules.md#闭环文档格式) 相同：权限类断言必须检查 `api`；AI 输出写判定条件，同一输入至少跑 2 次；未实现的功能路径照写，执行时标记 known gap。
 
 用例状态：✅ 可测（功能已有实现，不代表会通过）；🟡 部分可测；❌ 未实现。
+
+## 用例统计（User_Cases.md）
+
+| 模块 | 用例数 | ✅ 可测 | 🟡 部分可测 | ❌ 未实现 |
+|---|---|---|---|---|
+| W01 | 14 | 4 | 5 | 5 |
+| W02 | 12 | 0 | 3 | 9 |
+| W03 | 12 | 1 | 2 | 9 |
+| W04 | 12 | 6 | 2 | 4 |
+| W05 | 12 | 4 | 2 | 6 |
+| W06 | 14 | 0 | 3 | 11 |
+| W07 | 13 | 0 | 1 | 12 |
+| W08 | 12 | 2 | 5 | 5 |
+| W09 | 10 | 2 | 4 | 4 |
+| W10 | 10 | 0 | 0 | 10 |
+| W11 | 11 | 4 | 2 | 5 |
+| W12 | 10 | 0 | 3 | 7 |
+| W13 | 13 | 4 | 3 | 6 |
+| **合计** | **155** | **27** | **35** | **93** |
+
+“✅ 可测”表示功能已有实现、用例可以直接执行，不代表会通过。状态按 2026-10-16 对代码的初步核对标注，执行前需要再确认。
 
 ## 说明
 

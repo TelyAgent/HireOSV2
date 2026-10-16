@@ -1,0 +1,80 @@
+- navigation "Primary navigation":
+  - link "checklist My Tasks 0":
+    - /url: /hireos/written/tasks
+    - generic: checklist
+    - generic: My Tasks
+    - generic: "0"
+  - link "quiz Question Bank":
+    - /url: /hireos/written/question-bank
+    - generic: quiz
+    - generic: Question Bank
+  - generic: Workspace
+  - link "tune Settings":
+    - /url: /hireos/written/settings
+    - generic: tune
+    - generic: Settings
+  - button "Collapse navigation" [expanded]:
+    - generic: left_panel_close
+    - generic: Collapse navigation
+- generic: H
+- generic: HireOS Command
+- generic: /
+- generic: Written Test
+- button "Toggle navigation":
+  - generic: menu
+- button "Language": 中 / EN
+- button "Notifications":
+  - generic: notifications_none
+- button "Appearance":
+  - text: Appearance
+- button "蔡敏 蔡敏":
+  - generic: 蔡敏
+  - text: 蔡敏
+- navigation "Breadcrumb":
+  - link "My Tasks":
+    - /url: /hireos/written/tasks
+  - generic: /
+  - generic: Candidate detail
+- heading "【Ai产品经理 武汉 12 20k】梁佳仪 1年's plan" [level=1]
+- text: candidate-a@example.com ·
+- generic: Pending release
+- generic: Round 1
+- button "Assessment plan"
+- button "Submission"
+- button "Comprehensive evaluation"
+- button "Evaluation result"
+- heading "Internal reference" [level=4]
+- generic: "Final overall (human): 0 / 100"
+- generic: Sum of the human scores below (0 / 100), scaled to 100. AI suggestions are shown for reference only and are not counted.
+- generic: Criteria
+- generic: Human score · AI suggests
+- generic: 方法论严谨性与正确性
+- text: 0/50
+- generic: · AI 0
+- generic: 企业级 AI 产品方案设计与安全治理
+- text: 0/25
+- generic: · AI 0
+- generic: 数据分析、评测与实验判断
+- text: 0/15
+- generic: · AI 0
+- generic: 跨职能交付与优先级管理
+- text: 0/10
+- generic: · AI 0
+- generic: Finalized by John · Oct 14, 2026, 5:28 PM
+- heading "Candidate preview" [level=4]
+- generic: "Disclosure policy: Score + summary"
+- generic: "Outcome:"
+- textbox: Below the bar for this role on this assessment.
+- generic: "Score: 0"
+- generic: "Feedback:"
+- textbox "Write feedback on this candidate's answers.": 候选人未提供针对题目的实际方案，仅重复了题目要求和任务编号，未呈现可评估的方法论、产品设计、评测方案或交付判断。由于缺少实质性作答，无法证明其具备企业级 AI 产品规划、安全治理、数据分析或跨职能交付能力。
+- generic: Pre-filled from the AI evaluation of these answers — check it reads well for the candidate before publishing.
+- generic: "Next step:"
+- textbox: HR will follow up with next steps.
+- generic: "Never includes: internal ranking, reviewer notes, or the internal answer key."
+- heading "Approve & publish" [level=4]
+- checkbox "Internal review complete" [active]
+- text: Internal review complete
+- checkbox "Disclosure content approved for release"
+- text: Disclosure content approved for release
+- button "Finalize & publish result"

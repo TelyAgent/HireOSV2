@@ -1,0 +1,110 @@
+Browser tab: 1663450778, Title: "HireOS Command — Written Test", URL: "https://hireos.aipollo.me/hireos/written/tasks".
+0 AXWebArea HireOS Command — Written Test, URL: hireos.aipollo.me/hireos/written/tasks
+	1 container root
+		2 container Primary navigation
+			3 link Description: checklist My Tasks 0, Help: My Tasks, Value: hireos.aipollo.me/hireos/written/tasks
+			4 link Description: quiz Question Bank, Help: Question Bank, Value: hireos.aipollo.me/hireos/written/question-bank
+			5 text WORKSPACE
+			6 link Description: tune Settings, Help: Settings, Value: hireos.aipollo.me/hireos/written/settings
+			7 button (expanded) Description: Collapse navigation, Secondary Actions: Collapse
+				8 text left_panel_close
+				9 text Collapse navigation
+		10 container
+			11 text HireOS Command / Written Test
+			12 button Toggle navigation
+			13 button Language
+			14 button Notifications
+			15 button Appearance
+			16 button 蔡敏 蔡敏
+				17 text 蔡敏
+				18 text 蔡敏
+		19 heading My Tasks, Value: 1
+			20 text My Tasks
+		21 button + New written test
+		22 container
+			23 text Signed in as John  ·  HR Head  · Aurora Studio
+		24 link Description: My open tasks 0 Unique task_id, open/in_progress/waiting, Value: hireos.aipollo.me/hireos/written/tasks
+		25 link Description: Reviews awaiting me 0 Same filter as list view, Value: hireos.aipollo.me/hireos/written/tasks
+		26 link Description: Due today 0 Same filter as list view, Value: hireos.aipollo.me/hireos/written/tasks
+		27 link Description: In progress 0 Same filter as list view, Value: hireos.aipollo.me/hireos/written/tasks
+		28 button More statistics
+		29 button All tasks (4)
+			30 text All tasks
+			31 text  (
+			32 text 4
+			33 text )
+		34 button Pending test (2)
+			35 text Pending test
+			36 text  (
+			37 text 2
+			38 text )
+		39 button Test sent (0)
+			40 text Test sent
+			41 text  (
+			42 text 0
+			43 text )
+		44 button Pending submission (0)
+			45 text Pending submission
+			46 text  (
+			47 text 0
+			48 text )
+		49 button Pending result review (0)
+			50 text Pending result review
+			51 text  (
+			52 text 0
+			53 text )
+		54 button Pending release (1)
+			55 text Pending release
+			56 text  (
+			57 text 1
+			58 text )
+		59 button Awaiting next step (0)
+			60 text Awaiting next step
+			61 text  (
+			62 text 0
+			63 text )
+		64 button Handed off to interview (0)
+			65 text Handed off to interview
+			66 text  (
+			67 text 0
+			68 text )
+		69 button On hold (0)
+			70 text On hold
+			71 text  (
+			72 text 0
+			73 text )
+		74 button Testing closed (1)
+			75 text Testing closed
+			76 text  (
+			77 text 1
+			78 text )
+		79 container
+			80 button Task list
+			81 button Cluster by JD
+		82 container
+			83 text CANDIDATE STATUS CREATED DEADLINE RESUME 夏A
+			84 text 夏天 Ai产品经理 简历
+			85 text AI 工具产品经理
+			86 text Testing closed
+			87 text Oct 14, 2026
+			88 button View resume
+			89 text 【武
+			90 text 【Ai产品经理 武汉 12 20k】梁佳仪 1年
+			91 text 高级 AI 产品经理
+			92 text Pending release
+			93 text Sep 29, 2026
+			94 button View resume
+			95 text 张
+			96 text 张毅
+			97 text 高级 AI 产品经理
+			98 text Pending test
+			99 text Sep 24, 2026
+			100 button View resume
+			101 text 0陈
+			102 text 06 陈昊天 全栈工程师
+			103 text 全栈工程师
+			104 text Pending test
+			105 text Sep 24, 2026
+			106 button View resume
+
+The focused UI element is 0 AXWebArea HireOS Command — Written Test, URL: hireos.aipollo.me/hireos/written/tasks

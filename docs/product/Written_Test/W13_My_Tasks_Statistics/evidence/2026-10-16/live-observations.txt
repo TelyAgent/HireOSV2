@@ -1,0 +1,23 @@
+W13 live browser observations — 2026-10-16, approximately 12:10–12:15 Asia/Shanghai
+URL: https://hireos.aipollo.me/hireos/written/tasks
+Browser: Chrome, existing signed-in session. Build SHA unavailable.
+Method: browser accessibility tree and visual viewport; read-only navigation only.
+Personal candidate names, email addresses and case UUIDs are intentionally omitted.
+
+E01 Initial load: My Tasks opened. The first accessibility snapshot showed all list filters at 0 and "Nothing here"; the next observation after expanding More statistics showed four rows. There was no visible Loading text in the metric cards. Initial zero may be a transient load state; no frame-by-frame recording was made.
+E02 Identity/header: app header displayed a Chinese account name while the page body said "Signed in as John · HR Head · Aurora Studio". Account identity mapping was not available for verification.
+E03 Overview: four My Work cards, all 0. More statistics was initially collapsed. After expansion it showed exactly five cards: Active projects, Awaiting acceptance, Awaiting submission, Submission issues, Results to release. All were 0. No Delivery issues card or as-of timestamp was visible.
+E04 List baseline: All tasks (4), Pending test (2), Pending release (1), Testing closed (1); other status filters 0. Four real candidate rows were visible. This is not the S0_employer seed and cannot be compared to Emma/Daniel/Morgan baseline values.
+E05 Metric drilldown: clicking My open tasks 0 kept /tasks with no visible filter change. Clicking Results to release 0 navigated to /assessments, showing "No assessment projects yet" plus three open roles; no corresponding filtered result list or query filter was visible. Zero-valued metric makes count equivalence untestable.
+E06 Filter: Pending test (2) showed two rows; Pending release (1) showed one; Testing closed (1) showed one; Pending submission (0) showed "Nothing here." The displayed counts matched visible rows for these sampled filters.
+E07 Cluster by JD: under Pending test (2), two job groups each displayed "1 candidates". Clicking Compare candidates on a group whose visible candidate was Pending test showed "No scored candidates to compare yet." No comparison was opened.
+E08 Resume: View resume opened a "Candidate resume" drawer. It identified the candidate and target role, and said no resume text was handed over from Screening while also displaying "Resume text handed over from Resume Screening." The candidate's private contact information was visible in the drawer but not copied into this evidence. The drawer closed with Close.
+E09 Deep link and return: from Pending test (2), clicking a task row opened /cases/<redacted>/plan. Breadcrumb My Tasks returned to /tasks with All tasks (4) selected and four rows visible. The Pending test filter was not preserved.
+E10 Task action controls: the task list showed candidate, status, created/deadline fields and View resume, but no Claim, Start, Assign, Wait, Resume, History, priority or task type controls in the observed state. No actual task mutations, concurrent requests, role switch or manual completion attempt were performed.
+
+Source cross-check (local HEAD c4b610500d33a279c03251091c5f0af13b831318; not verified as deployed build):
+- hireos-written/hireos-written-front/src/pages/TasksPage.tsx: filter and view are component state initialized to all/list; metric arrays have five More statistics entries and generic /tasks or /assessments links; no metric freshness state.
+- hireos-written/hireos-written-backend/src/tasks/tasks.controller.ts: GET /tasks is the only controller route; tasks.service.ts lists workspace tasks.
+- docs/product/Written_Test/W13_My_Tasks_Statistics/PRD.md: S0_employer and AC-1–AC-8 remain draft; §10 has unresolved list/role/approval/card decisions.
+
+Limits: no S0_employer seed, separate role accounts, authenticated API/DB read access, fault injection, or isolated mutable test data. UI observations do not prove backend authorization, persistence, reminder delivery or unique task_id metrics. This is not a merged-PR QA run.

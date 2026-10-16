@@ -1,0 +1,99 @@
+- navigation "Primary navigation":
+  - link "checklist My Tasks 0":
+    - /url: /hireos/written/tasks
+    - generic: checklist
+    - generic: My Tasks
+    - generic: "0"
+  - link "quiz Question Bank":
+    - /url: /hireos/written/question-bank
+    - generic: quiz
+    - generic: Question Bank
+  - generic: Workspace
+  - link "tune Settings":
+    - /url: /hireos/written/settings
+    - generic: tune
+    - generic: Settings
+  - button "Collapse navigation" [expanded]:
+    - generic: left_panel_close
+    - generic: Collapse navigation
+- generic: H
+- generic: HireOS Command
+- generic: /
+- generic: Written Test
+- button "Toggle navigation":
+  - generic: menu
+- button "Language": 中 / EN
+- button "Notifications":
+  - generic: notifications_none
+- button "Appearance":
+  - text: Appearance
+- button "蔡敏 蔡敏":
+  - generic: 蔡敏
+  - text: 蔡敏
+- heading "My Tasks" [level=1]
+- button "+ New written test"
+- generic: Signed in as John · HR Head · Aurora Studio
+- link "My open tasks 0 Unique task_id, open/in_progress/waiting":
+  - /url: /hireos/written/tasks
+  - generic: My open tasks
+  - generic: "0"
+  - generic: Unique task_id, open/in_progress/waiting
+- link "Reviews awaiting me 0 Same filter as list view":
+  - /url: /hireos/written/tasks
+  - generic: Reviews awaiting me
+  - generic: "0"
+  - generic: Same filter as list view
+- link "Due today 0 Same filter as list view":
+  - /url: /hireos/written/tasks
+  - generic: Due today
+  - generic: "0"
+  - generic: Same filter as list view
+- link "In progress 0 Same filter as list view":
+  - /url: /hireos/written/tasks
+  - generic: In progress
+  - generic: "0"
+  - generic: Same filter as list view
+- button "More statistics":
+  - generic: expand_more
+  - text: More statistics
+- button "All tasks (4)"
+- button "Pending test (2)"
+- button "Test sent (0)"
+- button "Pending submission (0)"
+- button "Pending result review (0)"
+- button "Pending release (1)"
+- button "Awaiting next step (0)"
+- button "Handed off to interview (0)"
+- button "On hold (0)"
+- button "Testing closed (1)"
+- button "Task list"
+- button "Cluster by JD"
+- generic: Candidate
+- generic: Status
+- generic: Created
+- generic: Deadline
+- generic: Resume
+- generic: 夏A
+- generic: 夏天 Ai产品经理 简历
+- generic: AI 工具产品经理
+- generic: Testing closed
+- generic: Oct 14, 2026
+- button "View resume"
+- generic: 【武
+- generic: 【Ai产品经理 武汉 12 20k】梁佳仪 1年
+- generic: 高级 AI 产品经理
+- generic: Pending release
+- generic: Sep 29, 2026
+- button "View resume"
+- generic: 张
+- generic: 张毅
+- generic: 高级 AI 产品经理
+- generic: Pending test
+- generic: Sep 24, 2026
+- button "View resume"
+- generic: 0陈
+- generic: 06 陈昊天 全栈工程师
+- generic: 全栈工程师
+- generic: Pending test
+- generic: Sep 24, 2026
+- button "View resume"

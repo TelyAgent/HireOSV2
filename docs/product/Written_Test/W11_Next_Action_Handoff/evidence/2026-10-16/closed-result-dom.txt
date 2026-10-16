@@ -1,0 +1,54 @@
+Browser tab: 1663450778, Title: "HireOS Command — Written Test", URL: "https://hireos.aipollo.me/hireos/written/cases/95df8c26-dcd8-4dcd-83d2-ca344d8562e4/plan".
+0 AXWebArea HireOS Command — Written Test, URL: hireos.aipollo.me/hireos/written/cases/95df8c26-dcd8-4dcd-83d2-ca344d8562e4/plan
+	1 container root
+		2 container Primary navigation
+			3 link Description: checklist My Tasks 0, Help: My Tasks, Value: hireos.aipollo.me/hireos/written/tasks
+			4 link Description: quiz Question Bank, Help: Question Bank, Value: hireos.aipollo.me/hireos/written/question-bank
+			5 text WORKSPACE
+			6 link Description: tune Settings, Help: Settings, Value: hireos.aipollo.me/hireos/written/settings
+			7 button (expanded) Description: Collapse navigation, Secondary Actions: Collapse
+				8 text left_panel_close
+				9 text Collapse navigation
+		10 container
+			11 text HireOS Command / Written Test
+			12 button Toggle navigation
+			13 button Language
+			14 button Notifications
+			15 button Appearance
+			16 button 蔡敏 蔡敏
+				17 text 蔡敏
+				18 text 蔡敏
+		19 container Breadcrumb
+			20 link Description: My Tasks, Value: hireos.aipollo.me/hireos/written/tasks
+			21 text / Candidate detail
+		22 heading 夏天 Ai产品经理 简历's plan, Value: 1
+			23 text 夏天 Ai产品经理 简历 's plan
+		24 text candidate-b@example.com  · Testing closed Round 1
+		25 button Assessment plan
+		26 button Submission
+		27 button Comprehensive evaluation
+		28 button Evaluation result
+		29 heading Internal reference, Value: 4
+			30 text Internal reference
+		31 container
+			32 text Final overall (human) :  5  / 100
+		33 container
+			34 text Sum of the human scores below  ( 5  /  100 ) , scaled to 100. AI suggestions are shown for reference only and are not counted.
+		35 text Criteria Human score  ·  AI suggests 任务理解与复杂场景拆解 0 / 35  · AI  0 AI Agent产品方案设计与边界判断 3 / 30  · AI  3 产品全流程落地与评测迭代 0 / 20  · AI  0 移动端交互与原型表达 2 / 15  · AI  2
+		36 container
+			37 text Finalized by John  ·  Oct 14, 2026, 4:01 PM
+		38 heading Candidate preview, Value: 4
+			39 text Candidate preview
+		40 container
+			41 text Disclosure policy: Score + summary
+		42 container
+			43 text Outcome: This assessment did not meet the bar for this role.
+			44 text Feedback: Clear structure; accounting treatment mostly correct with one gap in variance analysis.
+			45 text Next step: HR will follow up with next steps.
+		46 text Never includes: internal ranking, reviewer notes, or the internal answer key.
+		47 text Published Oct 14, 2026, 4:04 PM .  Delivery does not guarantee delivery — a bounce would still leave the result visible internally.
+		48 heading Next action, Value: 4
+			49 text Next action
+		50 text Testing closed Oct 14, 2026, 4:09 PM  ·  Reason: Passed
+
+The focused UI element is 28 button Evaluation result

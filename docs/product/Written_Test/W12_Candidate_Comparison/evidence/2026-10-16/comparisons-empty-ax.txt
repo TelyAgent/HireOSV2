@@ -1,0 +1,27 @@
+Browser tab: 1663450779, Title: "HireOS Command — Written Test", URL: "https://hireos.aipollo.me/hireos/written/comparisons".
+1 AXWebArea HireOS Command — Written Test, URL: hireos.aipollo.me/hireos/written/comparisons
+	2 container root
+		3 container Primary navigation
+			4 link Description: checklist My Tasks 0, Help: My Tasks, Value: hireos.aipollo.me/hireos/written/tasks
+			5 link Description: quiz Question Bank, Help: Question Bank, Value: hireos.aipollo.me/hireos/written/question-bank
+			6 text WORKSPACE
+			7 link Description: tune Settings, Help: Settings, Value: hireos.aipollo.me/hireos/written/settings
+			8 button (expanded) Description: Collapse navigation, Secondary Actions: Collapse
+				9 text left_panel_close
+				10 text Collapse navigation
+		11 container
+			12 text HireOS Command / Written Test
+			13 button Toggle navigation
+			14 button Language
+			15 button Notifications
+			16 button Appearance
+			17 button 蔡敏 蔡敏
+				18 text 蔡敏
+				19 text 蔡敏
+		20 heading Comparisons, Value: 1
+			21 text Comparisons
+		22 text compare_arrows
+		23 text No comparisons yet.
+		24 text Start one from a role group on My Tasks once candidates have scores.
+
+The focused UI element is 1 AXWebArea HireOS Command — Written Test, URL: hireos.aipollo.me/hireos/written/comparisons

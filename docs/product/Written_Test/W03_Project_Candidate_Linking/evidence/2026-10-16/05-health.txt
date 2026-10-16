@@ -1,0 +1,2 @@
+{"status":"ok","service":"hireos-written","phase":"phase-0","timestamp":"2026-10-16T03:57:18.294Z"}
+HTTP 200; content_type=application/json; charset=utf-8; total_seconds=1.199251

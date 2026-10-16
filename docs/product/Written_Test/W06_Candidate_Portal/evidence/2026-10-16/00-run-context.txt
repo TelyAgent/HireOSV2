@@ -1,0 +1,16 @@
+Run: 2026-10-16 12:00–12:01 Asia/Shanghai
+Surface: https://hireos.aipollo.me/hireos/written/
+Browser: existing signed-in Chrome session; no candidate test identity or disposable invitation available.
+Local reference HEAD: c4b610500d33a279c03251091c5f0af13b831318 (not confirmed as production build).
+
+Browser observations:
+1. Navigate to /hireos/written/candidate and PRD prototype hash route /hireos/written/#/candidate -> /hireos/written/tasks; employer My Tasks shell shown. Screenshot 02 captures the first route.
+2. Navigate to /hireos/written/apply/w06-invalid-token-probe -> "This link is invalid or has expired."; no employee navigation. Screenshot 01.
+
+Read-only HTTP checks (exit 0):
+curl -sS --max-time 15 https://hireos.aipollo.me/hireos/written/api/public/invitations/w06-invalid-token-probe
+  HTTP 404, application/json; charset=utf-8; body in 03-invalid-api-response.json.
+curl -sS --max-time 15 https://hireos.aipollo.me/hireos/written/api/health
+  HTTP 200, application/json; charset=utf-8; body in 04-health-response.json.
+
+No real invitation URL/token was opened. No invitation, OTP, upload, submission, mail or user record was changed by this run.

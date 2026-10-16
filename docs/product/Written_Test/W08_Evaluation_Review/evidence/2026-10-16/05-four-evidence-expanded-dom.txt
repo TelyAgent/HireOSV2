@@ -1,0 +1,97 @@
+- navigation "Primary navigation":
+  - link "checklist My Tasks 0":
+    - /url: /hireos/written/tasks
+    - generic: checklist
+    - generic: My Tasks
+    - generic: "0"
+  - link "quiz Question Bank":
+    - /url: /hireos/written/question-bank
+    - generic: quiz
+    - generic: Question Bank
+  - generic: Workspace
+  - link "tune Settings":
+    - /url: /hireos/written/settings
+    - generic: tune
+    - generic: Settings
+  - button "Collapse navigation" [expanded]:
+    - generic: left_panel_close
+    - generic: Collapse navigation
+- generic: H
+- generic: HireOS Command
+- generic: /
+- generic: Written Test
+- button "Toggle navigation":
+  - generic: menu
+- button "Language": 中 / EN
+- button "Notifications":
+  - generic: notifications_none
+- button "Appearance":
+  - text: Appearance
+- button "蔡敏 蔡敏":
+  - generic: 蔡敏
+  - text: 蔡敏
+- navigation "Breadcrumb":
+  - link "My Tasks":
+    - /url: /hireos/written/tasks
+  - generic: /
+  - generic: Candidate detail
+- heading "【Ai产品经理 武汉 12 20k】梁佳仪 1年's plan" [level=1]
+- text: candidate-a@example.com ·
+- generic: Pending release
+- generic: Round 1
+- button "Assessment plan"
+- button "Submission"
+- button "Comprehensive evaluation"
+- button "Evaluation result"
+- generic: Final
+- generic: Overall (human)
+- generic: 0 / 100
+- generic: "Points: 0 / 100 · scaled to 100"
+- generic: Overall (AI)
+- generic: 0 / 100
+- generic: "Points: 0 / 100 · Draft only, not a hiring probability"
+- generic: Coverage / Confidence
+- generic: Full
+- generic: Shown separately from score
+- heading "Criteria" [level=4]
+- text: 方法论严谨性与正确性
+- generic: max 50
+- generic: AI suggests 0
+- text: Human score
+- spinbutton "Human score / 50" [disabled]: "0"
+- generic: / 50
+- generic: "Confidence: Medium"
+- generic: "Coverage: Full"
+- generic "View evidence"
+- generic: "Source: AI evaluation"
+- text: 企业级 AI 产品方案设计与安全治理
+- generic: max 25
+- generic: AI suggests 0
+- text: Human score
+- spinbutton "Human score / 25" [disabled]: "0"
+- generic: / 25
+- generic: "Confidence: Medium"
+- generic: "Coverage: Full"
+- generic "View evidence"
+- generic: "Source: AI evaluation"
+- text: 数据分析、评测与实验判断
+- generic: max 15
+- generic: AI suggests 0
+- text: Human score
+- spinbutton "Human score / 15" [disabled]: "0"
+- generic: / 15
+- generic: "Confidence: Medium"
+- generic: "Coverage: Full"
+- generic "View evidence"
+- generic: "Source: AI evaluation"
+- text: 跨职能交付与优先级管理
+- generic: max 10
+- generic: AI suggests 0
+- text: Human score
+- spinbutton "Human score / 10" [disabled]: "0"
+- generic: / 10
+- generic: "Confidence: Medium"
+- generic: "Coverage: Full"
+- generic "View evidence" [active]
+- generic: "Source: AI evaluation"
+- button "View final result"

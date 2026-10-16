@@ -1,0 +1,72 @@
+- navigation "Primary navigation":
+  - link "checklist My Tasks 0":
+    - /url: /hireos/written/tasks
+    - generic: checklist
+    - generic: My Tasks
+    - generic: "0"
+  - link "quiz Question Bank":
+    - /url: /hireos/written/question-bank
+    - generic: quiz
+    - generic: Question Bank
+  - generic: Workspace
+  - link "tune Settings":
+    - /url: /hireos/written/settings
+    - generic: tune
+    - generic: Settings
+  - button "Collapse navigation" [expanded]:
+    - generic: left_panel_close
+    - generic: Collapse navigation
+- generic: H
+- generic: HireOS Command
+- generic: /
+- generic: Written Test
+- button "Toggle navigation":
+  - generic: menu
+- button "Language": 中 / EN
+- button "Notifications":
+  - generic: notifications_none
+- button "Appearance":
+  - text: Appearance
+- button "蔡敏 蔡敏":
+  - generic: 蔡敏
+  - text: 蔡敏
+- navigation "Breadcrumb":
+  - link "My Tasks":
+    - /url: /hireos/written/tasks
+  - generic: /
+  - generic: Candidate detail
+- heading "夏天 Ai产品经理 简历's plan" [level=1]
+- text: candidate-b@example.com ·
+- generic: Testing closed
+- generic: Round 1
+- button "Assessment plan"
+- button "Submission"
+- button "Comprehensive evaluation"
+- button "Evaluation result" [active]
+- heading "Internal reference" [level=4]
+- generic: "Final overall (human): 5 / 100"
+- generic: Sum of the human scores below (5 / 100), scaled to 100. AI suggestions are shown for reference only and are not counted.
+- generic: Criteria
+- generic: Human score · AI suggests
+- generic: 任务理解与复杂场景拆解
+- text: 0/35
+- generic: · AI 0
+- generic: AI Agent产品方案设计与边界判断
+- text: 3/30
+- generic: · AI 3
+- generic: 产品全流程落地与评测迭代
+- text: 0/20
+- generic: · AI 0
+- generic: 移动端交互与原型表达
+- text: 2/15
+- generic: · AI 2
+- generic: Finalized by John · Oct 14, 2026, 4:01 PM
+- heading "Candidate preview" [level=4]
+- generic: "Disclosure policy: Score + summary"
+- text: "Outcome: This assessment did not meet the bar for this role."
+- text: "Feedback: Clear structure; accounting treatment mostly correct with one gap in variance analysis."
+- text: "Next step: HR will follow up with next steps."
+- generic: "Never includes: internal ranking, reviewer notes, or the internal answer key."
+- generic: Published Oct 14, 2026, 4:04 PM. Delivery does not guarantee delivery — a bounce would still leave the result visible internally.
+- heading "Next action" [level=4]
+- generic: "Testing closed Oct 14, 2026, 4:09 PM · Reason: Passed"

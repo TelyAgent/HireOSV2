@@ -1,0 +1,112 @@
+Browser tab: 1663450779, Title: "HireOS Command — Written Test", URL: "https://hireos.aipollo.me/hireos/written/tasks".
+0 AXWebArea HireOS Command — Written Test, URL: hireos.aipollo.me/hireos/written/tasks
+	1 container root
+		2 container Primary navigation
+			3 link Description: checklist My Tasks 0, Help: My Tasks, Value: hireos.aipollo.me/hireos/written/tasks
+			4 link Description: quiz Question Bank, Help: Question Bank, Value: hireos.aipollo.me/hireos/written/question-bank
+			5 text WORKSPACE
+			6 link Description: tune Settings, Help: Settings, Value: hireos.aipollo.me/hireos/written/settings
+			7 button (expanded) Description: Collapse navigation, Secondary Actions: Collapse
+				8 text left_panel_close
+				9 text Collapse navigation
+		10 container
+			11 text HireOS Command / Written Test
+			12 button Toggle navigation
+			13 button Language
+			14 button Notifications
+			15 button Appearance
+			16 button 蔡敏 蔡敏
+				17 text 蔡敏
+				18 text 蔡敏
+		19 heading My Tasks, Value: 1
+			20 text My Tasks
+		21 button + New written test
+		22 container
+			23 text Signed in as John  ·  HR Head  · Aurora Studio
+		24 link Description: My open tasks 0 Unique task_id, open/in_progress/waiting, Value: hireos.aipollo.me/hireos/written/tasks
+		25 link Description: Reviews awaiting me 0 Same filter as list view, Value: hireos.aipollo.me/hireos/written/tasks
+		26 link Description: Due today 0 Same filter as list view, Value: hireos.aipollo.me/hireos/written/tasks
+		27 link Description: In progress 0 Same filter as list view, Value: hireos.aipollo.me/hireos/written/tasks
+		28 button More statistics
+		29 button All tasks (4)
+			30 text All tasks
+			31 text  (
+			32 text 4
+			33 text )
+		34 button Pending test (2)
+			35 text Pending test
+			36 text  (
+			37 text 2
+			38 text )
+		39 button Test sent (0)
+			40 text Test sent
+			41 text  (
+			42 text 0
+			43 text )
+		44 button Pending submission (0)
+			45 text Pending submission
+			46 text  (
+			47 text 0
+			48 text )
+		49 button Pending result review (0)
+			50 text Pending result review
+			51 text  (
+			52 text 0
+			53 text )
+		54 button Pending release (1)
+			55 text Pending release
+			56 text  (
+			57 text 1
+			58 text )
+		59 button Awaiting next step (0)
+			60 text Awaiting next step
+			61 text  (
+			62 text 0
+			63 text )
+		64 button Handed off to interview (0)
+			65 text Handed off to interview
+			66 text  (
+			67 text 0
+			68 text )
+		69 button On hold (0)
+			70 text On hold
+			71 text  (
+			72 text 0
+			73 text )
+		74 button Testing closed (1)
+			75 text Testing closed
+			76 text  (
+			77 text 1
+			78 text )
+		79 container
+			80 button Task list
+			81 button Cluster by JD
+		82 text ROLE & PROJECT
+		83 container
+			84 button
+			85 text A工 AI 工具产品经理 1 candidates
+			86 button Compare candidates
+			87 button Link candidate
+		88 text CANDIDATE STATUS ROUND RESUME
+		89 container
+			90 text 夏A 夏天 Ai产品经理 简历 AI 工具产品经理 Testing closed Round 1
+			91 button View resume
+		92 container
+			93 button
+			94 text 高A 高级 AI 产品经理 2 candidates
+			95 button Compare candidates
+			96 button Link candidate
+		97 text CANDIDATE STATUS ROUND RESUME
+		98 container
+			99 text 【武 【Ai产品经理 武汉 12 20k】梁佳仪 1年 高级 AI 产品经理 Pending release Round 1
+			100 button View resume
+		101 container
+			102 text 张 张毅 高级 AI 产品经理 Pending test Round 1
+			103 button View resume
+		104 container
+			105 button
+			106 text 全 全栈工程师 1 candidates
+			107 button Compare candidates
+			108 button Link candidate
+
+The focused UI element is 95 button Compare candidates

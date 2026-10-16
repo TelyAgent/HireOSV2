@@ -1,0 +1,11 @@
+2026-10-16 approximately 12:08–12:12 Asia/Shanghai
+Browser: logged-in Chrome, https://hireos.aipollo.me/hireos/written/tasks
+Method: browser accessibility tree and visual inspection; read-only navigation. Candidate names, addresses and Case IDs are omitted here.
+
+E02 My Tasks: All tasks (4); Pending test (2); Test sent (0); Pending submission (0); Pending result review (0); Pending release (1); Awaiting next step (0); Testing closed (1). Header account label differs from task-page "Signed in as John · HR Head · Aurora Studio"; role mapping was not verified.
+
+E03 Pending-release Case, Assessment plan: after data finished loading, Round 1 was a collapsed card labeled "Finalized — not released", sent Oct 8, deadline Oct 10, score 0; "New supplemental test" was visible on the plan page. Evaluation result: "Final overall (human): 0 / 100", "Finalized by John", editable candidate-preview fields, "Internal review complete" and "Disclosure content approved for release" unchecked, and "Finalize & publish result". No Request revision, Rescore or Retake control on this unreleased result page. No publish or supplemental action was taken. The transient initial "Round 1 (draft)" / empty-plan display was loading state, not a persistent issue.
+
+E04 Testing-closed Case, Evaluation result: "Final overall (human): 5 / 100", published timestamp shown, Next action area says "Testing closed" and reason "Passed". No revision or supplemental action was available in this terminal state. Its candidate preview outcome says the assessment did not meet the bar, despite close reason Passed. The feedback refers to "accounting treatment" and "variance analysis" although the four visible criteria concern AI Agent product design and delivery. Closing decision context and origin of the feedback text were not available; no W10 behavior is inferred from this page. See 02-closed-result-contradiction.png and 03-feedback-domain-mismatch.png.
+
+No active, released Case with S_result_released; no S_revision_round1_sent, isolated candidate, simulated mail adapter access, role-separated accounts, authenticated business API/DB, or fault injection was available. No production data were changed and no email was sent.

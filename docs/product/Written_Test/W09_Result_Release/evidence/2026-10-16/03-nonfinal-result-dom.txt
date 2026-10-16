@@ -1,0 +1,45 @@
+- navigation "Primary navigation":
+  - link "checklist My Tasks 0":
+    - /url: /hireos/written/tasks
+    - generic: checklist
+    - generic: My Tasks
+    - generic: "0"
+  - link "quiz Question Bank":
+    - /url: /hireos/written/question-bank
+    - generic: quiz
+    - generic: Question Bank
+  - generic: Workspace
+  - link "tune Settings":
+    - /url: /hireos/written/settings
+    - generic: tune
+    - generic: Settings
+  - button "Collapse navigation" [expanded]:
+    - generic: left_panel_close
+    - generic: Collapse navigation
+- generic: H
+- generic: HireOS Command
+- generic: /
+- generic: Written Test
+- button "Toggle navigation":
+  - generic: menu
+- button "Language": 中 / EN
+- button "Notifications":
+  - generic: notifications_none
+- button "Appearance":
+  - text: Appearance
+- button "蔡敏 蔡敏":
+  - generic: 蔡敏
+  - text: 蔡敏
+- navigation "Breadcrumb":
+  - link "My Tasks":
+    - /url: /hireos/written/tasks
+  - generic: /
+  - generic: Candidate detail
+- heading "张毅's plan" [level=1]
+- text: candidate-c@example.com ·
+- generic: Pending test
+- button "Assessment plan"
+- button "Submission"
+- button "Comprehensive evaluation"
+- button "Evaluation result" [active]
+- generic: No finalized result for this round yet.

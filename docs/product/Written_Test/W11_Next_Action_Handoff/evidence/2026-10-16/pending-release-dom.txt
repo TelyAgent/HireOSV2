@@ -1,0 +1,60 @@
+Browser tab: 1663450778, Title: "HireOS Command — Written Test", URL: "https://hireos.aipollo.me/hireos/written/cases/d6e14cf0-c429-4fe6-ad5f-c7d1f950be4d/plan".
+0 AXWebArea HireOS Command — Written Test, URL: hireos.aipollo.me/hireos/written/cases/d6e14cf0-c429-4fe6-ad5f-c7d1f950be4d/plan
+	1 container root
+		2 container Primary navigation
+			3 link Description: checklist My Tasks 0, Help: My Tasks, Value: hireos.aipollo.me/hireos/written/tasks
+			4 link Description: quiz Question Bank, Help: Question Bank, Value: hireos.aipollo.me/hireos/written/question-bank
+			5 text WORKSPACE
+			6 link Description: tune Settings, Help: Settings, Value: hireos.aipollo.me/hireos/written/settings
+			7 button (expanded) Description: Collapse navigation, Secondary Actions: Collapse
+				8 text left_panel_close
+				9 text Collapse navigation
+		10 container
+			11 text HireOS Command / Written Test
+			12 button Toggle navigation
+			13 button Language
+			14 button Notifications
+			15 button Appearance
+			16 button 蔡敏 蔡敏
+				17 text 蔡敏
+				18 text 蔡敏
+		19 container Breadcrumb
+			20 link Description: My Tasks, Value: hireos.aipollo.me/hireos/written/tasks
+			21 text / Candidate detail
+		22 heading 【Ai产品经理 武汉 12 20k】梁佳仪 1年's plan, Value: 1
+			23 text 【Ai产品经理 武汉 12 20k】梁佳仪 1年 's plan
+		24 text candidate-a@example.com  · Pending release Round 1
+		25 button Assessment plan
+		26 button Submission
+		27 button Comprehensive evaluation
+		28 button Evaluation result
+		29 heading Internal reference, Value: 4
+			30 text Internal reference
+		31 container
+			32 text Final overall (human) :  0  / 100
+		33 container
+			34 text Sum of the human scores below  ( 0  /  100 ) , scaled to 100. AI suggestions are shown for reference only and are not counted.
+		35 text Criteria Human score  ·  AI suggests 方法论严谨性与正确性 0 / 50  · AI  0 企业级 AI 产品方案设计与安全治理 0 / 25  · AI  0 数据分析、评测与实验判断 0 / 15  · AI  0 跨职能交付与优先级管理 0 / 10  · AI  0
+		36 container
+			37 text Finalized by John  ·  Oct 14, 2026, 5:28 PM
+		38 heading Candidate preview, Value: 4
+			39 text Candidate preview
+		40 container
+			41 text Disclosure policy: Score + summary
+		42 text Outcome:
+		43 text field (settable) Below the bar for this role on this assessment.
+		44 container
+			45 text Score: 0
+		46 text Feedback:
+		47 text entry area (settable) 候选人未提供针对题目的实际方案，仅重复了题目要求和任务编号，未呈现可评估的方法论、产品设计、评测方案或交付判断。由于缺少实质性作答，无法证明其具备企业级 AI 产品规划、安全治理、数据分析或跨职能交付能力。
+		48 text Pre-filled from the AI evaluation of these answers — check it reads well for the candidate before publishing.
+		49 text Next step:
+		50 text field (settable) HR will follow up with next steps.
+		51 text Never includes: internal ranking, reviewer notes, or the internal answer key.
+		52 heading Approve & publish, Value: 4
+			53 text Approve & publish
+		54 checkbox (settable, integer) Description: Internal review complete, Value: 0
+		55 checkbox (settable, integer) Description: Disclosure content approved for release, Value: 0
+		56 button Finalize & publish result
+
+The focused UI element is 28 button Evaluation result

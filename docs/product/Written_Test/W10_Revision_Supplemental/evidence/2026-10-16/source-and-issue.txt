@@ -1,0 +1,11 @@
+2026-10-16 approximately 12:10–12:12 Asia/Shanghai
+Local reference HEAD: c4b610500d33a279c03251091c5f0af13b831318 (not verified as production build SHA)
+
+Command: rg -n -i 'request revision|add supplemental|revision round|not comparable|feedbackpackage|rescore|retake|revisions/:|revisioncomparison|supplemental' hireos-written/hireos-written-front/src hireos-written/hireos-written-backend/src hireos-written/hireos-written-backend/prisma
+Exit code: 0
+Relevant matches: frontend ReleasePage.tsx lines 268–270 shows Add supplemental test; PlanPage.tsx lines 136–148 opens draft round; backend case-lifecycle.service.ts lines 87–98 opens an idempotent supplemental draft; schema.prisma Invitation.round at line 173. No Request revision, FeedbackPackage, RevisionComparison, Rescore or Retake implementation matches were found in these application directories. Search absence is only local source evidence, not proof of the deployed binary.
+
+GitHub: https://github.com/TelyAgent/HireOSV2/issues/48
+Issue #48 and both comments read. Scope and human decision specify: supplemental round, HR picks questions, no recommendation or automatic question selection; previous round must be finalized before another opens; each round scored/published separately. Comment reports PR #59 deployment and AC-10 partial because frontend npm test was not run. This Issue does not cover the complete W10 revision/retake/feedback scope.
+
+The W10 PRD (draft) requires selection by untested competency and a new PlanItem type "supplemental", while #48 explicitly says HR picks questions and no recommendation. Product intent for that difference remains unresolved.
