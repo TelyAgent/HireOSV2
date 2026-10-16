@@ -1,3 +1,3 @@
 UPDATE "InterviewTask"
-SET "offerState" = 'acknowledged'
+SET "offerState" = 'failed', "offerError" = 'LEGACY_SENT_REQUIRES_RETRY'
 WHERE "offerState" = 'sent';

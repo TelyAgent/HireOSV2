@@ -66,7 +66,7 @@ export function packagePdfLines(data: {
     for (const ref of item.sourceRefs) for (const line of wrap(`Evidence ${ref.segmentId}: ${ref.quote}`)) lines.push({ text: line });
   }
   lines.push({ text: '' }, { text: 'Human review', bold: true });
-  lines.push({ text: `HR: ${data.hrConfirmedBy ?? 'Not confirmed'} | ${data.hrConfirmedAt?.toISOString() ?? 'No confirmation time'}` });
-  lines.push({ text: `Hiring Manager: ${data.hmConfirmedBy ?? 'Not confirmed'} | ${data.hmConfirmedAt?.toISOString() ?? 'No confirmation time'}` });
+  for (const line of wrap(`HR: ${data.hrConfirmedBy ?? 'Not confirmed'} | ${data.hrConfirmedAt?.toISOString() ?? 'No confirmation time'}`)) lines.push({ text: line });
+  for (const line of wrap(`Hiring Manager: ${data.hmConfirmedBy ?? 'Not confirmed'} | ${data.hmConfirmedAt?.toISOString() ?? 'No confirmation time'}`)) lines.push({ text: line });
   return lines;
 }

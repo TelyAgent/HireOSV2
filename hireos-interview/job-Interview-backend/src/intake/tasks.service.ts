@@ -430,7 +430,7 @@ export class TasksService {
       hmConfirmationNote: task.hmConfirmationNote,
       published: decision.decision != null && task.hrConfirmedAt != null && task.hmConfirmedAt != null,
       offerState: task.offerState, offerSentAt: task.offerSentAt,
-      offerAckAt: task.offerAckAt, offerPackageVersion: task.offerPackageVersion, offerError: task.offerError,
+      offerAckAt: task.offerAckAt, offerAttemptId: undefined, offerPackageVersion: task.offerPackageVersion, offerError: task.offerError,
     };
   }
 
@@ -462,12 +462,13 @@ export class TasksService {
     if (!task) throw new NotFoundException({ code: 'NOT_FOUND' });
     if (task.decision !== 'recommend_offer') throw new BadRequestException({ code: 'DECISION_NOT_RECOMMEND_OFFER' });
     if (!task.hrConfirmedAt || !task.hmConfirmedAt) throw new BadRequestException({ code: 'PACKAGE_NOT_CONFIRMED' });
-    if (task.offerState === 'acknowledged' || task.offerState === 'sent') throw new ConflictException({ code: 'ALREADY_SENT' });
+    if (task.offerState === 'acknowledged') throw new ConflictException({ code: 'ALREADY_SENT' });
+    if (task.offerState === 'sent') await this.db.interviewTask.update({ where: { id: taskId }, data: { offerState: 'failed', offerError: 'LEGACY_SENT_REQUIRES_RETRY' } });
     if (task.offerState === 'pending' && task.offerSentAt && Date.now() - task.offerSentAt.getTime() < 5 * 60 * 1000) throw new ConflictException({ code: 'OFFER_PENDING' });
     if (task.offerState === 'pending') await this.db.interviewTask.update({ where: { id: taskId }, data: { offerState: 'failed', offerError: 'OFFER_ACK_TIMEOUT' } });
     const attemptId = randomUUID();
     await this.db.interviewTask.update({ where: { id: taskId }, data: { offerState: 'pending', offerSentAt: new Date(), offerAckAt: null, offerAttemptId: attemptId, offerPackageVersion: task.version, offerError: null } });
-    return this.package(identity.workspaceId, taskId);
+    return { ...(await this.package(identity.workspaceId, taskId)), offerAttemptId: attemptId };
   }
 
   /** Offer's idempotent delivery callback. A stale attempt can never overwrite a newer one. */
