@@ -83,7 +83,7 @@ function WorkspaceRow({ app, ev, openConcerns, concerns, selected, onToggle }: W
       <td>
         <label className="flex items-center gap-8" onClick={(e) => e.stopPropagation()}>
           <input type="checkbox" checked={selected} onChange={onToggle} aria-label={t("Select {name} for comparison").replace("{name}", app.candidateName || app.candidateId)} />
-          <span style={{ fontWeight: 500 }}>{app.candidateName || app.candidateId}</span>
+          <span className="candidate-name" style={{ fontWeight: 500 }}>{app.candidateName || app.candidateId}</span>
         </label>
         {ev?.freshness === "stale" && <div className="tiny">{t("Refresh available")}</div>}
       </td>

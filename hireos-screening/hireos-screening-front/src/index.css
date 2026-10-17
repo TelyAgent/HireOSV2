@@ -606,11 +606,13 @@ a:focus-visible,button:focus-visible,[tabindex]:focus-visible,input:focus-visibl
 .linked-candidates-table th.open-col{ background:var(--surface-2); }
 .linked-candidates-table tr.clickable:hover .open-col{ background:var(--surface-alt); }
 @media (max-width:1280px){
-  .linked-candidates-table th:first-child, .linked-candidates-table td:first-child{ display:none; }
+  .linked-candidates-table thead th:first-child, .linked-candidates-table tbody tr.clickable > td:first-child{ display:none; }
   .linked-candidates-table .secondary-col{ display:none; }
   .linked-candidates-table .ai-inline{ display:block; }
   .linked-candidates-table th, .linked-candidates-table td{ padding:8px 8px; }
   .linked-candidates-table th:nth-child(2), .linked-candidates-table td:nth-child(2){ padding-left:14px; }
+  .linked-candidates-table td:nth-child(2) label{ min-width:0; }
+  .linked-candidates-table .candidate-name{ min-width:0; overflow-wrap:anywhere; word-break:break-word; }
   .linked-candidates-table .coverage-col{ min-width:84px; }
   .linked-candidates-table .table-head-filter{ max-width:140px; text-overflow:ellipsis; }
 }
