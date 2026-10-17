@@ -79,7 +79,7 @@ export function QuestionBankPage() {
     <div>
       <h1 style={{ marginBottom: 4 }}>{t("Question Bank")}</h1>
       <div className="muted" style={{ marginBottom: 16 }}>
-        {t("Reusable questions, mapped to multiple roles and competencies. Publishing a case does not send it — invitations are a separate step.")}
+        {t("Reusable questions, mapped to multiple roles and competencies. Publishing a question doesn't send it to anyone — candidates get it only through an invitation, a separate step.")}
       </div>
 
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 12, marginBottom: 12 }}>

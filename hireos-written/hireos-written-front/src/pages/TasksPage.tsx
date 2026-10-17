@@ -350,14 +350,14 @@ function CandidateResumeModal({ entry, onClose }: { entry: { candidate: CoreCand
   const { t } = useStore();
   const caseEntry = entry ? Object.values(CASES).find((c) => c.candidateId === entry.candidate.id) : undefined;
   const caseId = caseEntry?.id;
-  const [resume, setResume] = useState<{ caseId: string; text: string | null } | null>(null);
+  const [resume, setResume] = useState<{ caseId: string; text: string | null; failed: boolean } | null>(null);
 
   useEffect(() => {
     if (!caseId) return;
     let cancelled = false;
     fetchCaseAiContext(caseId)
-      .then((ctx) => { if (!cancelled) setResume({ caseId, text: ctx?.resumeText ?? null }); })
-      .catch(() => { if (!cancelled) setResume({ caseId, text: null }); });
+      .then((ctx) => { if (!cancelled) setResume({ caseId, text: ctx?.resumeText ?? null, failed: false }); })
+      .catch(() => { if (!cancelled) setResume({ caseId, text: null, failed: true }); });
     return () => { cancelled = true; };
   }, [caseId]);
 
@@ -365,6 +365,7 @@ function CandidateResumeModal({ entry, onClose }: { entry: { candidate: CoreCand
   const { candidate, job } = entry;
   const loading = !!caseId && resume?.caseId !== caseId;
   const resumeText = resume?.caseId === caseId ? resume?.text : null;
+  const failed = resume?.caseId === caseId && !!resume?.failed;
 
   return (
     <Modal open onCancel={onClose} footer={null} title={t("Candidate resume")} width={640}>
@@ -382,13 +383,19 @@ function CandidateResumeModal({ entry, onClose }: { entry: { candidate: CoreCand
         <div className="card card-pad">
           {loading ? (
             <div className="muted">{t("Loading…")}</div>
+          ) : failed ? (
+            <div className="banner warning" role="alert">{t("Couldn't load the resume. Close and open it again to retry.")}</div>
           ) : resumeText ? (
             <div style={{ whiteSpace: "pre-wrap", lineHeight: 1.7, fontSize: 13, maxHeight: "60vh", overflow: "auto" }}>{resumeText}</div>
           ) : (
-            <div className="muted">{t("No resume text was handed over from Screening for this candidate.")}</div>
+            <div className="muted">
+              {t("No resume text was handed over from Screening for this candidate.")}{" "}
+              {t("Open the candidate in Resume Screening to see their resume file.")}
+            </div>
           )}
         </div>
-        <div className="banner info">{t("Resume text handed over from Resume Screening.")}</div>
+        {/* Only when there is text to attribute: no text and "handed over" side by side contradicted each other (#411). */}
+        {resumeText && !loading && <div className="banner info">{t("Resume text handed over from Resume Screening.")}</div>}
       </div>
     </Modal>
   );

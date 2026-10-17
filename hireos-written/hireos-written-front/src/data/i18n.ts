@@ -119,8 +119,16 @@ export const ZH: Record<string, string> = {
   "Result release": "结果发布", "Evaluation review": "评估评审", "Submission issue": "提交异常",
   "Reviewer queue": "评审队列", "Plan review": "方案评审", "Delivery recovery": "交付恢复",
 
-  "Reusable questions, mapped to multiple roles and competencies. Publishing a case does not send it — invitations are a separate step.":
-    "可复用的题目，已映射到多个岗位与能力项。发布案例并不会自动发送——邀请候选人是单独的一步。",
+  "Reusable questions, mapped to multiple roles and competencies. Publishing a question doesn't send it to anyone — candidates get it only through an invitation, a separate step.":
+    "可复用的题目，已映射到多个岗位与能力项。发布题目不会发给任何人——候选人只能通过邀请收到题目，邀请是单独的一步。",
+  "Add to plan": "加入计划", "Question added to the plan.": "题目已加入计划。",
+  "Loading the question bank…": "正在加载题库…",
+  "Couldn't load the question bank, so the preset questions aren't known yet.": "题库加载失败，暂时无法列出预设题目。",
+  "Couldn't load the question bank. Try again.": "题库加载失败，请重试。",
+  "This role has no published question in the bank yet.": "该岗位在题库中还没有已发布的题目。",
+  "Generate one with AI": "用 AI 生成", "Open the Question Bank": "打开题库",
+  "Couldn't load the resume. Close and open it again to retry.": "简历加载失败，请关闭后重新打开以重试。",
+  "Open the candidate in Resume Screening to see their resume file.": "可在简历筛选中打开该候选人查看简历文件。",
   "Search title or code…": "按标题或编号搜索…", "All roles": "全部岗位", "All competencies": "全部能力项",
   "Import ZIP": "导入 ZIP", "Create question": "新建题目", "Code": "编号", "Title": "标题", "Role tags": "岗位标签",
   "Competencies": "能力项", "Type": "类型", "Difficulty": "难度", "Version": "版本", "Status": "状态",
