@@ -50,8 +50,8 @@ function ScoreCard({ roundId, entry, t, zh, onSaved }: { roundId: string; entry:
       {score == null && (
         <div role="status" style={{ marginTop: 9, padding: "9px 11px", border: "1px solid var(--warn)", borderRadius: 9, background: "var(--warn-soft)", color: "var(--ink-2)", fontSize: 12, lineHeight: 1.5 }}>
           <strong>{zh ? "未知不是零分。" : "Unknown is not zero."}</strong>{" "}
-          {zh ? "当前还缺少足够的人工证据。" : "There is not enough human evidence to score this requirement yet."}{" "}
-          {entry.card.expectedEvidence && (zh ? `需要补充：${entry.card.expectedEvidence}` : `Missing evidence: ${entry.card.expectedEvidence}`)}
+          {zh ? "请在理由中记录还缺少哪些证据。" : "Record which evidence is missing in the note."}{" "}
+          {entry.card.expectedEvidence && (zh ? `预期证据：${entry.card.expectedEvidence}` : `Expected evidence: ${entry.card.expectedEvidence}`)}
         </div>
       )}
 

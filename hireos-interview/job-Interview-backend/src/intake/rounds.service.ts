@@ -134,7 +134,7 @@ export class RoundsService {
     const rubric = await this.db.rubricVersion.findFirst({
       where: { workspaceId, jobId: task.jobId, status: 'confirmed' }, orderBy: { versionNumber: 'desc' },
       select: { cards: { orderBy: { createdAt: 'asc' }, select: {
-        id: true, requirement: true, responsibilityType: true, cardPriority: true, competencyTags: true, weight: true, levelAnchors: true,
+        id: true, requirement: true, responsibilityType: true, cardPriority: true, competencyTags: true, weight: true, levelAnchors: true, expectedEvidence: true,
       } } },
     });
     const cards = rubric?.cards ?? [];

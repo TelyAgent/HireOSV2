@@ -27,6 +27,6 @@ test('#291: the portal dialog receives theme tokens and readable controls', () =
 test('#288: Unknown scores explain the missing evidence and are not presented as zero', () => {
   assert.match(reviewSource, /score == null/);
   assert.match(reviewSource, /Unknown is not zero\./);
-  assert.match(reviewSource, /There is not enough human evidence to score this requirement yet\./);
+  assert.match(reviewSource, /Record which evidence is missing in the note\./);
   assert.match(reviewSource, /entry\.card\.expectedEvidence/);
 });
