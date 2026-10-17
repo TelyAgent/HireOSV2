@@ -12,7 +12,7 @@ const base = process.env.INTERVIEW_TEST_URL || 'http://127.0.0.1:5197/interview/
     let writes = 0;
     let failSave = false;
     const entry = { card: { id: 'card', requirement: 'Recovery', cardPriority: 'P0', weight: 100 }, score: null, note: '', aiScore: 2, aiRationale: 'AI original rationale' };
-    const rounds = [{ id: 'round', sequence: 1, name: 'Round 1', status: 'completed', interviewer: null }];
+    const rounds = [{ id: 'round', sequence: 1, name: 'Round 1', status: 'completed', completedAt: '2026-10-17T00:00:00Z', interviewer: null }];
     await page.route('**/account/api/**', route => route.fulfill({ json: { loginRequired: false }, status: route.request().url().endsWith('/me') ? 401 : 200 }));
     await page.route('**/interview/api/**', route => {
       const path = new URL(route.request().url()).pathname;
@@ -33,6 +33,8 @@ const base = process.env.INTERVIEW_TEST_URL || 'http://127.0.0.1:5197/interview/
       return route.fulfill({ json });
     });
     await page.goto(`${base}project/project/review`);
+    await page.getByText(/Interview completed/).waitFor();
+    assert.equal(await page.getByText(/submitted/i).count(), 0);
     const reason = page.getByRole('textbox', { name: 'Human score reason' });
     const save = page.getByRole('button', { name: 'Save score', exact: true });
     await page.getByRole('button', { name: '4', exact: true }).click();

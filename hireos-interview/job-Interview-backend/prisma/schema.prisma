@@ -153,10 +153,24 @@ model InterviewTask {
   revisions            Revision[]
   interviewSessions    InterviewSession[]
   rounds               InterviewRound[]
+  packageVersions      EvaluationPackageVersion[]
   @@unique([jobId, candidateId])
   @@index([workspaceId, createdAt])
   @@index([jobId])
   @@index([candidateId])
+}
+
+model EvaluationPackageVersion {
+  id          String   @id @default(uuid())
+  workspaceId String
+  taskId      String
+  version     Int
+  contentHash String
+  content     Json
+  createdAt   DateTime @default(now())
+  task        InterviewTask @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  @@unique([taskId, version])
+  @@index([workspaceId, taskId])
 }
 
 // One round of a task's interview plan. Every task gets two generic rounds created for

@@ -1,6 +1,6 @@
 import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
-import { randomUUID } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 
 export type OfferTimeline = {
   decision: string | null;
@@ -433,7 +433,7 @@ export class TasksService {
   /** Evaluation Package: decision, debrief roll-up, derived evidence and HR/Hiring Manager
    * sign-off in one read. Never throws on missing data — same "return an empty-but-honest
    * state" convention as decision()/debrief(). */
-  async package(workspaceId: string, taskId: string) {
+  private async packageCurrent(workspaceId: string, taskId: string) {
     const task = await this.db.interviewTask.findFirst({ where: { id: taskId, workspaceId }, select: {
       jobId: true, version: true, updatedAt: true, packageNeedsReview: true, packageReviewReason: true, packageInvalidatedAt: true, hrConfirmedBy: true, hrConfirmedAt: true, hrConfirmationNote: true, hmConfirmedBy: true, hmConfirmedAt: true, hmConfirmationNote: true, offerState: true, offerSentAt: true, offerAckAt: true, offerAttemptId: true, offerPackageVersion: true, offerError: true,
       job: { select: { title: true } }, candidate: { select: { name: true } },
@@ -447,7 +447,7 @@ export class TasksService {
     ]);
     return {
       candidateName: task.candidate.name, jobTitle: task.job.title,
-      packageId: taskId, packageVersion: task.version, rubricVersion: rubric?.versionNumber ?? null, generatedAt: task.updatedAt,
+      packageId: taskId, rubricVersion: rubric?.versionNumber ?? null,
       needsReview: task.packageNeedsReview, reviewReason: task.packageReviewReason, invalidatedAt: task.packageInvalidatedAt,
       decision: decision.decision, decisionAt: decision.decisionAt, conclusion: decision.conclusion,
       debrief, evidence,
@@ -462,8 +462,58 @@ export class TasksService {
     };
   }
 
-  async packagePdf(workspaceId: string, taskId: string) {
-    const data = await this.package(workspaceId, taskId);
+  async package(workspaceId: string, taskId: string) {
+    // Read and freeze one consistent source snapshot. Concurrent readers retry rather
+    // than assigning duplicate versions or freezing a mixture of two revisions.
+    for (let attempt = 0; attempt < 3; attempt++) {
+      try {
+        return await this.db.$transaction(async (tx) => {
+          const reader = new TasksService(tx as PrismaService, this.candidates, this.rounds, this.coreRecord);
+          const current = await reader.packageCurrent(workspaceId, taskId);
+          const { offerState, offerSentAt, offerAckAt, offerAttemptId, offerPackageVersion, offerError, offerTimelineIssue,
+            needsReview, reviewReason, invalidatedAt, ...content } = current;
+          // Delivery/invalidations are live operational state, not new content revisions.
+          const serialized = JSON.stringify(content);
+          const contentHash = createHash('sha256').update(serialized).digest('hex');
+          let record = await tx.evaluationPackageVersion.findFirst({ where: { workspaceId, taskId }, orderBy: { version: 'desc' } });
+          if (!record || record.contentHash !== contentHash) {
+            record = await tx.evaluationPackageVersion.create({ data: {
+              workspaceId, taskId, version: (record?.version ?? 0) + 1, contentHash,
+              content: JSON.parse(serialized) as Prisma.InputJsonValue,
+            } });
+          }
+          return { ...content, packageVersion: record.version, generatedAt: record.createdAt, historical: false,
+            needsReview, reviewReason, invalidatedAt,
+            offerState, offerSentAt, offerAckAt, offerAttemptId, offerPackageVersion, offerError, offerTimelineIssue };
+        }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
+      } catch (error) {
+        if (attempt < 2 && error instanceof Prisma.PrismaClientKnownRequestError && ['P2034', 'P2002'].includes(error.code)) continue;
+        throw error;
+      }
+    }
+    throw new ConflictException({ code: 'PACKAGE_VERSION_CONFLICT' });
+  }
+
+  async packageVersions(workspaceId: string, taskId: string) {
+    if (!await this.db.interviewTask.findFirst({ where: { id: taskId, workspaceId }, select: { id: true } })) throw new NotFoundException({ code: 'NOT_FOUND' });
+    return this.db.evaluationPackageVersion.findMany({ where: { workspaceId, taskId }, orderBy: { version: 'desc' }, select: { version: true, createdAt: true } });
+  }
+
+  async packageVersion(workspaceId: string, taskId: string, version: number) {
+    if (!Number.isSafeInteger(version) || version < 1) throw new BadRequestException({ code: 'INVALID_PACKAGE_VERSION' });
+    const record = await this.db.evaluationPackageVersion.findFirst({ where: { workspaceId, taskId, version } });
+    if (!record) throw new NotFoundException({ code: 'NOT_FOUND' });
+    const content = record.content as unknown as Awaited<ReturnType<TasksService['packageCurrent']>>;
+    return { ...content, packageVersion: record.version, generatedAt: record.createdAt, historical: true,
+      decisionAt: content.decisionAt ? new Date(content.decisionAt) : null,
+      hrConfirmedAt: content.hrConfirmedAt ? new Date(content.hrConfirmedAt) : null,
+      hmConfirmedAt: content.hmConfirmedAt ? new Date(content.hmConfirmedAt) : null,
+      needsReview: false, reviewReason: null, invalidatedAt: null,
+      offerState: 'none', offerSentAt: null, offerAckAt: null, offerPackageVersion: null, offerError: null, offerTimelineIssue: null };
+  }
+
+  async packagePdf(workspaceId: string, taskId: string, version?: number) {
+    const data = version === undefined ? await this.package(workspaceId, taskId) : await this.packageVersion(workspaceId, taskId, version);
     return buildPackagePdf(packagePdfLines(data));
   }
 
@@ -485,22 +535,27 @@ export class TasksService {
   /** Marks the package as handed off to Offer. No real Offer module exists in this codebase
    * to call, so this is a local, deterministic state transition — not a live downstream ack. */
   async sendOffer(identity: Identity, taskId: string) {
+    const packageData = await this.package(identity.workspaceId, taskId);
     const task = await this.db.interviewTask.findFirst({ where: { id: taskId, workspaceId: identity.workspaceId },
       select: { decision: true, decisionAt: true, version: true, hrConfirmedAt: true, hmConfirmedAt: true, offerState: true, offerSentAt: true } });
     if (!task) throw new NotFoundException({ code: 'NOT_FOUND' });
     if (task.decision !== 'recommend_offer') throw new BadRequestException({ code: 'DECISION_NOT_RECOMMEND_OFFER' });
     if (!task.decisionAt || !task.hrConfirmedAt || !task.hmConfirmedAt) throw new BadRequestException({ code: 'PACKAGE_NOT_CONFIRMED' });
+    if (task.decision !== packageData.decision || task.decisionAt.getTime() !== packageData.decisionAt?.getTime()
+      || task.hrConfirmedAt.getTime() !== packageData.hrConfirmedAt?.getTime() || task.hmConfirmedAt.getTime() !== packageData.hmConfirmedAt?.getTime()) {
+      throw new ConflictException({ code: 'PACKAGE_VERSION_CONFLICT' });
+    }
     const attemptId = randomUUID();
     const now = new Date();
     const orderIssue = offerTimelineIssue({ ...task, offerSentAt: now });
     if (orderIssue) throw new BadRequestException({ code: orderIssue });
     const timeoutBefore = new Date(now.getTime() - 5 * 60 * 1000);
     const claimed = await this.db.interviewTask.updateMany({
-      where: { id: taskId, workspaceId: identity.workspaceId, OR: [
+      where: { id: taskId, workspaceId: identity.workspaceId, decision: task.decision, decisionAt: task.decisionAt, hrConfirmedAt: task.hrConfirmedAt, hmConfirmedAt: task.hmConfirmedAt, OR: [
         { offerState: { in: ['none', 'failed', 'sent'] } },
         { offerState: 'pending', offerSentAt: { lt: timeoutBefore } },
       ] },
-      data: { offerState: 'pending', offerSentAt: now, offerAckAt: null, offerAttemptId: attemptId, offerPackageVersion: task.version, offerError: null },
+      data: { offerState: 'pending', offerSentAt: now, offerAckAt: null, offerAttemptId: attemptId, offerPackageVersion: packageData.packageVersion, offerError: null },
     });
     if (!claimed.count) {
       const current = await this.db.interviewTask.findFirst({ where: { id: taskId, workspaceId: identity.workspaceId }, select: { offerState: true } });

@@ -280,7 +280,7 @@ export function ReviewPage() {
         )}
         <div style={{ fontSize: 11.5, color: "var(--ink-3)" }}>
           {t.roundEvaluatorLabel}{round?.interviewer?.name ?? (zh ? "未指定" : "Unassigned")}
-          {round?.completedAt && <>{t.submittedLabel}{new Date(round.completedAt).toLocaleDateString(zh ? "zh-CN" : "en-US")}</>}
+          {round?.completedAt && <>{t.interviewCompletedLabel}{new Date(round.completedAt).toLocaleDateString(zh ? "zh-CN" : "en-US")}</>}
         </div>
       </div>
 

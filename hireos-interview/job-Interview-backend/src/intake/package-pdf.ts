@@ -60,6 +60,7 @@ export function buildPackagePdf(lines: PdfLine[]): Buffer {
 }
 
 export function packagePdfLines(data: {
+  packageId?: string; packageVersion?: number; rubricVersion?: number | null; generatedAt?: Date;
   candidateName: string; jobTitle: string; decision: string | null; decisionAt: Date | null;
   needsReview?: boolean; reviewReason?: string | null; invalidatedAt?: Date | null;
   evidence: { requirement: string; expectedEvidence?: string; levelAnchors?: unknown; score: number | null; note: string; roundId?: string | null; roundName: string | null; sourceRefs: { segmentId: string; quote: string }[] }[];
@@ -72,6 +73,9 @@ export function packagePdfLines(data: {
     { text: `Decision time: ${data.decisionAt?.toISOString() ?? 'Not recorded'}` }, { text: '' },
     { text: 'Rubric and interview evidence', bold: true },
   ];
+  if (data.packageId) lines.splice(1, 0,
+    { text: `Package: ${data.packageId} | Version ${data.packageVersion}` },
+    { text: `Rubric: ${data.rubricVersion ?? 'Not recorded'} | Generated: ${data.generatedAt?.toISOString() ?? 'Not recorded'}` });
   if (data.needsReview) {
     lines.splice(1, 0, { text: `REVIEW REQUIRED: ${data.reviewReason ?? 'Upstream data changed'}${data.invalidatedAt ? ` (${data.invalidatedAt.toISOString()})` : ''}`, bold: true });
   }
