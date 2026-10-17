@@ -88,8 +88,12 @@ function toOrphanedQuestion(snapshot: QuestionSnapshot): Question {
   };
 }
 
+// Coverage and confidence aren't computed yet, and their definitions await the Owner (#379): say so rather than
+// show a fixed "Full" / "Medium" that reads as a measured result.
+const NOT_MEASURED = "Not measured";
+
 function toCriterion(c: RealEvaluation["criteria"][number]): Criterion {
-  return { name: c.name, max: c.max, ai: c.score, human: null, confidence: "Medium", coverage: "Full", evidence: c.evidence, source: "AI evaluation", quotes: c.quotes, unlocatedQuotes: c.unlocatedQuotes };
+  return { name: c.name, max: c.max, ai: c.score, human: null, confidence: NOT_MEASURED, coverage: NOT_MEASURED, evidence: c.evidence, source: "AI evaluation", quotes: c.quotes, unlocatedQuotes: c.unlocatedQuotes };
 }
 
 /**
@@ -99,7 +103,7 @@ function toCriterion(c: RealEvaluation["criteria"][number]): Criterion {
 function toFinalCriterion(c: RealFinalCriterion, ai: RealEvaluation | null | undefined): Criterion {
   const fromAi = ai?.criteria.find((x) => x.name === c.name);
   return {
-    name: c.name, max: c.max, ai: c.ai, human: c.human, confidence: "Medium", coverage: "Full",
+    name: c.name, max: c.max, ai: c.ai, human: c.human, confidence: NOT_MEASURED, coverage: NOT_MEASURED,
     overridden: c.overridden, overrideReason: c.overrideReason,
     evidence: fromAi?.evidence ?? "", source: fromAi ? "AI evaluation" : "Manual scoring",
     quotes: fromAi?.quotes, unlocatedQuotes: fromAi?.unlocatedQuotes,

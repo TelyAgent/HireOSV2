@@ -136,6 +136,7 @@ export const ZH: Record<string, string> = {
   "Hide answer": "收起作答", "Show in answer": "在作答中查看", "The answer isn't loaded here.": "此处未加载该作答。",
   "Excerpts weren't recorded for evaluations made before 17 Oct 2026 — only the rationale is available.": "2026-10-17 之前的评估没有记录原文摘录，只有评分理由。",
   "%s excerpt(s) the AI gave are not in the answer and are not shown.": "AI 给出的 %s 段摘录在作答中找不到，未予显示。",
+  "Not measured": "尚未测量", "Not measured yet — shown separately from the score once defined": "尚未测量——口径确定后与分数分开显示",
   "Add to plan": "加入计划", "Question added to the plan.": "题目已加入计划。",
   "Loading the question bank…": "正在加载题库…",
   "Couldn't load the question bank, so the preset questions aren't known yet.": "题库加载失败，暂时无法列出预设题目。",
