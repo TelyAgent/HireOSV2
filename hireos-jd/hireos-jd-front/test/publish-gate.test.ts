@@ -48,6 +48,15 @@ describe('publishGate', () => {
     expect(describePublishGate(gate, true)).toMatch(/Publish button is available\. The document has unsaved changes\. Submitting for approval is not available/);
   });
 
+  it('#93 AC-1: an AI-written block nobody has kept blocks the gate, even with a clean, current analysis', () => {
+    const st = state([]);
+    const draft = Object.values(st.drafts)[0] as { blocks: Array<{ aiDraft?: boolean }> };
+    draft.blocks = draft.blocks.map((b, i) => (i === 1 ? { ...b, aiDraft: true } : b));
+    const gate = publishGate(st, 'j1', ev());
+    expect(gate).toMatchObject({ kind: 'issues', count: 1 });
+    expect(describePublishGate(gate, false)).toMatch(/1 AI-written block\(s\) still need Keep/);
+  });
+
   it('a flag on a Confidential block is named by rule only — its quoted text never reaches the Copilot', () => {
     const flag = { rule: 'R2', severity: 'warning' as const, blockId: 'b3', message: '“under 42 years old” implies an age.', evidence: 'under 42 years old' };
     const text = describePublishGate(publishGate(state([]), 'j1', ev({ flags: [flag], weakCount: 1 })), false);

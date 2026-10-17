@@ -427,7 +427,7 @@ export const ZH: Record<string, string> = {
   "City + country; for Remote, name the accepted regions.": "城市 + 国家；远程岗位需写明可接受的地区。",
   "Number of openings (1 or more).": "招聘人数（大于等于 1）。",
   "Role summary": "职位概述",
-  "2–4 sentences: what the role does, for whom, and why it matters.": "2–4 句话：这个职位做什么、为谁做、价值是什么。",
+  "What the role does, for whom, and why it matters.": "这个职位做什么、为谁做、价值是什么。",
   "Core responsibilities": "核心职责",
   "3–8 bullets, each starting with a verb.": "3–8 条，每条以动词开头。",
   "3–8 verifiable requirements, including at least 2 specific skills or tools.": "3–8 条可验证的要求，至少 2 条是具体技能或工具。",

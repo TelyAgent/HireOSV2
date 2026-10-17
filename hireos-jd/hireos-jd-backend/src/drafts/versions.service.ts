@@ -79,6 +79,10 @@ export class VersionsService {
     if (doc.revision !== input.revision) {
       throw new ConflictException({ code: 'DOCUMENT_CHANGED', message: '文档在你确认之后又有更新，请重新打开发布窗口确认。' });
     }
+    // AI-written text nobody has kept or edited is not the job's content yet (#93 AC-1): the same rule as the button.
+    if (Array.isArray(doc.blocks) && doc.blocks.some((b) => (b as { aiDraft?: unknown } | null)?.aiDraft === true)) {
+      throw new ConflictException({ code: 'AI_DRAFT_UNCONFIRMED', message: '还有 AI 撰写的内容未确认保留，请逐项确认或修改后再发布。' });
+    }
     const analysis = doc.aiAnalysis as { verdict?: string; items?: { severity?: string }[] } | null;
     if (doc.aiAnalysisRevision !== doc.revision || !analysis) {
       throw new ConflictException({ code: 'ANALYSIS_REQUIRED', message: '请先对当前已保存版本完成 AI 分析。' });

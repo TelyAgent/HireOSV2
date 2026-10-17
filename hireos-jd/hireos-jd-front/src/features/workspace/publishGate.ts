@@ -53,6 +53,12 @@ export function publishGate(state: AppState, jobId: string, ev: Evaluation | nul
     };
   }
   const doc = selectDraft(state, jobId);
+  // AI-written text nobody has kept yet is not the job's content: it blocks like an open issue (#93 AC-1).
+  const unkept = doc.blocks.filter((b) => b.aiDraft).length;
+  if (unkept) {
+    const analysis = [`${unkept} AI-written block(s) still need Keep or editing.`];
+    return { kind: "issues", count: count + unkept, missing: [], revise: [], blockers: [], analysis };
+  }
   const run = state.wsAiAnalysis[jobId];
   const analysisIssues = !run
     ? ["AI Analyze has not been run on the current saved revision."]

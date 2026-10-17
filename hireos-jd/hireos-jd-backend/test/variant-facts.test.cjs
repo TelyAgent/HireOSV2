@@ -2,7 +2,7 @@
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const { CopilotService } = require('../dist/copilot/copilot.service');
-const { FACT_FIELDS, pickFacts, pinFacts } = require('../dist/copilot/variant-facts');
+const { FACT_FIELDS, factsFromTitleOnly, pickFacts, pinFacts } = require('../dist/copilot/variant-facts');
 
 const identity = { workspaceId: 'ws-1', actorId: 'hr-1', roles: ['hr'], kind: 'session' };
 const db = { copilotConversation: { findFirst: async () => ({ id: 'c1', phase: 'intake' }) }, aiRun: { create: async () => ({}) } };
@@ -29,18 +29,30 @@ function driftingLlm(places) {
 const svc = (llm) => new CopilotService(db, llm, { jdAutotakeSystemPrompt: 'autotake' }, {}, {});
 const facts = (v) => FACT_FIELDS.map((k) => JSON.stringify(v.fields[k]));
 
-test('#71 AC-1: one "Finance Manager" run → A/B/C share every job fact; styles still differ; two runs both hold', async () => {
+test('#72 AC-1: title-only input does not confirm department, location, work mode, or pay', async () => {
   for (const places of [['上海', '远程', '北京'], ['中国大陆', '深圳', '远程（中国大陆）']]) {
     const llm = driftingLlm(places);
     const { variants } = await svc(llm).titleVariants(identity, 'c1', { title: 'Finance Manager' });
     assert.equal(variants.length, 3);
     assert.deepEqual(facts(variants[1]), facts(variants[0]));
     assert.deepEqual(facts(variants[2]), facts(variants[0]));
-    assert.equal(variants[0].fields.location, places[0]);
+    assert.equal(variants[0].fields.department, undefined);
+    assert.equal(variants[0].fields.location, undefined);
+    assert.equal(variants[0].fields.employmentType, undefined);
+    assert.equal(variants[0].fields.publicCompensation, undefined);
+    assert.equal(variants[0].fields.headcount, 1);
     assert.notEqual(variants[1].fields.roleSummary, variants[0].fields.roleSummary, 'prose stays each style’s own');
     assert.doesNotMatch(llm.calls[0], /以下职位事实已经确定/, 'the first version settles the facts');
-    assert.match(llm.calls[1], new RegExp(`"location":"${places[0].replace(/[()（）]/g, '.')}"`), 'later versions are told the facts');
+    assert.match(llm.calls[1], /"title":"Finance Manager"/, 'later versions are told the confirmed title');
+    assert.doesNotMatch(llm.calls[1], /"location"|"department"|"employmentType"|"publicCompensation"/, 'later versions are not given unconfirmed facts');
   }
+});
+
+test('factsFromTitleOnly keeps only the confirmed title and existing headcount default', () => {
+  assert.deepEqual(
+    factsFromTitleOnly({ title: 'Finance Manager', department: 'Finance', location: 'Shanghai', employmentType: 'Remote', headcount: 1 }, 'Finance Manager'),
+    { title: 'Finance Manager', headcount: 1 },
+  );
 });
 
 test('#71 AC-2: refining with B selected → B is refined first, all three end with B’s work mode and location', async () => {
