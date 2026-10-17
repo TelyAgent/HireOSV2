@@ -5,6 +5,8 @@ const path = require('node:path');
 
 const storeSource = fs.readFileSync(path.join(__dirname, '../src/store/StoreContext.tsx'), 'utf8');
 const initialStateSource = fs.readFileSync(path.join(__dirname, '../src/store/initialState.ts'), 'utf8');
+const modalSource = fs.readFileSync(path.join(__dirname, '../src/components/AppearanceModal.tsx'), 'utf8');
+const stylesSource = fs.readFileSync(path.join(__dirname, '../src/index.css'), 'utf8');
 
 test('#295: appearance defaults stay Light + Blue + Medium', () => {
   assert.match(initialStateSource, /theme: "light",\n\s+accent: "blue",\n\s+textSize: "medium"/);
@@ -12,4 +14,11 @@ test('#295: appearance defaults stay Light + Blue + Medium', () => {
   assert.match(storeSource, /accent: p\.accent \|\| "blue"/);
   assert.match(storeSource, /Appearance reset to Light, Blue, Medium\./);
   assert.match(storeSource, /外观已重置为浅色、蓝色和中等字号。/);
+});
+
+test('#291: the portal dialog receives theme tokens and readable controls', () => {
+  assert.match(modalSource, /className=\{`appearance-modal appearance-\$\{state\.textSize\}`\}/);
+  assert.match(stylesSource, /\.appearance-modal \.ant-modal-content[\s\S]*?background: var\(--surface\) !important/);
+  assert.match(stylesSource, /\.appearance-modal \.ant-radio-button-wrapper[\s\S]*?color: var\(--ink-2\) !important/);
+  assert.match(stylesSource, /\.appearance-modal \.ant-radio-button-wrapper-checked[^\{]*\{[\s\S]*?color: var\(--brand\) !important/);
 });
