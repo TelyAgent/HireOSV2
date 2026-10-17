@@ -80,7 +80,7 @@ function WorkspaceRow({ app, ev, openConcerns, concerns }: WorkspaceRowData) {
           <span className="score-big">{scoreDisplay(ev.overall)}</span>
         )}
       </td>
-      <td style={{ minWidth: 120 }}>{ev ? <CoverageBar coverage={ev.coverage} /> : "—"}</td>
+      <td className="coverage-col">{ev ? <CoverageBar coverage={ev.coverage} /> : "—"}</td>
       <td>
         {openConcerns > 0 && (
           <Badge tone="danger">
@@ -92,8 +92,16 @@ function WorkspaceRow({ app, ev, openConcerns, concerns }: WorkspaceRowData) {
       <td className="secondary-col">
         {!ev ? null : <AiRecommendationBadge display={recommendationDisplay(recommend(ev, concerns))} />}
       </td>
-      <td>{humanStatusCell}</td>
-      <td className="text-right">
+      <td>
+        {humanStatusCell}
+        {/* Where the AI column is hidden for width (#203), its recommendation stays readable here. */}
+        {ev && (
+          <div className="ai-inline tiny">
+            {t("AI:")} <AiRecommendationBadge display={recommendationDisplay(recommend(ev, concerns))} />
+          </div>
+        )}
+      </td>
+      <td className="text-right open-col">
         <Link className="btn btn-sm btn-secondary" to={`/applications/${app.id}`} onClick={(e) => e.stopPropagation()}>
           {t("Open", "Open (action)")}
         </Link>
@@ -361,7 +369,7 @@ export function ScreeningWorkspacePage() {
               </th>
               <th className="secondary-col">{t("AI recommendation")}</th>
               <th>{t("Human status")}</th>
-              <th></th>
+              <th className="open-col"></th>
             </tr>
           </thead>
           <tbody>

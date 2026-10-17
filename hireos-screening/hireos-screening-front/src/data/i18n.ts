@@ -643,6 +643,7 @@ export const ZH: Record<string, string> = {
   "No change since v{n}: the same members, scores and ranks.": "与 v{n} 相比没有变化：成员、分数和排名都相同。",
   "Generated from the current screening evaluation baseline.": "基于当前的初筛评估基线生成。",
   "Shortlist review": "候选名单评审",
+  "AI:": "AI：",
   // Decision process states (#214).
   "Awaiting exception approval": "待例外审批",
   "No longer in effect": "已失效",
