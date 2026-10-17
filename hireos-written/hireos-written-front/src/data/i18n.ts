@@ -119,6 +119,15 @@ export const ZH: Record<string, string> = {
   "Result release": "结果发布", "Evaluation review": "评估评审", "Submission issue": "提交异常",
   "Reviewer queue": "评审队列", "Plan review": "方案评审", "Delivery recovery": "交付恢复",
 
+  "The AI evaluation is still running — its rationale and excerpts appear here when it finishes.": "AI 评估仍在进行——完成后会在这里显示评分理由和原文摘录。",
+  "The AI evaluation failed, so there is no AI evidence for this criterion.": "AI 评估失败，该维度没有 AI 依据。",
+  "Scored by hand without an AI evaluation — there is no AI evidence for this criterion.": "该维度由人工评分，没有 AI 评估，因此没有 AI 依据。",
+  "The AI gave no rationale or excerpt for this criterion.": "AI 没有为该维度给出评分理由或原文摘录。",
+  "Rationale": "评分理由", "Excerpts from the answer": "作答原文摘录", "line %s": "第 %s 行", "lines %s–%e": "第 %s–%e 行", "AI evaluation": "AI 评估", "Manual scoring": "人工评分",
+  "Hide answer": "收起答案", "Show in answer": "在答案中查看", "The answer isn't loaded here.": "此处未加载该答案。",
+  "Excerpts weren't recorded for evaluations made before 17 Oct 2026 — only the rationale is available.": "2026-10-17 之前的评估没有记录原文摘录，只有评分理由。",
+  "%s excerpt(s) the AI gave are not in the answer and are not shown.": "AI 给出的 %s 段摘录在答案中找不到，未予显示。",
+
   "Reusable questions, mapped to multiple roles and competencies. Publishing a case does not send it — invitations are a separate step.":
     "可复用的题目，已映射到多个岗位与能力项。发布案例并不会自动发送——邀请候选人是单独的一步。",
   "Search title or code…": "按标题或编号搜索…", "All roles": "全部岗位", "All competencies": "全部能力项",

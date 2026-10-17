@@ -7,7 +7,7 @@
  */
 import { finalOverall } from "../utils/score";
 import {
-  ATTEMPTS, EVALUATIONS, PLANS, QUESTIONS, RELEASES, RESULTS,
+  ANSWERS, ATTEMPTS, EVALUATIONS, PLANS, QUESTIONS, RELEASES, RESULTS,
   type Attempt, type Criterion, type Evaluation, type PlanItem, type Question,
 } from "./fixtures";
 import type { QuestionSnapshot, RealEvaluation, RealFinalCriterion, RealInvitation, RealPlanItem } from "./writtenApi";
@@ -89,13 +89,20 @@ function toOrphanedQuestion(snapshot: QuestionSnapshot): Question {
 }
 
 function toCriterion(c: RealEvaluation["criteria"][number]): Criterion {
-  return { name: c.name, max: c.max, ai: c.score, human: null, confidence: "Medium", coverage: "Full", evidence: c.evidence, source: "AI evaluation" };
+  return { name: c.name, max: c.max, ai: c.score, human: null, confidence: "Medium", coverage: "Full", evidence: c.evidence, source: "AI evaluation", quotes: c.quotes, unlocatedQuotes: c.unlocatedQuotes };
 }
 
-function toFinalCriterion(c: RealFinalCriterion): Criterion {
+/**
+ * A finalized criterion keeps the AI's rationale and excerpts for it (#378): the final scores don't carry them,
+ * so they are joined back from the round's AI evaluation by name. Without one, it was scored by hand.
+ */
+function toFinalCriterion(c: RealFinalCriterion, ai: RealEvaluation | null | undefined): Criterion {
+  const fromAi = ai?.criteria.find((x) => x.name === c.name);
   return {
     name: c.name, max: c.max, ai: c.ai, human: c.human, confidence: "Medium", coverage: "Full",
-    overridden: c.overridden, overrideReason: c.overrideReason, evidence: "", source: "AI evaluation",
+    overridden: c.overridden, overrideReason: c.overrideReason,
+    evidence: fromAi?.evidence ?? "", source: fromAi ? "AI evaluation" : "Manual scoring",
+    quotes: fromAi?.quotes, unlocatedQuotes: fromAi?.unlocatedQuotes,
   };
 }
 
@@ -126,6 +133,10 @@ export function applyRealEvaluation(caseId: string, invitation: RealInvitation):
     submittedAt: submission.submittedAt, fileRef: "", receivedAt: submission.submittedAt, processedAt: submission.submittedAt,
   };
   ATTEMPTS[attemptId] = attempt;
+  ANSWERS[attemptId] = invitation.questions.map((q) => ({
+    questionId: q.questionId, title: q.title,
+    answerText: submission.answers.find((a) => a.questionId === q.questionId)?.answerText ?? "",
+  }));
 
   const evaluationId = `eval_${key}`;
   const final = submission.finalEvaluation;
@@ -133,7 +144,7 @@ export function applyRealEvaluation(caseId: string, invitation: RealInvitation):
     if (EVALUATIONS[evaluationId]?.status !== "final") {
       EVALUATIONS[evaluationId] = {
         id: evaluationId, attemptId, status: "final", finalizedBy: submission.finalizedBy ?? null, finalizedAt: submission.finalizedAt,
-        criteria: final.criteria.map(toFinalCriterion),
+        criteria: final.criteria.map((c) => toFinalCriterion(c, submission.evaluation)),
         summary: submission.evaluation?.summary,
       };
     }

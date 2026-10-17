@@ -4,7 +4,8 @@ import { Modal } from "antd";
 import { useStore } from "../store/StoreContext";
 import { StatusBadge } from "../utils/status";
 import { Breadcrumbs, Button, EmptyState } from "../components/ui/Primitives";
-import { ATTEMPTS, CASES, CORE_CANDIDATES, EVALUATIONS, QUESTIONS, RESULTS, type Criterion, type Evaluation } from "../data/fixtures";
+import { ANSWERS, ATTEMPTS, CASES, CORE_CANDIDATES, EVALUATIONS, QUESTIONS, RESULTS, type Criterion, type Evaluation } from "../data/fixtures";
+import { CriterionEvidence } from "../components/CriterionEvidence";
 import { finalizeCaseEvaluation } from "../data/writtenApi";
 import { computeOverall } from "../utils/score";
 
@@ -238,7 +239,8 @@ export function EvaluationReviewContent({
           </div>
         )}
         {evaluation.criteria.map((c, i) => (
-          <CriterionRow key={c.name} id={`crit-${ev.id}-${i}`} c={c} locked={isFinalized} showErrors={showErrors} onChange={(patch) => setCriterion(i, patch)} />
+          <CriterionRow key={c.name} id={`crit-${ev.id}-${i}`} c={c} locked={isFinalized} showErrors={showErrors} onChange={(patch) => setCriterion(i, patch)}
+            evidence={<CriterionEvidence c={c} answers={ANSWERS[attemptId] ?? []} aiStatus={evaluation.aiStatus} aiError={evaluation.aiError} />} />
         ))}
       </div>
 
@@ -287,7 +289,7 @@ export function EvaluationReviewPage() {
   return <EvaluationReviewContent attemptId={id} />;
 }
 
-function CriterionRow({ id, c, locked, showErrors, onChange }: { id: string; c: Criterion; locked: boolean; showErrors: boolean; onChange: (patch: Partial<Criterion>) => void }) {
+function CriterionRow({ id, c, locked, showErrors, onChange, evidence }: { id: string; c: Criterion; locked: boolean; showErrors: boolean; onChange: (patch: Partial<Criterion>) => void; evidence: React.ReactNode }) {
   const { t } = useStore();
   const [humanText, setHumanText] = useState(c.human == null ? "" : String(c.human));
   // The input keeps its own text (so a half-typed value isn't reformatted), but a change made from
@@ -348,13 +350,10 @@ function CriterionRow({ id, c, locked, showErrors, onChange }: { id: string; c: 
         </div>
       )}
       <div className="scorebar" style={{ margin: "8px 0" }}><div style={{ width: `${Math.min(bar, 100)}%` }} /></div>
-      {!c.manual && <details>
+      <details>
         <summary style={{ cursor: "pointer", color: "var(--accent)", fontSize: "calc(var(--text-base)*.85)" }}>{t("View evidence")}</summary>
-        <div className="evidence-excerpt" style={{ marginTop: 8 }}>
-          {c.evidence}
-          <div className="tiny" style={{ marginTop: 4 }}>{t("Source:")} {c.source}</div>
-        </div>
-      </details>}
+        {evidence}
+      </details>
       {!c.manual && c.human != null && c.human !== c.ai && (
         <div className="field" style={{ marginTop: 8 }}>
           {/* Says why it's asked: the human score differs from the AI's suggestion. */}
