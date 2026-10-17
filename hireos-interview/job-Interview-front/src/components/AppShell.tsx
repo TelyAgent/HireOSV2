@@ -1,4 +1,5 @@
 import { useEffect, useLayoutEffect, useState } from "react";
+import { ConfigProvider } from "antd";
 import { useStore } from "../store/StoreContext";
 import {
   CloseSvg,
@@ -427,6 +428,14 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   };
 
   return (
+    <ConfigProvider theme={{
+      token: {
+        colorPrimary: accentHex,
+        colorPrimaryHover: dark ? ac.darkBrand : ac.strong,
+        colorPrimaryActive: dark ? ac.darkBrand : ac.strong,
+      },
+      components: { Button: { primaryColor: dark ? "#062a2a" : "#ffffff" } },
+    }}>
     <div
       className="hireos-root"
       data-text-size={state.textSize}
@@ -440,5 +449,6 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         </div>
       </div>
     </div>
+    </ConfigProvider>
   );
 }

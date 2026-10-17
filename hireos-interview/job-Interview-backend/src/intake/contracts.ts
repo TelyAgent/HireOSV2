@@ -100,7 +100,9 @@ export const scheduleRoundSchema = z.object({
 export const setCardScoreSchema = z.object({
   score: z.number().int().min(1).max(5).nullable(),
   note: z.string().max(5000),
-}).strict();
+}).strict().refine((input) => input.score === null || input.note.trim().length > 0, {
+  path: ['note'], message: 'A reason is required for a human score.',
+});
 export const recommendationSchema = z.enum(['strong_advance', 'advance', 'hold', 'do_not_advance', 'request_info']);
 export const setRecommendationSchema = z.object({ recommendation: recommendationSchema.nullable() }).strict();
 // Decision & Next Steps: the human's final call on the whole task. The AI draft only ever

@@ -39,28 +39,55 @@ export function PackagePage() {
   const [exporting, setExporting] = useState(false);
   const [exportError, setExportError] = useState("");
   const [now, setNow] = useState(() => Date.now());
+  const [selection, setSelection] = useState<{ taskId: string; version: number } | null>(null);
+  const selectedVersion = selection?.taskId === taskId ? selection.version : null;
+  const [versions, setVersions] = useState<{ version: number; createdAt: string }[]>([]);
+  const [versionsError, setVersionsError] = useState("");
+  const [events, setEvents] = useState<{ id: string; packageVersion: number; action: string; actorId: string; role: string | null; createdAt: string; hrConfirmedAt: string | null; hmConfirmedAt: string | null }[]>([]);
+  const [eventsError, setEventsError] = useState(false);
+
+  useEffect(() => {
+    if (!taskId || !data) return;
+    let active = true;
+    setEvents([]); setEventsError(false);
+    api<typeof events>(`/tasks/${taskId}/package/events`)
+      .then(value => { if (active) setEvents(value); })
+      .catch(() => { if (active) setEventsError(true); });
+    return () => { active = false; };
+  }, [taskId, data]);
 
   useEffect(() => {
     if (!taskId) { setData(null); return; }
-    let active = true; setError("");
-    api<PackageState>(`/tasks/${taskId}/package`)
+    let active = true; setError(""); setData(null); setActionError(""); setExportError("");
+    api<PackageState>(`/tasks/${taskId}/package${selectedVersion === null ? "" : `/versions/${selectedVersion}`}`)
       .then((value) => { if (active) setData(value); })
       .catch((e) => { if (active) setError(e instanceof Error ? e.message : "REQUEST_FAILED"); });
     return () => { active = false; };
-  }, [taskId]);
+  }, [taskId, selectedVersion]);
 
   useEffect(() => {
-    if (data?.offerState !== "pending") return;
+    if (!taskId || !data) return;
+    let active = true;
+    setVersionsError("");
+    api<{ version: number; createdAt: string }[]>(`/tasks/${taskId}/package/versions`)
+      .then(value => { if (active) setVersions(value); })
+      .catch(() => { if (active) { setVersions([]); setVersionsError(zh ? "历史版本暂不可用。" : "Version history is unavailable."); } });
+    return () => { active = false; };
+  }, [taskId, data, zh]);
+
+  useEffect(() => {
+    if (selectedVersion !== null || data?.offerState !== "pending") return;
+    let active = true;
     const timer = window.setInterval(() => setNow(Date.now()), 1000);
     const refresh = window.setInterval(() => {
       if (!taskId) return;
-      api<PackageState>(`/tasks/${taskId}/package`).then(setData).catch(() => undefined);
+      api<PackageState>(`/tasks/${taskId}/package`).then(value => { if (active) setData(value); }).catch(() => undefined);
     }, 5000);
-    return () => { window.clearInterval(timer); window.clearInterval(refresh); };
-  }, [data?.offerState, taskId]);
+    return () => { active = false; window.clearInterval(timer); window.clearInterval(refresh); };
+  }, [data?.offerState, taskId, selectedVersion]);
 
   const toggleConfirm = async (role: "hr" | "hm") => {
-    if (!taskId || !data) return;
+    if (!taskId || !data || data.historical) return;
     const confirmed = role === "hr" ? !data.hrConfirmedAt : !data.hmConfirmedAt;
     setConfirming(role); setActionError("");
     try { setData(await api<PackageState>(`/tasks/${taskId}/package/confirm`, { method: "PATCH", body: JSON.stringify({ role, confirmed, note: confirmationNotes[role] }) })); }
@@ -69,12 +96,13 @@ export function PackagePage() {
   };
 
   const sendOffer = async () => {
-    if (!taskId) return;
+    if (!taskId || !data || data.historical || data.needsReview) return;
     setSendingOffer(true); setActionError("");
     try { setData(await api<PackageState>(`/tasks/${taskId}/package/offer`, { method: "POST" })); }
     catch (e) {
       const code = e instanceof Error ? e.message : "REQUEST_FAILED";
       setActionError(code === "DECISION_NOT_RECOMMEND_OFFER" ? (zh ? "当前决定不是「推荐发放 Offer」，无法发送。" : "The recorded decision isn't \"Recommend for offer\" — can't send.")
+        : code === "PACKAGE_REVIEW_REQUIRED" ? (zh ? "上游资料已变化，请完成复核后再交接。" : "Upstream material changed. Complete the review before handing off.")
         : code === "PACKAGE_NOT_CONFIRMED" ? (zh ? "需要 HR 和招聘经理都确认后才能发送。" : "Both HR and Hiring Manager must confirm first.")
         : code === "ALREADY_SENT" ? (zh ? "该版本已被 Offer 接收。" : "This package version was already acknowledged by Offer.")
         : code === "OFFER_PENDING" ? (zh ? "正在等待 Offer 确认，超时后可重试。" : "Waiting for Offer ACK; retry will be available after timeout.")
@@ -86,11 +114,11 @@ export function PackagePage() {
     if (!taskId) return;
     setExporting(true); setExportError("");
     try {
-      const blob = await downloadApi(`/tasks/${taskId}/package.pdf`);
+      const blob = await downloadApi(`/tasks/${taskId}/package.pdf?version=${data!.packageVersion}`);
       try {
         const url = URL.createObjectURL(blob);
         const anchor = document.createElement("a");
-        anchor.href = url; anchor.download = `evaluation-package-${taskId}.pdf`;
+        anchor.href = url; anchor.download = `evaluation-package-${taskId}-v${data!.packageVersion}.pdf`;
         document.body.appendChild(anchor); anchor.click(); anchor.remove(); URL.revokeObjectURL(url);
       } catch { throw new Error(exportFailureCode("download")); }
     } catch (e) {
@@ -101,18 +129,36 @@ export function PackagePage() {
 
   if (!taskId) return <div style={{ ...card, fontSize: 12.5, color: "var(--ink-3)" }}>{zh ? "未关联真实面试任务。" : "No real task linked."}</div>;
   if (!data) return error
-    ? <div role="alert" style={{ ...card, borderColor: "var(--bad)", background: "var(--bad-soft)", color: "var(--bad)", fontSize: 12.5 }}>{error}</div>
+    ? <div role="alert" style={{ ...card, borderColor: "var(--bad)", background: "var(--bad-soft)", color: "var(--bad)", fontSize: 12.5 }}>
+        {error}
+        {selectedVersion !== null && <button style={{ ...btn, marginLeft: 12 }} onClick={() => setSelection(null)}>{zh ? "返回当前内容" : "Back to current content"}</button>}
+      </div>
     : <p style={{ fontSize: 12.5, color: "var(--ink-3)" }}>{zh ? "加载中…" : "Loading…"}</p>;
+
+  const recordedHandoff = events.some(event => event.action === "handoff_requested"
+    && event.packageVersion === data.offerPackageVersion && event.createdAt === data.offerSentAt);
+  const handoffDisabled = sendingOffer || data.needsReview || !!data.offerTimelineIssue || data.offerState === "acknowledged"
+    || (data.offerState === "pending" && (!data.offerSentAt || now - new Date(data.offerSentAt).getTime() < 5 * 60 * 1000));
 
   return (
     <>
+      <label style={{ display: "flex", gap: 8, alignItems: "center" }}>
+        {zh ? "评估包版本" : "Package version"}
+        <select aria-label={zh ? "评估包版本" : "Package version"} value={selectedVersion ?? "current"} disabled={!!confirming || sendingOffer || exporting}
+          onChange={e => setSelection(e.target.value === "current" ? null : { taskId, version: Number(e.target.value) })}>
+          <option value="current">{zh ? "当前内容" : "Current content"}</option>
+          {versions.map(version => <option key={version.version} value={version.version}>{`Version ${version.version}`}</option>)}
+        </select>
+      </label>
+      {versionsError && <div role="status">{versionsError}</div>}
+      {data.historical && <div role="status">{zh ? "历史快照（只读）。确认及交接仅可在当前内容中操作。" : "Historical snapshot (read-only). Confirmations and handoff are available only on current content."}</div>}
       <div style={{ display: "flex", alignItems: "center", gap: 12, padding: "14px 16px", border: "1px solid var(--line)", borderRadius: 14, background: "var(--surface)" }}>
         <div style={{ width: 34, height: 34, borderRadius: 9, background: "var(--surface-3)" }} />
-        <div style={{ flex: 1 }}>
+        <div style={{ flex: 1, minWidth: 0, overflowWrap: "anywhere" }}>
           <div style={{ fontSize: 14.5, fontWeight: 700 }}>{t.hiringEvalPackage}</div>
-          <div style={{ fontSize: 11.5, color: "var(--ink-3)" }}>{data.candidateName} · {data.jobTitle} · {data.published ? (zh ? "已发布" : "Published") : (zh ? "审阅中" : "In review")}</div>
+          <div style={{ fontSize: 11.5, color: "var(--ink-3)" }}>{data.candidateName} · {data.jobTitle} · {data.needsReview ? (zh ? "需复核" : "Review required") : data.published ? (zh ? "已发布" : "Published") : (zh ? "审阅中" : "In review")}</div>
             <div style={{ marginTop: 3, fontSize: 10.5, color: "var(--ink-3)" }}>
-              {zh ? `包 ${data.packageId.slice(0, 8)} · 版本 ${data.packageVersion} · Rubric v${data.rubricVersion ?? "-"} · ${new Date(data.generatedAt).toLocaleString("zh-CN")}` : `Package ${data.packageId.slice(0, 8)} · Version ${data.packageVersion} · Rubric v${data.rubricVersion ?? "-"} · ${new Date(data.generatedAt).toLocaleString("en-US")}`}
+              {zh ? `包 ${data.packageId} · 版本 ${data.packageVersion} · Rubric v${data.rubricVersion ?? "-"} · ${new Date(data.generatedAt).toLocaleString("zh-CN")}` : `Package ${data.packageId} · Version ${data.packageVersion} · Rubric v${data.rubricVersion ?? "-"} · ${new Date(data.generatedAt).toLocaleString("en-US")}`}
             </div>
         </div>
         <button disabled={exporting} onClick={() => void exportPdf()} style={{ ...btn, cursor: exporting ? "not-allowed" : "pointer" }}>{exporting ? (zh ? "生成中…" : "Generating…") : t.exportPdf}</button>
@@ -157,7 +203,7 @@ export function PackagePage() {
         <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
           <div style={{ ...card, padding: "14px 16px" }}>
             <div style={eyebrow}>{t.humanReviewHeader}</div>
-            <div style={{ marginTop: 9, display: "flex", flexDirection: "column", gap: 10 }}>
+            <fieldset disabled={!!data.historical} style={{ margin: "9px 0 0", padding: 0, border: 0, minWidth: 0, display: "flex", flexDirection: "column", gap: 10 }}>
               {(["hr", "hm"] as const).map((role) => {
                 const confirmedAt = role === "hr" ? data.hrConfirmedAt : data.hmConfirmedAt;
                 const label = role === "hr" ? t.hrLabel : t.hmLabel;
@@ -169,13 +215,13 @@ export function PackagePage() {
                       {confirmedAt && (role === "hr" ? data.hrConfirmationNote : data.hmConfirmationNote) && <div style={{ marginTop: 3, fontSize: 11, color: "var(--ink-2)" }}>{role === "hr" ? data.hrConfirmationNote : data.hmConfirmationNote}</div>}
                       {!confirmedAt && <input value={confirmationNotes[role]} onChange={(e) => setConfirmationNotes((current) => ({ ...current, [role]: e.target.value }))} placeholder={zh ? "确认意见（可选）" : "Confirmation note (optional)"} style={{ marginTop: 5, width: "100%", boxSizing: "border-box", height: 28, border: "1px solid var(--line-strong)", borderRadius: 6, padding: "0 7px", fontSize: 11 }} />}
                     </div>
-                    <button disabled={confirming === role} onClick={() => void toggleConfirm(role)} style={{ ...btn, height: 28, cursor: confirming === role ? "not-allowed" : "pointer" }}>
+                    <button disabled={!!data.historical || confirming === role} onClick={() => void toggleConfirm(role)} style={{ ...btn, height: 28, cursor: data.historical || confirming === role ? "not-allowed" : "pointer" }}>
                       {confirming === role ? "…" : confirmedAt ? (zh ? "取消确认" : "Unconfirm") : (zh ? "确认" : "Confirm")}
                     </button>
                   </div>
                 );
               })}
-            </div>
+            </fieldset>
           </div>
 
           <div style={{ ...card, padding: "14px 16px" }}>
@@ -188,22 +234,36 @@ export function PackagePage() {
             </div>
           </div>
 
-          <div style={{ ...card, padding: "14px 16px" }}>
+          {!data.historical && <div style={{ ...card, padding: "14px 16px" }}>
             <div style={eyebrow}>{t.offerHandoffStatus}</div>
-            {data.offerTimelineIssue && <div role="alert" style={{ marginTop: 8, color: "var(--bad)", fontSize: 11.5, lineHeight: 1.45 }}>{zh ? "检测到交接时间早于决定或确认，已暂停 Offer 交接，请先修正记录。" : "Handoff timeline is invalid: it predates the decision or a confirmation. Handoff is paused until the record is corrected."}</div>}
+            {data.offerTimelineIssue && <div role="alert" style={{ marginTop: 8, color: "var(--bad)", fontSize: 11.5, lineHeight: 1.45 }}>{recordedHandoff
+              ? (zh ? `交接后决定或确认已变化。原交接属于版本 ${data.offerPackageVersion}，详见操作记录。` : `The decision or confirmations changed after handoff. The original handoff belongs to version ${data.offerPackageVersion}; see the history below.`)
+              : (zh ? "交接时间早于当前决定或确认，且缺少对应版本记录；无法据此判断原交接顺序。请先核对记录。" : "Handoff predates the current decision or confirmation, with no matching versioned event. The original sequence cannot be verified; review the records first.")}</div>}
             <div style={statusPill}>
               {data.offerState === "acknowledged" ? `${zh ? "Offer 已接收" : "Acknowledged by Offer"} · ${data.offerAckAt ? new Date(data.offerAckAt).toLocaleString(zh ? "zh-CN" : "en-US") : ""}` : data.offerState === "sent" ? (zh ? "历史交接未确认，可重试" : "Legacy handoff unconfirmed; retry available") : data.offerState === "pending" && data.offerSentAt && now - new Date(data.offerSentAt).getTime() >= 5 * 60 * 1000 ? (zh ? "确认超时，可重试" : "ACK timed out; retry available") : data.offerState === "pending" ? (zh ? "等待 Offer 接收确认" : "Awaiting Offer ACK") : data.offerState === "failed" ? `${zh ? "交接失败" : "Handoff failed"}${data.offerError ? ` · ${data.offerError}` : ""}` : (zh ? "未连接" : "Not connected")}
             </div>
             <div style={{ marginTop: 10, display: "flex", gap: 8 }}>
-              <button disabled={sendingOffer || !!data.offerTimelineIssue || data.offerState === "acknowledged" || (data.offerState === "pending" && (!data.offerSentAt || now - new Date(data.offerSentAt).getTime() < 5 * 60 * 1000))} onClick={() => void sendOffer()} style={{ ...btn, cursor: sendingOffer || !!data.offerTimelineIssue || data.offerState === "acknowledged" || (data.offerState === "pending" && (!data.offerSentAt || now - new Date(data.offerSentAt).getTime() < 5 * 60 * 1000)) ? "not-allowed" : "pointer" }}>
+              <button disabled={handoffDisabled} onClick={() => void sendOffer()} style={{ ...btn, cursor: handoffDisabled ? "not-allowed" : "pointer" }}>
                 {data.offerState === "acknowledged" ? (zh ? "Offer 已接收" : "Offer acknowledged") : data.offerState === "pending" && data.offerSentAt && now - new Date(data.offerSentAt).getTime() >= 5 * 60 * 1000 ? (zh ? "重试交接" : "Retry handoff") : data.offerState === "pending" ? (zh ? "等待确认…" : "Awaiting ACK…") : sendingOffer ? (zh ? "发送中…" : "Sending…") : data.offerState === "failed" || data.offerState === "sent" ? (zh ? "重试交接" : "Retry handoff") : (zh ? "发送至 Offer" : "Send to Offer")}
               </button>
             </div>
             {actionError && <div role="alert" style={{ marginTop: 8, fontSize: 11.5, color: "var(--bad)" }}>{actionError}</div>}
-          </div>
+          </div>}
         </div>
       </div>
 
+      <section aria-label={zh ? "确认与交接记录" : "Confirmation and handoff history"} style={{ borderTop: "1px solid var(--line)", paddingTop: 16 }}>
+        <h3 style={{ fontSize: 14 }}>{zh ? "确认与交接记录" : "Confirmation and handoff history"}</h3>
+        {eventsError ? <p role="alert">{zh ? "记录暂不可用，请刷新重试。" : "History is unavailable. Refresh to retry."}</p>
+          : events.length === 0 ? <p>{zh ? "尚无版本化操作记录；历史时间戳不能还原操作顺序。" : "No versioned events recorded. Legacy timestamps cannot reconstruct the operation sequence."}</p>
+          : <ol style={{ paddingLeft: 20 }}>{events.map(event => <li key={event.id} style={{ marginBottom: 12, overflowWrap: "anywhere" }}>
+            <div>{event.action === "handoff_requested" ? (zh ? "已请求交接" : "Handoff requested") : event.action === "confirmed" ? (zh ? "已确认" : "Confirmed") : (zh ? "已取消确认" : "Unconfirmed")}
+              {event.role ? ` · ${event.role.toUpperCase()}` : ""} · Version {event.packageVersion} · {event.actorId} · {new Date(event.createdAt).toLocaleString(zh ? "zh-CN" : "en-US")}</div>
+            {event.action === "handoff_requested" && <div style={{ fontSize: 12, color: "var(--ink-3)" }}>
+              {zh ? "交接版本的确认时间" : "Confirmation times in the handed-off version"}: HR {event.hrConfirmedAt ? new Date(event.hrConfirmedAt).toLocaleString(zh ? "zh-CN" : "en-US") : "—"} · HM {event.hmConfirmedAt ? new Date(event.hmConfirmedAt).toLocaleString(zh ? "zh-CN" : "en-US") : "—"}
+            </div>}
+          </li>)}</ol>}
+      </section>
     </>
   );
 }

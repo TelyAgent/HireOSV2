@@ -153,6 +153,7 @@ export type PackageEvidenceItem = {
   tag: 'strong' | 'medium' | 'weak' | 'unknown';
 };
 export type PackageState = {
+  historical?: boolean;
   candidateName: string; jobTitle: string;
   packageId: string; packageVersion: number; rubricVersion: number | null; generatedAt: string;
   needsReview: boolean; reviewReason: string | null; invalidatedAt: string | null;

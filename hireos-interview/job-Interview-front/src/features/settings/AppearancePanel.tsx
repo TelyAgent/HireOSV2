@@ -11,7 +11,7 @@ export function AppearancePanel() {
     <>
       <div className="hs-field">
         <div className="hs-label">{t("Theme")}</div>
-        <Radio.Group value={state.theme} onChange={(e) => setTheme(e.target.value as AppState["theme"])}>
+        <Radio.Group className="appearance-options" aria-label={t("Theme")} value={state.theme} onChange={(e) => setTheme(e.target.value as AppState["theme"])}>
           <Radio.Button value="light">{t("Light")}</Radio.Button>
           <Radio.Button value="dark">{t("Dark")}</Radio.Button>
           <Radio.Button value="deep">{t("Deep")}</Radio.Button>
@@ -20,7 +20,7 @@ export function AppearancePanel() {
       </div>
       <div className="hs-field">
         <div className="hs-label">{t("Accent")}</div>
-        <Radio.Group value={state.accent} onChange={(e) => setAccent(e.target.value as AppState["accent"])}>
+        <Radio.Group className="appearance-options" aria-label={t("Accent")} value={state.accent} onChange={(e) => setAccent(e.target.value as AppState["accent"])}>
           <Radio.Button value="blue">{t("Blue")}</Radio.Button>
           <Radio.Button value="teal">{t("Teal")}</Radio.Button>
           <Radio.Button value="violet">{t("Violet")}</Radio.Button>
@@ -28,7 +28,7 @@ export function AppearancePanel() {
       </div>
       <div className="hs-field">
         <div className="hs-label">{t("Text size")}</div>
-        <Radio.Group value={state.textSize} onChange={(e) => setTextSize(e.target.value as AppState["textSize"])}>
+        <Radio.Group className="appearance-options" aria-label={t("Text size")} value={state.textSize} onChange={(e) => setTextSize(e.target.value as AppState["textSize"])}>
           <Radio.Button value="small">{t("Small")}</Radio.Button>
           <Radio.Button value="medium">{t("Medium")}</Radio.Button>
           <Radio.Button value="large">{t("Large")}</Radio.Button>

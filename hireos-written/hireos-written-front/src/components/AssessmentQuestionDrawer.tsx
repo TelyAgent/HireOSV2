@@ -139,8 +139,8 @@ export function AssessmentQuestionDrawer({
         favorite: false,
         deliverables: [],
         materials: [],
-        usageCount: 0,
-        seenByCount: 0,
+        usageCount: null,
+        seenByCount: null,
         prompt: contentDraft,
         caseScoped: true,
       };

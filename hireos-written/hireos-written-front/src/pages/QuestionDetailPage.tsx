@@ -65,7 +65,9 @@ export function QuestionDetailPage() {
         <StatusBadge status={q.status} />
         <span className="tiny">
           v{q.version} · {q.type} · {q.language} · ~{q.estMinutes || "—"} min ·{" "}
-          {zh ? `已使用 ${q.usageCount} 次 · ${q.seenByCount} 位候选人见过此版本` : `Used ${q.usageCount} times · ${q.seenByCount} candidates have seen this exact version`}
+          {q.usageCount == null || q.seenByCount == null
+            ? t("Usage: Unknown")
+            : zh ? `已使用 ${q.usageCount} 次 · ${q.seenByCount} 位候选人见过此版本` : `Used ${q.usageCount} times · ${q.seenByCount} candidates have seen this exact version`}
         </span>
       </div>
 
@@ -117,10 +119,11 @@ export function QuestionDetailPage() {
       {tab === "usage" && (
         <div className="card card-pad">
           <div className="grid-3">
-            <div className="metric"><div className="label">{t("Used in cases")}</div><div className="value">{q.usageCount}</div></div>
-            <div className="metric"><div className="label">{t("Candidates who have seen this version")}</div><div className="value">{q.seenByCount}</div></div>
+            <div className="metric"><div className="label">{t("Used in cases")}</div><div className="value">{q.usageCount ?? t("Unknown")}</div></div>
+            <div className="metric"><div className="label">{t("Candidates who have seen this version")}</div><div className="value">{q.seenByCount ?? t("Unknown")}</div></div>
             <div className="metric"><div className="label">{t("Role mappings")}</div><div className="value">{q.roles.length}</div></div>
           </div>
+          {(q.usageCount == null || q.seenByCount == null) && <p role="status" className="tiny" style={{ marginTop: 12 }}>{t("External usage records have not been retrieved. Unknown does not mean zero.")}</p>}
           <div className="tiny" style={{ marginTop: 12 }}>{t("Mapped roles:")} {q.roles.map((r) => <Chip key={r}>{r}</Chip>)}</div>
         </div>
       )}

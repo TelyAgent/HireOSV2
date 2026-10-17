@@ -232,7 +232,7 @@ export const LANG = {
       "Candidate declined recording. Evidence for this round is the interviewer's manual record instead.",
     recFailedNote: "Transcription failed. Falling back to the manual record.",
     roundEvaluatorLabel: "Round evaluator (human): ",
-    submittedLabel: " · submitted ",
+    interviewCompletedLabel: " · Interview completed ",
     aiDraftedSummary: "AI-DRAFTED SUMMARY",
     reviewSummaryPre: "AI recommendation: ",
     reviewSummaryPost:
@@ -616,7 +616,7 @@ export const LANG = {
     recDeclinedNote: "候选人拒绝录制。本轮证据改为使用面试官的人工记录。",
     recFailedNote: "转写失败，回退到人工记录。",
     roundEvaluatorLabel: "本轮评审人(人工)：",
-    submittedLabel: " · 提交于 ",
+    interviewCompletedLabel: " · 面试完成于 ",
     aiDraftedSummary: "AI 草拟摘要",
     reviewSummaryPre: "AI 建议：",
     reviewSummaryPost:

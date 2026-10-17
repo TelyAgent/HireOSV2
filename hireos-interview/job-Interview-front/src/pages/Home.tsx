@@ -19,6 +19,7 @@ import {
 } from "../components/ui/Icons";
 import { characters, initials } from "../lib/initials";
 import { ResumePreview } from '../features/project-intake/ResumePreview';
+import { LinkCandidateModal } from '../features/project-intake/LinkCandidateModal';
 import { Input } from 'antd';
 import { SearchOutlined } from '@ant-design/icons';
 
@@ -39,9 +40,11 @@ export function HomePage() {
   const [loading, setLoading] = useState(true);
   const [reload, setReload] = useState(0);
   const dataReady = !loading && !loadError;
-  const metricValue = (value: number) => loading ? it.loading : loadError ? (state.lang === 'zh' ? '暂不可用' : 'Unavailable') : value;
+  const unavailable = state.lang === 'zh' ? '暂不可用' : 'Unavailable';
+  const metricValue = (value: number | null) => value === null ? unavailable : loading ? it.loading : loadError ? unavailable : value;
   const [expandedRoles, setExpandedRoles] = useState<Record<string, boolean>>({});
   const [resumeTaskId, setResumeTaskId] = useState<string | null>(null);
+  const [linkJob, setLinkJob] = useState<{ id: string; title: string } | null>(null);
   useEffect(() => {
     let active = true;
     setLoading(true);
@@ -192,17 +195,17 @@ export function HomePage() {
   ];
 
   const moreCards = [
-    { label: t.cardTodayInterviews, value: 0, sub: t.cardTodayInterviewsSub, icon: <CalendarSvg /> },
-    { label: t.cardNext7, value: 0, sub: t.cardNext7Sub, icon: <CalendarSvg /> },
-    { label: t.cardActiveProjects, value: 0, sub: t.cardActiveProjectsSub, icon: <BoltIcon /> },
-    { label: t.cardAwaitingJoint, value: 0, sub: t.cardAwaitingJointSub, icon: <CheckCircleSvg /> },
-    { label: t.cardAwaitingScheduling, value: 0, sub: t.cardAwaitingSchedulingSub, icon: <CalendarSvg /> },
+    { label: t.cardTodayInterviews, value: null, sub: t.cardTodayInterviewsSub, icon: <CalendarSvg /> },
+    { label: t.cardNext7, value: null, sub: t.cardNext7Sub, icon: <CalendarSvg /> },
+    { label: t.cardActiveProjects, value: null, sub: t.cardActiveProjectsSub, icon: <BoltIcon /> },
+    { label: t.cardAwaitingJoint, value: null, sub: t.cardAwaitingJointSub, icon: <CheckCircleSvg /> },
+    { label: t.cardAwaitingScheduling, value: null, sub: t.cardAwaitingSchedulingSub, icon: <CalendarSvg /> },
     { label: t.cardUnknownRoles, value: unknownRolesCount, sub: t.cardUnknownRolesSub, icon: <HelpIcon /> },
   ];
   const trendCards = [
-    { label: t.cardInterviewsCompleted, value: 0, sub: t.cardLast30, icon: <ChartSvg /> },
-    { label: t.cardPackagesCompleted, value: 0, sub: t.cardLast30, icon: <BoxIcon /> },
-    { label: t.cardProjectsOnHold, value: 0, sub: t.cardOnHoldStatus, icon: <PauseSvg /> },
+    { label: t.cardInterviewsCompleted, value: null, sub: t.cardLast30, icon: <ChartSvg /> },
+    { label: t.cardPackagesCompleted, value: null, sub: t.cardLast30, icon: <BoxIcon /> },
+    { label: t.cardProjectsOnHold, value: null, sub: t.cardOnHoldStatus, icon: <PauseSvg /> },
   ];
 
   const filters = ["All projects", "Needs my confirmation", "Draft", "Published"] as const;
@@ -436,7 +439,7 @@ export function HomePage() {
             {group.cards.map((c, i) => (
               <div key={i} style={statsCard}>
                 <div>
-                  <div data-testid="home-metric" style={{ fontSize: dataReady ? 22 : 12, minHeight: 26, fontWeight: 700, lineHeight: 1.15 }}>
+                  <div data-testid="home-metric" style={{ fontSize: dataReady && c.value !== null ? 22 : 12, minHeight: 26, fontWeight: 700, lineHeight: 1.15 }}>
                     {metricValue(c.value)}
                   </div>
                   <div
@@ -732,7 +735,7 @@ export function HomePage() {
                         </div>
                         <div style={{ display: "flex", justifyContent: "flex-end" }}>
                           <button
-                            onClick={() => say(state.lang === "zh" ? "该功能即将上线：为此岗位关联更多候选人。" : "Coming soon: link more candidates to this role.")}
+                            onClick={() => setLinkJob({ id: g.jobId, title: g.role })}
                             style={{ height: 30, padding: "0 10px", border: "1px solid var(--brand)", borderRadius: 8, background: "var(--brand-soft)", color: "var(--brand)", fontSize: 11.5, fontWeight: 600, cursor: "pointer" }}
                           >
                             {t.linkCandidate}
@@ -829,6 +832,11 @@ export function HomePage() {
         </div>
       </div>
       {resumeTaskId && <ResumePreview key={resumeTaskId} taskId={resumeTaskId} lang={state.lang} onClose={() => setResumeTaskId(null)} />}
+      {linkJob && <LinkCandidateModal key={linkJob.id} job={linkJob} lang={state.lang} onClose={() => setLinkJob(null)} onLinked={() => {
+        setExpandedRoles(previous => ({ ...previous, [linkJob.id]: true }));
+        setLinkJob(null); setReload(value => value + 1);
+        say(state.lang === 'zh' ? '候选人已关联。' : 'Candidate linked.');
+      }} />}
     </div>
   );
 }

@@ -92,9 +92,16 @@ export class IntakeController {
   setTaskDecision(@Req() req: { identity: Identity }, @Param('id') id: string, @Body() body: unknown) { return this.tasks.setDecision(req.identity, id, body); }
   @Get('tasks/:id/package')
   taskPackage(@Req() req: { identity: Identity }, @Param('id') id: string) { return this.tasks.package(req.identity.workspaceId, id); }
+  @Get('tasks/:id/package/versions')
+  taskPackageVersions(@Req() req: { identity: Identity }, @Param('id') id: string) { return this.tasks.packageVersions(req.identity.workspaceId, id); }
+
+  @Get('tasks/:id/package/events')
+  taskPackageEvents(@Req() req: { identity: Identity }, @Param('id') id: string) { return this.tasks.packageEvents(req.identity.workspaceId, id); }
+  @Get('tasks/:id/package/versions/:version')
+  taskPackageVersion(@Req() req: { identity: Identity }, @Param('id') id: string, @Param('version') version: string) { return this.tasks.packageVersion(req.identity.workspaceId, id, Number(version)); }
   @Get('tasks/:id/package.pdf')
-  async taskPackagePdf(@Req() req: { identity: Identity }, @Param('id') id: string, @Res() response: Response) {
-    const pdf = await this.tasks.packagePdf(req.identity.workspaceId, id);
+  async taskPackagePdf(@Req() req: { identity: Identity }, @Param('id') id: string, @Res() response: Response, @Query('version') version?: string) {
+    const pdf = await this.tasks.packagePdf(req.identity.workspaceId, id, version === undefined ? undefined : Number(version));
     response.set({ 'Content-Type': 'application/pdf', 'Content-Disposition': `attachment; filename="evaluation-package-${id}.pdf"` });
     response.send(pdf);
   }

@@ -53,6 +53,9 @@ export function SchedulePage() {
   const [draftLink, setDraftLink] = useState("");
   const [draftLanguage, setDraftLanguage] = useState<"zh" | "en" | "auto">("zh");
   const [saving, setSaving] = useState(false);
+  const schedulingRound = rounds.find(r => r.id === openRoundId);
+  const interviewerMissing = !!schedulingRound && !schedulingRound.interviewer;
+  const interviewerRequired = zh ? "请先在面试计划中核对并指定面试官，再保存排期。" : "Review and assign the interviewer in Interview plan before saving the schedule.";
   // mode 's2s': the backend uses a Server-to-Server app on a fixed host account — nothing to authorize.
   type ZoomConnection = { mode?: "oauth" | "s2s"; connected: boolean; name: string | null; pending: boolean; error: string | null };
   const [zoomConnection, setZoomConnection] = useState<ZoomConnection | null>(null);
@@ -167,6 +170,7 @@ export function SchedulePage() {
   const saveSchedule = async () => {
     const round = rounds.find((r) => r.id === openRoundId);
     if (!round || !draftAt) return;
+    if (!round.interviewer) { say(interviewerRequired); return; }
     const at = wallTimeToInstant(draftAt, draftTz);
     if (at.kind !== "ok") {
       say(at.kind === "gap" ? t.scheduleTimeSkipped : at.kind === "overlap" ? t.scheduleTimeRepeated : t.scheduleTimeInvalid);
@@ -186,7 +190,7 @@ export function SchedulePage() {
       const code = (e as ApiError).code;
       say(code === "VERSION_CONFLICT"
         ? (zh ? "该轮次已被其他人更新，请重新打开后再排期。" : "This round was updated elsewhere — reopen it and try again.")
-        : errorText(code, state.lang));
+        : code === "INTERVIEWER_REQUIRED" ? interviewerRequired : errorText(code, state.lang));
     } finally {
       setSaving(false);
     }
@@ -276,8 +280,9 @@ export function SchedulePage() {
 
           {rounds.map((r) => {
             const overdue = isOverdue(r);
-            const isScheduled = !!r.scheduledAt && r.status !== "completed";
-            const statusLabel = r.status === "completed" ? t.scheduleStatusCompleted : overdue ? (zh ? "已逾期" : "Overdue") : isScheduled ? t.scheduleStatusScheduled : t.scheduleStatusPlanned;
+            const isScheduled = !!r.scheduledAt && !!r.interviewer && r.status !== "completed";
+            const missingInterviewer = !!r.scheduledAt && !r.interviewer && r.status !== "completed";
+            const statusLabel = r.status === "completed" ? t.scheduleStatusCompleted : missingInterviewer ? (zh ? "需指定面试官" : "Interviewer required") : overdue ? (zh ? "已逾期" : "Overdue") : isScheduled ? t.scheduleStatusScheduled : t.scheduleStatusPlanned;
             const when = !r.scheduledAt
               ? t.notScheduledLabel
               : isIanaZone(r.timezone)
@@ -396,7 +401,7 @@ export function SchedulePage() {
             <button onClick={closeDrawer} className="h-9 cursor-pointer rounded-[9px] border border-[var(--line)] bg-[var(--surface)] px-3.5 text-[12.5px] text-[var(--ink-2)]">
               {t.cancel}
             </button>
-            <button disabled={saving || !draftAt} onClick={saveSchedule} className="h-9 cursor-pointer rounded-[9px] border border-[var(--brand)] bg-[var(--brand)] px-[15px] text-[12.5px] font-semibold text-[var(--brand-ink)] disabled:cursor-not-allowed disabled:opacity-60">
+            <button disabled={saving || !draftAt || !schedulingRound?.interviewer} onClick={saveSchedule} className="h-9 cursor-pointer rounded-[9px] border border-[var(--brand)] bg-[var(--brand)] px-[15px] text-[12.5px] font-semibold text-[var(--brand-ink)] disabled:cursor-not-allowed disabled:opacity-60">
               {t.saveSchedule}
             </button>
           </div>
@@ -409,6 +414,10 @@ export function SchedulePage() {
           </button>
         </div>
         <div className="flex flex-col gap-4 px-5 pb-6 pt-5">
+          <div role="status">
+            {interviewerMissing ? interviewerRequired : `${zh ? "面试官：" : "Interviewer: "}${schedulingRound?.interviewer?.name ?? ""}`}
+            {interviewerMissing && <button onClick={() => { closeDrawer(); set({ screen: "plan" }); }} className="ml-2 underline">{zh ? "查看面试计划" : "Review interview plan"}</button>}
+          </div>
           <label className="block">
             <div className="mb-1.5 text-[11.5px] font-semibold text-[var(--ink-2)]">{t.scheduleDateTimeLabel}</div>
             <input

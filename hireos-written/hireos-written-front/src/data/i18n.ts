@@ -7,6 +7,8 @@
  * literal (JS takes the last one); those are resolved here the same way.
  */
 export const ZH: Record<string, string> = {
+  "Usage: Unknown": "使用情况：未知",
+  "External usage records have not been retrieved. Unknown does not mean zero.": "尚未取得外部使用记录。未知不代表零次。",
   // New written test entry (CreateWrittenTaskModal)
   "AI is reading the JD…": "AI 正在提取岗位信息…",
   "+ New written test": "+ 新建笔试任务",
