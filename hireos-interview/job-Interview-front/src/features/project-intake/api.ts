@@ -124,6 +124,7 @@ export type DecisionState = {
 export type DebriefCard = {
   id: string; requirement: string; cardPriority: CardPriority; weight: number;
   score: number | null; note: string; round: { sequence: number; name: string } | null;
+  roundScores?: { roundId: string; sequence: number; name: string; interviewer: { id: string; name: string } | null; score: number | null; note: string; updatedAt: string; aiEvidence: { segmentId: string; quote: string } | null }[];
   ai: { score: number | null; rationale: string; quote: string | null } | null;
 };
 export type DebriefSummary = {

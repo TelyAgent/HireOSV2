@@ -145,31 +145,25 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     const base = (import.meta as ImportMeta & { env?: Record<string, string | undefined> }).env?.BASE_URL || "/";
     const full = window.location.pathname;
     const route = pathToRoute(full.startsWith(base) ? `/${full.slice(base.length)}` : full);
-    return { ...initial, screen: route.screen, currentTaskId: route.taskId };
-  });
-
-  // Persist prefs to localStorage
-  useEffect(() => {
+    // Read before the first save effect so mounting never overwrites saved preferences.
+    let preferences: Partial<AppState> = {};
     try {
       const raw = localStorage.getItem("hireos_prefs");
       if (raw) {
         const p = JSON.parse(raw);
-        dispatch({
-          type: "SET",
-          payload: {
-            theme: p.theme || "light",
-            accent: p.accent || "blue",
-            textSize: p.textSize || "medium",
-            moreOpen: !!p.moreOpen,
-            overviewStatsOpen:
-              p.overviewStatsOpen !== false,
-            lang: p.lang || "en",
-            sidenavCollapsed: !!p.sidenavCollapsed,
-          },
-        });
+        preferences = {
+          theme: p.theme || "light",
+          accent: p.accent || "blue",
+          textSize: p.textSize || "medium",
+          moreOpen: !!p.moreOpen,
+          overviewStatsOpen: p.overviewStatsOpen !== false,
+          lang: p.lang || "en",
+          sidenavCollapsed: !!p.sidenavCollapsed,
+        };
       }
     } catch {}
-  }, []);
+    return { ...initial, ...preferences, screen: route.screen, currentTaskId: route.taskId };
+  });
 
   // Save prefs on change
   useEffect(() => {

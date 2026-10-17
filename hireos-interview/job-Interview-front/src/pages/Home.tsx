@@ -19,6 +19,8 @@ import {
 } from "../components/ui/Icons";
 import { characters, initials } from "../lib/initials";
 import { ResumePreview } from '../features/project-intake/ResumePreview';
+import { Input } from 'antd';
+import { SearchOutlined } from '@ant-design/icons';
 
 // By whole characters, never half of one (#240).
 function initialsFromTitle(title: string) {
@@ -196,6 +198,8 @@ export function HomePage() {
     { label: t.cardAwaitingJoint, value: 0, sub: t.cardAwaitingJointSub, icon: <CheckCircleSvg /> },
     { label: t.cardAwaitingScheduling, value: 0, sub: t.cardAwaitingSchedulingSub, icon: <CalendarSvg /> },
     { label: t.cardUnknownRoles, value: unknownRolesCount, sub: t.cardUnknownRolesSub, icon: <HelpIcon /> },
+  ];
+  const trendCards = [
     { label: t.cardInterviewsCompleted, value: 0, sub: t.cardLast30, icon: <ChartSvg /> },
     { label: t.cardPackagesCompleted, value: 0, sub: t.cardLast30, icon: <BoxIcon /> },
     { label: t.cardProjectsOnHold, value: 0, sub: t.cardOnHoldStatus, icon: <PauseSvg /> },
@@ -392,6 +396,8 @@ export function HomePage() {
       <div>
         <button
           onClick={() => set({ moreOpen: !state.moreOpen })}
+          aria-expanded={state.moreOpen}
+          aria-controls="additional-statistics"
           style={{
             display: "flex",
             alignItems: "center",
@@ -413,15 +419,21 @@ export function HomePage() {
               color: "var(--ink-3)",
             }}
           >
-            {t.moreStats}
+            {t.moreStats} ({moreCards.length + trendCards.length})
           </div>
           <div style={{ fontSize: 12, color: "var(--ink-3)" }}>
             {state.moreOpen ? (state.lang === "zh" ? "收起 ⌃" : "Show less ⌃") : (state.lang === "zh" ? "展开 ⌄" : "Show more ⌄")}
           </div>
         </button>
         {state.moreOpen && (
-          <div style={statsGrid}>
-            {moreCards.map((c, i) => (
+          <div id="additional-statistics">
+            {[
+              { id: 'supplementary', title: state.lang === 'zh' ? '补充指标' : 'Supplementary metrics', cards: moreCards },
+              { id: 'trends', title: state.lang === 'zh' ? '趋势与附加统计' : 'Trends & additional stats', cards: trendCards },
+            ].map(group => <section key={group.id} aria-labelledby={`${group.id}-heading`} style={{ marginTop: 16 }}>
+              <h3 id={`${group.id}-heading`} style={{ margin: 0, fontSize: 13, fontWeight: 600 }}>{group.title} ({group.cards.length})</h3>
+              <div style={statsGrid}>
+            {group.cards.map((c, i) => (
               <div key={i} style={statsCard}>
                 <div>
                   <div data-testid="home-metric" style={{ fontSize: dataReady ? 22 : 12, minHeight: 26, fontWeight: 700, lineHeight: 1.15 }}>
@@ -462,6 +474,8 @@ export function HomePage() {
                 </div>
               </div>
             ))}
+              </div>
+            </section>)}
           </div>
         )}
       </div>
@@ -469,6 +483,16 @@ export function HomePage() {
       <div style={{ display: "flex", flexWrap: "wrap", gap: 20, alignItems: "start" }}>
         <div style={{ flex: "2 1 480px", minWidth: 0, display: "flex", flexDirection: "column", gap: 10 }}>
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, flexWrap: "wrap" }}>
+            <Input
+              type="search"
+              aria-label={state.lang === 'zh' ? '搜索项目或候选人' : 'Search projects or candidates'}
+              placeholder={state.lang === 'zh' ? '搜索项目或候选人' : 'Search projects or candidates'}
+              prefix={<SearchOutlined />}
+              allowClear
+              value={state.searchQuery}
+              onChange={event => set({ searchQuery: event.target.value })}
+              style={{ width: 280, maxWidth: '100%' }}
+            />
             <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
               {filters.map((f) => {
                 const active = state.homeFilter === f;
