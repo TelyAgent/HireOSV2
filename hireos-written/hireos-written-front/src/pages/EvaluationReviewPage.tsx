@@ -216,8 +216,9 @@ export function EvaluationReviewContent({
           </div>
           <div className="metric">
             <div className="label">{t("Coverage / Confidence")}</div>
-            <div className="value">{t("Full")}</div>
-            <div className="sub">{t("Shown separately from score")}</div>
+            {/* Not computed yet; the definition is pending (#379) -- never a fixed "Full". */}
+            <div className="value">—</div>
+            <div className="sub">{t("Not measured yet — shown separately from the score once defined")}</div>
           </div>
         </div>
       </div>
@@ -340,7 +341,7 @@ function CriterionRow({ id, c, locked, showErrors, onChange, evidence }: { id: s
               {t("Use AI score")}
             </Button>
           )}
-          {!c.manual && <span className={`badge ${c.confidence === "High" ? "success" : "info"}`}>{t("Confidence:")} {t(c.confidence)}</span>}
+          {!c.manual && <span className={`badge ${c.confidence === "High" ? "success" : c.confidence === "Not measured" ? "neutral" : "info"}`}>{t("Confidence:")} {t(c.confidence)}</span>}
           {!c.manual && <span className="badge neutral">{t("Coverage:")} {t(c.coverage)}</span>}
         </div>
       </div>

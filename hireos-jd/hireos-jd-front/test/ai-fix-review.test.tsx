@@ -46,7 +46,7 @@ function Controls() {
     </>
   );
 }
-function Seeded({ withAnalysis = false }: { withAnalysis?: boolean }) {
+function Seeded({ withAnalysis = false, summary = SUMMARY }: { withAnalysis?: boolean; summary?: string }) {
   const { mutate } = useStore();
   const [ready, setReady] = useState(false);
   useEffect(() => {
@@ -60,7 +60,7 @@ function Seeded({ withAnalysis = false }: { withAnalysis?: boolean }) {
           id: 'doc-j1', jobId: 'j1', audience: 'internal', language: 'en', revision: 1, saveState: 'saved',
           blocks: [
             mkBlock('b1', 'h2', 'Data Analyst', { level: 'public' }),
-            mkBlock('b2', 'p', 'Turns product data into weekly decisions for the team.', { level: 'public' }),
+            mkBlock('b2', 'p', summary, { level: 'public' }),
             mkBlock('b3', 'h2', 'Responsibilities', { level: 'public' }),
             mkBlock('b4', 'ul', ['Review product data weekly and share findings'], { level: 'public' }),
             mkBlock('b5', 'h2', 'Requirements', { level: 'public' }),
@@ -70,7 +70,7 @@ function Seeded({ withAnalysis = false }: { withAnalysis?: boolean }) {
       };
     });
     setReady(true);
-  }, [mutate, withAnalysis]);
+  }, [mutate, withAnalysis, summary]);
   return ready ? (
     <>
       <SidePanel jobId="j1" />
@@ -80,14 +80,15 @@ function Seeded({ withAnalysis = false }: { withAnalysis?: boolean }) {
     </>
   ) : null;
 }
-const renderPanel = (withAnalysis = false) => render(<AntApp><StoreProvider><Seeded withAnalysis={withAnalysis} /></StoreProvider></AntApp>);
-const paras = () => [...screen.getByTestId('paras').querySelectorAll('p')].map((p) => p.textContent);
 const SUMMARY = 'Turns product data into weekly decisions for the team.';
-/** The "AI fix" link in the row for `label`. */
+const renderPanel = (withAnalysis = false, summary = SUMMARY) => render(<AntApp><StoreProvider><Seeded withAnalysis={withAnalysis} summary={summary} /></StoreProvider></AntApp>);
+const paras = () => [...screen.getByTestId('paras').querySelectorAll('p')].map((p) => p.textContent);
+/** The AI link ("AI fix" / "AI draft") in the Analysis row named `label`; fails if that row has none. */
 async function aiFixFor(label: string) {
-  let el: HTMLElement | null = await screen.findByText(label);
-  while (el && !el.querySelector('.req-link-ai')) el = el.parentElement;
-  return el!.querySelector('.req-link-ai') as HTMLElement;
+  const name = (await screen.findAllByText(label)).find((el) => el.classList.contains('ck-name'));
+  const link = name?.closest('.ck-row')?.querySelector('.req-link-ai') as HTMLElement | null;
+  if (!link) throw new Error(`no AI link in the Analysis row for ${label}`);
+  return link;
 }
 const bullets = () => [...screen.getByTestId('doc').querySelectorAll('li')].map((li) => li.textContent);
 const ORIGINAL = ['Review product data weekly and share findings', 'Can write SQL queries'];
@@ -129,15 +130,17 @@ describe('single AI fix (#94)', () => {
   });
 });
 
-describe('single AI fix — paragraph, save round-trip, re-analysis (#94 review)', () => {
+// A summary with content is complete (#93 AC-4: no sentence-count rule), so the paragraph change here is the AI draft
+// of a summary left empty: the same preview, keep, save and undo path.
+describe('single AI change — paragraph, save round-trip, re-analysis (#94 review)', () => {
   const NEW_SUMMARY = 'Turns weekly product data into clear decisions for the product team.';
 
   it('AC-3: a paragraph fix is kept, saved, undone and saved again — what is saved matches each step exactly', async () => {
     api.aiSection.mockResolvedValue({ items: [NEW_SUMMARY], explain: 'clearer', toConfirm: [] });
-    renderPanel();
+    renderPanel(false, '');
     fireEvent.click(await aiFixFor('Role summary'));
     expect(await screen.findByText(NEW_SUMMARY)).toBeInTheDocument();
-    expect(document.querySelector('.ai-diff-line.is-removed')).toHaveTextContent(SUMMARY);
+    expect(document.querySelector('.ai-diff-line.is-removed')).toBeNull();
     fireEvent.click(screen.getByRole('button', { name: 'Keep' }));
     await waitFor(() => expect(paras()).toContain(NEW_SUMMARY));
 
@@ -145,20 +148,19 @@ describe('single AI fix — paragraph, save round-trip, re-analysis (#94 review)
     await waitFor(() => expect(api.saveJobDocument).toHaveBeenCalledTimes(1));
     const kept = api.saveJobDocument.mock.calls[0][2].map((b) => blockPlainText(b));
     expect(kept).toContain(NEW_SUMMARY);
-    expect(kept).not.toContain(SUMMARY);
 
     fireEvent.click(screen.getByText('undo-ai'));
-    await waitFor(() => expect(paras()).toEqual([SUMMARY]));
+    await waitFor(() => expect(paras()).not.toContain(NEW_SUMMARY));
     fireEvent.click(screen.getByText('save-doc'));
     await waitFor(() => expect(api.saveJobDocument).toHaveBeenCalledTimes(2));
     // What a reload would read back is the original document, block for block.
     const reloaded = api.saveJobDocument.mock.calls[1][2].map((b) => blockPlainText(b));
-    expect(reloaded).toEqual(['Data Analyst', SUMMARY, 'Responsibilities', ...ORIGINAL.slice(0, 1), 'Requirements', ORIGINAL[1]]);
+    expect(reloaded).toEqual(['Data Analyst', '', 'Responsibilities', ...ORIGINAL.slice(0, 1), 'Requirements', ORIGINAL[1]]);
   });
 
   it('AC-2: keeping a change re-runs AI Analyze on the new text when the job had been analyzed', async () => {
     api.aiSection.mockResolvedValue({ items: [NEW_SUMMARY], explain: 'clearer', toConfirm: [] });
-    renderPanel(true);
+    renderPanel(true, '');
     fireEvent.click(await aiFixFor('Role summary'));
     fireEvent.click(await screen.findByRole('button', { name: 'Keep' }));
     await waitFor(() => expect(api.aiAnalyze).toHaveBeenCalledTimes(1));
@@ -168,19 +170,19 @@ describe('single AI fix — paragraph, save round-trip, re-analysis (#94 review)
 
   it('Reject never triggers a re-analysis', async () => {
     api.aiSection.mockResolvedValue({ items: [NEW_SUMMARY], explain: 'clearer', toConfirm: [] });
-    renderPanel(true);
+    renderPanel(true, '');
     fireEvent.click(await aiFixFor('Role summary'));
     fireEvent.click(await screen.findByRole('button', { name: 'Reject' }));
     await new Promise((r) => setTimeout(r, 50));
     expect(api.aiAnalyze).not.toHaveBeenCalled();
-    expect(paras()).toEqual([SUMMARY]);
+    expect(paras()).not.toContain(NEW_SUMMARY);
   });
 });
 
 describe('#94 review', () => {
   it('the preview lists lines in the order they will be written, and Keep confirms them (no second keep)', async () => {
     api.aiSection.mockResolvedValue({ items: ['Review product data weekly and share findings', 'Build dashboards', 'Answer data questions'], explain: '', toConfirm: [] });
-    renderPanel();
+    renderPanel(false, '');
     fireEvent.click(await aiFixFor('Core responsibilities'));
     await screen.findByText(/Review AI change/);
     const shown = [...document.querySelectorAll('.ai-diff-line')].map((el) => el.textContent?.slice(1).trim());
@@ -195,7 +197,7 @@ describe('#94 review', () => {
     let finishFirst!: () => void;
     api.aiAnalyze.mockImplementationOnce(() => new Promise((resolve) => (finishFirst = () => resolve({ verdict: 'needs_work', summary: 'old', items: [] }))) as never);
     api.aiSection.mockResolvedValue({ items: ['A clearer summary of the role.'], explain: '', toConfirm: [] });
-    renderPanel(true);
+    renderPanel(true, '');
     fireEvent.click(await screen.findByText('analyze-now'));
     await waitFor(() => expect(api.aiAnalyze).toHaveBeenCalledTimes(1));
     fireEvent.click(await aiFixFor('Role summary'));
@@ -213,7 +215,7 @@ describe('#94 review: first analysis', () => {
     let finishFirst!: () => void;
     api.aiAnalyze.mockImplementationOnce(() => new Promise((resolve) => (finishFirst = () => resolve({ verdict: 'needs_work', summary: 'old', items: [] }))) as never);
     api.aiSection.mockResolvedValue({ items: ['A clearer summary of the role.'], explain: '', toConfirm: [] });
-    renderPanel(false);
+    renderPanel(false, '');
     fireEvent.click(await screen.findByText('analyze-now'));
     await waitFor(() => expect(api.aiAnalyze).toHaveBeenCalledTimes(1));
     fireEvent.click(await aiFixFor('Role summary'));
@@ -238,7 +240,7 @@ describe('lineDiff', () => {
 
 describe('batch AI fix (#95)', () => {
   it('AC-2: the batch says what it handles, and lists what a person must fill with a way to get there', async () => {
-    renderPanel();
+    renderPanel(false, '');
     expect(await screen.findByText(/AI handles/)).toHaveTextContent(/Core responsibilities/);
     const manual = screen.getByText('Needs you — AI won’t fill these').closest('.ck-sec, section, div') as HTMLElement;
     expect(manual.parentElement!.textContent).toMatch(/Level/);
@@ -251,7 +253,7 @@ describe('batch AI fix (#95)', () => {
       (_job, _aud, body) =>
         new Promise((resolve) => (release = () => resolve({ items: [`${body.itemId} one`, `${body.itemId} two`, `${body.itemId} three`], explain: '', toConfirm: [] }))) as never,
     );
-    renderPanel();
+    renderPanel(false, '');
     const button = await screen.findByRole('button', { name: /AI fix all/ });
     fireEvent.click(button);
     fireEvent.click(button);

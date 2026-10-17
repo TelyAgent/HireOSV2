@@ -655,6 +655,10 @@ export function useDocActions(jobId: string) {
           const b = doc.blocks.find((x) => x.id === blockId);
           if (b) b.aiDraft = false;
         });
+        // As for a kept preview: a past AI Analyze described the text before it was kept, so it runs again (#93 AC-3).
+        mutate((draft) => {
+          if (draft.wsAiAnalysis[jobId] || draft.wsAiBusy[`${jobId}:analyze`]) draft.wsReanalyze = { jobId, n: (draft.wsReanalyze?.n ?? 0) + 1 };
+        });
       },
 
       /** Puts the cursor on a title field (Location / Headcount / Level). */

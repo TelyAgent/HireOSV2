@@ -352,7 +352,7 @@ export const ZH: Record<string, string> = {
   "Evidence has not finished processing.": "证据尚未处理完成。",
   "evaluation": "评估", "Overall (human)": "总分（人工）", "Any missing required criterion → Unknown": "任一评分项未填 → 未知",
   "Overall (AI)": "总分（AI 建议）", "Draft only, not a hiring probability": "仅为草稿，不代表录用概率",
-  "Coverage / Confidence": "覆盖度 / 置信度", "Full": "完整", "Partial": "部分", "Shown separately from score": "与分数分开展示",
+  "Coverage / Confidence": "覆盖度 / 置信度", "Full": "完整", "Partial": "部分", "Not measured": "尚未测量", "Not measured yet — shown separately from the score once defined": "尚未测量——口径确定后与分数分开显示", "Shown separately from score": "与分数分开展示",
   "Criteria": "评分项", "max": "满分", "Human": "人工", "Confidence:": "置信度：", "Coverage:": "覆盖度：",
   "High": "高", "Medium": "中", "Low": "低",
   "View evidence": "查看依据",
