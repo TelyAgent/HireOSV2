@@ -13,9 +13,10 @@ import { PromptRegistry } from './prompt-registry';
 import { fieldsToDraftContent } from './draft-mapping';
 import { ReplyStreamExtractor } from './reply-stream-extractor';
 import { historyTurns } from './history-budget';
+import { keepSourced, withToConfirm } from './sourced-fields';
 import { asFieldMeta, confirmFields, recordChanges } from './field-meta';
 import { QUICK_START_ASSESS_PROMPT, TITLE_UNCONFIRMED, followUp, parseAssessment, tooThinToAssess } from './quick-start';
-import { factsInstruction, pickFacts, pinFacts, type JobFacts } from './variant-facts';
+import { factsFromTitleOnly, factsInstruction, pickFacts, pinFacts, type JobFacts } from './variant-facts';
 import { changedJdFields, refineReply } from './refine-summary';
 import { OUT_OF_SCOPE_REPLY, SALARY_ANSWER_RULES, fixAnnualSalary, workflowGuide } from './jd-agent-scope';
 import {
@@ -66,6 +67,11 @@ type TurnPrep =
       currentFields: JdFields;
       /** The conversation's stateRevision when `currentFields` was read, before the model call (#68 review). */
       baseRevision: number;
+      /**
+       * What the user gave this draft — their messages, answers, file or page, and the fields already there. Years
+       * and pay figures the model writes must be in it (#67); none for turns that write no content.
+       */
+      source?: string;
     };
 
 @Injectable()
@@ -172,6 +178,7 @@ export class CopilotService {
       turns,
       currentFields: asRecord(conversation.fields) as JdFields,
       baseRevision: conversation.stateRevision,
+      source: sourceOf([...userTexts(history), input.text], conversation.fields),
     };
   }
 
@@ -192,6 +199,10 @@ export class CopilotService {
     sourceLists: Array<'responsibilities' | 'mustHave'> = [],
   ): Promise<SerializedConversation> {
     const { operation, key, hash, userMessage, capabilityCode, currentFields } = prep;
+    if (prep.source !== undefined) {
+      const checked = keepSourced(parsed.fields, prep.source);
+      parsed = { ...parsed, fields: checked.fields, reply: withToConfirm(parsed.reply, checked.toConfirm) };
+    }
     const mergedFields: JdFields = { ...currentFields, ...parsed.fields };
     const computed = computeMissingFields(mergedFields, sourceLists);
     const phase = forcePhase ?? (computed.length === 0 ? 'ready_to_confirm' : 'intake');
@@ -420,6 +431,7 @@ export class CopilotService {
       turns,
       currentFields: asRecord(conversation.fields) as JdFields,
       baseRevision: conversation.stateRevision,
+      source: sourceOf([...userTexts(history), source.llmContent], conversation.fields),
     };
     return this.commitTurn(identity, id, prep, parsed);
   }
@@ -443,12 +455,14 @@ export class CopilotService {
         ...(facts ? ['', factsInstruction(facts)] : []),
       ].join('\n');
       const parsed = await this.runAutoCompleteTurn(identity, id, [{ role: 'user', content }]);
-      const drafted: JdFields = { headcount: 1, ...parsed.fields, title: parsed.fields.title || input.title };
+      // Only the title was given: years and pay figures in a version have no source (#67).
+      const drafted: JdFields = { headcount: 1, ...keepSourced(parsed.fields, input.title).fields, title: parsed.fields.title || input.title };
       return { key: style.key, label: style.label, description: style.description, fields: facts ? pinFacts(drafted, facts) : drafted };
     };
     const [firstStyle, ...otherStyles] = TITLE_VARIANT_STYLES;
-    const first = await write(firstStyle);
-    const facts = pickFacts(first.fields);
+    const firstDraft = await write(firstStyle);
+    const facts = factsFromTitleOnly(firstDraft.fields, input.title);
+    const first = { ...firstDraft, fields: pinFacts(firstDraft.fields, facts) };
     const others = await Promise.all(otherStyles.map((style) => write(style, facts)));
     return { title: input.title, variants: [first, ...others] };
   }
@@ -753,6 +767,7 @@ export class CopilotService {
       turns,
       currentFields,
       baseRevision: conversation.stateRevision,
+      source: sourceOf([...userTexts(history), userText], conversation.fields),
     };
     // A list the draft already has came from the user or their material: as many items as it has are enough.
     const sourceLists = (['responsibilities', 'mustHave'] as const).filter((key) => (currentFields[key]?.length ?? 0) > 0);
@@ -795,6 +810,7 @@ export class CopilotService {
       turns,
       currentFields,
       baseRevision: conversation.stateRevision,
+      source: sourceOf([answers, assessment.titleFromUser && assessment.title ? assessment.title : ''], conversation.fields),
     });
 
     const ask = followUp(assessment, answers);
@@ -1025,6 +1041,16 @@ function serializeConversation(conversation: ConversationRow, messages: MessageR
       createdAt: message.createdAt,
     })),
   };
+}
+
+/** The user's own messages (an upload's file text isn't stored, only "[已上传文件] name"). */
+function userTexts(history: Array<{ role: string; text: string | null }>): string[] {
+  return history.filter((m) => m.role === 'user').map((m) => m.text ?? '');
+}
+
+/** The source for #67's check: the user's texts and the fields the draft already has (accepted before). */
+function sourceOf(texts: string[], fields: unknown): string {
+  return [...texts, JSON.stringify(fields ?? {})].join('\n');
 }
 
 function asRecord(value: unknown): Record<string, unknown> {

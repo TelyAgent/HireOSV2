@@ -190,7 +190,8 @@ export class LinkingService {
       where: { workspaceId: identity.workspaceId, ...(jobId ? { jobId } : {}) },
       orderBy: { linkedAt: 'desc' },
       include: {
-        candidate: { select: { id: true, displayName: true } },
+        // Owner and latest résumé source let the job workspace filter by them (#198).
+        candidate: { select: { id: true, displayName: true, ownerId: true, resumeVersions: { where: { isLatest: true }, take: 1, select: { source: true } } } },
         job: { select: { id: true, title: true } },
       },
     });
@@ -210,7 +211,7 @@ function toFrontendApplication(application: {
   linkedAt: Date;
   linkedBy: string;
   linkReason: string;
-  candidate?: { id: string; displayName: string };
+  candidate?: { id: string; displayName: string; ownerId?: string; resumeVersions?: Array<{ source: string }> };
   job?: { id: string; title: string };
 }) {
   return {
@@ -227,5 +228,8 @@ function toFrontendApplication(application: {
     linkReason: application.linkReason,
     candidateName: application.candidate?.displayName,
     jobTitle: application.job?.title,
+    ...(application.candidate?.ownerId !== undefined ? { candidateOwnerId: application.candidate.ownerId } : {}),
+    // A candidate without a résumé file was entered by hand (as in the Resume Library, #176).
+    ...(application.candidate?.resumeVersions ? { candidateSource: application.candidate.resumeVersions[0]?.source || 'structured_entry' } : {}),
   };
 }

@@ -48,7 +48,7 @@ export const REQ_ITEMS: ReqItem[] = [
     id: "B1",
     group: "content",
     label: "Role summary",
-    hint: "2–4 sentences: what the role does, for whom, and why it matters.",
+    hint: "What the role does, for whom, and why it matters.",
     heading: { en: "About the role", zh: "职位概述" },
     match: /summary|overview|about the role|职位概述|岗位概述|职位简介|岗位简介|关于(这个)?(职位|岗位)/i,
     lead: true,
@@ -171,9 +171,6 @@ function maxYears(text: string) {
   const ys = [...text.matchAll(/(\d+)\s*\+?\s*(?:years?|yrs|年)/gi)].map((m) => Number(m[1]));
   return ys.length ? Math.max(...ys) : 0;
 }
-function sentenceCount(t: string) {
-  return t.split(/[.!?。！？]+/).filter((x) => textWeight(x.trim()) > 4).length;
-}
 
 export function findSection(secs: DocSection[], item: ReqItem, blocks: DocBlock[]): { sec: DocSection | null; byHead: boolean } {
   // The first section is the title section (its heading is the job title), never a named section.
@@ -239,12 +236,6 @@ const WEAK_RULES: Record<string, (c: WeakCtx) => string> = {
     /^(remote|远程)$/i.test(String(job.location || "").trim())
       ? L("Remote roles should name the accepted regions or time zones.", "远程岗位需要写明可接受的地区或时区。")
       : "",
-  B1: ({ items, L }) => {
-    const n = sentenceCount((items.B1 ?? []).join(" "));
-    if (n < 2) return L("Use 2–4 sentences: what the role does, for whom, and why it matters.", "用 2–4 句话说明：这个职位做什么、为谁做、价值是什么。");
-    if (n > 5) return L("Shorten to 2–4 sentences.", "精简到 2–4 句话。");
-    return "";
-  },
   C1: ({ items, L }) => {
     const b = items.C1 ?? [];
     if (b.length < 3) return L("Add at least 3 responsibilities.", "至少写 3 条职责。");

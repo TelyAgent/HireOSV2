@@ -145,6 +145,9 @@ export const ZH: Record<string, string> = {
   "Generate one with AI": "用 AI 生成", "Open the Question Bank": "打开题库",
   "Couldn't load the resume. Close and open it again to retry.": "简历加载失败，请关闭后重新打开以重试。",
   "Open the candidate in Resume Screening to see their resume file.": "可在简历筛选中打开该候选人查看简历文件。",
+
+  "Reusable questions, mapped to multiple roles and competencies. Publishing a case does not send it — invitations are a separate step.":
+    "可复用的题目，已映射到多个岗位与能力项。发布案例并不会自动发送——邀请候选人是单独的一步。",
   "Search title or code…": "按标题或编号搜索…", "All roles": "全部岗位", "All competencies": "全部能力项",
   "Import ZIP": "导入 ZIP", "Create question": "新建题目", "Code": "编号", "Title": "标题", "Role tags": "岗位标签",
   "Competencies": "能力项", "Type": "类型", "Difficulty": "难度", "Version": "版本", "Status": "状态",

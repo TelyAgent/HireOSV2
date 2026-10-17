@@ -1,7 +1,7 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useState } from "react";
 import { decisionDiffersFromAi, humanStatus } from "../features/screening/humanStatus";
 import type { Concern } from "../data/fixtures/concerns";
-import { Link, useNavigate, useParams } from "react-router-dom";
+import { Link, useNavigate, useNavigationType, useParams, useSearchParams } from "react-router-dom";
 import { useStore } from "../store/StoreContext";
 import { getJobDetail, listJobBelowThreshold, runJobMatch, type BelowThresholdCandidate } from "../data/api/jobs";
 import { getJobRecommendations, type JobRecommendation } from "../data/api/candidates";
@@ -28,15 +28,29 @@ import {
 } from "../components/ui/Primitives";
 import { recommend, recommendationDisplay } from "../lib/recommendationRule";
 import { PageSkeleton } from "../components/ui/PageSkeleton";
+import { NO_FILTERS, isFiltered, matchesFilters, readFilters, writeFilters, type WorkspaceFilters } from "../lib/workspaceFilters";
+import { sourceLabel } from "../features/imports/sources";
+import { getPerson } from "../data/db";
 import { WithDisabledReason } from "../components/ui/DisabledReason";
 
 type EligFilter = "all" | EligibilityStatus;
+// Where the list was scrolled, per job, to return to after a candidate's page (#198).
+const scrollKey = (jobId: string) => `screening-workspace-scroll:${jobId}`;
+const scrollReturnKey = (jobId: string) => `screening-workspace-return:${jobId}`;
+
+function markWorkspaceReturn(jobId: string) {
+  try {
+    sessionStorage.setItem(scrollReturnKey(jobId), "1");
+  } catch {
+    // no-op: returning to the list simply starts at the top
+  }
+}
 
 type WorkspaceRowData = { app: ApplicationWithNames; ev: Evaluation | undefined; openConcerns: number; concerns: Concern[] };
 
 
 
-function WorkspaceRow({ app, ev, openConcerns, concerns }: WorkspaceRowData) {
+function WorkspaceRow({ app, ev, openConcerns, concerns, selected, onToggle }: WorkspaceRowData & { selected: boolean; onToggle: () => void }) {
   const { t } = useStore();
   const navigate = useNavigate();
   const decision = db.decisions[app.id];
@@ -62,12 +76,15 @@ function WorkspaceRow({ app, ev, openConcerns, concerns }: WorkspaceRowData) {
   );
 
   return (
-    <tr className="clickable" onClick={() => navigate(`/applications/${app.id}`)}>
+    <tr className="clickable" onClick={() => { markWorkspaceReturn(app.jobId); navigate(`/applications/${app.id}`); }}>
       <td>
         <CandidateAvatar id={app.candidateId} name={app.candidateName || app.candidateId} />
       </td>
       <td>
-        <div style={{ fontWeight: 500 }}>{app.candidateName || app.candidateId}</div>
+        <label className="flex items-center gap-8" onClick={(e) => e.stopPropagation()}>
+          <input type="checkbox" checked={selected} onChange={onToggle} aria-label={t("Select {name} for comparison").replace("{name}", app.candidateName || app.candidateId)} />
+          <span className="candidate-name" style={{ fontWeight: 500 }}>{app.candidateName || app.candidateId}</span>
+        </label>
         {ev?.freshness === "stale" && <div className="tiny">{t("Refresh available")}</div>}
       </td>
       {/* Ordered by decision value (#27): score first, then coverage and concerns, explanations last. */}
@@ -80,7 +97,7 @@ function WorkspaceRow({ app, ev, openConcerns, concerns }: WorkspaceRowData) {
           <span className="score-big">{scoreDisplay(ev.overall)}</span>
         )}
       </td>
-      <td style={{ minWidth: 120 }}>{ev ? <CoverageBar coverage={ev.coverage} /> : "—"}</td>
+      <td className="coverage-col">{ev ? <CoverageBar coverage={ev.coverage} /> : "—"}</td>
       <td>
         {openConcerns > 0 && (
           <Badge tone="danger">
@@ -92,9 +109,17 @@ function WorkspaceRow({ app, ev, openConcerns, concerns }: WorkspaceRowData) {
       <td className="secondary-col">
         {!ev ? null : <AiRecommendationBadge display={recommendationDisplay(recommend(ev, concerns))} />}
       </td>
-      <td>{humanStatusCell}</td>
-      <td className="text-right">
-        <Link className="btn btn-sm btn-secondary" to={`/applications/${app.id}`} onClick={(e) => e.stopPropagation()}>
+      <td>
+        {humanStatusCell}
+        {/* Where the AI column is hidden for width (#203), its recommendation stays readable here. */}
+        {ev && (
+          <div className="ai-inline tiny">
+            {t("AI:")} <AiRecommendationBadge display={recommendationDisplay(recommend(ev, concerns))} />
+          </div>
+        )}
+      </td>
+      <td className="text-right open-col">
+        <Link className="btn btn-sm btn-secondary" to={`/applications/${app.id}`} onClick={(e) => { e.stopPropagation(); markWorkspaceReturn(app.jobId); }}>
           {t("Open", "Open (action)")}
         </Link>
       </td>
@@ -141,7 +166,15 @@ export function ScreeningWorkspacePage() {
   const [job, setJob] = useState<Job | null | undefined>(undefined);
   const [suggested, setSuggested] = useState<JobRecommendation[]>([]);
   const [rows, setRows] = useState<WorkspaceRowData[]>([]);
-  const [eligFilter, setEligFilter] = useState<EligFilter>("all");
+  // Filters live in the URL, so Back, a refresh or a shared link show the same list (#198).
+  const [searchParams, setSearchParams] = useSearchParams();
+  const filters = readFilters(searchParams);
+  const setFilters = (next: WorkspaceFilters) => setSearchParams(writeFilters(searchParams, next), { replace: true });
+  const eligFilter = filters.elig as EligFilter;
+  const setEligFilter = (elig: EligFilter) => setFilters({ ...filters, elig });
+  // The candidates ticked for a comparison (#209).
+  const [selected, setSelected] = useState<Set<string>>(() => new Set());
+  const navigationType = useNavigationType();
   const [creatingComparison, setCreatingComparison] = useState(false);
   const [matching, setMatching] = useState(false);
   const [importTab, setImportTab] = useState<ImportTab | null>(null);
@@ -182,16 +215,49 @@ export function ScreeningWorkspacePage() {
     load();
   }, [load]);
 
+  // Back from a candidate's page returns to where the list was; any other arrival starts at the top (#198). The
+  // page scrolls inside the app's main column, as on the Resume Library.
+  useEffect(() => {
+    const scroller = document.querySelector<HTMLElement>("main.main");
+    if (!scroller) return;
+    const remember = () => {
+      try {
+        sessionStorage.setItem(scrollKey(id), String(scroller.scrollTop));
+      } catch {
+        // not kept -- the list just opens at the top
+      }
+    };
+    scroller.addEventListener("scroll", remember, { passive: true });
+    return () => scroller.removeEventListener("scroll", remember);
+  }, [id]);
+  const loaded = rows.length > 0;
+  useLayoutEffect(() => {
+    if (!loaded || navigationType !== "POP") return;
+    try {
+      // A full refresh keeps URL filters but intentionally starts at the top.
+      // Only a candidate-detail departure marks this history entry for scroll
+      // restoration, so this does not depend on browser navigation timing.
+      if (sessionStorage.getItem(scrollReturnKey(id)) !== "1") return;
+      sessionStorage.removeItem(scrollReturnKey(id));
+      const top = Number(sessionStorage.getItem(scrollKey(id)));
+      if (top > 0) document.querySelector<HTMLElement>("main.main")?.scrollTo({ top });
+    } catch {
+      // nothing to restore
+    }
+  }, [loaded, navigationType, id]);
+
   const handleCompare = async () => {
-    if (!job || rows.length < 2) return;
+    // Exactly the candidates ticked, never everyone linked (#209).
+    const chosen = rows.filter((r) => selected.has(r.app.id)).map((r) => r.app.id);
+    if (!job || chosen.length < 2) return;
     setCreatingComparison(true);
     try {
-      const cmp = await createComparison(job.id, `Shortlist review — ${job.title}`, rows.map((r) => r.app.id));
+      const cmp = await createComparison(job.id, `Shortlist review — ${job.title}`, chosen);
       // A comparison with zero snapshots has nothing for the page to render -- generate
       // the first one immediately so "Compare candidates" actually produces a comparison,
       // not an empty shell the user has to know to refresh.
       await refreshComparison(cmp.id);
-      navigate(`/comparisons/${cmp.id}`);
+      navigate(`/comparisons/${cmp.id}`, { state: { workspaceSearch: searchParams.toString() } });
     } catch {
       say(t("Could not create the comparison."), { type: "error" });
     } finally {
@@ -222,8 +288,34 @@ export function ScreeningWorkspacePage() {
   if (job === null) return <EmptyState icon="work_off" title={t("Job not found")} />;
 
   const eligCount = (status: EligFilter) => rows.filter((r) => r.ev && r.ev.eligibilityStatus === status).length;
-  let visibleRows = rows;
-  if (eligFilter !== "all") visibleRows = visibleRows.filter((r) => r.ev && r.ev.eligibilityStatus === eligFilter);
+  const filterable = (r: WorkspaceRowData) => ({
+    eligibility: r.ev?.eligibilityStatus,
+    decided: humanStatus(db.decisions[r.app.id]).decided,
+    source: r.app.candidateSource,
+    ownerId: r.app.candidateOwnerId,
+    coverage: r.ev?.coverage ?? null,
+  });
+  let visibleRows = rows.filter((r) => matchesFilters(filterable(r), filters));
+  const sources = [...new Set(rows.map((r) => r.app.candidateSource).filter((v): v is string => Boolean(v)))];
+  const owners = [...new Set(rows.map((r) => r.app.candidateOwnerId).filter((v): v is string => Boolean(v)))];
+  const selectedCount = rows.filter((r) => selected.has(r.app.id)).length;
+  const toggle = (appId: string) =>
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(appId)) next.delete(appId);
+      else next.add(appId);
+      return next;
+    });
+  const allVisibleSelected = visibleRows.length > 0 && visibleRows.every((r) => selected.has(r.app.id));
+  const toggleAllVisible = () =>
+    setSelected((prev) => {
+      const next = new Set(prev);
+      for (const r of visibleRows) {
+        if (allVisibleSelected) next.delete(r.app.id);
+        else next.add(r.app.id);
+      }
+      return next;
+    });
   // Newly linked, not-yet-screened candidates float to the top (newest first); the rest by score.
   const isNew = (r: WorkspaceRowData) => !r.ev && r.app.screeningStatus === "not_started";
   visibleRows = [...visibleRows].sort((a, b) => {
@@ -326,19 +418,62 @@ export function ScreeningWorkspacePage() {
           {t("Linked candidates")} <span className="cnt">{rows.length}</span>
         </div>
         <div className="actions">
-          <WithDisabledReason reason={rows.length < 2 ? t("Link at least two candidates to this job before comparing.") : null}>
-            <Button size="sm" variant="secondary" onClick={handleCompare} disabled={rows.length < 2 || creatingComparison}>
-              {t("Compare candidates")}
+          <WithDisabledReason
+            reason={rows.length < 2 ? t("Link at least two candidates to this job before comparing.") : selectedCount < 2 ? t("Tick at least two candidates to compare.") : null}
+          >
+            <Button size="sm" variant="secondary" onClick={handleCompare} disabled={selectedCount < 2 || creatingComparison}>
+              {selectedCount ? t("Compare {n} selected").replace("{n}", String(selectedCount)) : t("Compare candidates")}
             </Button>
           </WithDisabledReason>
         </div>
+      </div>
+      <div className="workspace-filters">
+        <select aria-label={t("Human status")} value={filters.status} onChange={(e) => setFilters({ ...filters, status: e.target.value as WorkspaceFilters["status"] })}>
+          <option value="all">{t("All statuses")}</option>
+          <option value="awaiting">{t("Awaiting next step")}</option>
+          <option value="decided">{t("Decided")}</option>
+        </select>
+        <select aria-label={t("Source")} value={filters.source} onChange={(e) => setFilters({ ...filters, source: e.target.value })}>
+          <option value="all">{t("All sources")}</option>
+          {sources.map((source) => (
+            <option key={source} value={source}>
+              {t(sourceLabel(source))}
+            </option>
+          ))}
+        </select>
+        <select aria-label={t("Owner")} value={filters.owner} onChange={(e) => setFilters({ ...filters, owner: e.target.value })}>
+          <option value="all">{t("All owners")}</option>
+          {owners.map((owner) => (
+            <option key={owner} value={owner}>
+              {getPerson(owner)?.name ?? owner}
+            </option>
+          ))}
+        </select>
+        <select aria-label={t("Minimum coverage")} value={filters.minCoverage} onChange={(e) => setFilters({ ...filters, minCoverage: Number(e.target.value) })}>
+          <option value={0}>{t("Any coverage")}</option>
+          {[50, 70, 90].map((n) => (
+            <option key={n} value={n}>
+              {t("Coverage ≥ {n}%").replace("{n}", String(n))}
+            </option>
+          ))}
+        </select>
+        {isFiltered(filters) && (
+          <Button size="sm" variant="text" onClick={() => setFilters(NO_FILTERS)}>
+            {t("Clear filters")}
+          </Button>
+        )}
       </div>
       <div className="card">
         <table className="data-table linked-candidates-table">
           <thead>
             <tr>
               <th></th>
-              <th>{t("Candidate")}</th>
+              <th>
+                <label className="flex items-center gap-8">
+                  <input type="checkbox" checked={allVisibleSelected} onChange={toggleAllVisible} aria-label={t("Select all shown")} disabled={!visibleRows.length} />
+                  {t("Candidate")}
+                </label>
+              </th>
               <th>{t("Overall")}</th>
               <th>{t("Coverage")}</th>
               <th>{t("Concerns")}</th>
@@ -361,16 +496,29 @@ export function ScreeningWorkspacePage() {
               </th>
               <th className="secondary-col">{t("AI recommendation")}</th>
               <th>{t("Human status")}</th>
-              <th></th>
+              <th className="open-col"></th>
             </tr>
           </thead>
           <tbody>
             {visibleRows.length ? (
-              visibleRows.map((r) => <WorkspaceRow key={r.app.id} app={r.app} ev={r.ev} openConcerns={r.openConcerns} concerns={r.concerns} />)
+              visibleRows.map((r) => (
+                <WorkspaceRow key={r.app.id} app={r.app} ev={r.ev} openConcerns={r.openConcerns} concerns={r.concerns} selected={selected.has(r.app.id)} onToggle={() => toggle(r.app.id)} />
+              ))
             ) : (
               <tr>
                 <td colSpan={9}>
-                  <EmptyState icon="group_off" title={t("No linked candidates match this filter")} />
+                  <EmptyState
+                    icon="group_off"
+                    title={t("No linked candidates match this filter")}
+                    body={t("{n} linked candidates are hidden by the filters above.").replace("{n}", String(rows.length))}
+                    actions={
+                      isFiltered(filters) ? (
+                        <Button variant="secondary" onClick={() => setFilters(NO_FILTERS)}>
+                          {t("Clear filters")}
+                        </Button>
+                      ) : undefined
+                    }
+                  />
                 </td>
               </tr>
             )}

@@ -15,6 +15,7 @@ import { recommend, recommendationDisplay } from "../lib/recommendationRule";
 import { ConfirmDialog, Modal } from "../components/ui/Overlays";
 import { PageSkeleton } from "../components/ui/PageSkeleton";
 import { useFieldValidation } from "../lib/useFieldValidation";
+import { decisionStateLabel } from "../lib/decisionState";
 import { concernTitle } from "../lib/concerns";
 
 const OUTCOME_META: Record<DecisionOutcome, { label: string; needsTarget: boolean }> = {
@@ -177,7 +178,7 @@ function AlreadyDecidedView({ app, withdrawn, onWithdrawn }: { app: Application;
           <strong>{t("Reason:")}</strong> {decision.reason}
         </p>
         <p className="tiny">
-          {t("Decided by")} {db.people[decision.decidedBy]?.name} · {fmtDateTime(decision.decidedAt, state.lang)} · {t("Status:")} {t(cap(decision.status.replace(/_/g, " ")))}
+          {t("Decided by")} {db.people[decision.decidedBy]?.name} · {fmtDateTime(decision.decidedAt, state.lang)} · {t("Status:")} {t(decisionStateLabel(decision))}
         </p>
         {decision.exceptionRef && (
           <p className="tiny" style={{ color: "var(--warning-text)" }}>
