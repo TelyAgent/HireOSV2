@@ -1,9 +1,12 @@
+import { useEffect, useRef, useState } from "react";
 import { useStore } from "../store/StoreContext";
 import { flowGateReason } from "../utils/flowGate";
 import type { Task } from "../features/project-intake/api";
 
 export function FlowNav({ task }: { task: Task | null }) {
   const { state, go, set, say, t } = useStore();
+  const navRef = useRef<HTMLDivElement>(null);
+  const [overflow, setOverflow] = useState({ start: false, end: false });
   const flowIds = ["overview", "rubric", "plan", "schedule", "brief", "live", "review", "debrief", "decision", "package"] as const;
   const flowLabels: Record<string, string> = {
     overview: t.navOverview,
@@ -18,18 +21,40 @@ export function FlowNav({ task }: { task: Task | null }) {
     package: t.navPackage,
   };
 
+  useEffect(() => {
+    const nav = navRef.current;
+    if (!nav) return;
+    const updateOverflow = () => setOverflow({
+      start: nav.scrollLeft > 1,
+      end: nav.scrollLeft + nav.clientWidth < nav.scrollWidth - 1,
+    });
+    updateOverflow();
+    nav.addEventListener("scroll", updateOverflow, { passive: true });
+    const observer = new ResizeObserver(updateOverflow);
+    observer.observe(nav);
+    return () => {
+      nav.removeEventListener("scroll", updateOverflow);
+      observer.disconnect();
+    };
+  }, []);
+
+  const scrollBy = (amount: number) => navRef.current?.scrollBy({ left: amount, behavior: "smooth" });
+
   return (
-    <div
-      role="navigation"
-      aria-label={t.interviewProjectNav}
-      style={{
-        display: "flex",
-        gap: 2,
-        borderBottom: "1px solid var(--line)",
-        overflowX: "auto",
-      }}
-    >
-      {flowIds.map((id) => {
+    <div className="flow-nav-shell" role="navigation" aria-label={t.interviewProjectNav}>
+      <div className="flow-nav-row">
+        <button
+          type="button"
+          className="flow-nav-scroll"
+          aria-label={state.lang === "zh" ? "查看前面的步骤" : "Show earlier steps"}
+          title={state.lang === "zh" ? "查看前面的步骤" : "Show earlier steps"}
+          disabled={!overflow.start}
+          onClick={() => scrollBy(-260)}
+        >
+          ‹
+        </button>
+        <div ref={navRef} className="flow-nav" tabIndex={0}>
+          {flowIds.map((id) => {
         const active = state.screen === id;
         // Live Interview is entered only through Brief's "Start this round" (which picks the
         // round), never straight from the tab.
@@ -40,8 +65,10 @@ export function FlowNav({ task }: { task: Task | null }) {
         return (
           <button
             key={id}
+            type="button"
             title={lockedReason ?? undefined}
             aria-disabled={!!lockedReason}
+            aria-current={active ? "step" : undefined}
             onClick={() => {
               if (lockedReason) { say(lockedReason); return; }
               // The checks below only gate the fully-simulated demo flow; a real task is
@@ -107,8 +134,25 @@ export function FlowNav({ task }: { task: Task | null }) {
           >
             {flowLabels[id]}
           </button>
-        );
-      })}
+          );
+          })}
+        </div>
+        <button
+          type="button"
+          className="flow-nav-scroll"
+          aria-label={state.lang === "zh" ? "查看后面的步骤" : "Show later steps"}
+          title={state.lang === "zh" ? "查看后面的步骤" : "Show later steps"}
+          disabled={!overflow.end}
+          onClick={() => scrollBy(260)}
+        >
+          ›
+        </button>
+      </div>
+      {(overflow.start || overflow.end) && (
+        <div className="flow-nav-hint" aria-live="polite">
+          {state.lang === "zh" ? "还有步骤，可横向滚动查看" : "More steps available — scroll horizontally"}
+        </div>
+      )}
     </div>
   );
 }
