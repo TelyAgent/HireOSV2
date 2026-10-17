@@ -157,7 +157,8 @@ export class ComparisonsService {
           mode: 'current_summary',
           freshness: 'current',
           note: 'Generated from the current screening evaluation baseline.',
-          changesSinceLast: json(changes),
+          // Null on the first snapshot: "nothing to compare with" is not the same as "nothing changed" (#206).
+          changesSinceLast: changes === null ? Prisma.JsonNull : json(changes),
         },
       });
       await tx.rankingSnapshot.create({
@@ -273,18 +274,46 @@ function buildEntry(application: any, evaluation: any) {
   };
 }
 
-function calculateChanges(previous: any, current: any[]) {
-  if (!Array.isArray(previous)) return [];
-  const priorById = new Map(previous.map((entry: any) => [entry.applicationId, entry]));
-  return current
-    .map((entry) => {
-      const prior = priorById.get(entry.applicationId);
-      if (!prior) return `${entry.candidateName} added to the comparison.`;
-      if (prior.overall !== entry.overall) return `${entry.candidateName}: overall changed from ${prior.overall ?? 'unknown'} to ${entry.overall ?? 'unknown'}.`;
-      if (prior.rank !== entry.rank) return `${entry.candidateName}: rank changed from ${prior.rank ?? 'unranked'} to ${entry.rank ?? 'unranked'}.`;
-      return null;
-    })
-    .filter((change): change is string => Boolean(change));
+/**
+ * What changed since the previous snapshot of the set, member by member (#206): who joined or left, and for
+ * each member every change of overall score, rank, eligibility and dimension score. Kept as data so the page can
+ * word it in the interface language (#208). An empty list with a previous snapshot means "no change";
+ * `null` means there was no previous snapshot.
+ */
+export type SnapshotChange =
+  | { kind: 'added' | 'removed'; applicationId: string; candidateName: string }
+  | { kind: 'overall' | 'rank' | 'eligibility'; applicationId: string; candidateName: string; from: string | number | null; to: string | number | null }
+  | { kind: 'dimension'; applicationId: string; candidateName: string; dimension: string; from: number | null; to: number | null };
+
+export function calculateChanges(previous: any, current: any[]): SnapshotChange[] | null {
+  if (!Array.isArray(previous)) return null;
+  const priorById = new Map<string, any>(previous.map((entry: any) => [entry.applicationId, entry]));
+  const changes: SnapshotChange[] = [];
+  for (const entry of current) {
+    const who = { applicationId: entry.applicationId, candidateName: entry.candidateName };
+    const prior = priorById.get(entry.applicationId);
+    if (!prior) {
+      changes.push({ kind: 'added', ...who });
+      continue;
+    }
+    if ((prior.overall ?? null) !== (entry.overall ?? null)) changes.push({ kind: 'overall', ...who, from: prior.overall ?? null, to: entry.overall ?? null });
+    if ((prior.rank ?? null) !== (entry.rank ?? null)) changes.push({ kind: 'rank', ...who, from: prior.rank ?? null, to: entry.rank ?? null });
+    if ((prior.eligibilityStatus ?? null) !== (entry.eligibilityStatus ?? null)) {
+      changes.push({ kind: 'eligibility', ...who, from: prior.eligibilityStatus ?? null, to: entry.eligibilityStatus ?? null });
+    }
+    const priorDims = new Map<string, any>((prior.dimensions ?? []).map((d: any) => [d.id, d]));
+    for (const dimension of entry.dimensions ?? []) {
+      const before = priorDims.get(dimension.id);
+      if ((before?.score ?? null) !== (dimension.score ?? null)) {
+        changes.push({ kind: 'dimension', ...who, dimension: dimension.name, from: before?.score ?? null, to: dimension.score ?? null });
+      }
+    }
+  }
+  const currentIds = new Set(current.map((entry) => entry.applicationId));
+  for (const prior of previous) {
+    if (!currentIds.has(prior.applicationId)) changes.push({ kind: 'removed', applicationId: prior.applicationId, candidateName: prior.candidateName });
+  }
+  return changes;
 }
 
 function readCriteriaVersion(value: unknown): number | null {

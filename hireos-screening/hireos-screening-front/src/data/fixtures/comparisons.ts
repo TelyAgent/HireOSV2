@@ -1,4 +1,5 @@
 import type { PersonId } from "./people";
+import type { SnapshotChange } from "../../lib/snapshotChanges";
 
 export type ComparisonMode = "same_stage" | "current_summary" | "changes_since_last";
 export type ComparisonFreshness = "current" | "stale";
@@ -10,7 +11,8 @@ export interface ComparisonSnapshot {
   mode: ComparisonMode;
   freshness: ComparisonFreshness;
   note: string;
-  changesSinceLast?: string[];
+  /** Null on a set's first snapshot; English sentences on snapshots from before #206. */
+  changesSinceLast?: Array<SnapshotChange | string> | null;
 }
 export interface ComparisonAnnotation {
   id: string;
