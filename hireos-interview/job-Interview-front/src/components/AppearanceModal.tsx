@@ -12,6 +12,7 @@ export function AppearanceModal() {
       open={state.showAppearance}
       onCancel={toggleAppearance}
       title={t("Appearance")}
+      className={`appearance-modal appearance-${state.textSize}`}
       width={640}
       destroyOnHidden
       footer={

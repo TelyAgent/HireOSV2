@@ -304,3 +304,37 @@ textarea::placeholder {
    and scrolls instead of being clipped. */
 .ant-modal-wrap { display: flex; }
 .ant-modal-wrap .ant-modal { top: 0; margin: auto; padding: 24px 0; }
+
+/* Appearance uses an antd Portal, so it is outside AppShell's themed subtree. Keep the
+   dialog and its radio controls on the same surface/ink tokens as the rest of the app. */
+.appearance-modal .ant-modal-content,
+.appearance-modal .ant-modal-header,
+.appearance-modal .ant-modal-body,
+.appearance-modal .ant-modal-footer {
+  background: var(--surface) !important;
+  color: var(--ink) !important;
+}
+.appearance-modal .ant-modal-header,
+.appearance-modal .ant-modal-footer {
+  border-color: var(--line) !important;
+}
+.appearance-modal .ant-modal-title { color: var(--ink) !important; }
+.appearance-modal .ant-modal-close { color: var(--ink-2) !important; }
+.appearance-modal .ant-modal-close:hover { color: var(--ink) !important; background: var(--surface-2) !important; }
+.appearance-modal .ant-radio-button-wrapper {
+  background: var(--surface) !important;
+  border-color: var(--line-strong) !important;
+  color: var(--ink-2) !important;
+}
+.appearance-modal .ant-radio-button-wrapper:hover { color: var(--brand) !important; }
+.appearance-modal .ant-radio-button-wrapper-checked:not(.ant-radio-button-wrapper-disabled) {
+  background: var(--brand-soft) !important;
+  border-color: var(--brand) !important;
+  color: var(--brand) !important;
+}
+.appearance-modal .ant-radio-button-wrapper-checked:not(.ant-radio-button-wrapper-disabled)::before {
+  background-color: var(--brand) !important;
+}
+.appearance-modal.appearance-large .hs-label { font-size: 12px; }
+.appearance-modal.appearance-large .ant-radio-button-wrapper { font-size: 15px; }
+.appearance-modal.appearance-large .hs-tiny { font-size: 13px; line-height: 1.5; }
