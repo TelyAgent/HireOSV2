@@ -1,9 +1,9 @@
-import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ConflictException, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { createHash, randomUUID } from 'node:crypto';
 import { Buffer } from 'node:buffer';
 import { createReadStream } from 'node:fs';
-import { mkdir, unlink, writeFile } from 'node:fs/promises';
+import { access, mkdir, unlink, writeFile } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
 import { PrismaService } from '../persistence/prisma.service';
 import type { Identity } from '../auth/workspace.guard';
@@ -17,6 +17,8 @@ const MAX_FILE_SIZE = 25 * 1024 * 1024;
 
 @Injectable()
 export class MaterialsService {
+  private readonly logger = new Logger(MaterialsService.name);
+
   constructor(
     private readonly db: PrismaService,
     private readonly config: ConfigService,
@@ -139,6 +141,14 @@ export class MaterialsService {
     const material = await this.assertReadable(identity, id);
     const storageRoot = resolve(this.config.get<string>('STORAGE_DIR', '.local/materials'));
     const storagePath = join(storageRoot, material.storageKey);
+    // The record can outlive its file -- a lost volume, or another host's disk (#148) -- and failing here says so,
+    // where a stream that breaks after the headers are sent says nothing (#391).
+    try {
+      await access(storagePath);
+    } catch {
+      this.logger.error(`Material ${material.id} is recorded but its file is missing from ${storageRoot}`);
+      throw new ConflictException({ code: 'MATERIAL_FILE_MISSING', message: 'The file for this material is missing from storage.' });
+    }
     return { stream: createReadStream(storagePath), name: material.name, mime: material.mime };
   }
 
