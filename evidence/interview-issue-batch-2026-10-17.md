@@ -11,6 +11,9 @@ push, merge, or Issue closure. Identity/permissions/roles remain out of scope.
   an extracted-text preview, not a rendering of the original PDF/DOCX.
 - #227: empty or whitespace-only JD gets an associated inline required-field
   error before creating any upstream records; editing clears the error.
+- #223: explain the existing Draft total as candidate tasks plus jobs without
+  candidates, with an action to locate drafts in the JD-grouped view. Existing
+  count semantics and task ordering are unchanged.
 - #252 regression: preserve first/middle card positions when editing while
   appending newly created cards. The previous order-preserving fix dropped new cards.
 - #254: confirmed Rubric shows actor account ID, timestamp and the source JD
@@ -39,13 +42,15 @@ Frontend directory `hireos-interview/job-Interview-front`:
 - `npm run typecheck`
 - `npm test`: 13 passed, 0 failed.
 - `NODE_PATH=/Users/qmk/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/node_modules node test/issue-batch.browser.cjs`
-  against Vite at `http://127.0.0.1:5197/interview/`: all four groups passed.
+  against Vite at `http://127.0.0.1:5197/interview/`: all five groups passed.
 
 Browser uses installed Chrome and controlled API fixtures. It covers both
 resume entry layouts, keyboard activation, no navigation, absence, preview
 retry, empty/whitespace JD, no create request, corrected input, slow Home
 requests, true zero, failure and slow retry, refreshed confirmation versions,
 unknown source metadata and draft state. No browser JavaScript errors.
+The mixed-draft fixture also checks two candidate tasks plus one JD-only job,
+two task rows, and navigation to the unfilled job in the grouped view.
 Backend intake tests use the existing isolated local database; the dedicated
 Rubric confirmation test exercises the service with database doubles.
 These are not production browser or production database verification.

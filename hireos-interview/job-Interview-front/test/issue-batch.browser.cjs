@@ -57,6 +57,16 @@ const base = process.env.INTERVIEW_TEST_URL || 'http://127.0.0.1:5197/interview/
     await page.locator('#jdTextInput').fill('Platform engineer');
     assert.equal(await page.locator('#jdTextInput').getAttribute('aria-invalid'), null);
     console.log('PASS #227: empty/whitespace JD, linked error, no create request, correction clears error');
+    await page.route('**/interview/api/jobs', route => route.fulfill({ json: [job, { ...job, id: 'jd-only', title: 'Unfilled engineer' }] }));
+    await page.goto(base);
+    await page.getByRole('button', { name: 'Draft (3)', exact: true }).click();
+    await page.getByRole('button', { name: 'Task list', exact: true }).click();
+    await page.getByText('Draft 3 = 2 candidate tasks + 1 job without candidates.', { exact: true }).waitFor();
+    assert.equal(await page.getByRole('table').getByRole('button', { name: /Candidate (with|without)/ }).count(), 2);
+    await page.getByRole('button', { name: 'View drafts by JD', exact: true }).click();
+    await page.getByRole('table').getByText('Unfilled engineer', { exact: true }).waitFor();
+    await page.getByRole('table').getByText('0 candidates', { exact: true }).waitFor();
+    console.log('PASS #223: mixed draft count, candidate-task rows, JD-only discoverability');
     let release;
     let pending = new Promise(resolve => { release = resolve; });
     let failHome = false;

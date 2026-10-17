@@ -511,6 +511,16 @@ export function HomePage() {
             </div>
           </div>
 
+          {dataReady && draftOnlyJobCount > 0 && (
+            <div style={{ fontSize: 12, color: 'var(--ink-3)', display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+              <span>{state.lang === 'zh'
+                ? `草稿 ${counts.Draft} = 候选人任务 ${counts.Draft - draftOnlyJobCount} + 未关联候选人的岗位 ${draftOnlyJobCount}。`
+                : `Draft ${counts.Draft} = ${counts.Draft - draftOnlyJobCount} candidate tasks + ${draftOnlyJobCount} ${draftOnlyJobCount === 1 ? 'job' : 'jobs'} without candidates.`}</span>
+              <button onClick={() => set({ homeViewMode: 'cluster', homeFilter: 'Draft', searchQuery: '' })} style={{ border: 0, padding: 0, background: 'none', color: 'var(--brand)', cursor: 'pointer' }}>
+                {state.lang === 'zh' ? '按 JD 查看草稿' : 'View drafts by JD'}
+              </button>
+            </div>
+          )}
           <div
             role="table"
             aria-label={t.interviewProjects}
