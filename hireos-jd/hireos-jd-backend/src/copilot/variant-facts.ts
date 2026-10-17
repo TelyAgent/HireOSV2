@@ -14,6 +14,13 @@ export function pickFacts(fields: JdFields): JobFacts {
   return facts;
 }
 
+/** A title alone does not confirm company-specific facts such as team, place, or work mode. */
+export function factsFromTitleOnly(fields: JdFields, title: string): JobFacts {
+  const facts: JobFacts = { title };
+  if (fields.headcount !== undefined) facts.headcount = fields.headcount;
+  return facts;
+}
+
 /** `fields` with exactly `facts` as its job facts: a fact the reference lacks is removed, not kept. */
 export function pinFacts(fields: JdFields, facts: JobFacts): JdFields {
   const out: JdFields = { ...fields };

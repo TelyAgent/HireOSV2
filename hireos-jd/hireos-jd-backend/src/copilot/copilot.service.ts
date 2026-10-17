@@ -16,7 +16,7 @@ import { historyTurns } from './history-budget';
 import { keepSourced, withToConfirm } from './sourced-fields';
 import { asFieldMeta, confirmFields, recordChanges } from './field-meta';
 import { QUICK_START_ASSESS_PROMPT, TITLE_UNCONFIRMED, followUp, parseAssessment, tooThinToAssess } from './quick-start';
-import { factsInstruction, pickFacts, pinFacts, type JobFacts } from './variant-facts';
+import { factsFromTitleOnly, factsInstruction, pickFacts, pinFacts, type JobFacts } from './variant-facts';
 import { changedJdFields, refineReply } from './refine-summary';
 import { OUT_OF_SCOPE_REPLY, SALARY_ANSWER_RULES, fixAnnualSalary, workflowGuide } from './jd-agent-scope';
 import {
@@ -460,8 +460,9 @@ export class CopilotService {
       return { key: style.key, label: style.label, description: style.description, fields: facts ? pinFacts(drafted, facts) : drafted };
     };
     const [firstStyle, ...otherStyles] = TITLE_VARIANT_STYLES;
-    const first = await write(firstStyle);
-    const facts = pickFacts(first.fields);
+    const firstDraft = await write(firstStyle);
+    const facts = factsFromTitleOnly(firstDraft.fields, input.title);
+    const first = { ...firstDraft, fields: pinFacts(firstDraft.fields, facts) };
     const others = await Promise.all(otherStyles.map((style) => write(style, facts)));
     return { title: input.title, variants: [first, ...others] };
   }
