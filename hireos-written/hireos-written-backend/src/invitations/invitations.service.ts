@@ -191,6 +191,7 @@ export class InvitationsService implements OnModuleInit, OnModuleDestroy {
   async releaseResult(identity: Identity, caseId: string, dto: ReleaseResultDto) {
     // Also enforced here, not only by the DTO, for callers that don't go through the HTTP validation (#393).
     const missing: Record<string, string[]> = {};
+    if (!['met', 'not_met'].includes(dto.assessmentOutcome)) missing.assessmentOutcome = ['Confirm the assessment outcome.'];
     if (dto.reviewComplete !== true) missing.reviewComplete = ['Confirm that the internal review is complete.'];
     if (dto.disclosureApproved !== true) missing.disclosureApproved = ['Confirm that the disclosure content is approved for release.'];
     if (Object.keys(missing).length) throw invalidSchema(missing);
@@ -209,6 +210,7 @@ export class InvitationsService implements OnModuleInit, OnModuleDestroy {
         where: { id: submission.id, finalizedAt: { not: null }, releasedAt: null },
         data: {
           release: {
+            assessmentOutcome: dto.assessmentOutcome,
             overall: dto.overall, showScore: dto.showScore, outcomeText: dto.outcomeText, feedbackText: dto.feedbackText, nextStepText: dto.nextStepText,
             // Who gave both approvals, and when (#393).
             approvals: { reviewComplete: true, disclosureApproved: true, by: identity.actorId, at: releasedAt.toISOString() },

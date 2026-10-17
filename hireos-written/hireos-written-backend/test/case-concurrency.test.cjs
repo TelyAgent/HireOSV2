@@ -125,7 +125,7 @@ test('written case concurrency', { skip: !process.env.DATABASE_URL && 'DATABASE_
         const sub = await dbA.submission.findFirst({ where: { invitation: { caseId: kase.id } } });
         assert.equal(sub.finalEvaluation.overall, results[0] === 'ok' ? 60 : 90, 'the saved score is the winner\'s');
         assert.equal((await dbA.case.findUnique({ where: { id: kase.id } })).status, 'finalized');
-        const rel = (text) => ({ overall: 60, showScore: true, outcomeText: text, feedbackText: '', nextStepText: '', reviewComplete: true, disclosureApproved: true });
+        const rel = (text) => ({ overall: 60, showScore: true, outcomeText: text, feedbackText: '', nextStepText: '', assessmentOutcome: 'not_met', reviewComplete: true, disclosureApproved: true });
         const published = await Promise.all([outcome(A.invitations.releaseResult(identity, kase.id, rel('A'))), outcome(B.invitations.releaseResult(identity, kase.id, rel('B')))]);
         assert.deepEqual(published.slice().sort(), ['409:ALREADY_RELEASED', 'ok']);
         const released = await dbA.submission.findFirst({ where: { invitation: { caseId: kase.id } } });
@@ -182,10 +182,49 @@ test('written case concurrency', { skip: !process.env.DATABASE_URL && 'DATABASE_
 
     await t.test('#118 AC-2: closing completes the task in the same step, and a second close is a conflict', async () => {
       const { kase } = await caseIn('released', { submitted: true, finalized: true });
-      const results = await Promise.all([outcome(A.lifecycle.close(identity, kase.id, 'passed')), outcome(B.lifecycle.close(identity, kase.id, 'rejected'))]);
+      const results = await Promise.all([outcome(A.lifecycle.close(identity, kase.id, 'passed', 'Manual review')), outcome(B.lifecycle.close(identity, kase.id, 'rejected'))]);
       assert.deepEqual(results.slice().sort(), ['409:ALREADY_ENDED', 'ok']);
       const after = await dbA.case.findUnique({ where: { id: kase.id }, include: { task: true } });
       assert.deepEqual([after.status, after.task.status], ['closed', 'completed']);
+    });
+
+    await t.test('#397/#399: outcome snapshot, required override reason, actor/time and task commit atomically', async () => {
+      for (const assessmentOutcome of ['met', 'not_met', undefined]) {
+        const { kase, invitation } = await caseIn('released', { submitted: true, finalized: true });
+        const release = { overall: 5, outcomeText: 'Editable text', ...(assessmentOutcome ? { assessmentOutcome } : {}) };
+        await dbA.submission.update({ where: { invitationId: invitation.id }, data: { release, releasedAt: new Date() } });
+        if (assessmentOutcome !== 'met') {
+          for (const reason of [undefined, '   ']) {
+            await assert.rejects(A.lifecycle.close(identity, kase.id, 'passed', reason), e => e.getResponse().code === 'DECISION_REASON_REQUIRED');
+          }
+          const unchanged = await dbA.case.findUnique({ where: { id: kase.id }, include: { task: true } });
+          assert.deepEqual([unchanged.status, unchanged.closeDecision, unchanged.task.status], ['released', null, 'open']);
+        }
+        const before = Date.now();
+        const saved = await A.lifecycle.close(identity, kase.id, 'passed', assessmentOutcome === 'met' ? undefined : '  Portfolio evidence reviewed  ');
+        assert.equal(saved.closeDecision.actorId, identity.actorId);
+        assert.equal(saved.closeDecision.assessmentOutcome, assessmentOutcome ?? 'unknown');
+        assert.equal(saved.closeDecision.overridesAssessment, assessmentOutcome === 'not_met');
+        assert.equal(saved.closeDecision.invitationId, invitation.id);
+        assert.ok(Date.parse(saved.closeDecision.decidedAt) >= before);
+        assert.equal(saved.closedAt, saved.closeDecision.decidedAt);
+        const stored = await dbA.case.findUnique({ where: { id: kase.id }, include: { task: true } });
+        assert.deepEqual(stored.closeDecision, saved.closeDecision);
+        assert.equal(stored.task.status, 'completed');
+        assert.deepEqual((await dbA.submission.findUnique({ where: { invitationId: invitation.id } })).release, release);
+        await assert.rejects(B.lifecycle.close(identity, kase.id, 'rejected'), e => e.getResponse().code === 'ALREADY_ENDED');
+      }
+    });
+
+    await t.test('#397: close audit rolls back with task failure and refuses another workspace', async () => {
+      const { kase } = await caseIn('released');
+      await assert.rejects(A.lifecycle.close({ ...identity, workspaceId: 'other' }, kase.id, 'passed', 'reason'), e => e.getStatus() === 404);
+      const complete = A.lifecycle.completeTask;
+      A.lifecycle.completeTask = async () => { throw new Error('task write failed'); };
+      try { await assert.rejects(A.lifecycle.close(identity, kase.id, 'passed', 'reason'), /task write failed/); }
+      finally { A.lifecycle.completeTask = complete; }
+      const stored = await dbA.case.findUnique({ where: { id: kase.id } });
+      assert.deepEqual([stored.status, stored.closeDecision, stored.closedAt], ['released', null, null]);
     });
   } finally {
     await dbA.$disconnect();

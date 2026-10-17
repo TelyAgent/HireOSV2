@@ -92,6 +92,7 @@ export interface Case {
   /** Real cases only (hireos-written-backend Case): set once testing ended / was handed to Interview. */
   closeReason?: "passed" | "rejected" | "withdrawn" | null;
   closedAt?: string | null;
+  closeDecision?: CloseDecision | null;
   handedOffAt?: string | null;
   interviewTaskId?: string | null;
 }
@@ -121,7 +122,7 @@ export interface Invitation {
 }
 export const INVITATIONS: Record<string, Invitation> = {};
 
-export interface Attempt { id: string; caseId: string; questionId: string; round: number; /** Real cases: the round's invitation (#48). */ invitationId?: string; status: string; submittedAt?: string; fileRef: string; receivedAt: string; processedAt?: string; missing?: string[] }
+export interface Attempt { id: string; caseId: string; questionId: string; round: number; /** Real cases: the round's invitation (#48). */ invitationId?: string; status: string; submittedAt?: string; fileRef: string; receivedAt?: string; processedAt?: string; missing?: string[] }
 export const ATTEMPTS: Record<string, Attempt> = {};
 
 export interface Criterion {
@@ -140,7 +141,18 @@ export const EVALUATIONS: Record<string, Evaluation> = {};
 export interface Result { id: string; caseId: string; evaluationId: string; overall: number; status: string; releaseId: string | null; /** Real cases: the round this result belongs to (#48). */ invitationId?: string; round?: number }
 export const RESULTS: Record<string, Result> = {};
 
+export interface CloseDecision {
+  actorId: string;
+  decidedAt: string;
+  reason: string | null;
+  assessmentOutcome: "met" | "not_met" | "unknown";
+  submissionId: string | null;
+  invitationId: string | null;
+  overridesAssessment: boolean;
+}
+
 export interface Release {
+  assessmentOutcome?: "met" | "not_met";
   id: string; caseId: string; overall: number; showScore: boolean; outcomeText: string; feedbackText: string; nextStepText: string; publishedAt: string;
 }
 export const RELEASES: Record<string, Release> = {};

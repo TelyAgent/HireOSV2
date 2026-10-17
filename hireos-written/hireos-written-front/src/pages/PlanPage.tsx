@@ -309,6 +309,9 @@ export function PlanPage() {
             questions={selectedRound.questions}
             answers={selectedRound.submission.answers}
             submittedAt={selectedRound.submission.submittedAt}
+            caseId={caseId}
+            invitationId={selectedRound.id}
+            round={selectedRound.round}
             onGoToEvaluation={() => setActiveTab("evaluation")}
           />
         ) : (

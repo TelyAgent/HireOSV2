@@ -81,6 +81,21 @@ test('intake: a JD becomes a Core job + structured draft only once AI has read i
       const draft = await drafts.current(identity, first.coreJobId);
       assert.equal(draft.roleSummary, 'Edited by HR'); assert.equal(draft.sourceText, null);
     });
+    await t.test('#325: structured required levels persist; invalid levels cannot change the draft', async () => {
+      const requirements = [
+        { id: 'req-api', label: 'API design', requiredLevel: 4, priority: 'must_have' },
+        { id: 'req-ui', label: 'UI implementation', requiredLevel: null },
+        { id: 'req-legacy', label: 'Legacy requirement without level' },
+      ];
+      await drafts.updateCurrent(identity, first.coreJobId, { requirements }, { idempotencyKey: randomUUID() });
+      assert.deepEqual((await drafts.current(identity, first.coreJobId)).requirements, requirements);
+      for (const requiredLevel of [0, 6, 2.5, '3', true]) {
+        await assert.rejects(drafts.updateCurrent(identity, first.coreJobId, {
+          requirements: [{ id: 'req-api', label: 'API design', requiredLevel }],
+        }, { idempotencyKey: randomUUID() }), e => e.name === 'ZodError');
+      }
+      assert.deepEqual((await drafts.current(identity, first.coreJobId)).requirements, requirements);
+    });
     await t.test('the same JD (whitespace aside) resolves to the existing job without another AI call', async () => {
       const calls = llmCalls;
       const again = await post({ text: jdText.replace(/\n\n/g, '\n \n  ') + '  ' });

@@ -26,6 +26,18 @@ button{ font-family:inherit; }
 /* ---------- App shell ---------- */
 #app{ display:flex; flex-direction:column; height:100vh; min-width:960px; }
 
+/* F07 disclosures and actions must remain readable at desktop 200% zoom. */
+@media (max-width: 960px) {
+  #app:has(.recommendations-page) { min-width: 0; }
+  #app:has(.recommendations-page) .topbar { flex-wrap: wrap; height: auto; padding: 8px 14px; }
+  #app:has(.recommendations-page) .topbar-actions { flex-wrap: wrap; }
+  #app:has(.recommendations-page) .main { min-width: 0; }
+  #app:has(.recommendations-page) .sidenav:not(.collapsed) { width: 172px; }
+  .recommendations-page .actions { display: flex; flex-wrap: wrap; }
+  .recommendations-page .page-header { flex-wrap: wrap; }
+  .recommendations-page { overflow-wrap: anywhere; }
+}
+
 .topbar{
   height:56px; flex:0 0 auto; display:flex; align-items:center; gap:14px;
   padding:0 16px; background:var(--surface); border-bottom:1px solid var(--border);

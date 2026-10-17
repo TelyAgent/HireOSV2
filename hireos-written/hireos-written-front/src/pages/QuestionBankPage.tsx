@@ -180,17 +180,15 @@ export function QuestionBankPage() {
         open={importOpen}
         onCancel={() => setImportOpen(false)}
         title={t("Import ZIP")}
-        okText={t("Parse (demo)")}
-        onOk={() => { setImportOpen(false); say("Parsed: 1 prompt · 2 materials · 1 internal answer key. Human confirmation required before publish."); }}
+        footer={<Button onClick={() => setImportOpen(false)}>{t("Close")}</Button>}
       >
         <div className="banner info" style={{ marginBottom: 12 }}>
-          Demo adapter — no file is actually uploaded. Import separates <b>materials</b> from <b>internal answer keys</b> before anything is confirmed.
+          {t("ZIP import is not available. No files have been uploaded or parsed.")}
         </div>
         <div className="field">
           <label>{t("ZIP file")}</label>
           <input className="input" type="file" disabled />
         </div>
-        <div className="tiny" style={{ marginTop: 8 }}>{t("On confirm, this demo will show a parsed preview: 1 prompt, 2 materials, 1 internal answer key. Old candidate submissions found inside a ZIP are never re-exported.")}</div>
       </Modal>
     </div>
   );

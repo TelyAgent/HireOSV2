@@ -6,9 +6,9 @@ import { api, type DebriefCard, type DebriefSummary } from "../../features/proje
 
 const panel = { padding: "15px 17px", border: "1px solid var(--line)", borderRadius: 14, background: "var(--surface)" } as const;
 
-function DebriefRow({ card, bar, open, onToggle, zh }: { card: DebriefCard; bar: number; open: boolean; onToggle: () => void; zh: boolean }) {
+function DebriefRow({ card, open, onToggle, zh }: { card: DebriefCard; open: boolean; onToggle: () => void; zh: boolean }) {
   const must = card.cardPriority === "P0";
-  const tone: Tone = card.score == null ? "unknown" : must && card.score < bar ? "bad" : "ok";
+  const tone: Tone = card.score == null || card.requiredLevel == null ? "unknown" : card.score < card.requiredLevel ? "bad" : "ok";
   return (
     <div id={`debrief-${card.id}`} style={{ border: "1px solid var(--line)", borderRadius: 14, background: "var(--surface)" }}>
       <button onClick={onToggle} aria-expanded={open}
@@ -19,7 +19,7 @@ function DebriefRow({ card, bar, open, onToggle, zh }: { card: DebriefCard; bar:
         <div style={{ flex: 1, minWidth: 0 }}>
           <div style={{ fontSize: 14, fontWeight: 600 }}>{card.requirement}</div>
           <div style={{ marginTop: 2, fontSize: 11.5, color: "var(--ink-3)" }}>
-            {(must ? (zh ? "必须项" : "Must-have") : zh ? "标准项" : "Standard") + " · " + (zh ? `要求 L${bar}` : `Required L${bar}`) + " · " + (zh ? `权重 ${card.weight}%` : `Weight ${card.weight}%`)}
+            {(must ? (zh ? "必须项" : "Must-have") : zh ? "标准项" : "Standard") + " · " + (card.requiredLevel == null ? (zh ? "要求等级未记录" : "Required level not recorded") : zh ? `要求 L${card.requiredLevel}` : `Required L${card.requiredLevel}`) + " · " + (zh ? `权重 ${card.weight}%` : `Weight ${card.weight}%`)}
           </div>
         </div>
         <Pill label={tone === "unknown" ? (zh ? "未知" : "Unknown") : tone === "bad" ? (zh ? "未达标" : "Below bar") : (zh ? "达标" : "Meets bar")} tone={tone} />
@@ -195,7 +195,7 @@ export function DebriefPage() {
         </button>
       </div>
 
-      {summary.cards.map((c) => <DebriefRow key={c.id} card={c} bar={summary.bar} open={openCards.has(c.id)} onToggle={() => toggle(c.id)} zh={zh} />)}
+      {summary.cards.map((c) => <DebriefRow key={c.id} card={c} open={openCards.has(c.id)} onToggle={() => toggle(c.id)} zh={zh} />)}
 
       {summary.unresolved.length > 0 && (
         <div style={panel}>

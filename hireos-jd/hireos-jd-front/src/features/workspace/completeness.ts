@@ -41,7 +41,6 @@ export const REQ_GROUP_LABELS: Record<ReqGroup, string> = {
 
 export const REQ_ITEMS: ReqItem[] = [
   { id: "A1", group: "fields", label: "Job title", hint: "Name the role: function + seniority.", field: "title" },
-  { id: "A4", group: "fields", label: "Level", hint: "e.g. Junior, Senior, Lead, Manager.", field: "level" },
   { id: "A7", group: "fields", label: "Location", hint: "City + country; for Remote, name the accepted regions.", field: "location" },
   { id: "A8", group: "fields", label: "Headcount", hint: "Number of openings (1 or more).", field: "headcount" },
   {
@@ -92,6 +91,7 @@ export const REQ_ITEMS: ReqItem[] = [
 
 /** Optional sections suggested once the user has run Analyze (§2 B2, D7, C2, C3). */
 export const REQ_SUGGEST: ReqItem[] = [
+  { id: "A4", group: "fields", label: "Level", hint: "e.g. Junior, Senior, Lead, Manager.", field: "level", noAi: true },
   {
     id: "B2",
     group: "content",
@@ -491,7 +491,10 @@ export function evaluateJob(job: Job, draft: DocumentDraft, lang: Lang = "en", j
       const has = filledBlocks(found.sec, item);
       // Present-but-short content is a "Needs revision" (Weak) case, not a missing one.
       ok = has.length > 0;
-      ctx.items[item.id] = has.map(plain);
+      // Legacy ul blocks hold multiple bullets; current documents use one li per bullet.
+      ctx.items[item.id] = has.flatMap(b => item.list && b.kind === 'ul' && Array.isArray(b.text)
+        ? b.text.map(text => plain({ ...b, text })).filter(isFilled)
+        : [plain(b)]);
       note = !found.sec
         ? "Section missing."
         : item.publicOnly && found.sec.blocks.some((b) => isFilled(plain(b)))
@@ -512,7 +515,11 @@ export function evaluateJob(job: Job, draft: DocumentDraft, lang: Lang = "en", j
   });
 
   const flags = [...checkCompliance(blocks, L), ...checkCeiling(sections, blocks, L)];
-  const suggestions = REQ_SUGGEST.filter((item) => filledBlocks(findSection(sections, item, blocks).sec, item).length === 0);
+  const levelWarning = !isBlank(job.level) ? WEAK_RULES.A4(ctx) : "";
+  if (levelWarning) flags.push({ rule: "X1", severity: "warning", blockId: blocks[0]?.id ?? "", message: levelWarning, evidence: String(job.level) });
+  const suggestions = REQ_SUGGEST.filter((item) => item.field
+    ? isBlank(job[item.field])
+    : filledBlocks(findSection(sections, item, blocks).sec, item).length === 0);
   const missing = rows.filter((r) => !r.ok).length;
   const weakCount = rows.filter((r) => r.ok && r.weak).length + flags.filter((f) => f.severity === "warning").length;
   const blockers = flags.filter((f) => f.severity === "blocker").length;

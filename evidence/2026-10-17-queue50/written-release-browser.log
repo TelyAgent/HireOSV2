@@ -1,0 +1,4 @@
+node test/release-scope.browser.cjs
+exit=0
+PASS #398 case/round/evaluation scope resets draft and approvals; mismatched case cannot render a release
+PASS #397/#399 historical unknown, required override reason and persisted response display (mock API, DB tested separately)

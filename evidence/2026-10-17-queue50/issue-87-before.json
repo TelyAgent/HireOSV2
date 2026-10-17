@@ -1,0 +1,22 @@
+{
+  "body": "### Type\n\nBug\n\n### Subsystem\n\nhireos-jd\n\n### Problem\n\nM5 创建的草稿在 Analyze 中出现 `2 missing · 1 to revise`，Publish 禁用提示为 `3 item(s) to complete or revise`，把一条完善建议计入阻断数。当前前端 `issueCount` 将 `missing + weakCount + blockers` 相加并用于禁用 Publish。线上未构造“仅剩建议”的隔离状态，故该路径仍需以 AC-1 复验。\n\n### User Outcome\n\n发布必填项缺失时用户得到具体缺项并不能发布；只有内容完善建议时，建议仍可见且可继续发布。\n\n### Scope\n\n区分发布阻断项与内容建议的计数和按钮状态；覆盖 Analyze、Publish 禁用原因及发布入口测试。\n\n### Non-goals\n\n不在本 Issue 重定义发布必填字段清单，不改变审批或发布渠道策略，不实际向线上渠道发布测试职位。\n\n### Acceptance Criteria\n\n- AC-1：构造已满足当前发布必填项、仅有一条 `To revise` 建议的草稿；Analyze 保留建议，Publish 可用，测试发布前检查不因该建议被拒绝；UI/API 测试断言。\n- AC-2：构造缺一项当前发布必填内容且另有一条建议的草稿；Publish 禁用，禁用原因只列阻断项及其数量，建议单独展示；UI 测试断言。\n- AC-3：存在真正阻断性校验错误时 Publish 仍被禁止，并明确指出原因；回归测试断言。\n\n### References\n\n`docs/product/JD_Management/M5_Manual_Form_Create/PRD.md`（FR-8、AC-8）；`docs/product/JD_Management/M5_Manual_Form_Create/Test_Report_2026-10-14.md`；`docs/product/JD_Management/M8_Publish_Versions/PRD.md`。\n\n### Dependencies\n\nRefs #53、#56；沿用现有发布必填规则，不以本 Issue 重新裁定字段清单。\n\n### Risk\n\nmedium\n\n### Owner\n\n@JsonSuCoder\n\n### AI Ready\n\nYes\n\n### Reproduction\n\n1. 打开 M5 手动创建的未发布草稿，运行 Analyze。\n2. 观察 `2 missing · 1 to revise` 与 Publish 的 `3 item(s) to complete or revise` 禁用提示。\n3. 本地对照 `JobWorkspacePage.tsx` 的禁用分支及 `completeness.ts` 中的 `issueCount`。\n\n### Expected / Actual\n\n预期：完善建议不计入发布阻断；缺失必填项和真正阻断项才禁用 Publish。实际：建议与缺项合并计数并出现在禁用原因中。仅剩建议状态尚未在线上隔离复测。\n\n### Environment\n\n2026-10-14 已发布 JD Web 页面，桌面端 Codex in-app browser，英文界面；线上构建号未知。本地代码证据：`hireos-jd/hireos-jd-front/src/features/workspace/completeness.ts`、`src/pages/JobWorkspacePage.tsx`。\n\n### Severity\n\nS2\n\n",
+  "comments": [
+    {
+      "id": "IC_kwDOUm32Us8AAAABcJo7Bw",
+      "author": {
+        "login": "mincai2010-maker"
+      },
+      "authorAssociation": "MEMBER",
+      "body": "[AI-EVIDENCE] 2026-10-15 已确认的新 M6 门禁口径：11 项必填和 X/V/R 的“阻断/待修改（Weak）”会阻断提交审批；仅 Suggestions 级建议不阻断。Ready 后先提交审批（#91），审批前 Publish 不可用。当前本 Issue AC-1 将 `To revise` 一概视为“不阻断发布”，与新规则冲突；后续实施前需把“仅建议级项”和真正 Weak 分开，并以 #93 的同一 revision 门禁为准。该口径已写入本地 M6 PRD/完整性标准，文档尚未提交。\n",
+      "createdAt": "2026-10-15T04:03:29Z",
+      "includesCreatedEdit": false,
+      "isMinimized": false,
+      "minimizedReason": "",
+      "reactionGroups": [],
+      "url": "https://github.com/TelyAgent/HireOSV2/issues/87#issuecomment-6184123143",
+      "viewerDidAuthor": false
+    }
+  ],
+  "number": 87,
+  "title": "[Bug] JD M5/M8：完善建议被计入发布阻断"
+}

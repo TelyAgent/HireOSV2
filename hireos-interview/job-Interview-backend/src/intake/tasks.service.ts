@@ -30,9 +30,6 @@ import { mergeTranscriptLines } from '../rubric/summary-contracts';
 import { CoreRecordClient } from '../core-record/core-record.client';
 import type { Identity } from './workspace.guard';
 
-// A card "meets the bar" at this human score or above — the single threshold Review and
-// Debrief both use (capability cards carry no per-card required level yet).
-const DEBRIEF_BAR = 3;
 
 @Injectable()
 export class TasksService {
@@ -201,7 +198,7 @@ export class TasksService {
     if (!task) throw new NotFoundException({ code: 'NOT_FOUND' });
     const rubric = await this.db.rubricVersion.findFirst({
       where: { workspaceId, jobId: task.jobId, status: 'confirmed' }, orderBy: { versionNumber: 'desc' },
-      select: { cards: { orderBy: { createdAt: 'asc' }, select: { id: true, requirement: true, cardPriority: true, weight: true } } },
+      select: { cards: { orderBy: { createdAt: 'asc' }, select: { id: true, requirement: true, cardPriority: true, weight: true, requiredLevel: true, sourceRequirementId: true } } },
     });
     const cards = rubric?.cards ?? [];
     const rounds = await this.db.interviewRound.findMany({ where: { taskId, workspaceId }, select: { id: true, sequence: true, name: true, interviewer: { select: { id: true, name: true } } } });
@@ -221,7 +218,8 @@ export class TasksService {
     const aiByCard = new Map((draft?.cards ?? []).map((c) => [c.cardId, c]));
 
     const mustHaves = cards.filter((c) => c.cardPriority === 'P0');
-    const mustMet = mustHaves.filter((c) => { const value = humanScore(c.id); return value != null && value >= DEBRIEF_BAR; });
+    const mustMet = mustHaves.filter((c) => { const value = humanScore(c.id); return value != null && c.requiredLevel != null && value >= c.requiredLevel; });
+    const unknownRequirements = mustHaves.some(c => c.requiredLevel == null);
     const totalWeight = cards.reduce((sum, c) => sum + c.weight, 0);
     const evaluatedWeight = cards.reduce((sum, c) => (humanScore(c.id) != null ? sum + c.weight : sum), 0);
     const unknownCards = cards.filter((c) => humanScore(c.id) == null);
@@ -231,6 +229,7 @@ export class TasksService {
       const ai = aiByCard.get(c.id);
       return {
         id: c.id, requirement: c.requirement, cardPriority: c.cardPriority, weight: c.weight,
+        requiredLevel: c.requiredLevel ?? null, sourceRequirementId: c.sourceRequirementId ?? null,
         score: human?.score ?? null, note: human?.note ?? '', round: round ? { sequence: round.sequence, name: round.name } : null,
         roundScores: scores.filter(s => s.cardId === c.id).map(s => {
           const sourceRound = roundById.get(s.roundId)!;
@@ -244,11 +243,11 @@ export class TasksService {
       };
     });
     return {
-      bar: DEBRIEF_BAR,
+      bar: null,
       totalCards: cards.length, scoredCount: cards.length - unknownCards.length,
       mustHaveTotal: mustHaves.length, mustHaveMet: mustMet.length,
       evaluatedWeightPct: totalWeight ? Math.round((evaluatedWeight / totalWeight) * 100) : 0,
-      overall: cards.length > 0 && unknownCards.length === 0 ? (mustMet.length === mustHaves.length ? 'pass' : 'fail') : null,
+      overall: cards.length > 0 && unknownCards.length === 0 && !unknownRequirements ? (mustMet.length === mustHaves.length ? 'pass' : 'fail') : null,
       unknownCards: unknownCards.map((c) => ({ id: c.id, requirement: c.requirement })),
       cards: rows,
       // PRD INT-10: every card where the AI draft and the recorded human score are 2+ levels apart.
@@ -297,7 +296,7 @@ export class TasksService {
   private async decisionSegments(workspaceId: string, taskId: string, jobId: string) {
     const rubric = await this.db.rubricVersion.findFirst({
       where: { workspaceId, jobId, status: 'confirmed' }, orderBy: { versionNumber: 'desc' },
-      select: { cards: { orderBy: { createdAt: 'asc' }, select: { id: true, requirement: true, cardPriority: true, weight: true } } },
+      select: { cards: { orderBy: { createdAt: 'asc' }, select: { id: true, requirement: true, cardPriority: true, weight: true, requiredLevel: true } } },
     });
     const cards = rubric?.cards ?? [];
     if (!cards.length) return [];
@@ -317,6 +316,8 @@ export class TasksService {
         `优先级：${card.cardPriority}（权重 ${card.weight}%）`,
         s ? `所在轮次：${byRound.get(s.roundId) ?? s.roundId}` : '尚未在任何轮次评分',
         `人工评分：${s?.score ?? '未评分'}`,
+        `要求等级：${card.requiredLevel == null ? '未记录' : `L${card.requiredLevel}`}`,
+        `达标状态：${s?.score == null || card.requiredLevel == null ? '未知' : s.score >= card.requiredLevel ? '达标' : '未达标'}`,
         s?.note ? `评分说明：${s.note}` : '',
         s?.aiScore != null ? `AI 评分：${s.aiScore}` : '',
         s?.aiRationale ? `AI 依据：${s.aiRationale}` : '',
@@ -352,7 +353,7 @@ export class TasksService {
    * draft on read (same pattern as rubric cards and round scores). */
   async decision(workspaceId: string, taskId: string) {
     const task = await this.db.interviewTask.findFirst({ where: { id: taskId, workspaceId }, select: {
-      decision: true, decisionAt: true, decisionConclusion: true, decisionSuggested: true, decisionSourceJobId: true,
+      decision: true, decisionAt: true, decisionReason: true, decisionBy: true, decisionVersion: true, decisionConclusion: true, decisionSuggested: true, decisionSourceJobId: true,
     } });
     if (!task) throw new NotFoundException({ code: 'NOT_FOUND' });
     const ready = await this.db.parseJob.findFirst({ where: { workspaceId, taskId, type: 'decision_summary', status: 'needs_review' }, orderBy: { inputVersion: 'desc' } });
@@ -362,12 +363,21 @@ export class TasksService {
       current = await this.db.interviewTask.update({
         where: { id: taskId },
         data: { decisionConclusion: result?.conclusion ?? null, decisionSuggested: result?.suggestedDecision ?? null, decisionSourceJobId: ready.id },
-        select: { decision: true, decisionAt: true, decisionConclusion: true, decisionSuggested: true, decisionSourceJobId: true },
+        select: { decision: true, decisionAt: true, decisionReason: true, decisionBy: true, decisionVersion: true, decisionConclusion: true, decisionSuggested: true, decisionSourceJobId: true },
       });
     }
     const generation = await this.db.parseJob.findFirst({ where: { workspaceId, taskId, type: 'decision_summary' }, orderBy: { inputVersion: 'desc' }, select: { id: true, status: true, errorCode: true } });
+    const source = current.decisionSourceJobId ? await this.db.parseJob.findFirst({ where: { id: current.decisionSourceJobId, workspaceId, taskId, type: 'decision_summary', status: 'needs_review' }, select: { id: true, input: true, result: true, createdAt: true } }) : null;
+    const input = source?.input as { segments?: { id: string; text: string }[] } | null;
+    const output = source?.result as { citations?: { segmentId: string; quote: string }[] } | null;
+    const citations = Array.isArray(output?.citations) ? output.citations.flatMap(c => {
+      if (typeof c?.segmentId !== 'string' || typeof c?.quote !== 'string' || !c.quote.trim()) return [];
+      const segment = Array.isArray(input?.segments) ? input.segments.find(s => s?.id === c.segmentId && typeof s.text === 'string' && s.text.includes(c.quote)) : null;
+      return [{ segmentId: c.segmentId, quote: c.quote, sourceJobId: source!.id, generatedAt: source!.createdAt, snapshot: segment?.text ?? null }];
+    }) : [];
     return {
       decision: current.decision, decisionAt: current.decisionAt,
+      decisionReason: current.decisionReason ?? null, decisionBy: current.decisionBy ?? null, decisionVersion: current.decisionVersion || null, citations,
       conclusion: current.decisionConclusion, suggestedDecision: current.decisionSuggested,
       generation: generation ? { id: generation.id, status: generation.status, errorCode: generation.errorCode } : null,
     };
@@ -376,10 +386,20 @@ export class TasksService {
   /** Records the human's final decision — never written by the AI draft. */
   async setDecision(identity: Identity, taskId: string, raw: unknown) {
     const input = validate(setDecisionSchema, raw);
-    const existing = await this.db.interviewTask.findFirst({ where: { id: taskId, workspaceId: identity.workspaceId } });
-    if (!existing) throw new NotFoundException({ code: 'NOT_FOUND' });
-    if (existing.debriefConfirmedAt == null && existing.decision == null) throw new BadRequestException({ code: 'DEBRIEF_NOT_CONFIRMED' });
-    await this.db.interviewTask.update({ where: { id: taskId }, data: { decision: input.decision, decisionAt: input.decision ? new Date() : null } });
+    await this.db.$transaction(async tx => {
+      await tx.$queryRaw`SELECT id FROM "InterviewTask" WHERE id = ${taskId} AND "workspaceId" = ${identity.workspaceId} FOR UPDATE`;
+      const existing = await tx.interviewTask.findFirst({ where: { id: taskId, workspaceId: identity.workspaceId } });
+      if (!existing) throw new NotFoundException({ code: 'NOT_FOUND' });
+      if (existing.debriefConfirmedAt == null && existing.decision == null) throw new BadRequestException({ code: 'DEBRIEF_NOT_CONFIRMED' });
+      const reason = input.reason ?? (input.decision === existing.decision ? existing.decisionReason : null);
+      if (existing.decisionBy === identity.actorId && existing.decision === input.decision && existing.decisionReason === reason) return;
+      if (input.version !== undefined && input.version !== existing.decisionVersion) throw new ConflictException({ code: 'VERSION_CONFLICT' });
+      const at = new Date();
+      const decisionVersion = existing.decisionVersion + 1;
+      await tx.interviewTask.update({ where: { id: taskId }, data: { decision: input.decision, decisionAt: input.decision ? at : null, decisionReason: reason, decisionBy: identity.actorId, decisionVersion, version: { increment: 1 } } });
+      await tx.revision.create({ data: { taskId, actorId: identity.actorId, version: existing.version + 1,
+        payload: { kind: 'stage_decision', decision: input.decision, reason, decisionVersion, decidedAt: at.toISOString() } } });
+    });
     await this.syncPackageStatus(identity.workspaceId, taskId);
     return this.decision(identity.workspaceId, taskId);
   }

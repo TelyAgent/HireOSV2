@@ -1,0 +1,6 @@
+{
+  "body": "### Type\n\nBug\n\n### Subsystem\n\nhireos-interview\n\n### Problem\n\n线上草稿与已确认 Rubric 卡显示要求、权重及 Expected evidence，但未显示 Required L、简历匹配 Claim、无匹配空状态和 STAR 追问。草稿编辑面板也没有 Required L 字段。\n\n### User Outcome\n\nHR/HM 能在每张能力卡上看到通过门槛、待核实的简历经历和对应追问。\n\n### Scope\n\n能力卡的等级要求、Claim、无匹配状态与 STAR 追问的呈现和保存。\n\n### Non-goals\n\n不将简历 Claim 当作已验证事实；不自动决定候选人是否达标。\n\n### Acceptance Criteria\n\nAC-1：每张能力卡显示并可核查 Required L 及其含义。\nAC-2：有相关简历时显示带来源且标记为待核实的 Claim；无匹配时显示 No matching experience found。\nAC-3：每张卡显示与该能力相关的 STAR 追问；自动测试覆盖有简历与无简历的两种数据。\n\n### References\n\ndocs/product/Interview/I03_Requirements_Rubric/PRD.md（当前本地工作树，尚未提交） FR-3、FR-6；docs/product/Interview/I03_Requirements_Rubric/User_Cases.md（当前本地工作树，尚未提交） UC-I03-05；docs/product/Interview/I03_Requirements_Rubric/Test_Report_2026-10-15.md（当前本地工作树，尚未提交） F-03。\n\n### Dependencies\n\nI03 PRD 尚需确认验证卡与 Rubric 是否为同一对象。\n\n### Risk\n\nmedium\n\n### Owner\n\n@JsonSuCoder\n\n### AI Ready\n\nNo\n\n### Reproduction\n\n打开草稿和已确认 Rubric，查看能力卡及草稿编辑面板；对照 PRD FR-3、FR-6 的必需字段。\n\n### Expected / Actual\n\n预期：能看到 Required L、Claim 或无匹配提示、STAR 追问。实际：只显示要求、优先级、权重、Expected evidence 等。\n\n### Environment\n\n线上 https://hireos.aipollo.me/hireos/interview/；2026-10-15；Chrome 桌面端；线上构建号未知。本地源码仅作为旁证，未证明与线上部署完全一致。\n\n### Severity\n\nS2\n",
+  "comments": [],
+  "number": 250,
+  "title": "[Bug] I03 能力验证卡缺少 Required L、简历 Claim 和 STAR 追问"
+}

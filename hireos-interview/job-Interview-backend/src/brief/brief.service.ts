@@ -4,6 +4,7 @@ import type { z } from 'zod';
 import { PrismaService } from '../persistence/prisma.service';
 import type { ParseInput } from '../intake/contracts';
 import { buildCardSegment, questionGenerationSchema } from './contracts';
+import { createHash } from 'node:crypto';
 
 const QUESTION_SELECT = {
   id: true, cardId: true, situationPrompt: true, taskPrompt: true, actionPrompt: true, resultPrompt: true,
@@ -14,6 +15,43 @@ const QUESTION_SELECT = {
 @Injectable()
 export class BriefService {
   constructor(private readonly db: PrismaService) {}
+
+  // Preview results never materialize InterviewQuestion rows or bypass rubric confirmation.
+  async rubricPreview(workspaceId: string, jobId: string, generate = false) {
+    await this.getJob(workspaceId, jobId);
+    const rubric = await this.db.rubricVersion.findFirst({ where: { workspaceId, jobId }, orderBy: { versionNumber: 'desc' }, include: { cards: { orderBy: { id: 'asc' } } } });
+    const base = { jobId, rubricVersionId: rubric?.id ?? null, versionNumber: rubric?.versionNumber ?? null };
+    if (!rubric) return { ...base, generation: null, questions: [] };
+    const segments = rubric.cards.map(buildCardSegment);
+    const sourceId = createHash('sha256').update(JSON.stringify({ id: rubric.id, version: rubric.version, segments })).digest('hex');
+    const parseResult = (value: unknown) => {
+      const parsed = questionGenerationSchema.safeParse(value);
+      if (!parsed.success || new Set(parsed.data.questions.map(q => q.segmentId)).size !== parsed.data.questions.length || parsed.data.questions.some(q =>
+        !segments.some(s => s.id === q.segmentId && s.text.includes(q.quote)))) return null;
+      return parsed.data;
+    };
+    const jobs = await this.db.parseJob.findMany({ where: { workspaceId, jobId, type: 'rubric_questions' }, orderBy: { createdAt: 'desc' } });
+    let job = jobs.find(j => (j.input as { sourceId?: string })?.sourceId === sourceId);
+    const reusable = (j: NonNullable<typeof job>) => j.status !== 'failed' && (j.status !== 'needs_review' || !!parseResult(j.result));
+    if (generate && (!job || !reusable(job))) {
+      if (!segments.length) throw new BadRequestException({ code: 'NO_CAPABILITY_CARDS' });
+      job = await this.db.$transaction(async tx => {
+        await tx.$queryRaw`SELECT id FROM "Job" WHERE id = ${jobId} AND "workspaceId" = ${workspaceId} FOR UPDATE`;
+        const current = await tx.parseJob.findMany({ where: { workspaceId, jobId, type: 'rubric_questions' }, orderBy: { createdAt: 'desc' } });
+        const same = current.find(j => (j.input as { sourceId?: string })?.sourceId === sourceId);
+        if (same && reusable(same)) return same;
+        return tx.parseJob.create({ data: { workspaceId, jobId, type: 'rubric_questions', inputVersion: rubric.versionNumber,
+          input: { sourceId, segments } as unknown as Prisma.InputJsonValue } });
+      });
+    }
+    const result = job?.status === 'needs_review' ? parseResult(job.result) : null;
+    return { ...base, generation: job ? { id: job.id, status: job.status === 'needs_review' && !result ? 'failed' : job.status, errorCode: job.status === 'needs_review' && !result ? 'AI_OUTPUT_INVALID' : job.errorCode } : null,
+      questions: (result?.questions ?? []).map(q => ({ id: `${job!.id}:${q.segmentId}`, cardId: q.segmentId,
+        situationPrompt: q.situationPrompt, taskPrompt: q.taskPrompt, actionPrompt: q.actionPrompt, resultPrompt: q.resultPrompt,
+        mandatory: rubric.cards.find(c => c.id === q.segmentId)!.cardPriority === 'P0', createdAt: job!.createdAt,
+        card: rubric.cards.find(c => c.id === q.segmentId)!,
+      })) };
+  }
 
   /**
    * Entry point for the whole capability — usable for any Job with a confirmed rubric,

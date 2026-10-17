@@ -76,7 +76,7 @@ export function LivePage() {
         {isCompleted
           ? <div className="zoom-panel"><div className="zoom-stage"><div className="zoom-placeholder"><strong>Zoom</strong><p>{zh ? '本轮面试已完成，会议已结束，无法再加入。' : 'This round is complete; the meeting has ended and can no longer be joined.'}</p></div></div></div>
           : <ZoomHostPanel lang={state.lang} onActive={setActive} round={joinRound} autoJoin={!!joinRound} />}
-        <LiveQuestionPanel key={roundId ?? round} />
+        <LiveQuestionPanel key={roundId ?? round} roundId={roundId} completed={isCompleted} />
       </div>
       <MeetingRecordPanel lang={state.lang} dirty={dirty} onDirty={setDirty} taskId={state.currentTaskId} round={round} roundId={roundId} />
     </div>

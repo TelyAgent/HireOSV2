@@ -7,22 +7,35 @@ import type { Identity } from '../auth/workspace.guard';
 
 const OUTCOMES = ['strong_advance', 'advance', 'hold', 'do_not_advance', 'request_information'];
 const TARGETS = ['record_only', 'send_assessment', 'move_to_interview'];
+type DecisionInput = { outcome?: string; reason?: string; nextStepTarget?: string; overrideAi?: boolean; exceptionApproved?: boolean };
 
 @Injectable()
 export class DecisionsService {
   constructor(private readonly db: PrismaService) {}
 
-  async record(identity: Identity, applicationId: string, raw: {
-    outcome?: string;
-    reason?: string;
-    nextStepTarget?: string;
-    overrideAi?: boolean;
-    exceptionApproved?: boolean;
-  }) {
+  async record(identity: Identity, applicationId: string, raw: DecisionInput) {
+    try {
+      return await this.db.$transaction(
+        (tx) => this.recordInTransaction(tx, identity, applicationId, raw),
+        { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
+      );
+    } catch (error) {
+      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2034') {
+        const existing = await this.db.screeningDecision.findFirst({
+          where: { applicationId, workspaceId: identity.workspaceId, status: 'approved' },
+          orderBy: { createdAt: 'desc' },
+        });
+        throw new ConflictException({ code: 'DECISION_CONFLICT', decision: existing ? serializeDecision(existing) : null });
+      }
+      throw error;
+    }
+  }
+
+  private async recordInTransaction(tx: Prisma.TransactionClient, identity: Identity, applicationId: string, raw: DecisionInput) {
     if (!OUTCOMES.includes(raw.outcome || '') || !TARGETS.includes(raw.nextStepTarget || '') || !raw.reason?.trim()) {
       throw new BadRequestException({ code: 'INVALID_DECISION' });
     }
-    const application = await this.db.application.findFirst({
+    const application = await tx.application.findFirst({
       where: { id: applicationId, workspaceId: identity.workspaceId },
       include: {
         job: true,
@@ -30,8 +43,8 @@ export class DecisionsService {
       },
     });
     if (!application) throw new NotFoundException({ code: 'NOT_FOUND' });
-    const currentEvaluation = await this.db.screeningEvaluation.findFirst({
-      where: { applicationId, workspaceId: identity.workspaceId, freshness: 'current' },
+    const currentEvaluation = await tx.screeningEvaluation.findFirst({
+      where: { applicationId, workspaceId: identity.workspaceId, freshness: 'current', status: 'completed' },
       orderBy: { version: 'desc' },
     });
     if (raw.nextStepTarget === 'move_to_interview' && application.job.criteriaStatus !== 'confirmed') {
@@ -46,18 +59,26 @@ export class DecisionsService {
     ) {
       throw new ConflictException({ code: 'ASSESSMENT_REQUIRED', message: 'Required assessment is missing — request an exception to proceed' });
     }
-    const existing = await this.db.screeningDecision.findFirst({
+    const existing = await tx.screeningDecision.findFirst({
       where: { applicationId, workspaceId: identity.workspaceId, status: 'approved' },
       orderBy: { createdAt: 'desc' },
     });
     if (existing) {
+      if (existing.actorId !== identity.actorId || existing.outcome !== raw.outcome ||
+          existing.reason !== raw.reason!.trim() || existing.nextStepTarget !== raw.nextStepTarget ||
+          existing.overrideAi !== Boolean(raw.overrideAi) || Boolean(existing.exceptionRef) !== Boolean(raw.exceptionApproved)) {
+        throw new ConflictException({ code: 'DECISION_CONFLICT', decision: serializeDecision(existing) });
+      }
       // Belt-and-suspenders: if an earlier run recorded the decision but this
       // step never ran (e.g. deployed after the decision was made), close the
       // task now rather than leaving it stuck open forever.
-      await this.completeScreeningTask(identity, applicationId, existing.id);
-      return { decision: serializeDecision(existing) };
+      await this.completeScreeningTask(identity, applicationId, existing.id, tx);
+      return { decision: serializeDecision(existing), replayed: true };
     }
-    const decision = await this.db.$transaction(async (tx) => {
+    if (raw.nextStepTarget !== 'record_only' && !currentEvaluation) {
+      throw new ConflictException({ code: 'CURRENT_EVALUATION_REQUIRED' });
+    }
+    const decision = await (async () => {
       const created = await tx.screeningDecision.create({
         data: {
           workspaceId: identity.workspaceId,
@@ -170,10 +191,10 @@ export class DecisionsService {
         });
       }
       return created;
-    });
+    })();
     // The handoff itself is the outbox event above; there is no separate "delivery package" any more. Just written,
     // so it is queued (or there is none) (#214).
-    return { decision: serializeDecision(decision, handoffStatusOf(decision, [])) };
+    return { decision: serializeDecision(decision, handoffStatusOf(decision, [])), replayed: false };
   }
 
   /**
@@ -277,8 +298,8 @@ export class DecisionsService {
     return { applicationId: updated.id, assessmentStatus: updated.assessmentStatus };
   }
 
-  private async completeScreeningTask(identity: Identity, applicationId: string, decisionId: string) {
-    await this.db.humanTask.updateMany({
+  private async completeScreeningTask(identity: Identity, applicationId: string, decisionId: string, db: Prisma.TransactionClient = this.db) {
+    await db.humanTask.updateMany({
       where: { workspaceId: identity.workspaceId, applicationId, taskType: { in: ['screening_review', 'screening_evaluation_issue'] }, status: { notIn: ['completed', 'cancelled'] } },
       data: { status: 'completed', completedAt: new Date(), completionRef: decisionId },
     });

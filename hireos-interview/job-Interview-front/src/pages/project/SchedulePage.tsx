@@ -4,7 +4,7 @@ import { useStore } from "../../store/StoreContext";
 import { useProjectTask } from "../../features/project-intake/useTask";
 import { Pill } from "../../utils/status";
 import { CloseSvg } from "../../components/ui/Icons";
-import { api, type ApiError, type Round } from "../../features/project-intake/api";
+import { api, type ApiError, type Round, type Interviewer } from "../../features/project-intake/api";
 import { errorText } from "../../features/project-intake/i18n";
 import { API_BASE_URL } from "../../utils/apiBase";
 import { authFetch } from "../../lib/session";
@@ -53,9 +53,23 @@ export function SchedulePage() {
   const [draftLink, setDraftLink] = useState("");
   const [draftLanguage, setDraftLanguage] = useState<"zh" | "en" | "auto">("zh");
   const [saving, setSaving] = useState(false);
+  const [draftInterviewer, setDraftInterviewer] = useState('');
+  const [interviewers, setInterviewers] = useState<Interviewer[]>([]);
+  const [interviewersLoading, setInterviewersLoading] = useState(false);
+  const [interviewersError, setInterviewersError] = useState(false);
+  const [interviewersRetry, setInterviewersRetry] = useState(0);
   const schedulingRound = rounds.find(r => r.id === openRoundId);
   const interviewerMissing = !!schedulingRound && !schedulingRound.interviewer;
-  const interviewerRequired = zh ? "请先在面试计划中核对并指定面试官，再保存排期。" : "Review and assign the interviewer in Interview plan before saving the schedule.";
+  const interviewerRequired = zh ? "请选择面试官后保存排期。" : "Select an interviewer before saving the schedule.";
+  useEffect(() => {
+    if (!openRoundId || !interviewerMissing) return;
+    let active = true;
+    setInterviewers([]); setInterviewersLoading(true); setInterviewersError(false);
+    void api<Interviewer[]>('/interviewers').then(rows => { if (active) setInterviewers(rows); })
+      .catch(() => { if (active) setInterviewersError(true); })
+      .finally(() => { if (active) setInterviewersLoading(false); });
+    return () => { active = false; };
+  }, [openRoundId, interviewerMissing, interviewersRetry]);
   // mode 's2s': the backend uses a Server-to-Server app on a fixed host account — nothing to authorize.
   type ZoomConnection = { mode?: "oauth" | "s2s"; connected: boolean; name: string | null; pending: boolean; error: string | null };
   const [zoomConnection, setZoomConnection] = useState<ZoomConnection | null>(null);
@@ -124,6 +138,7 @@ export function SchedulePage() {
 
   const openSchedule = (r: Round) => {
     setOpenRoundId(r.id);
+    setDraftInterviewer('');
     const zone = isIanaZone(r.timezone) ? r.timezone : DEFAULT_ZONE;
     setDraftTz(zone);
     setDraftAt(r.scheduledAt ? instantToWallTime(r.scheduledAt, zone) : "");
@@ -170,7 +185,7 @@ export function SchedulePage() {
   const saveSchedule = async () => {
     const round = rounds.find((r) => r.id === openRoundId);
     if (!round || !draftAt) return;
-    if (!round.interviewer) { say(interviewerRequired); return; }
+    if (!round.interviewer && !draftInterviewer) { say(interviewerRequired); return; }
     const at = wallTimeToInstant(draftAt, draftTz);
     if (at.kind !== "ok") {
       say(at.kind === "gap" ? t.scheduleTimeSkipped : at.kind === "overlap" ? t.scheduleTimeRepeated : t.scheduleTimeInvalid);
@@ -181,6 +196,7 @@ export function SchedulePage() {
       await api(`/rounds/${round.id}/schedule`, { method: "POST", body: JSON.stringify({
         version: round.version, scheduledAt: at.iso, timezone: draftTz, meetingLink: draftLink.trim(),
         interviewLanguage: draftLanguage,
+        ...(!round.interviewer ? { interviewerId: draftInterviewer } : {}),
       }) });
       say(zh ? `${round.name} 已排期。` : `${round.name} scheduled.`);
       closeDrawer();
@@ -188,7 +204,10 @@ export function SchedulePage() {
       void reloadTask();
     } catch (e) {
       const code = (e as ApiError).code;
-      say(code === "VERSION_CONFLICT"
+      if (code === 'VERSION_CONFLICT' || code === 'INTERVIEWER_ALREADY_ASSIGNED' || code === 'ROUND_COMPLETED') loadRounds();
+      say(code === 'INTERVIEWER_ALREADY_ASSIGNED' ? (zh ? '已有人指定面试官，请重新核对。' : 'An interviewer has already been assigned. Review the updated round.')
+        : code === 'ROUND_COMPLETED' ? (zh ? '该轮次已完成，不能补填面试官。' : 'This round is completed; an interviewer cannot be added.')
+        : code === "VERSION_CONFLICT"
         ? (zh ? "该轮次已被其他人更新，请重新打开后再排期。" : "This round was updated elsewhere — reopen it and try again.")
         : code === "INTERVIEWER_REQUIRED" ? interviewerRequired : errorText(code, state.lang));
     } finally {
@@ -401,7 +420,7 @@ export function SchedulePage() {
             <button onClick={closeDrawer} className="h-9 cursor-pointer rounded-[9px] border border-[var(--line)] bg-[var(--surface)] px-3.5 text-[12.5px] text-[var(--ink-2)]">
               {t.cancel}
             </button>
-            <button disabled={saving || !draftAt || !schedulingRound?.interviewer} onClick={saveSchedule} className="h-9 cursor-pointer rounded-[9px] border border-[var(--brand)] bg-[var(--brand)] px-[15px] text-[12.5px] font-semibold text-[var(--brand-ink)] disabled:cursor-not-allowed disabled:opacity-60">
+            <button disabled={saving || !draftAt || schedulingRound?.status === 'completed' || !!schedulingRound?.completedAt || (!schedulingRound?.interviewer && (!draftInterviewer || interviewersLoading || interviewersError))} onClick={saveSchedule} className="h-9 cursor-pointer rounded-[9px] border border-[var(--brand)] bg-[var(--brand)] px-[15px] text-[12.5px] font-semibold text-[var(--brand-ink)] disabled:cursor-not-allowed disabled:opacity-60">
               {t.saveSchedule}
             </button>
           </div>
@@ -416,8 +435,16 @@ export function SchedulePage() {
         <div className="flex flex-col gap-4 px-5 pb-6 pt-5">
           <div role="status">
             {interviewerMissing ? interviewerRequired : `${zh ? "面试官：" : "Interviewer: "}${schedulingRound?.interviewer?.name ?? ""}`}
-            {interviewerMissing && <button onClick={() => { closeDrawer(); set({ screen: "plan" }); }} className="ml-2 underline">{zh ? "查看面试计划" : "Review interview plan"}</button>}
           </div>
+          {interviewerMissing && <div>
+            <label htmlFor="schedule-interviewer">{zh ? '面试官' : 'Interviewer'}</label>
+            <select id="schedule-interviewer" value={draftInterviewer} disabled={saving || interviewersLoading || interviewersError} onChange={e => setDraftInterviewer(e.target.value)} className="block w-full rounded-md border border-[var(--line)] bg-[var(--surface)] p-2 text-[var(--ink)]">
+              <option value="">{interviewersLoading ? (zh ? '加载中…' : 'Loading…') : (zh ? '选择面试官' : 'Select interviewer')}</option>
+              {interviewers.map(person => <option key={person.id} value={person.id}>{person.name}{person.title ? ` · ${person.title}` : ''}</option>)}
+            </select>
+            {interviewersError && <div role="alert">{zh ? '面试官列表加载失败。' : 'Could not load interviewers.'}<button onClick={() => setInterviewersRetry(n => n + 1)} className="ml-2 underline">{zh ? '重试' : 'Retry'}</button></div>}
+            {!interviewersLoading && !interviewersError && !interviewers.length && <p>{zh ? '暂无可选面试官。' : 'No interviewers available.'}</p>}
+          </div>}
           <label className="block">
             <div className="mb-1.5 text-[11.5px] font-semibold text-[var(--ink-2)]">{t.scheduleDateTimeLabel}</div>
             <input

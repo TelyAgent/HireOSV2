@@ -1,4 +1,4 @@
-import { BadGatewayException, ConflictException, Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { BadGatewayException, BadRequestException, ConflictException, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../persistence/prisma.service';
@@ -96,12 +96,13 @@ export class CaseLifecycleService {
     return kase;
   }
 
-  private serialize(kase: { status: string; statusBeforeHold: string | null; closeReason: string | null; closedAt: Date | null; handedOffAt: Date | null; interviewTaskId: string | null }) {
+  private serialize(kase: { status: string; statusBeforeHold: string | null; closeReason: string | null; closedAt: Date | null; closeDecision?: Prisma.JsonValue; handedOffAt: Date | null; interviewTaskId: string | null }) {
     return {
       status: kase.status,
       statusBeforeHold: kase.statusBeforeHold,
       closeReason: kase.closeReason,
       closedAt: kase.closedAt?.toISOString() ?? null,
+      closeDecision: kase.closeDecision ?? null,
       handedOffAt: kase.handedOffAt?.toISOString() ?? null,
       interviewTaskId: kase.interviewTaskId,
     };
@@ -170,13 +171,35 @@ export class CaseLifecycleService {
     return this.serialize(kase);
   }
 
-  async close(identity: Identity, caseId: string, reason: CloseReason) {
+  async close(identity: Identity, caseId: string, reason: CloseReason, decisionReason?: string) {
     await this.findCase(identity, caseId);
+    if (!CLOSE_REASONS.includes(reason) || (decisionReason !== undefined && (typeof decisionReason !== 'string' || decisionReason.length > 4000))) {
+      throw new BadRequestException({ code: 'INVALID_CLOSE_DECISION' });
+    }
     // Closing and completing the task are one step (#118), and only an open case closes (#131).
     const closed = await this.db.$transaction(async (tx) => {
+      // Release/finalize use this same lock: the decision records the round seen at close time.
+      const locked = await this.lockCase(tx, caseId);
+      if (!locked || TERMINAL_STATUSES.includes(locked.status)) return false;
+      const latest = await tx.invitation.findFirst({
+        where: { caseId, workspaceId: identity.workspaceId }, orderBy: { round: 'desc' }, include: { submission: true },
+      });
+      const submission = latest?.submission;
+      const release = submission?.releasedAt ? submission.release as Record<string, unknown> | null : null;
+      const assessmentOutcome = release?.assessmentOutcome === 'met' || release?.assessmentOutcome === 'not_met' ? release.assessmentOutcome : 'unknown';
+      const explanation = decisionReason?.trim() || null;
+      if (reason === 'passed' && assessmentOutcome !== 'met' && !explanation) {
+        throw new BadRequestException({ code: 'DECISION_REASON_REQUIRED', message: 'A reason is required when passing an unmet or unknown assessment.' });
+      }
+      const closedAt = new Date();
+      const closeDecision = {
+        actorId: identity.actorId, decidedAt: closedAt.toISOString(), reason: explanation,
+        assessmentOutcome, submissionId: submission?.id ?? null, invitationId: latest?.id ?? null,
+        overridesAssessment: reason === 'passed' && assessmentOutcome === 'not_met',
+      };
       const { count } = await tx.case.updateMany({
         where: { id: caseId, status: { notIn: TERMINAL_STATUSES } },
-        data: { status: 'closed', statusBeforeHold: null, closeReason: reason, closedAt: new Date() },
+        data: { status: 'closed', statusBeforeHold: null, closeReason: reason, closedAt, closeDecision },
       });
       if (count) await this.completeTask(caseId, tx);
       return count > 0;

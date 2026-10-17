@@ -4,6 +4,7 @@ import { CoreRecordClient, mapRecruitingStatus } from '../core-record/core-recor
 import { JdContentFacade, formatJdText } from '../core-record/jd-content.facade';
 import { attachJobSchema, validate } from './contracts';
 import type { Identity } from './workspace.guard';
+import { jdRequirements } from '../rubric/required-levels';
 
 @Injectable()
 export class JobsService {
@@ -28,9 +29,10 @@ export class JobsService {
     const coreJob = await this.coreRecord.getJob(identity, coreJobId);
     const content = await this.jdContent.get(identity, coreJobId);
     const jdText = content ? formatJdText(content, coreJob.title) : coreJob.title;
+    const requirements = jdRequirements(content?.requirements);
     const recruitingStatus = mapRecruitingStatus(coreJob.status);
     const existing = await this.db.job.findUnique({ where: { coreJobId } });
-    const jdChanged = existing ? existing.jdText !== jdText : true;
+    const jdChanged = existing ? existing.jdText !== jdText || JSON.stringify(existing.jdRequirements) !== JSON.stringify(requirements) : true;
     const job = await this.db.job.upsert({
       where: { coreJobId },
       update: {
@@ -40,6 +42,7 @@ export class JobsService {
         level: coreJob.seniority,
         recruitingStatus,
         jdText,
+        jdRequirements: requirements,
         ...(jdChanged ? { jdVersion: { increment: 1 } } : {}),
       },
       create: {
@@ -52,6 +55,7 @@ export class JobsService {
         level: coreJob.seniority,
         recruitingStatus,
         jdText,
+        jdRequirements: requirements,
       },
     });
     if (jdChanged) {

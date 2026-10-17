@@ -25,6 +25,7 @@ export interface WrittenTaskDto {
   caseStatus: string;
   closeReason: string | null;
   closedAt: string | null;
+  closeDecision: unknown;
   handedOffAt: string | null;
   interviewTaskId: string | null;
   candidateId: string;
@@ -170,6 +171,7 @@ export class TasksService {
       caseStatus: t.case.status,
       closeReason: t.case.closeReason,
       closedAt: t.case.closedAt?.toISOString() ?? null,
+      closeDecision: t.case.closeDecision,
       handedOffAt: t.case.handedOffAt?.toISOString() ?? null,
       interviewTaskId: t.case.interviewTaskId,
       candidateId: t.case.candidate.id,

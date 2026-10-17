@@ -16,6 +16,11 @@ const card = { padding: "15px 17px", border: "1px solid var(--line)", borderRadi
 const eyebrow = { fontFamily: "'IBM Plex Mono', monospace", fontSize: 10.5, letterSpacing: ".05em", color: "var(--ink-3)" } as const;
 
 export function DecisionPage() {
+  const { state } = useStore();
+  return <ScopedDecisionPage key={state.currentTaskId ?? 'none'} />;
+}
+
+function ScopedDecisionPage() {
   const { state, t } = useStore();
   const { reload: reloadTask, advance, isDone } = useProjectTask();
   const zh = state.lang === "zh";
@@ -25,6 +30,7 @@ export function DecisionPage() {
   const [saving, setSaving] = useState(false);
   const [regenerating, setRegenerating] = useState(false);
   const [pollKey, setPollKey] = useState(0);
+  const [reasonDraft, setReasonDraft] = useState<string | null>(null);
 
   useEffect(() => {
     if (!taskId) { setData(null); return; }
@@ -41,12 +47,13 @@ export function DecisionPage() {
     return () => { stopped = true; clearTimeout(timer); };
   }, [taskId, pollKey]);
 
-  const choose = async (value: Decision) => {
+  const choose = async (value: Decision, reasonOnly = false) => {
     if (!taskId || !data) return;
-    const next = data.decision === value ? null : value;
+    const next = !reasonOnly && data.decision === value ? null : value;
     setSaving(true);
     try {
-      setData(await api<DecisionState>(`/tasks/${taskId}/decision`, { method: "PATCH", body: JSON.stringify({ decision: next }) }));
+      setData(await api<DecisionState>(`/tasks/${taskId}/decision`, { method: "PATCH", body: JSON.stringify({ decision: next, reason: reasonDraft ?? data.decisionReason ?? '', version: data.decisionVersion ?? 0 }) }));
+      setReasonDraft(null); setError('');
       void reloadTask(); // recording (or clearing) the decision locks/unlocks the package
     }
     catch (e) { setError(e instanceof Error ? e.message : "REQUEST_FAILED"); }
@@ -77,6 +84,9 @@ export function DecisionPage() {
       <div style={card}>
         <div style={eyebrow}>{t.recommendedAction}</div>
         {suggested && <div style={{ marginTop: 6, fontSize: 11.5, color: "var(--ink-3)" }}>{zh ? `AI 草案建议：${suggested.zh}（仅供参考，最终由人决定）` : `AI draft suggests: ${suggested.en} (a proposal — a person decides)`}</div>}
+        <label htmlFor="decision-reason" style={{ display: 'block', marginTop: 12 }}>{zh ? '人工决定理由' : 'Human decision reason'}</label>
+        <textarea id="decision-reason" maxLength={4000} disabled={saving} value={reasonDraft ?? data.decisionReason ?? ''} onChange={e => setReasonDraft(e.target.value)} style={{ width: '100%', minHeight: 76, boxSizing: 'border-box', border: '1px solid var(--line)', borderRadius: 6, padding: 8, background: 'var(--surface)', color: 'var(--ink)' }} />
+        {data.decision && reasonDraft !== null && reasonDraft !== (data.decisionReason ?? '') && <button disabled={saving} onClick={() => void choose(data.decision!, true)}>{zh ? '保存理由' : 'Save reason'}</button>}
         <div style={{ marginTop: 10, display: "flex", gap: 9, flexWrap: "wrap" }}>
           {OPTIONS.map((o) => {
             const active = data.decision === o.value;
@@ -91,6 +101,12 @@ export function DecisionPage() {
           })}
         </div>
         {data.decision && data.decisionAt && <div style={{ marginTop: 8, fontSize: 11.5, color: "var(--ok)" }}>{zh ? `已记录决定 · ${new Date(data.decisionAt).toLocaleString("zh-CN")}` : `Decision recorded · ${new Date(data.decisionAt).toLocaleString("en-US")}`}</div>}
+        {data.decision && <div style={{ marginTop: 8, fontSize: 12, overflowWrap: 'anywhere' }}>
+          <div>{zh ? '记录人' : 'Recorded by'}: {data.decisionBy ?? (zh ? '未记录' : 'Not recorded')}</div>
+          {!data.decisionAt && <div>{zh ? '记录时间：未记录' : 'Recorded at: Not recorded'}</div>}
+          <div>{zh ? '决定版本' : 'Decision version'}: {data.decisionVersion ?? (zh ? '未记录' : 'Not recorded')}</div>
+          <div>{zh ? '已保存理由' : 'Saved reason'}: {data.decisionReason || (zh ? '未记录' : 'Not recorded')}</div>
+        </div>}
       </div>
 
       <div style={card}>
@@ -107,6 +123,13 @@ export function DecisionPage() {
         {generating && <div style={{ marginTop: 10, fontSize: 13, color: "var(--ink-3)" }}>{zh ? "AI 正在基于两轮评分生成结论草案…" : "AI is drafting the conclusion from the round scores…"}</div>}
         {status === "failed" && <div role="alert" style={{ marginTop: 10, fontSize: 12.5, color: "var(--bad)" }}>{zh ? `结论草案生成失败：${data.generation?.errorCode}` : `Draft generation failed: ${data.generation?.errorCode}`}</div>}
         {!generating && data.conclusion && <div style={{ marginTop: 8, fontSize: 13, lineHeight: 1.7, whiteSpace: "pre-wrap" }}>{data.conclusion}</div>}
+        {!generating && data.citations?.map((citation, index) => <details key={`${citation.sourceJobId}:${index}`} style={{ marginTop: 12, overflowWrap: 'anywhere' }}>
+          <summary style={{ cursor: 'pointer', color: 'var(--brand)', textDecoration: 'underline' }}>{zh ? '查看引用快照' : 'View cited snapshot'} {index + 1}</summary>
+          <p>{citation.quote}</p>
+          <small>{zh ? '生成时的评分快照，不代表当前评分' : 'Score snapshot at generation, not the current score'} · {new Date(citation.generatedAt).toLocaleString(zh ? 'zh-CN' : 'en-US')}</small>
+          <pre style={{ whiteSpace: 'pre-wrap', overflowWrap: 'anywhere', fontSize: 12 }}>{citation.snapshot ?? (zh ? '来源无法核验' : 'Source unavailable')}</pre>
+          <small>{citation.sourceJobId} · {citation.segmentId}</small>
+        </details>)}
         {!generating && !data.conclusion && status !== "failed" && <div style={{ marginTop: 10, fontSize: 12.5, color: "var(--ink-3)" }}>{zh ? "还没有结论草案。" : "No draft yet."}</div>}
       </div>
 

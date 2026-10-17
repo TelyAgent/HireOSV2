@@ -1,0 +1,3 @@
+node test/rubric-evidence.browser.cjs
+exit=0
+PASS #250 candidate claim/source/empty/missing and STAR; #325 L3/L4 and historical unknown (mock API)

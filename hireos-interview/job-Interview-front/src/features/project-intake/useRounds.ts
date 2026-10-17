@@ -17,5 +17,6 @@ export function useRounds(taskId: string | null) {
     return () => { active = false; };
   }, [taskId, reloadKey]);
 
-  return { rounds, loading, reload: () => setReloadKey((n) => n + 1) };
+  return { rounds, loading, reload: () => setReloadKey((n) => n + 1),
+    updateRound: (round: Round) => setRounds(rows => rows.map(row => row.id === round.id ? round : row)) };
 }

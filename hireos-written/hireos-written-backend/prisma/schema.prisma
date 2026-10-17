@@ -61,6 +61,7 @@ model Case {
   // closed: why testing ended -- 'passed' | 'rejected' | 'withdrawn'
   closeReason         String?
   closedAt            DateTime?
+  closeDecision       Json?
   // handed_off: the hireos-interview InterviewTask this case was handed to
   handedOffAt         DateTime?
   interviewTaskId     String?

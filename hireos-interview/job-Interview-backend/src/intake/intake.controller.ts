@@ -66,6 +66,10 @@ export class IntakeController {
   roundTranscript(@Req() req: { identity: Identity }, @Param('id') id: string) { return this.rounds.transcript(req.identity.workspaceId, id); }
   @Get('rounds/:id/transcript/:segmentId')
   transcriptSegment(@Req() req: { identity: Identity }, @Param('id') id: string, @Param('segmentId') segmentId: string) { return this.rounds.transcriptSegment(req.identity.workspaceId, id, segmentId); }
+  @Get('rounds/:id/skipped-questions')
+  skippedQuestions(@Req() req: { identity: Identity }, @Param('id') id: string) { return this.rounds.skippedQuestions(req.identity.workspaceId, id); }
+  @Post('rounds/:id/questions/:questionId/skip')
+  skipQuestion(@Req() req: { identity: Identity }, @Param('id') id: string, @Param('questionId') questionId: string) { return this.rounds.skipQuestion(req.identity, id, questionId); }
   @Get('rounds/:id/scores')
   roundScores(@Req() req: { identity: Identity }, @Param('id') id: string) { return this.rounds.scores(req.identity.workspaceId, id); }
   @Patch('rounds/:id/scores/:cardId')

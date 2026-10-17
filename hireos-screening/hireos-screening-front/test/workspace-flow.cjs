@@ -10,6 +10,23 @@ const assert = require('node:assert/strict');
   if (!base) throw new Error('Usage: node test/workspace-flow.cjs <job workspace url>');
   const b = await chromium.launch({ executablePath: process.env.EXE });
   const page = await b.newPage({ viewport: { width: 1280, height: 420 } });
+  if (process.env.SYNTHETIC === '1') {
+    const job = { id: 'j198', title: 'Synthetic workspace', status: 'open', criteriaStatus: 'confirmed', criteriaVersion: 1, requirements: [], dimensions: [], workflowPolicy: {} };
+    const apps = Array.from({ length: 25 }, (_, i) => ({ id: `a${i}`, candidateId: `c${i}`, candidateName: `Synthetic ${i}`, jobId: job.id, status: 'active', screeningStatus: 'review_pending', linkedAt: '2026-10-17T00:00:00Z', linkedBy: 'emma', origin: 'sourced' }));
+    await page.route('https://fonts.googleapis.com/**', r => r.abort());
+    await page.route('**/account/api/**', r => r.fulfill({ status: r.request().url().endsWith('/me') ? 401 : 200, json: { loginRequired: false } }));
+    await page.route('**/screening/api/**', r => {
+      const p = new URL(r.request().url()).pathname;
+      if (p.endsWith('/jobs/j198')) return r.fulfill({ json: job });
+      if (p.endsWith('/jobs')) return r.fulfill({ json: [job] });
+      if (p.endsWith('/applications')) return r.fulfill({ json: apps });
+      const match = p.match(/\/applications\/(a\d+)\/screening$/);
+      if (match) return r.fulfill({ json: { application: apps.find(a => a.id === match[1]), evaluation: null, decision: null, concerns: [], verificationItems: [], humanAssessments: [] } });
+      const candidate = p.match(/\/candidates\/(c\d+)$/);
+      if (candidate) return r.fulfill({ json: { candidate: { id: candidate[1], displayName: `Synthetic ${candidate[1]}`, tags: [], skills: [], projects: [], workExperience: [] }, resumeVersions: [], applications: apps.filter(a => a.candidateId === candidate[1]), recommendations: [], matching: { isMatching: false, lastRun: null } } });
+      return r.fulfill({ json: [] });
+    });
+  }
   const rows = () => page.$$eval('.linked-candidates-table tbody tr.clickable', (trs) => trs.length);
   await page.goto(`${base}?status=awaiting`, { waitUntil: 'networkidle' });
   await page.waitForSelector('.linked-candidates-table tbody tr');
@@ -55,7 +72,7 @@ const assert = require('node:assert/strict');
   await page.goto(`${base}?status=decided&source=__missing_source__`, { waitUntil: 'networkidle' });
   await page.waitForSelector('.linked-candidates-table tbody', { state: 'attached' });
   assert.equal(await rows(), 0);
-  await page.getByRole('button', { name: 'Clear filters' }).waitFor();
+  await page.locator('.linked-candidates-table').getByRole('button', { name: 'Clear filters', exact: true }).waitFor();
   assert.match(await page.locator('.linked-candidates-table').textContent(), /No linked candidates match this filter/);
   console.log('PASS: #198 empty results explain the active filter and expose Clear filters');
   // Selection

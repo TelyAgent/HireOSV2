@@ -34,7 +34,7 @@ export class ScreeningHandoffService {
         department: input.jobDepartment,
         location: input.jobLocation,
         level: input.jobLevel,
-        ...(jdChanged ? { jdText, jdVersion: { increment: 1 } } : {}),
+        ...(jdChanged ? { jdText, jdRequirements: [], jdVersion: { increment: 1 } } : {}),
       },
       create: {
         workspaceId: identity.workspaceId,

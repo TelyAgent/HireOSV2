@@ -1,0 +1,22 @@
+const fs = require('node:fs');
+const path = require('node:path');
+const { spawnSync } = require('node:child_process');
+const root = path.resolve(__dirname, '../..');
+const registry = require('../../.github/ci/projects.json');
+const results = [];
+const prefix = process.env.EVIDENCE_PREFIX || '335-296';
+function run(name, dir, command, args, env = process.env) {
+  const result = spawnSync(command, args, { cwd: path.join(root, dir), env, encoding: 'utf8', maxBuffer: 16 * 1024 * 1024, timeout: 180000 });
+  const log = `${prefix}-${name}.log`;
+  fs.writeFileSync(path.join(__dirname, log), `${command} ${args.join(' ')}\nexit=${result.status}\n${result.stdout ?? ''}${result.stderr ?? ''}${result.error ?? ''}`);
+  results.push({ name, command: [command, ...args].join(' '), exit: result.status, log });
+  fs.writeFileSync(path.join(__dirname, `${prefix}-results.json`), JSON.stringify(results, null, 2) + '\n');
+  console.log(`${name}: ${result.status}`);
+}
+for (const name of ['interview-backend', 'interview-front']) {
+  const project = registry.projects.find(p => p.name === name);
+  const pkg = JSON.parse(fs.readFileSync(path.join(root, project.dir, 'package.json')));
+  for (const check of new Set([...project.checks, ...(pkg.scripts.test ? ['test'] : [])])) run(`${name}-${check}`, project.dir, 'npm', ['run', check]);
+}
+for (const test of ['question-decision', 'rubric-evidence', 'score-reason', ...(prefix === '260' ? ['schedule-interviewer'] : [])]) run(test, 'hireos-interview/job-Interview-front', 'node', [`test/${test}.browser.cjs`], { ...process.env, NODE_PATH: path.join(root, 'hireos-screening/hireos-screening-front/node_modules') });
+process.exitCode = results.some(r => r.exit !== 0) ? 1 : 0;

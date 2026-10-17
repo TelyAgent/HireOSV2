@@ -86,6 +86,7 @@ const isIanaZone = (zone: string) => {
 };
 export const scheduleRoundSchema = z.object({
   version: z.number().int().positive(),
+  interviewerId: z.string().uuid().optional(),
   scheduledAt: z.string().datetime(),
   timezone: z.string().trim().min(1).max(64).refine(isIanaZone, { message: 'Choose a time zone such as Asia/Shanghai.' }),
   // Pasted by the scheduler (Google Meet/Zoom/etc.) — an empty string clears it. No real
@@ -104,11 +105,12 @@ export const setCardScoreSchema = z.object({
   path: ['note'], message: 'A reason is required for a human score.',
 });
 export const recommendationSchema = z.enum(['strong_advance', 'advance', 'hold', 'do_not_advance', 'request_info']);
-export const setRecommendationSchema = z.object({ recommendation: recommendationSchema.nullable() }).strict();
+export const setRecommendationSchema = z.object({ recommendation: recommendationSchema.nullable(), reason: z.string().trim().max(4000).optional() }).strict()
+  .refine(input => input.recommendation === null || !!input.reason, { message: 'Recommendation reason is required', path: ['reason'] });
 // Decision & Next Steps: the human's final call on the whole task. The AI draft only ever
 // suggests one of these (see rubric/decision-contracts.ts) — this endpoint records a human's.
 export const decisionSchema = z.enum(['continue_next_round', 'hold', 'request_more_evidence', 'do_not_proceed', 'recommend_offer']);
-export const setDecisionSchema = z.object({ decision: decisionSchema.nullable() }).strict();
+export const setDecisionSchema = z.object({ decision: decisionSchema.nullable(), reason: z.string().trim().max(4000).optional(), version: z.number().int().min(0).optional() }).strict();
 // Evaluation Package sign-off: HR and Hiring Manager confirm independently of each other —
 // see TasksService.confirmPackage.
 export const confirmPlanSchema = z.object({ confirmed: z.boolean() }).strict();
@@ -120,7 +122,7 @@ export type Segment = { id: string; text: string; page?: number };
 // rubric/score-contracts.ts, rubric/debrief-contracts.ts)
 // — the capability cards being scored against, alongside the segments (transcript lines)
 // carrying the evidence. Every other extraction type ignores it.
-export type ParseInput = { segments: Segment[]; sourceId: string; cards?: { id: string; requirement: string; cardPriority: string; levelAnchors: unknown }[] };
+export type ParseInput = { segments: Segment[]; sourceId: string; requirements?: { id: string; label: string; requiredLevel: number | null }[]; cards?: { id: string; requirement: string; cardPriority: string; levelAnchors: unknown }[] };
 const fact = z.object({ value: z.string().max(5000), segmentId: z.string(), quote: z.string().min(1).max(5000) }).strict();
 export const extractionSchema = z.object({
   title: fact.nullable(), name: fact.nullable(), email: fact.nullable(),

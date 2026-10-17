@@ -1,0 +1,22 @@
+{
+  "body": "### Type\n\nBug\n\n### Subsystem\n\nhireos-written\n\n### Problem\n\n2026-10-16 线上已发布、已结束的一条 Written Test Case，在同一 Evaluation result 页面同时显示最终人工分数 5/100、候选人结果 `This assessment did not meet the bar for this role`，以及 `Testing closed · Reason: Passed`。页面没有说明“未达标”与“Passed”为何并存，招聘者无法从回看页判断关闭决定的依据。截图见创建后的 `[AI-EVIDENCE]` 附件评论。此观察不证明评分或关闭决定本身错误，也不推断后端状态被覆盖。\n\n### User Outcome\n\n招聘者能分别识别已发布测评结果与关闭测评的业务决定；两者看似相反时，可查看决策依据并复核相应记录。\n\n### Scope\n\n核对已发布结果、关闭原因及审计记录的来源；明确允许的状态组合与冲突提示；修正 Evaluation result 的呈现及必要的保存校验，并补自动回归测试。\n\n#### Estimate analysis\n\nEstimate: TBD（建议值，待 Owner @JsonSuCoder 确认）。AC-1 涉及关闭前的结果/原因对照及可能的理由输入；AC-2 涉及已存在记录的回看展示、审计来源及历史兼容；AC-3 需覆盖一致、相反组合及状态持久化。前端 `ReleasePage.tsx` 显示 Release 文案与 `closeReason`，后端 `case-lifecycle.service.ts` 保存关闭原因，现有数据模型是否有决策说明尚未确认。若业务允许“测评未达标但人工选择 Passed”，可能只需解释及审计；若禁止该组合，则需服务端规则、历史数据处理和兼容验证，工作量跨越起始尺度的多个档位，不能可靠给具体点数。接口/数据、测试与文档均受规则影响；外部等待不计点。未找到已验收且点数已确认的直接可比 Issue。下一步先核该 Case 的关闭审计和产品定义，再限定 AC 后由 Owner 确认点数。\n\n### Non-goals\n\n不根据 5/100 自动推翻人工决定，不重算评分，也不直接修改这条已发布的真实候选人结果。\n\n### Acceptance Criteria\n\n- AC-1: 当发布结果为未达标而关闭原因选择 Passed 时，系统按经 Owner 确认的规则在提交前提示冲突、收集必要理由或阻止不允许的组合；自动测试覆盖。\n- AC-2: 回看页能清楚区分已发布结果与关闭决定；对允许的相反组合显示可核查的决策说明，对历史缺少说明的记录如实标示未知。\n- AC-3: 自动测试覆盖一致与相反的结果/关闭原因组合，核对 UI、服务端保存值和异常路径。\n\n### References\n\n- `docs/product/Written_Test/W09_Result_Release/PRD.md`（结果发布与 Next action）\n- `docs/product/HireOS_Command_JD_Management_UX_UI_Review_Standard_v1.0.md`（U1、U4；按本次 Written Test 场景采用）\n- 本地测试记录：`docs/product/Written_Test/W10_Revision_Supplemental/Test_Report_2026-10-16.md` E04；截图见创建后的 `[AI-EVIDENCE]` 评论。\n\n### Dependencies\n\nOwner 需确认 `Passed` 的业务定义，以及“未达标但通过”是否允许、是否必须记录说明；需核对该 Case 的关闭审计记录。未发现已知外部 Issue 阻塞。\n\n### Risk\n\nmedium\n\n### Owner\n\n@JsonSuCoder\n\n### Estimate\n\nTBD\n\n### AI Ready\n\nNo\n\n### Reproduction\n\n1. 在同一线上登录会话打开 Written Test → My Tasks → 已结束的一条 Case → Evaluation result。\n2. 对照 Final overall、Candidate preview Outcome 和 Next action 的关闭原因。2026-10-16 一次线上只读检查复现；未对真实记录执行写入。\n\n### Expected / Actual\n\nExpected: 测评结果与关闭决定的含义清楚；若结论不同，页面给出可核查的决策说明。\n\nActual: 同屏显示 5/100、`This assessment did not meet the bar for this role`、`Reason: Passed`，无解释。\n\n### Environment\n\n2026-10-16 线上 `https://hireos.aipollo.me/hireos/written/tasks`；Chrome 桌面；线上构建 SHA 未知。本地参考 HEAD `c4b610500d33a279c03251091c5f0af13b831318`，未核实等于线上版本。截图已裁去候选人姓名和邮箱，见附件评论。\n\n### Severity\n\nS2\n",
+  "comments": [
+    {
+      "id": "IC_kwDOUm32Us8AAAABczYLcA",
+      "author": {
+        "login": "mincai2010-maker"
+      },
+      "authorAssociation": "MEMBER",
+      "body": "[AI-EVIDENCE] 2026-10-16 线上只读复现：同一已发布结果页面显示人工 5/100、候选人 Outcome 为未达岗位要求，而关闭原因是 Passed。截图已裁去姓名和邮箱；本轮未修改该 Case。\n\n![结果与关闭原因冲突](https://github.com/user-attachments/assets/1cbca957-38af-4cc6-9bd9-8f8a54cf30a2)\n\n[AI-QUESTION] 产品上是否允许“测评未达标、但关闭原因 Passed”？若允许，关闭时是否必须记录并在回看页显示人工决策理由？",
+      "createdAt": "2026-10-17T01:21:03Z",
+      "includesCreatedEdit": false,
+      "isMinimized": false,
+      "minimizedReason": "",
+      "reactionGroups": [],
+      "url": "https://github.com/TelyAgent/HireOSV2/issues/397#issuecomment-6227889008",
+      "viewerDidAuthor": false
+    }
+  ],
+  "number": 397,
+  "title": "[Bug] Written Test 已发布结果未达标却显示关闭原因为 Passed"
+}

@@ -35,6 +35,13 @@ export function computeAggregate(
 export type EligibilityResultStatus = "met" | "not_met" | "unknown" | "conflicting" | "provisionally_met";
 export type EligibilityStatus = "eligible" | "likely_eligible" | "needs_verification" | "not_eligible";
 
+export function confidenceExplanation(r: { eligibility?: EligibilityStatus; proposalSource?: string; confidence: number | null }, lang: Lang): string {
+  if (r.eligibility === "not_eligible") return translate(lang, "The current evidence conflicts with a role requirement. Review the reasons below; no match level is assigned.");
+  if (r.proposalSource === "manual") return translate(lang, "A person proposed this role. No AI match level has been calculated.");
+  if (r.confidence == null) return translate(lang, "There is not enough evidence to assign a match level. Review the unknowns before deciding.");
+  return translate(lang, "Strong, some and limited describe the strength of matching evidence between the current profile and role criteria. Review the reasons and unknowns below.");
+}
+
 /** Confidence display per Patch 1 rule: reuse the overall/coverage engine, no
  * percentages, coverage-gated buckets. */
 export function confidenceLabel(

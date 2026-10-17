@@ -17,8 +17,8 @@ export interface RecordDecisionInput {
 /** The shared decision-recording core — used both by the single-application
  * Decision page and by Compare's bulk "submit next steps." Each candidate is
  * still handled independently: a failure for one never affects the others. */
-export async function recordDecision(applicationId: string, input: RecordDecisionInput): Promise<{ decision: Decision }> {
-  const result = await apiFetch<{ decision: Decision }>(`/applications/${applicationId}/decisions`, {
+export async function recordDecision(applicationId: string, input: RecordDecisionInput): Promise<{ decision: Decision; replayed?: boolean }> {
+  const result = await apiFetch<{ decision: Decision; replayed?: boolean }>(`/applications/${applicationId}/decisions`, {
     method: "POST",
     body: JSON.stringify(input),
   });

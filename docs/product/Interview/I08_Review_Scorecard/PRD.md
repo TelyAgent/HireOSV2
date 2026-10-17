@@ -100,6 +100,13 @@
 
 ## 10. 待确认
 
+### #287 已确认的推荐理由契约（2026-10-17）
+
+- 先填写必需的推荐理由（去空白后非空，最多 4000 字符），点击推荐选项时与推荐一起立即保存；允许单独保存理由修改。
+- `PATCH rounds/:id/recommendation` 接收 recommendation 与 reason，读取轮次返回 recommendationReason；取消推荐同时清空理由。
+- 保存失败保留当前输入，不显示虚假的保存成功；刷新后读取已保存值，历史缺失理由显示未记录。
+- 本项不新增整体 Scorecard 提交/修订流程，不修改逐项评分或最终录用决定，原推荐枚举不变。
+
 1. 面试官推荐枚举：现有实现为 strong_advance / advance / hold / do_not_advance / request_info，PRD §7 的 AI 建议为 Strong Hire … Insufficient Evidence。两者是否统一？
 2. 「提交」是否是独立动作（现有实现逐项保存，没有整体提交状态）。
 3. 提交后谁可以修改分数：仅本人，还是 HR / HM 也可以。

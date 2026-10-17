@@ -1,0 +1,3 @@
+node test/score-reason.browser.cjs
+exit=0
+PASS #282 blank/whitespace blocked, valid save, failure retry, reload, discard, AI unchanged

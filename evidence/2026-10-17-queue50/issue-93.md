@@ -1,0 +1,83 @@
+### Type
+
+Bug
+
+### Subsystem
+
+hireos-jd
+
+### Problem
+
+2026-10-14 线上测试（M6-LIVE-01/02）中，7 个 AI 内容块仍等待 Keep 且页面提示有未保存改动时，11/11 使 Publish 按钮启用。逐项 Keep、保存并重新 Analyze 后，AI Review 仍给出 D1、X7“待修改”，规则摘要却显示 11/11 合格且 Publish 可用。已证实 UI 门禁和分析结论不一致；未点击 Publish，服务端是否允许发布尚未验证。
+
+### User Outcome
+
+招聘人员能看到一致、可解释的 Ready 结论；只有当前已保存且已确认的文档通过全部本期检查后才能提交审批，审批前不能直接发布。
+
+### Scope
+
+统一 10 项必填、Weak、X1–X8/V1–V5/R1–R3 的分析结论与圆标、摘要、提交审批控件；待确认 AI 提案、未保存 revision、过期或失败的检查均阻断提交；Keep 后自动重查；服务端在提交审批时按同一 revision 复核；审批前 Publish 保持不可用。职位概述不显示句数提示，也不因句数判 Weak。
+
+#### Confirmed decision
+
+[HUMAN-DECISION] 2026-10-17：用户在本任务确认 Estimate=5（回复“确认以上点数”）。以最新 PRD 为准：10 项必填，Level 选填。保留 Keep、已保存同 revision、分析有效、Weak/阻断规则。Ready 只允许提交审批，发布仍需有效批准。
+
+#### Estimate analysis
+
+跨分析、保存、前后端门禁和 X/V/R 分级矩阵；复用已有 publishGate 和发布测试。5 点不含 #91 审批系统的建设；该依赖未解除，保持 AI Ready No。
+
+### Non-goals
+
+M7 审批决策和 M8 审批后发布流程；不在本 Issue 中实施审批通知或渠道发布。
+
+### Acceptance Criteria
+
+AC-1:含 10 项必填且均 Pass，但至少一项 AI 草稿未 Keep 或当前 revision 未保存时，UI 不显示 Ready，提交审批不可用且给出原因；服务端对同状态的提交请求拒绝且无审批记录。
+
+AC-2:同一已保存 revision 命中 D1、X7 或完整性标准中的其他阻断/待修改规则时，分析分组、圆标、总体结论与提交审批状态一致；建议级规则不阻断。用规则夹具分别覆盖 X1–X8、V1–V5、R1–R3 的分级。
+
+AC-3:Keep 后自动重查当前 revision；重查期间、失败或旧结果过期时不显示 Ready，服务端不得用旧结果放行。重新分析完成且 10 项和 X/V/R 均合格、无未确认提案、已保存后，提交审批可用。
+
+AC-4:Ready 的下一步为“提交审批”；审批前 Publish 不可用。概述非空的一句话不触发句数提示或 Weak；清空后按必填缺失阻断。
+
+AC-5:对绕过 UI 的提交与发布请求作自动测试，验证未满足上述条件时拒绝，且没有审批或发布副作用；在隔离环境验证相同结果。
+
+### References
+
+`docs/product/JD_Management/M6_Analyze_AI_Fix/Test_Report_2026-10-14.md` §4 M6-LIVE-01/02；`docs/product/JD_Management/M6_Analyze_AI_Fix/PRD.md` FR-9–11、AC-1/2/5/7；`docs/product/JD_Management/HireOS_Command_JD_Completeness_Standard_v0.1.md`（文内 v0.2）。本地截图 `.local/m6-test-evidence/publish-enabled-before-keep.png`、`ready-with-ai-revise.png` 不上传公开仓库。
+
+### Dependencies
+
+Blocked by: #91（真实审批提交接口/冻结版本与批准记录；本 Issue 不重建角色或整套邮件审批）。Refs #54、#55、#56、#87。
+
+### Risk
+
+high
+
+### Owner
+
+@JsonSuCoder
+
+### AI Ready
+
+No
+
+### Reproduction
+
+1. 打开不完整 JD 草稿，人工补齐职级和合成薪资；点击 AI 一键处理至 11/11。2. 在 AI 内容仍带“点击确认保留”且页面有未保存改动时观察 Publish。3. Keep、保存、刷新并 Analyze；在 D1/X7“待修改”与 11/11 同屏时再观察 Publish。测试记录中的隔离草稿 ID 为 `65685cc8-95a8-4052-9440-ce192eaf4c8f`。复现频率：本次路径中观察到。
+
+### Expected / Actual
+
+预期：未确认、未保存或存在待修改时不 Ready，也不能提交审批；审批前不能发布。实际：上述两种状态下 Publish 按钮在 UI 上启用。服务端行为未验证。
+
+### Environment
+
+2026-10-14，线上 `https://hireos.aipollo.me/hireos/jd/jobs`，Chrome 中文桌面视口约 1416×640；页面未展示构建号。证据见测试报告；本地截图未上传公开仓库。
+
+### Severity
+
+S1
+
+### Estimate
+
+5

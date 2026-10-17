@@ -1,0 +1,5 @@
+npm run lint
+exit=0
+
+> hireos-written-backend@0.1.0 lint
+> eslint "src/**/*.ts"

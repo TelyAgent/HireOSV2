@@ -8,7 +8,12 @@ const POLL_MS = 3000;
  * capability card — and exposes `generate`. Polls while a generation is in flight, same
  * pattern as useRubric.
  */
-export function useBrief(jobId: string | null) {
+export function useBrief(jobId: string | null, previewKey?: string) {
+  const endpoint = previewKey === undefined ? 'brief-questions' : 'rubric-questions';
+  const scope = JSON.stringify([jobId, endpoint, previewKey]);
+  const activeScope = useRef(scope);
+  activeScope.current = scope;
+  const [loadedScope, setLoadedScope] = useState('');
   const [state, setState] = useState<BriefState | null>(null);
   const [loading, setLoading] = useState(!!jobId);
   const [error, setError] = useState("");
@@ -16,31 +21,35 @@ export function useBrief(jobId: string | null) {
 
   const load = useCallback(() => {
     if (!jobId) return Promise.resolve(null);
-    return api<BriefState>(`/jobs/${jobId}/brief-questions`)
-      .then((s) => { setState(s); setError(""); return s; })
-      .catch((e: ApiError) => { setError(e.code); return null; });
-  }, [jobId]);
+    return api<BriefState>(`/jobs/${jobId}/${endpoint}`)
+      .then((s) => { if (activeScope.current !== scope) return null; setState(s); setLoadedScope(scope); setError(""); return s; })
+      .catch((e: ApiError) => { if (activeScope.current === scope) setError(e.code); return null; });
+  }, [jobId, endpoint, scope]);
 
   useEffect(() => {
+    activeScope.current = scope;
     if (!jobId) { setState(null); setLoading(false); setError(""); return; }
     setLoading(true);
-    load().finally(() => setLoading(false));
-  }, [jobId, load]);
+    setError('');
+    load().finally(() => { if (activeScope.current === scope) setLoading(false); });
+    return () => { activeScope.current = ''; };
+  }, [jobId, load, scope]);
 
   useEffect(() => {
     if (pollTimer.current) { clearTimeout(pollTimer.current); pollTimer.current = null; }
-    const status = state?.generation?.status;
+    const status = loadedScope === scope ? state?.generation?.status : null;
     if (status === "queued" || status === "parsing") {
       pollTimer.current = setTimeout(load, POLL_MS);
     }
     return () => { if (pollTimer.current) clearTimeout(pollTimer.current); };
-  }, [state, load]);
+  }, [state, load, loadedScope, scope]);
 
   const generate = useCallback(async () => {
     if (!jobId) return;
-    await api(`/jobs/${jobId}/brief-questions`, { method: "POST" });
+    await api(`/jobs/${jobId}/${endpoint}`, { method: "POST" });
+    if (activeScope.current !== scope) return;
     await load();
-  }, [jobId, load]);
+  }, [jobId, load, endpoint, scope]);
 
-  return { state, loading, error, generate, reload: load };
+  return { state: loadedScope === scope ? state : null, loading, error, generate, reload: load };
 }

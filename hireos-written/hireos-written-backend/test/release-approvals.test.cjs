@@ -4,7 +4,7 @@ const assert = require('node:assert/strict');
 const { InvitationsService } = require('../dist/invitations/invitations.service');
 
 const identity = { workspaceId: 'ws-1', actorId: 'hr-1', roles: ['hr'] };
-const body = { overall: 60, showScore: true, outcomeText: 'o', feedbackText: 'f', nextStepText: 'n' };
+const body = { overall: 60, showScore: true, outcomeText: 'o', feedbackText: 'f', nextStepText: 'n', assessmentOutcome: 'not_met' };
 
 function service() {
   const touched = [];
@@ -34,4 +34,15 @@ test('#393: the HTTP validation also requires both to be true', async () => {
   assert.deepEqual(await errors({}), ['disclosureApproved', 'reviewComplete']);
   assert.deepEqual(await errors({ reviewComplete: 'true', disclosureApproved: true }), ['reviewComplete']);
   assert.deepEqual(await errors({ reviewComplete: true, disclosureApproved: true }), []);
+});
+
+test('#397: new releases require a structured human outcome; free text and score cannot substitute', async () => {
+  for (const assessmentOutcome of [undefined, null, '', 'passed', 'unknown']) {
+    const { svc, touched } = service();
+    await assert.rejects(svc.releaseResult(identity, 'case-1', { ...body, assessmentOutcome, reviewComplete: true, disclosureApproved: true }), e => {
+      assert.deepEqual(e.getResponse().fieldPaths, ['assessmentOutcome']);
+      return true;
+    });
+    assert.deepEqual(touched, []);
+  }
 });

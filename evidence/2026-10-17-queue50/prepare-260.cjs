@@ -1,0 +1,16 @@
+const fs = require('node:fs');
+const path = require('node:path');
+const { execFileSync } = require('node:child_process');
+const { inspectIssue } = require('../../.github/scripts/issue-contract.cjs');
+const issue = JSON.parse(execFileSync('gh', ['api', 'repos/TelyAgent/HireOSV2/issues/260'], { encoding: 'utf8', timeout: 30000 }));
+const comments = JSON.parse(execFileSync('gh', ['api', '--paginate', '--slurp', 'repos/TelyAgent/HireOSV2/issues/260/comments?per_page=100'], { encoding: 'utf8', timeout: 30000 })).flat();
+fs.writeFileSync(path.join(__dirname, 'issue-260-before.json'), JSON.stringify({ issue, comments }, null, 2));
+const { sections, errors } = inspectIssue(issue.body);
+if (errors.length) throw Error(errors.join('; '));
+sections.Scope += '\n\n#### Confirmed decision\n\n[HUMAN-DECISION] 2026-10-17 Owner 确认在 Schedule 补填缺失面试官，并确认 3 点。仅未完成且未指定面试官的轮次允许补填，不更换已有面试官、不修改已确认题目/能力/其他计划内容，不自动发送邀请。\n\n#### Estimate analysis\n\n3 点：复用排期 API、面试官目录和轮次字段，无新模型或迁移。AC-1 增加选择入口、加载/失败状态和输入保留；AC-2 校验同工作区、仅补填及未完成，乐观锁防并发覆盖；AC-3 数据库/API/浏览器覆盖有无面试官、历史异常、刷新及失败重试。比 2 点多前后端原子更新和并发验证；不新增向导或外部服务，低于 5 点。采用起始尺度，未用未经验收的历史估算作为依据。';
+sections.Dependencies = 'Owner 已确认 Schedule 补填入口。Refs #111，仅复用现有轮次与面试官目录，不承担多轮向导、角色授权或通知服务。';
+sections.Estimate = '3'; sections['AI Ready'] = 'Yes';
+const file = path.join(__dirname, 'issue-260.md');
+fs.writeFileSync(file, Object.entries(sections).map(([name, value]) => `### ${name}\n\n${value}\n`).join('\n'));
+for (const mode of ['submission', 'execution']) execFileSync(process.execPath, ['.github/scripts/issue-contract.cjs', file, mode], { stdio: 'inherit' });
+execFileSync(process.execPath, ['.github/scripts/issue-submit.cjs', 'edit', '--issue', '260', '--repo', 'TelyAgent/HireOSV2', '--body-file', file], { stdio: 'inherit', timeout: 60000 });
