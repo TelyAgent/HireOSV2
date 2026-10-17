@@ -41,7 +41,7 @@ test('identity sign-in rules (issue #16)', { skip: !process.env.DATABASE_URL && 
     }
 
     const sent = [];
-    const mail = { send: async (to, rendered) => void sent.push({ to, code: rendered.subject.match(/\d{6}/)?.[0] }) };
+    const mail = { send: async (to, rendered) => void sent.push({ to, code: rendered.subject.match(/\d{6}/)?.[0], subject: rendered.subject }) };
     const config = new IdentityConfig(new ConfigService({ DEFAULT_WORKSPACE_ID: WORKSPACE, LOGIN_CODE_SECRET: 'test-secret' }));
     const sessions = new SessionsService(db);
     const auth = new AuthService(db, config, mail, sessions);
@@ -226,6 +226,42 @@ test('identity sign-in rules (issue #16)', { skip: !process.env.DATABASE_URL && 
       await db.authEvent.deleteMany({ where: { type: 'code_requested' } });
       await auth.requestCode(MEMBER, 'en', META);
       assert.equal(sent.length, before, 'no email for a removed member');
+    });
+    await t.test('#233: the code email is in the sign-in page language, even when the account chose another', async () => {
+      const user = await db.user.create({ data: { email: 'chose-zh@example.com', displayName: 'Chose zh', locale: 'zh', localeSetAt: new Date() } });
+      await db.membership.create({ data: { userId: user.id, workspaceId: WORKSPACE, roles: ['hr'], status: 'active' } });
+      await db.authEvent.deleteMany({ where: { type: 'code_requested' } });
+      await auth.requestCode('chose-zh@example.com', 'en', META);
+      assert.match(sent.at(-1).subject, /is your HireOS verification code/);
+      await db.authEvent.deleteMany({ where: { type: 'code_requested' } });
+      await auth.requestCode('chose-zh@example.com', undefined, META);
+      assert.match(sent.at(-1).subject, /登录验证码/, 'without a page language, the account language');
+    });
+
+    await t.test('#233: an account that never chose a language takes the sign-in page language; one that did keeps its own', async () => {
+      const email = 'new-lang@example.com';
+      const user = await db.user.create({ data: { email, displayName: 'New' } });
+      await db.membership.create({ data: { userId: user.id, workspaceId: WORKSPACE, roles: ['hr'], status: 'active' } });
+      const first = await auth.verifyCode(email, await freshCode(email), META, 'en');
+      assert.equal(first.identity.locale, 'en');
+      assert.equal(first.identity.localeChosen, true);
+      const second = await auth.verifyCode(email, await freshCode(email), META, 'zh');
+      assert.equal(second.identity.locale, 'en', 'the account keeps the language it already has');
+    });
+
+    await t.test('#233: choosing a language in any module makes it the account language', async () => {
+      const { AuthController } = require('../dist/auth/auth.controller');
+      const email = 'switcher@example.com';
+      const user = await db.user.create({ data: { email, displayName: 'Switcher' } });
+      await db.membership.create({ data: { userId: user.id, workspaceId: WORKSPACE, roles: ['hr'], status: 'active' } });
+      const signedIn = await auth.verifyCode(email, await freshCode(email), META);
+      assert.equal(signedIn.identity.localeChosen, false, 'no page language sent: still the default');
+      const controller = new AuthController(auth, sessions, config, db);
+      await controller.updateMe({ auth: signedIn.identity, headers: { cookie: `hireos_sid=${signedIn.token}` }, cookies: {} }, { locale: 'en' });
+      const after = await sessions.resolve(signedIn.token);
+      assert.deepEqual([after.locale, after.localeChosen], ['en', true]);
+      await controller.updateMe({ auth: after, headers: { cookie: `hireos_sid=${signedIn.token}` }, cookies: {} }, { displayName: 'Renamed' });
+      assert.equal((await sessions.resolve(signedIn.token)).locale, 'en', 'saving the name leaves the language alone');
     });
   } finally {
     await db.$executeRawUnsafe(`DROP SCHEMA IF EXISTS "${schema}" CASCADE`);

@@ -9,6 +9,8 @@ export type SessionIdentity = {
   displayName: string;
   avatarColor: string | null;
   locale: string;
+  /** Whether `locale` is the user's own choice rather than the default (#233). */
+  localeChosen: boolean;
   workspaceId: string;
   workspaceName: string;
   roles: Role[];
@@ -62,6 +64,7 @@ export class SessionsService {
       displayName: session.user.displayName,
       avatarColor: session.user.avatarColor,
       locale: session.user.locale,
+      localeChosen: session.user.localeSetAt !== null,
       workspaceId: session.workspaceId,
       workspaceName: membership.workspace.name,
       roles: normalizeRoles(membership.roles),

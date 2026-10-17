@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
+import { createContext, useContext, useEffect, useRef, useState, type ReactNode } from "react";
 import { Dropdown } from "antd";
 import { initials } from "./initials";
 
@@ -18,7 +18,8 @@ const BASE_URL = (import.meta as ImportMeta & { env?: Record<string, string | un
 const ROOT_URL = BASE_URL.endsWith(`${SECTION}/`) ? BASE_URL.slice(0, -`${SECTION}/`.length) : "/";
 export const ACCOUNT_URL = `${ROOT_URL}account/`;
 
-export type SessionUser = { id: string; email: string; displayName: string; avatarColor: string | null; roles: string[] };
+/** `locale`: the interface language the account chose, or null while it has not chosen one (#233). */
+export type SessionUser = { id: string; email: string; displayName: string; avatarColor: string | null; roles: string[]; locale: "zh" | "en" | null };
 
 let loginRequired = false;
 
@@ -51,8 +52,9 @@ async function loadSession(): Promise<SessionUser | null> {
   ]);
   loginRequired = Boolean((config as { loginRequired?: boolean }).loginRequired);
   if (!me?.ok) return null;
-  const body = (await me.json()) as { user: Omit<SessionUser, "roles">; roles: string[] };
-  return { ...body.user, roles: body.roles };
+  const body = (await me.json()) as { user: Omit<SessionUser, "roles" | "locale"> & { locale?: string; localeChosen?: boolean }; roles: string[] };
+  const { locale, localeChosen, ...user } = body.user;
+  return { ...user, roles: body.roles, locale: localeChosen && (locale === "zh" || locale === "en") ? locale : null };
 }
 
 const SessionContext = createContext<SessionUser | null>(null);
@@ -78,6 +80,33 @@ export function SessionGate({ children }: { children: ReactNode }) {
 /** The signed-in user, or null in demo mode (sign-in not required and nobody signed in). */
 export function useSessionUser() {
   return useContext(SessionContext);
+}
+
+/**
+ * One interface language for the account across every module, the next sign-in and other devices (#233). Signed
+ * in, the account's language wins over what this browser remembered; switching here saves it to the account.
+ * An account without one takes this module's. Only two languages exist, so `switchLang` is a toggle.
+ */
+export function useAccountLocale(lang: "zh" | "en", switchLang: () => void) {
+  const user = useSessionUser();
+  const saved = useRef<string | null | undefined>(undefined);
+  useEffect(() => {
+    if (!user) return;
+    if (saved.current === undefined) {
+      saved.current = user.locale;
+      if (user.locale && user.locale !== lang) {
+        switchLang();
+        return;
+      }
+    }
+    if (lang === saved.current) return;
+    saved.current = lang;
+    void fetch(`${ACCOUNT_URL}api/auth/me`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ locale: lang }),
+    }).catch(() => undefined);
+  }, [user, lang, switchLang]);
 }
 
 

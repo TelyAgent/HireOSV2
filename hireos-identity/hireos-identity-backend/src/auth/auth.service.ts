@@ -80,7 +80,8 @@ export class AuthService {
     });
     if (user) {
       try {
-        await this.mail.send(email, renderLoginCodeEmail(code, mailLocale(user.locale || localeHint)));
+        // The language the sign-in page shows now: the one this person can read at this moment (#233).
+        await this.mail.send(email, renderLoginCodeEmail(code, mailLocale(localeHint || user.locale)));
       } catch (error) {
         await this.db.loginCode.delete({ where: { id: record.id } });
         this.logger.error(`Sign-in code email to ${email} failed: ${error instanceof Error ? error.message : String(error)}`);
@@ -90,7 +91,7 @@ export class AuthService {
     return { sent: true, resendAfterSeconds: RESEND_COOLDOWN_S, expiresInSeconds: CODE_TTL_MS / 1000 };
   }
 
-  async verifyCode(rawEmail: string, rawCode: string, meta: RequestMeta): Promise<SignedIn> {
+  async verifyCode(rawEmail: string, rawCode: string, meta: RequestMeta, signInLocale?: 'zh' | 'en'): Promise<SignedIn> {
     const email = normalizeEmail(rawEmail);
     const code = rawCode.replace(/\s+/g, '');
     const reject = (reason: CodeRejection, attemptsLeft = 0) =>
@@ -129,15 +130,15 @@ export class AuthService {
     // Only reachable by guessing an uninvited email's unsent decoy code: answer like a wrong code.
     if (!user || !membership) throw reject('CODE_INVALID', Math.max(0, CODE_MAX_ATTEMPTS - current.attempts - 1));
 
-    return this.signIn(user.id, membership.status === 'invited', meta, 'code');
+    return this.signIn(user.id, membership.status === 'invited', meta, 'code', signInLocale);
   }
 
-  async devLogin(rawEmail: string, meta: RequestMeta): Promise<SignedIn> {
+  async devLogin(rawEmail: string, meta: RequestMeta, signInLocale?: 'zh' | 'en'): Promise<SignedIn> {
     if (!this.config.devLoginEnabled) throw new NotFoundException();
     const user = await this.signInEligibleUser(normalizeEmail(rawEmail));
     if (!user) throw new BadRequestException({ code: 'UNKNOWN_DEMO_ACCOUNT' });
     const membership = user.memberships.find((m) => m.workspaceId === this.config.workspaceId);
-    return this.signIn(user.id, membership?.status === 'invited', meta, 'dev');
+    return this.signIn(user.id, membership?.status === 'invited', meta, 'dev', signInLocale);
   }
 
   async devAccounts() {
@@ -150,10 +151,16 @@ export class AuthService {
     return members.map((m) => ({ email: m.user.email, displayName: m.user.displayName, avatarColor: m.user.avatarColor, roles: m.roles }));
   }
 
-  private async signIn(userId: string, activateMembership: boolean, meta: RequestMeta, method: 'code' | 'dev'): Promise<SignedIn> {
+  /**
+   * `signInLocale` is the sign-in page's language. An account that never chose one takes it; an account that did
+   * keeps its own, and the modules switch to it after sign-in (#233).
+   */
+  private async signIn(userId: string, activateMembership: boolean, meta: RequestMeta, method: 'code' | 'dev', signInLocale?: 'zh' | 'en'): Promise<SignedIn> {
     const workspaceId = this.config.workspaceId;
+    const now = new Date();
     await this.db.$transaction([
-      this.db.user.update({ where: { id: userId }, data: { lastLoginAt: new Date() } }),
+      this.db.user.update({ where: { id: userId }, data: { lastLoginAt: now } }),
+      ...(signInLocale ? [this.db.user.updateMany({ where: { id: userId, localeSetAt: null }, data: { locale: signInLocale, localeSetAt: now } })] : []),
       ...(activateMembership
         ? [this.db.membership.update({ where: { userId_workspaceId: { userId, workspaceId } }, data: { status: 'active' } })]
         : []),

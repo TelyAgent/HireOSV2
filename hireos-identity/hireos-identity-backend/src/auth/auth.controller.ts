@@ -10,8 +10,8 @@ import { assertAllowedOrigin, clearSessionCookie, requestMeta, sessionToken, set
 import { SessionGuard, type AuthedRequest } from './session.guard';
 
 const codeSchema = z.object({ email: z.string().max(254), locale: z.string().max(10).optional() });
-const verifySchema = z.object({ email: z.string().max(254), code: z.string().max(20), returnTo: z.string().max(2000).optional() });
-const devLoginSchema = z.object({ email: z.string().max(254), returnTo: z.string().max(2000).optional() });
+const verifySchema = z.object({ email: z.string().max(254), code: z.string().max(20), returnTo: z.string().max(2000).optional(), locale: z.enum(['zh', 'en']).optional() });
+const devLoginSchema = z.object({ email: z.string().max(254), returnTo: z.string().max(2000).optional(), locale: z.enum(['zh', 'en']).optional() });
 const profileSchema = z.object({ displayName: z.string().trim().min(1).max(100).optional(), locale: z.enum(['zh', 'en']).optional() });
 
 function parse<T>(schema: z.ZodType<T>, body: unknown): T {
@@ -28,6 +28,7 @@ export function serializeMe(identity: SessionIdentity) {
       displayName: identity.displayName,
       avatarColor: identity.avatarColor,
       locale: identity.locale,
+      localeChosen: identity.localeChosen,
     },
     workspace: { id: identity.workspaceId, name: identity.workspaceName },
     roles: identity.roles,
@@ -62,7 +63,7 @@ export class AuthController {
   async verify(@Req() req: Request, @Res({ passthrough: true }) res: Response, @Body() body: unknown) {
     assertAllowedOrigin(req, this.config.allowedOrigins);
     const input = parse(verifySchema, body);
-    const signedIn = await this.auth.verifyCode(input.email, input.code, requestMeta(req, this.config.trustedProxyHops));
+    const signedIn = await this.auth.verifyCode(input.email, input.code, requestMeta(req, this.config.trustedProxyHops), input.locale);
     return this.finishSignIn(res, signedIn, input.returnTo);
   }
 
@@ -76,7 +77,7 @@ export class AuthController {
   async devLogin(@Req() req: Request, @Res({ passthrough: true }) res: Response, @Body() body: unknown) {
     assertAllowedOrigin(req, this.config.allowedOrigins);
     const input = parse(devLoginSchema, body);
-    const signedIn = await this.auth.devLogin(input.email, requestMeta(req, this.config.trustedProxyHops));
+    const signedIn = await this.auth.devLogin(input.email, requestMeta(req, this.config.trustedProxyHops), input.locale);
     return this.finishSignIn(res, signedIn, input.returnTo);
   }
 
@@ -93,7 +94,8 @@ export class AuthController {
   @UseGuards(SessionGuard)
   async updateMe(@Req() req: AuthedRequest, @Body() body: unknown) {
     const input = parse(profileSchema, body);
-    await this.db.user.update({ where: { id: req.auth.userId }, data: input });
+    // Choosing a language anywhere makes it the account's: every module and the next sign-in follow it (#233).
+    await this.db.user.update({ where: { id: req.auth.userId }, data: { ...input, ...(input.locale ? { localeSetAt: new Date() } : {}) } });
     const refreshed = await this.sessions.resolve(sessionToken(req));
     return serializeMe(refreshed ?? req.auth);
   }

@@ -21,7 +21,7 @@ import { ComparisonsListPage } from "./pages/ComparisonsListPage";
 import { ComparisonDetailPage } from "./pages/ComparisonDetailPage";
 import { SettingsPage } from "./pages/SettingsPage";
 import { CandidateApplyPage } from "./pages/CandidateApplyPage";
-import { SessionGate } from "./lib/session";
+import { SessionGate, useAccountLocale } from "./lib/session";
 
 export default function App() {
   return (
@@ -32,12 +32,20 @@ export default function App() {
         path="/*"
         element={
           <SessionGate>
+            <AccountLocale />
             <ShellRoutes />
           </SessionGate>
         }
       />
     </Routes>
   );
+}
+
+/** The account's interface language (#233); inside the sign-in gate, since the candidate page has its own. */
+function AccountLocale() {
+  const { state, toggleLang } = useStore();
+  useAccountLocale(state.lang === "zh" ? "zh" : "en", toggleLang);
+  return null;
 }
 
 function ShellRoutes() {

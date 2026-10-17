@@ -47,10 +47,12 @@ export const api = {
   me: () => request<Me>("/auth/me"),
   requestCode: (email: string, locale: string) =>
     post<{ sent: true; resendAfterSeconds: number; expiresInSeconds: number }>("/auth/code", { email, locale }),
-  verify: (email: string, code: string, returnTo: string | null) =>
-    post<Me & { returnTo: string | null }>("/auth/verify", { email, code, returnTo: returnTo ?? undefined }),
+  // `locale`: the language this page shows; an account that never chose one adopts it (#233).
+  verify: (email: string, code: string, returnTo: string | null, locale: string) =>
+    post<Me & { returnTo: string | null }>("/auth/verify", { email, code, returnTo: returnTo ?? undefined, locale }),
   devAccounts: () => request<DevAccount[]>("/auth/dev-accounts"),
-  devLogin: (email: string, returnTo: string | null) => post<Me & { returnTo: string | null }>("/auth/dev-login", { email, returnTo: returnTo ?? undefined }),
+  devLogin: (email: string, returnTo: string | null, locale: string) =>
+    post<Me & { returnTo: string | null }>("/auth/dev-login", { email, returnTo: returnTo ?? undefined, locale }),
 };
 
 export { initials };

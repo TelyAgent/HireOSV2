@@ -97,7 +97,7 @@ export function LoginPage() {
     setBusy(true);
     setError(null);
     try {
-      const result = await api.verify(email.trim(), code, returnTo);
+      const result = await api.verify(email.trim(), code, returnTo, lang);
       goTo(result.returnTo);
     } catch (err) {
       setError(describe(err));
@@ -143,7 +143,7 @@ export function LoginPage() {
     setBusy(true);
     setError(null);
     try {
-      const result = await api.devLogin(account.email, returnTo);
+      const result = await api.devLogin(account.email, returnTo, lang);
       goTo(result.returnTo);
     } catch (err) {
       setError(describe(err));
