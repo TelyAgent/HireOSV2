@@ -64,6 +64,10 @@ test('#317 persisted package versions, concurrent reads, history isolation and v
     assert.equal((await service.package('ws', task.id)).packageVersion, 2);
     assert.equal((await service.package('ws', task.id)).needsReview, true);
     assert.equal(await db.evaluationPackageVersion.count(), 2);
+    const beforeRejectedHandoff = await db.interviewTask.findUnique({ where: { id: task.id } });
+    await assert.rejects(service.sendOffer({ workspaceId: 'ws', actorId: 'owner' }, task.id), error => error.getStatus() === 409 && error.getResponse().code === 'PACKAGE_REVIEW_REQUIRED');
+    assert.deepEqual(await db.interviewTask.findUnique({ where: { id: task.id } }), beforeRejectedHandoff);
+    assert.equal(await db.evaluationPackageEvent.count(), 0);
     await db.interviewTask.update({ where: { id: task.id }, data: { offerState: 'none', packageNeedsReview: false } });
     const sent = await service.sendOffer({ workspaceId: 'ws', actorId: 'owner' }, task.id);
     assert.equal(sent.offerPackageVersion, 2);

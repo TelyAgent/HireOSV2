@@ -564,6 +564,7 @@ export class TasksService {
 
   private async sendOfferWithEvent(identity: Identity, taskId: string) {
     const packageData = await this.materializePackage(identity.workspaceId, taskId);
+    if (packageData.needsReview) throw new ConflictException({ code: 'PACKAGE_REVIEW_REQUIRED' });
     const task = await this.db.interviewTask.findFirst({ where: { id: taskId, workspaceId: identity.workspaceId },
       select: { decision: true, decisionAt: true, version: true, hrConfirmedAt: true, hmConfirmedAt: true, offerState: true, offerSentAt: true } });
     if (!task) throw new NotFoundException({ code: 'NOT_FOUND' });

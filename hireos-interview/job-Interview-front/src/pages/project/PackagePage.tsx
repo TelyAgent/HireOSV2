@@ -96,12 +96,13 @@ export function PackagePage() {
   };
 
   const sendOffer = async () => {
-    if (!taskId || data?.historical) return;
+    if (!taskId || !data || data.historical || data.needsReview) return;
     setSendingOffer(true); setActionError("");
     try { setData(await api<PackageState>(`/tasks/${taskId}/package/offer`, { method: "POST" })); }
     catch (e) {
       const code = e instanceof Error ? e.message : "REQUEST_FAILED";
       setActionError(code === "DECISION_NOT_RECOMMEND_OFFER" ? (zh ? "当前决定不是「推荐发放 Offer」，无法发送。" : "The recorded decision isn't \"Recommend for offer\" — can't send.")
+        : code === "PACKAGE_REVIEW_REQUIRED" ? (zh ? "上游资料已变化，请完成复核后再交接。" : "Upstream material changed. Complete the review before handing off.")
         : code === "PACKAGE_NOT_CONFIRMED" ? (zh ? "需要 HR 和招聘经理都确认后才能发送。" : "Both HR and Hiring Manager must confirm first.")
         : code === "ALREADY_SENT" ? (zh ? "该版本已被 Offer 接收。" : "This package version was already acknowledged by Offer.")
         : code === "OFFER_PENDING" ? (zh ? "正在等待 Offer 确认，超时后可重试。" : "Waiting for Offer ACK; retry will be available after timeout.")
@@ -136,6 +137,8 @@ export function PackagePage() {
 
   const recordedHandoff = events.some(event => event.action === "handoff_requested"
     && event.packageVersion === data.offerPackageVersion && event.createdAt === data.offerSentAt);
+  const handoffDisabled = sendingOffer || data.needsReview || !!data.offerTimelineIssue || data.offerState === "acknowledged"
+    || (data.offerState === "pending" && (!data.offerSentAt || now - new Date(data.offerSentAt).getTime() < 5 * 60 * 1000));
 
   return (
     <>
@@ -153,7 +156,7 @@ export function PackagePage() {
         <div style={{ width: 34, height: 34, borderRadius: 9, background: "var(--surface-3)" }} />
         <div style={{ flex: 1, minWidth: 0, overflowWrap: "anywhere" }}>
           <div style={{ fontSize: 14.5, fontWeight: 700 }}>{t.hiringEvalPackage}</div>
-          <div style={{ fontSize: 11.5, color: "var(--ink-3)" }}>{data.candidateName} · {data.jobTitle} · {data.published ? (zh ? "已发布" : "Published") : (zh ? "审阅中" : "In review")}</div>
+          <div style={{ fontSize: 11.5, color: "var(--ink-3)" }}>{data.candidateName} · {data.jobTitle} · {data.needsReview ? (zh ? "需复核" : "Review required") : data.published ? (zh ? "已发布" : "Published") : (zh ? "审阅中" : "In review")}</div>
             <div style={{ marginTop: 3, fontSize: 10.5, color: "var(--ink-3)" }}>
               {zh ? `包 ${data.packageId} · 版本 ${data.packageVersion} · Rubric v${data.rubricVersion ?? "-"} · ${new Date(data.generatedAt).toLocaleString("zh-CN")}` : `Package ${data.packageId} · Version ${data.packageVersion} · Rubric v${data.rubricVersion ?? "-"} · ${new Date(data.generatedAt).toLocaleString("en-US")}`}
             </div>
@@ -240,7 +243,7 @@ export function PackagePage() {
               {data.offerState === "acknowledged" ? `${zh ? "Offer 已接收" : "Acknowledged by Offer"} · ${data.offerAckAt ? new Date(data.offerAckAt).toLocaleString(zh ? "zh-CN" : "en-US") : ""}` : data.offerState === "sent" ? (zh ? "历史交接未确认，可重试" : "Legacy handoff unconfirmed; retry available") : data.offerState === "pending" && data.offerSentAt && now - new Date(data.offerSentAt).getTime() >= 5 * 60 * 1000 ? (zh ? "确认超时，可重试" : "ACK timed out; retry available") : data.offerState === "pending" ? (zh ? "等待 Offer 接收确认" : "Awaiting Offer ACK") : data.offerState === "failed" ? `${zh ? "交接失败" : "Handoff failed"}${data.offerError ? ` · ${data.offerError}` : ""}` : (zh ? "未连接" : "Not connected")}
             </div>
             <div style={{ marginTop: 10, display: "flex", gap: 8 }}>
-              <button disabled={sendingOffer || !!data.offerTimelineIssue || data.offerState === "acknowledged" || (data.offerState === "pending" && (!data.offerSentAt || now - new Date(data.offerSentAt).getTime() < 5 * 60 * 1000))} onClick={() => void sendOffer()} style={{ ...btn, cursor: sendingOffer || !!data.offerTimelineIssue || data.offerState === "acknowledged" || (data.offerState === "pending" && (!data.offerSentAt || now - new Date(data.offerSentAt).getTime() < 5 * 60 * 1000)) ? "not-allowed" : "pointer" }}>
+              <button disabled={handoffDisabled} onClick={() => void sendOffer()} style={{ ...btn, cursor: handoffDisabled ? "not-allowed" : "pointer" }}>
                 {data.offerState === "acknowledged" ? (zh ? "Offer 已接收" : "Offer acknowledged") : data.offerState === "pending" && data.offerSentAt && now - new Date(data.offerSentAt).getTime() >= 5 * 60 * 1000 ? (zh ? "重试交接" : "Retry handoff") : data.offerState === "pending" ? (zh ? "等待确认…" : "Awaiting ACK…") : sendingOffer ? (zh ? "发送中…" : "Sending…") : data.offerState === "failed" || data.offerState === "sent" ? (zh ? "重试交接" : "Retry handoff") : (zh ? "发送至 Offer" : "Send to Offer")}
               </button>
             </div>

@@ -53,6 +53,14 @@ const base = process.env.INTERVIEW_TEST_URL || 'http://127.0.0.1:5197/interview/
     assert.deepEqual(downloads, ['1']);
     await select.selectOption('current');
     await page.getByText('Recommend for offer', { exact: true }).waitFor();
+    state.needsReview = true;
+    state.reviewReason = 'JD_UPDATED';
+    state.offerTimelineIssue = null;
+    await page.reload({ waitUntil: 'domcontentloaded' });
+    await page.getByText(/Test candidate.*Engineer.*Review required/).waitFor();
+    assert.equal(await page.getByRole('button', { name: 'Send to Offer', exact: true }).isDisabled(), true);
+    await page.getByRole('status').filter({ hasText: 'This package needs review' }).waitFor();
+    state.needsReview = false;
     await page.reload();
     await select.locator('option[value="1"]').waitFor({ state: 'attached' });
     await select.selectOption('1');
