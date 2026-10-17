@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useReducer, useState } from "react";
-import { useParams } from "react-router-dom";
+import { useParams, useSearchParams } from "react-router-dom";
 import { useStore } from "../store/StoreContext";
 import { StatusBadge } from "../utils/status";
 import { Badge, Breadcrumbs, Button, EmptyState, Tabs } from "../components/ui/Primitives";
@@ -20,6 +20,7 @@ import {
   type RealInvitation, type RealPlanItem, type RoundState,
 } from "../data/writtenApi";
 import { writtenStatusFromCase } from "../utils/writtenTasks";
+import { tasksHref } from "../utils/tasksReturn";
 import { applyRealEvaluation, applyRealPlanItems } from "../data/realPlanItemsMerge";
 
 type TabKey = "plan" | "submission" | "evaluation" | "result";
@@ -42,7 +43,12 @@ export function PlanPage() {
   const { t, say, state } = useStore();
   const c = CASES[caseId];
 
-  const [activeTab, setActiveTabState] = useState<TabKey>(planPageSelectedTab[caseId] ?? "plan");
+  // A link can open a given tab, e.g. My Tasks' "score this candidate" (#403); otherwise the last one used.
+  const [searchParams] = useSearchParams();
+  const linkedTab = searchParams.get("tab");
+  const [activeTab, setActiveTabState] = useState<TabKey>(
+    linkedTab === "plan" || linkedTab === "submission" || linkedTab === "evaluation" || linkedTab === "result" ? linkedTab : planPageSelectedTab[caseId] ?? "plan",
+  );
   const setActiveTab = (key: TabKey) => {
     planPageSelectedTab[caseId] = key;
     setActiveTabState(key);
@@ -200,7 +206,7 @@ export function PlanPage() {
 
   return (
     <div>
-      <Breadcrumbs items={[{ label: "My Tasks", href: "/tasks" }, { label: "Candidate detail" }]} />
+      <Breadcrumbs items={[{ label: "My Tasks", href: tasksHref() }, { label: "Candidate detail" }]} />
       <h1 style={{ marginBottom: 4 }}>{cand.name}{t("'s plan")}</h1>
       <div className="muted" style={{ marginBottom: 16, display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
         {cand.email} · <StatusBadge status={overallStatus} />

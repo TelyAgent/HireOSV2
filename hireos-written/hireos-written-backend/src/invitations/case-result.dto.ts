@@ -1,5 +1,5 @@
 import { Type } from 'class-transformer';
-import { IsArray, IsBoolean, IsNumber, IsOptional, IsString, ValidateNested } from 'class-validator';
+import { Equals, IsArray, IsBoolean, IsNumber, IsOptional, IsString, ValidateNested } from 'class-validator';
 
 export class FinalCriterionDto {
   @IsString()
@@ -61,6 +61,13 @@ export class ReleaseResultDto {
 
   @IsString()
   nextStepText!: string;
+
+  /** Both approvals are required to publish (#393): the internal review is done, and the disclosed text is approved. */
+  @Equals(true, { message: 'Confirm that the internal review is complete.' })
+  reviewComplete!: boolean;
+
+  @Equals(true, { message: 'Confirm that the disclosure content is approved for release.' })
+  disclosureApproved!: boolean;
 
   /** The round to release (#48); defaults to the latest submitted round. */
   @IsOptional()

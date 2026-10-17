@@ -37,6 +37,9 @@ const CLOSE_REASONS: { value: CloseReason; label: string }[] = [
  * hand off to Interview (a real call that creates the interview task), hold / resume, and close
  * testing with a reason. Handed-off and closed are terminal -- no further actions are offered.
  */
+
+// Before 2026-10-14 every published result carried this prototype sentence as its feedback (#398).
+const LEGACY_DEMO_FEEDBACK = "Clear structure; accounting treatment mostly correct with one gap in variance analysis.";
 export function ReleaseContent({
   caseId, invitationId, isLatestRound = true, inline = false, onGoToPlan, onChanged,
 }: {
@@ -79,6 +82,14 @@ export function ReleaseContent({
   const feedbackText = feedbackDraft ?? (evaluation.summary ?? "");
   const nextStepText = nextStepDraft ?? t("HR will follow up with next steps.");
 
+  const missingToPublish = [
+    ...(chk1 ? [] : ["Internal review complete"]),
+    ...(chk2 ? [] : ["Disclosure content approved for release"]),
+    ...(outcomeText.trim() ? [] : ["Outcome"]),
+    ...(feedbackText.trim() ? [] : ["Feedback"]),
+    ...(nextStepText.trim() ? [] : ["Next step"]),
+  ];
+
   async function publish() {
     if (busy) return;
     if (!chk1 || !chk2) {
@@ -102,7 +113,7 @@ export function ReleaseContent({
       const { overall, showScore, outcomeText, feedbackText, nextStepText } = rel;
       setBusy(true);
       try {
-        await releaseCaseResult(caseId, { overall, showScore, outcomeText, feedbackText, nextStepText, invitationId: result!.invitationId });
+        await releaseCaseResult(caseId, { overall, showScore, outcomeText, feedbackText, nextStepText, invitationId: result!.invitationId, reviewComplete: chk1, disclosureApproved: chk2 });
       } catch {
         say(t("Could not save to the server. Please refresh and try again."), { type: "danger" });
         return;
@@ -187,7 +198,23 @@ export function ReleaseContent({
 
         <div className="card card-pad">
           <h4 style={{ marginBottom: 8 }}>{t("Candidate preview")}</h4>
-          <div className="tiny" style={{ marginBottom: 8 }}>{t("Disclosure policy:")} {disclosure === "score_and_summary" ? t("Score + summary") : t("Summary only")}</div>
+          {/* Published: the policy is what that release stored, not the invitation's setting today (#395). */}
+          <div className="tiny" style={{ marginBottom: 8 }}>
+            {t("Disclosure policy:")}{" "}
+            {release
+              ? typeof release.showScore === "boolean"
+                ? release.showScore ? t("Score + summary") : t("Summary only")
+                : t("Not recorded for this release — check what the candidate was sent.")
+              : disclosure === "score_and_summary" ? t("Score + summary") : t("Summary only")}
+          </div>
+          {release && release.showScore && typeof release.overall !== "number" && (
+            <div className="banner warning" style={{ marginBottom: 8 }}>{t("This release is marked Score + summary but no score was stored with it — check what the candidate was sent.")}</div>
+          )}
+          {release && release.feedbackText.trim() === LEGACY_DEMO_FEEDBACK && (
+            <div className="banner warning" style={{ marginBottom: 8 }}>
+              {t("This feedback is the demo sentence that releases published before 14 Oct 2026 carried by mistake — it was not written for this candidate.")}
+            </div>
+          )}
           {release ? (
             // Published: show exactly what was released (older releases stored the English defaults).
             <div className="card card-pad" style={{ background: "var(--canvas)", whiteSpace: "pre-wrap" }}>
@@ -235,7 +262,13 @@ export function ReleaseContent({
           <label className="checkbox-row" style={{ marginBottom: 12, display: "flex" }}>
             <input type="checkbox" checked={chk2} onChange={(e) => setChk2(e.target.checked)} /> {t("Disclosure content approved for release")}
           </label>
-          <Button variant="primary" disabled={busy} onClick={() => void publish()}>{t("Finalize & publish result")}</Button>
+          {/* Publishing waits for both approvals and the three texts, and says which are still missing (#393). */}
+          {missingToPublish.length > 0 && (
+            <div className="tiny" role="status" style={{ marginBottom: 8, color: "var(--text-secondary)" }}>
+              {t("Still needed before publishing:")} {missingToPublish.map((m) => t(m)).join(t(", "))}
+            </div>
+          )}
+          <Button variant="primary" disabled={busy || missingToPublish.length > 0} onClick={() => void publish()}>{t("Finalize & publish result")}</Button>
         </div>
       ) : (
         <>

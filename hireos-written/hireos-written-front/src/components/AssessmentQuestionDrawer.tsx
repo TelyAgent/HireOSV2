@@ -1,10 +1,12 @@
 import { useEffect, useState } from "react";
+import { Link } from "react-router-dom";
 import { Drawer } from "antd";
 import { useStore } from "../store/StoreContext";
 import { Button } from "./ui/Primitives";
 import { Icon } from "./ui/Icon";
 import { QUESTIONS, bankQuestions, type Competency, type PlanItem, type Question } from "../data/fixtures";
 import { fetchCaseAiContext, generateAiQuestion, type CaseAiContext } from "../data/writtenApi";
+import { bankLoadState, loadBankQuestionsIntoFixtures } from "../data/realQuestionsMerge";
 
 type Mode = "bank" | "ai";
 
@@ -18,7 +20,7 @@ export function AssessmentQuestionDrawer({
   editing?: { planItem: PlanItem; question: Question };
   onConfirm: (result: { questionId: string; customPrompt: string | null; newQuestion?: Question }) => void;
 }) {
-  const { t, say, state } = useStore();
+  const { t, say, state, set } = useStore();
   const zh = state.lang === "zh";
 
   const [mode, setMode] = useState<Mode>("bank");
@@ -156,7 +158,8 @@ export function AssessmentQuestionDrawer({
     const baseQuestion = QUESTIONS[selectedQuestionId];
     const customPrompt = contentDraft !== baseQuestion.prompt ? contentDraft : null;
     onConfirm({ questionId: selectedQuestionId, customPrompt });
-    say(t("Assessment question generated."), { type: "success" });
+    // A preset question is added as it is -- nothing is generated (#383).
+    say(t("Question added to the plan."), { type: "success" });
     onClose();
   }
 
@@ -169,7 +172,7 @@ export function AssessmentQuestionDrawer({
       footer={
         <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
           <Button variant="ghost" onClick={onClose}>{t("Cancel")}</Button>
-          <Button variant="primary" onClick={handleConfirm} disabled={aiLoading}>{editing ? t("Save changes") : t("Confirm generate")}</Button>
+          <Button variant="primary" onClick={handleConfirm} disabled={aiLoading}>{editing ? t("Save changes") : mode === "bank" ? t("Add to plan") : t("Confirm generate")}</Button>
         </div>
       }
     >
@@ -198,9 +201,21 @@ export function AssessmentQuestionDrawer({
               <option key={q.id} value={q.id}>{q.code} · {q.title}</option>
             ))}
           </select>
-          <div className="tiny" style={{ marginTop: 8, color: "var(--text-tertiary)" }}>
-            {t("Approved v1; edits below only apply to this candidate's draft and never change the role preset.")}
-          </div>
+          {roleQuestions.length ? (
+            <div className="tiny" style={{ marginTop: 8, color: "var(--text-tertiary)" }}>
+              {t("Approved v1; edits below only apply to this candidate's draft and never change the role preset.")}
+            </div>
+          ) : (
+            <BankEmpty
+              state={bankLoadState()}
+              onRetry={() => {
+                loadBankQuestionsIntoFixtures()
+                  .then(() => set({ bankQuestionsVersion: Date.now() }))
+                  .catch(() => say(t("Couldn't load the question bank. Try again."), { type: "danger" }));
+              }}
+              onUseAi={() => switchMode("ai")}
+            />
+          )}
         </div>
       ) : (
         <div className="ai-panel flex-col gap-3" style={{ display: "flex", flexDirection: "column", gap: 12, marginBottom: 16 }}>
@@ -247,5 +262,33 @@ export function AssessmentQuestionDrawer({
         </div>
       )}
     </Drawer>
+  );
+}
+
+/**
+ * Why the role's picker has nothing to offer (#382): the bank is still loading, couldn't be read, or has no
+ * published question for this role -- each with the next step that fits.
+ */
+function BankEmpty({ state, onRetry, onUseAi }: { state: "loading" | "loaded" | "failed"; onRetry: () => void; onUseAi: () => void }) {
+  const { t } = useStore();
+  if (state === "loading") return <div className="tiny muted" style={{ marginTop: 8 }}>{t("Loading the question bank…")}</div>;
+  if (state === "failed") {
+    return (
+      <div className="banner warning" role="alert" style={{ marginTop: 8 }}>
+        {t("Couldn't load the question bank, so the preset questions aren't known yet.")}{" "}
+        <button type="button" className="btn ghost sm" onClick={onRetry}>{t("Retry")}</button>
+      </div>
+    );
+  }
+  return (
+    <div className="banner info" style={{ marginTop: 8 }}>
+      <div>
+        <div>{t("This role has no published question in the bank yet.")}</div>
+        <div style={{ display: "flex", gap: 8, marginTop: 8, flexWrap: "wrap", alignItems: "center" }}>
+          <button type="button" className="btn sm" onClick={onUseAi}>{t("Generate one with AI")}</button>
+          <Link className="btn ghost sm" to="/question-bank">{t("Open the Question Bank")}</Link>
+        </div>
+      </div>
+    </div>
   );
 }

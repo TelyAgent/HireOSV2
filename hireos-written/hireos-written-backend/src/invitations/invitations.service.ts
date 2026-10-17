@@ -2,6 +2,7 @@ import { randomBytes } from 'node:crypto';
 import { ConflictException, Injectable, Logger, NotFoundException, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../persistence/prisma.service';
+import { invalidSchema } from '../http/invalid-schema';
 import type { Identity } from '../auth/workspace.guard';
 import { MailAccountsService } from '../mail-accounts/mail-accounts.service';
 import { AiEvaluatorService, buildRubric } from '../ai/ai-evaluator.service';
@@ -188,6 +189,11 @@ export class InvitationsService implements OnModuleInit, OnModuleDestroy {
   }
 
   async releaseResult(identity: Identity, caseId: string, dto: ReleaseResultDto) {
+    // Also enforced here, not only by the DTO, for callers that don't go through the HTTP validation (#393).
+    const missing: Record<string, string[]> = {};
+    if (dto.reviewComplete !== true) missing.reviewComplete = ['Confirm that the internal review is complete.'];
+    if (dto.disclosureApproved !== true) missing.disclosureApproved = ['Confirm that the disclosure content is approved for release.'];
+    if (Object.keys(missing).length) throw invalidSchema(missing);
     const { submission, isLatestRound } = await this.roundSubmission(identity, caseId, dto.invitationId);
     if (!submission.finalizedAt) throw new ConflictException({ code: 'NOT_FINALIZED' });
     if (submission.releasedAt) {
@@ -201,7 +207,14 @@ export class InvitationsService implements OnModuleInit, OnModuleDestroy {
       await this.lifecycle.lockCase(tx, caseId);
       const { count } = await tx.submission.updateMany({
         where: { id: submission.id, finalizedAt: { not: null }, releasedAt: null },
-        data: { release: { overall: dto.overall, showScore: dto.showScore, outcomeText: dto.outcomeText, feedbackText: dto.feedbackText, nextStepText: dto.nextStepText } as unknown as object, releasedAt },
+        data: {
+          release: {
+            overall: dto.overall, showScore: dto.showScore, outcomeText: dto.outcomeText, feedbackText: dto.feedbackText, nextStepText: dto.nextStepText,
+            // Who gave both approvals, and when (#393).
+            approvals: { reviewComplete: true, disclosureApproved: true, by: identity.actorId, at: releasedAt.toISOString() },
+          } as unknown as object,
+          releasedAt,
+        },
       });
       if (count && isLatestRound) await this.lifecycle.advance(caseId, 'released', tx);
       return count > 0;
