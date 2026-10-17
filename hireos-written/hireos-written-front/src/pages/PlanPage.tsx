@@ -20,6 +20,7 @@ import {
   type RealInvitation, type RealPlanItem, type RoundState,
 } from "../data/writtenApi";
 import { writtenStatusFromCase } from "../utils/writtenTasks";
+import { tasksHref } from "../utils/tasksReturn";
 import { applyRealEvaluation, applyRealPlanItems } from "../data/realPlanItemsMerge";
 
 type TabKey = "plan" | "submission" | "evaluation" | "result";
@@ -200,7 +201,7 @@ export function PlanPage() {
 
   return (
     <div>
-      <Breadcrumbs items={[{ label: "My Tasks", href: "/tasks" }, { label: "Candidate detail" }]} />
+      <Breadcrumbs items={[{ label: "My Tasks", href: tasksHref() }, { label: "Candidate detail" }]} />
       <h1 style={{ marginBottom: 4 }}>{cand.name}{t("'s plan")}</h1>
       <div className="muted" style={{ marginBottom: 16, display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
         {cand.email} · <StatusBadge status={overallStatus} />

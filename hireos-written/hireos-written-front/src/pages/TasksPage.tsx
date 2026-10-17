@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { Modal } from "antd";
 import { useStore } from "../store/StoreContext";
 import { StatusBadge, taskTypeSource } from "../utils/status";
@@ -18,6 +18,7 @@ import { CreateWrittenTaskModal } from "../components/CreateWrittenTaskModal";
 import type { QuickStartResult } from "../data/writtenApi";
 import { initials } from "../lib/initials";
 import { dayRangeIn, sameDayIn } from "../utils/calendar";
+import { lastTasksScroll, readTasksParams, rememberTasksView, tasksHref, tasksSearch, type TasksView } from "../utils/tasksReturn";
 
 function candidateOf(caseId: string): CoreCandidate | null {
   const c = CASES[caseId];
@@ -59,8 +60,24 @@ export function TasksPage() {
   const uid = state.currentUser;
   const scoped = false; // no restricted-scope demo user selected by default
 
-  const [filter, setFilter] = useState<FilterKey>("all");
-  const [view, setView] = useState<"list" | "cluster">("list");
+  // Filter and view live in the URL (#408): back/forward and the breadcrumb from a task return to them.
+  const [searchParams, setSearchParams] = useSearchParams();
+  const { filter, view } = readTasksParams(searchParams, FILTER_DEFS.map((d) => d.key), "all" as FilterKey);
+  const setTasksParams = (next: { filter?: FilterKey; view?: TasksView }) => {
+    const search = tasksSearch(next.filter ?? filter, next.view ?? view, "all");
+    setSearchParams(new URLSearchParams(search), { replace: true });
+  };
+  const setFilter = (next: FilterKey) => setTasksParams({ filter: next });
+  const setView = (next: TasksView) => setTasksParams({ view: next });
+  const search = searchParams.toString();
+  // Captured before the effect below records this visit: where the list was scrolled when it was left.
+  const [returnScroll] = useState(() => (tasksHref().slice("/tasks".length) === (search ? `?${search}` : "") ? lastTasksScroll() : 0));
+  useEffect(() => {
+    const keep = () => rememberTasksView(search ? `?${search}` : "", window.scrollY);
+    window.addEventListener("scroll", keep, { passive: true });
+    keep();
+    return () => { keep(); window.removeEventListener("scroll", keep); };
+  }, [search]);
   const [resumeFor, setResumeFor] = useState<{ candidate: CoreCandidate; job: CoreJob } | null>(null);
   const [collapsedOverride, setCollapsedOverride] = useState<Record<string, boolean>>({});
 
@@ -81,6 +98,13 @@ export function TasksPage() {
   // eslint can't see that writtenTestTasks() reads those mutable module dicts.
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const allWritten = useMemo(() => writtenTestTasks(), [state.realTasksVersion, refreshVersion]);
+  // Back from a task to the same filter: once the list has loaded again, scroll to where it was left (#408).
+  const restored = useRef(false);
+  useEffect(() => {
+    if (restored.current || !returnScroll || refreshVersion === 0) return;
+    restored.current = true;
+    window.scrollTo(0, returnScroll);
+  }, [refreshVersion, returnScroll]);
   const counts = taskCountsFor(uid);
 
   // The list comes a page at a time (#412), so the figures come from the backend, counted over every task; the
