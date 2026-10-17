@@ -1,6 +1,21 @@
 # W03 测评项目与候选人关联线上测试报告（2026-10-16）
 
-## 1. 结论与范围
+## 勘误：现行入口是 My Tasks（2026-10-16 复核）
+
+用户确认 **Assessments 模块已移除，创建任务入口改为 My Tasks 右上角**。下文第 1–6 节保留了针对旧 `Assessments` 路由的原始探索记录和截图，**其「不通过、3 失败/9 阻塞」统计及 W03-LIVE-01/02/03 不能作为现行创建流程的缺陷结论**。先前按旧路由起草的「无法创建测评项目」「从 JD 起草」「Import 演示」「缺少 Create assessment 入口」四条 Bug 草稿全部撤回；旧路由的 Demo 行为仍是事实，但不应要求恢复已移除模块。
+
+现行线上入口为 [My Tasks](https://hireos.aipollo.me/hireos/written/tasks)。右上角 `+ New written test` 可打开 `Start with a job description` 弹窗，提供 `Paste a new JD` 和 `Choose an existing job` 两种方式，且候选人简历标为必填。空表单点击 `Create task` 显示 `Provide a job description.`；切到现有岗位后，岗位检索两次均显示 `The shared records service is unavailable. Please retry later.`。未准备隔离 JD/简历测试数据，未提交创建请求，因此**实际创建、持久化、幂等和候选人关联仍未验证**。现有 [W03 PRD](PRD.md) 的「目标-only 项目、无候选人项目」与现行任务先行弹窗不一致，需更新需求和用例后再给 W03 当前流程验收结论。
+
+| 新证据 | 内容 |
+|---|---|
+| E09 | [My Tasks 创建弹窗](evidence/2026-10-16/06-my-tasks-create-modal.jpg)：线上可见入口、新 JD 与必填简历 |
+| E10 | [现有岗位检索错误](evidence/2026-10-16/07-my-tasks-existing-job-unavailable.jpg)：共享主档服务不可用；当前仅可确认环境/依赖阻塞，未查到根因 |
+| E11 | [缺 JD 校验](evidence/2026-10-16/08-my-tasks-jd-required.jpg)：空表单提示 `Provide a job description.` |
+| E12 | [My Tasks 实现](../../../../hireos-written/hireos-written-front/src/pages/TasksPage.tsx)：第 155–158 行提供 `+ New written test` 与创建弹窗；[弹窗实现](../../../../hireos-written/hireos-written-front/src/components/CreateWrittenTaskModal.tsx) 提供两种 JD 模式和简历必填。代码不是线上构建身份凭证 |
+
+本勘误优先于下文旧路由结论。下文用例/AC/UX 状态是**旧规格与旧页面的历史对照**，不应提交为当前 Bug 或用于计算当前通过率。
+
+## 1. 旧 Assessments 路由的原始结论与范围（已被勘误取代）
 
 **结论：不通过（fail）。** 线上 `Assessments` 显示「No assessment projects yet.」。点击 `Create project`、`Draft a project from this JD` 均只显示 Demo 提示，没有创建表单、项目草稿或可继续的详情页。主任务在项目入口即被阻断。12 条用例中 **3 条失败、9 条阻塞、0 条通过**；阻塞项不能被解释为功能通过或已复现服务端缺陷。
 
@@ -32,7 +47,7 @@
 
 E01–E04 是线上 Chrome 页面截图；E05 是线上只读 HTTP 请求；E06–E08 是本地提交的代码定位。二者证据等级不同。
 
-## 3. 12 条 User Cases 逐项结果
+## 3. 旧 W03 规格的 12 条 User Cases 原始结果（当前须重测）
 
 | 用例 | 结果 | 实际执行与证据 | 尚需验证或解除条件 |
 |---|---|---|---|
@@ -51,7 +66,7 @@ E01–E04 是线上 Chrome 页面截图；E05 是线上只读 HTTP 请求；E06�
 
 本轮覆盖 W03a 的 P1–P3 入口（失败）；W03b 的 P4–P8 与 W03c 的 P9–P14 因前置项目/seed/注入能力缺失未走到终态。没有把点击演示按钮折算为项目创建成功。
 
-## 4. Acceptance Criteria 与业务规则
+## 4. 旧 Acceptance Criteria 与业务规则（当前须更新规格）
 
 | AC | 结论 | 证据与缺口 |
 |---|---|
@@ -65,7 +80,7 @@ E01–E04 是线上 Chrome 页面截图；E05 是线上只读 HTTP 请求；E06�
 
 FR-1 的统计、FR-3/4/5 的项目详情、FR-6 的向导和 BR-3/4/5 的权限/幂等都未获得线上行为证据。E08 表明本地实现使用本地 Candidate/Job 写入，与 W03 PRD 的「Core 唯一写入方」存在需产品/架构确认的差异；这不是通过本轮线上 UI 测出的数据污染。
 
-## 5. 按用户旅程的 UX/UI 审查
+## 5. 旧 Assessments 用户旅程的 UX/UI 审查（不作当前 Bug 结论）
 
 角色目标：HR / Recruiter 为岗位或能力目标建立测评项目，确认候选人与岗位关系，再准备邀请；Hiring Manager 可查看项目状态与结果。线上旅程仅到「Assessments 空态 → 点击 Create project / Draft from JD → Demo 提示」，没有下一步或交接对象。按指定标准，**存在 P0，verdict=fail**。
 
@@ -150,7 +165,7 @@ review:
     - "项目详情不可达；权限、持久化、幂等、真实发信及 200%/键盘未验证"
 ```
 
-## 6. 复测准备与交接
+## 6. 原复测准备与交接（以勘误中的现行入口为准）
 
 1. 先修通项目目标-only 与 JD 创建路径，并展示可持续访问的项目详情；提供线上构建 SHA。优先复测 AC-1、UC-W03-02/03，再运行依赖项目的其他用例。
 2. 准备隔离 workspace 与 [公共约定](../README.md#公共约定) 中的 `S0_employer`、`S_core_candidate_unlinked`、`S_screened_candidates`、`S_result_final_unreleased`；测试人名加 `[UJ-TEST]`、邮箱用 `example.com`，发信走 `simulation_only`，提供清理方案。

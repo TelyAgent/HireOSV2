@@ -1,6 +1,6 @@
 # W13 线上问题草稿（2026-10-16）
 
-依据 [线上测试报告](Test_Report_2026-10-16.md)。以下为本地 Issue 草稿，未提交 GitHub。线上构建号未知；截图截取自 2026-10-16 的 Chrome 线上会话。Estimate 是建议值，待 Owner 确认；身份、数据源和服务端行为未核实处保留为待查，不据此声称越权或数据丢失。
+依据 [线上测试报告](Test_Report_2026-10-16.md)。这六份草稿已于 2026-10-17 提交为 GitHub Issue，并在各 Issue 正文嵌入固定提交版本的截图：[ #406](https://github.com/TelyAgent/HireOSV2/issues/406)、[#407](https://github.com/TelyAgent/HireOSV2/issues/407)、[#408](https://github.com/TelyAgent/HireOSV2/issues/408)、[#409](https://github.com/TelyAgent/HireOSV2/issues/409)、[#410](https://github.com/TelyAgent/HireOSV2/issues/410)、[#411](https://github.com/TelyAgent/HireOSV2/issues/411)。线上构建号未知；截图截取自 2026-10-16 的 Chrome 线上会话。Estimate 是建议值，待 Owner 确认；身份、数据源和服务端行为未核实处保留为待查，不据此声称越权或数据丢失。
 
 ## 草稿 1｜更多统计缺少 Delivery issues
 

@@ -2,7 +2,7 @@
 
 ## 1. 结论与边界
 
-**结论：不通过（fail）。** 线上可以浏览计划、从任务进入 Case、预览题库题、生成 AI 题干草稿，并在历史轮次看到只读内容；但 W04 的核心任务「确定题目、条件和版本，确认后冻结为待发送版本」没有完整操作路径。Owner、提交截止时间、计划确认/冻结、前置条件与计划版本均无可见入口。依据 [UX/UI 审查标准](../../HireOS_Command_JD_Management_UX_UI_Review_Standard_v1.0.md) 第 7 节，核心任务存在 P0 时不能通过。
+**结论：不通过（fail）。** 线上可以浏览计划、从任务进入 Case、预览题库题、生成 AI 题干草稿，并在历史轮次看到只读内容；但 W04 的核心任务「确定题目、条件和版本，确认后冻结为待发送版本」没有完整操作路径。计划确认/冻结、前置条件与计划版本均无可见入口。负责人和提交截止时间由发送给候选人的步骤设置，不将其未出现在计划页计为 W04 缺陷。依据 [UX/UI 审查标准](../../HireOS_Command_JD_Management_UX_UI_Review_Standard_v1.0.md) 第 7 节，核心任务存在 P0 时不能通过。
 
 该标准原用于 JD Management；本报告复用其用户旅程、U1–U10、证据、严重级别和判定规则。JD 专属的薪资、JD 审批/激活/发布字段不套用于 W04。
 
@@ -33,10 +33,11 @@
 | E05 | AI 生成草稿（本地证据，含个人信息，未入库） | 输入全栈 API/UI 设计焦点后生成相关题干；DOM 显示四项 Rubric 权重 45/25/15/15，总和 100% |
 | E06 | 历史轮次（本地证据，含个人信息，未入库） | 待发布 Case 的 Round 1 状态、发送日期、截止日期和分数摘要 |
 | E07 | 已发送只读（本地证据，含个人信息，未入库） | 展开历史轮次显示题干及 `Sent rounds are read-only.`，无编辑/删除控件 |
-| E08 | 未发送草稿（本地证据，含个人信息，未入库） | Round 1 draft 含 Q-0001，显示 Edit/Delete/Send；没有 Owner、计划确认或前置条件 |
+| E08 | 未发送草稿（本地证据，含个人信息，未入库） | Round 1 draft 含 Q-0001，显示 Edit/Delete/Send；没有计划确认或前置条件 |
 | E09 | 编辑抽屉（本地证据，含个人信息，未入库） | 可编辑题干、Save changes；未保存 |
 | E10 | 从题库选择（本地证据，含个人信息，未入库） | 已在草稿中的 Q-0001 仍可选，题干预填；未再次提交 |
 | E11 | [任务页身份](evidence/2026-10-16/11-task-identity.png) | 同一页面顶栏显示「蔡敏」，工作台显示「Signed in as John · HR Head」 |
+| E12 | 发送设置（本地证据，含个人信息，未入库） | 点击 Send 打开抽屉，可设置 Deadline；另有 Sender 信息，未见单独标为 Owner 的输入字段；未发送 |
 
 ## 3. 执行步骤与 12 条用例
 
@@ -44,7 +45,7 @@
 
 | 用例 | 结果 | 实际操作和观察 | 缺口/证据 |
 |---|---|---|---|
-| UC-W04-01 计划页结构与空状态 | **部分/失败** | 从 My Tasks 进入空计划，四 tab、面包屑、验证目标和 Add 入口可见。 | Owner、提交截止时间不显示，FR-3 未满足。E01 |
+| UC-W04-01 计划页结构与空状态 | **部分/规格待同步** | 从 My Tasks 进入空计划，四 tab、面包屑、验证目标和 Add 入口可见。 | 原用例要求计划页显示 Owner/截止时间；用户已明确两者在发送步骤设置。Deadline 已在发送抽屉观察到，Owner 的具体设置入口仍需 W05 核对。E01、E12 |
 | UC-W04-02 从题库添加且原题不变 | **部分/阻塞** | 在同岗位草稿 Case 选 Q-0001，原题干预填，显示 Approved v1 与候选人级修改说明。 | 无 FIN-001 seed；未提交候选人级修改，无法比较保存后计划快照和题库原题。E08–E10 |
 | UC-W04-03 概念题不可加入 | **阻塞** | 线上题库仅 Q-0001/0002；可见选择器按岗位过滤。 | 无 FIN-009，未执行 UI 概念题门禁和 POST 4xx。E02、E10 |
 | UC-W04-04 AI 生成题目 | **部分** | 输入非敏感测试焦点，点 Generate with AI 后出现相关题干和四项 Rubric，随后取消。 | 未点 Confirm generate，因此未证明保存快照、刷新持久化或二次运行稳定质量；没有原定 FIN 岗位 seed。E03、E05 |
@@ -73,11 +74,11 @@
 
 ## 5. 按用户旅程的 UX/UI 审查
 
-主角色为 HR / Recruiter，目标是为一个候选人确定题目、Owner、截止时间、类型和前置条件，确认计划后交给 W05 发送。实际可走通的可见路径是「My Tasks → 计划 → 题库/AI 草稿 → 直接 Send」。
+主角色为 HR / Recruiter，目标是为一个候选人确定题目、类型和前置条件，确认计划后交给 W05 设置负责人、截止时间并发送。实际可走通的可见路径是「My Tasks → 计划 → 题库/AI 草稿 → 直接 Send 抽屉」。
 
 | 步骤 | 用户动作 | 预期 | 实际与证据 | 结论 |
 |---|---|---|---|---|
-| 1–3 | 进入计划并判断任务 | 四 tab、候选人/岗位/状态、目标、Owner、截止时间、空状态 | 四 tab、状态、目标和空状态可见；Owner/截止时间缺失。E01 | 部分 |
+| 1–3 | 进入计划并判断任务 | 四 tab、候选人/岗位/状态、目标、空状态 | 四 tab、状态、目标和空状态可见。原文档对 Owner/截止时间所在步骤与用户最新说明不一致，需同步规格。E01、E12 | 页面项部分通过；规格待同步 |
 | 4–5 | 选择题库或 AI 出题 | 已批准题目快照；岗位建议、题干和 Rubric | Q-0001 可预览；全栈岗位无题可选；AI 提示仅根据岗位名称，生成相关草稿及 Rubric。E02–E05、E10 | 部分 |
 | 6–8 | 编辑/删除草稿、查看已发送 | 草稿可操作，已发送只读 | 草稿控件与编辑抽屉可见；历史轮次只读。E07–E09 | UI 部分 |
 | 9 | 确认计划 | 冻结为待发送版本，和真正发送分开 | 没有确认/冻结控件，只有直接 Send。E08 | 失败 P0 |
@@ -89,11 +90,11 @@
 |---|---|---|
 | U1 容易理解 | **失败** | 顶栏身份「蔡敏」与 My Tasks「John · HR Head」不一致；计划页面未显示明确的计划版本，HR 无法确认当前身份与版本。E01、My Tasks 可访问 DOM |
 | U2 容易上手 | **部分** | 空状态和 Add 清楚；全栈岗位题库没有题目时，只出现空下拉与通用 Approved v1 文案，缺少「本岗位无可用题」和可行下一步。E01、E02 |
-| U3 快速完成任务 | **失败** | 不能在页面设置 Owner、截止时间、前置条件或独立确认计划；HR 无法完成完整计划准备。E08、E09 |
-| U4 下一步明确 | **失败** | 直接 Send 取代「确认后待发送」，计划的负责人、截止时间、等待原因不可见。E08 |
+| U3 快速完成任务 | **失败** | 不能在计划页设置前置条件或独立确认计划；HR 无法完成完整计划准备。E08、E09 |
+| U4 下一步明确 | **失败** | 直接 Send 取代「确认后待发送」；计划确认后的独立下一步和等待原因不可见。E08 |
 | U5 提示和按钮清楚 | **部分** | 空计划 Send 的禁用原因有文字提示，已发送只读有说明；`Confirm generate` 同时用于题库选择和 AI 生成，动作含义不准确。E01、E07、E10 |
 | U6 符合真实工作方式 | **失败** | 无法制定串行/并行与补证/修订类型，也无法在发信前锁定可审阅版本。E08、E09 |
-| U7 信息结构符合角色目标 | **失败** | 页面重心是题干，HR 决策所需的 Owner、截止时间、计划状态与下一步缺失；角色差异未取得测试身份验证。E08 |
+| U7 信息结构符合角色目标 | **部分/未知** | 页面重心是题干，计划状态与下一步不完整；负责人和截止时间属于发送步骤，角色差异未取得测试身份验证。E08、E12 |
 | U8 减少重复和跳转 | **部分/未知** | 四 tab 同页可切换，面包屑可返回 My Tasks；返回后的列表筛选保留与多轮操作成本未测。E01 |
 | U9 可恢复和可预期 | **未知** | 空输入有提示，AI 成功可见；故障/并发/未知结果和保存失败未注入。E04、E05 |
 | U10 可访问、可读、可操作 | **未知** | 可见状态有文字且抽屉有标题/关闭按钮；未做 200% 缩放、完整键盘焦点、屏幕阅读器及错误字段关联测试，不能宣称无障碍通过。E03、E07 |
@@ -103,7 +104,6 @@
 | ID/级别 | 旅程步骤与证据 | 对角色目标的影响 | 最小修复与验收方式 |
 |---|---|---|---|
 | W04-UX-01 **P0** | 步骤 9：草稿仅有 Add/Send，无确认/冻结。E08 | 无法先确认可追溯计划再决定发送，核心 W04 目标不成立 | 增加明确的确认/冻结动作和独立待发送状态；确认后核对版本快照存在、Invitation/发信记录为零，再单独发送 |
-| W04-UX-02 **P1** | 步骤 2、9：Owner/截止时间不可见。E01、E08 | HR 不知道责任人与完成时间，无法交接或追期 | 展示并可设置 Owner、截止时间及未设置状态；刷新后核对持久化和角色可见性 |
 | W04-UX-03 **P1** | 步骤 6、11：计划项无类型/前置条件配置。E08、E09 | 无法规划补证、修订、串行或并行测试 | 为草稿项提供类型和依赖设置；核对前置完成只创建待确认任务，不创建 Invitation |
 | W04-UX-04 **P1** | 步骤 1：顶栏「蔡敏」，My Tasks「John · HR Head」。E11 | 使用者无法确认当前操作身份及授权范围 | 统一身份来源；以两个真实角色会话核对顶栏、工作台、权限与审计身份一致 |
 | W04-UX-05 **P2** | 步骤 4：无同岗位题时空下拉仍显示 Approved v1。E02 | HR 需要试错才知道没有题可用 | 显示明确空状态、题库/AI 下一步；用无题岗位验证 |
@@ -116,12 +116,11 @@ review:
   role: "HR / Recruiter（页面角色显示冲突，实际权限未核实）"
   journey_goal: "确定候选人的测试内容、条件和版本，确认后待发送"
   evidence:
-    source: "线上 Chrome UI、可访问 DOM、E01–E11 截图；本地源码仅作交叉核对"
+    source: "线上 Chrome UI、可访问 DOM、E01–E12 截图；本地源码仅作交叉核对"
     steps_checked: [1, 2, 3, 4, 5, 6, 8, 9, 11]
   verdict: "fail"
   findings:
     - {id: "W04-UX-01", severity: "P0", category: "state", step: 9, title: "缺少独立的计划确认/冻结动作", evidence: "E08", user_impact: "HR 无法形成可审阅的待发送版本", recommendation: "增加确认及独立待发送状态", acceptance_check: "确认后有版本快照且没有 Invitation"}
-    - {id: "W04-UX-02", severity: "P1", category: "next_action", step: 2, title: "Owner 与截止时间缺失", evidence: "E01、E08", user_impact: "无法分工和追期", recommendation: "展示和设置 Owner、截止时间", acceptance_check: "保存刷新后可见且权限正确"}
     - {id: "W04-UX-03", severity: "P1", category: "state", step: 11, title: "缺少类型和前置条件配置", evidence: "E08、E09", user_impact: "无法规划补测和依赖", recommendation: "提供补证/修订及串行/并行配置", acceptance_check: "依赖满足只产生待确认任务"}
     - {id: "W04-UX-04", severity: "P1", category: "permissions", step: 1, title: "页面身份显示冲突", evidence: "E11", user_impact: "操作者无法确认自己的角色和授权", recommendation: "统一身份来源", acceptance_check: "多角色会话的顶栏、任务、审计一致"}
     - {id: "W04-UX-05", severity: "P2", category: "learnability", step: 4, title: "空题库缺少解释和下一步", evidence: "E02", user_impact: "选题需试错", recommendation: "显示无同岗位题的空状态", acceptance_check: "无题岗位有明确替代入口"}
@@ -147,7 +146,7 @@ review:
 
 以下是本地参考提交的源码观察，**不等同于线上构建已部署**：
 
-- [`PlanPage.tsx`](../../../../hireos-written/hireos-written-front/src/pages/PlanPage.tsx) 的草稿区域直接提供 Add 和 Send；`startSupplementalRound` 打开新草稿轮次，没有独立的确认计划步骤。页面的目标文本由岗位和第一道题能力拼装，未见 Owner/截止时间输入。
+- [`PlanPage.tsx`](../../../../hireos-written/hireos-written-front/src/pages/PlanPage.tsx) 的草稿区域直接提供 Add 和 Send；`startSupplementalRound` 打开新草稿轮次，没有独立的确认计划步骤。页面的目标文本由岗位和第一道题能力拼装。发送抽屉另有 Deadline 字段。
 - [`AssessmentQuestionDrawer.tsx`](../../../../hireos-written/hireos-written-front/src/components/AssessmentQuestionDrawer.tsx) 用岗位过滤已发布题库；AI 无 JD/简历时退化为岗位名称；题库与 AI 模式共享 `Confirm generate`。本地 `handleConfirm` 在异步 `onConfirm` 返回前即提示成功，因此需要用失败注入复核线上是否会出现错误成功提示。
 - [`plan-item.dto.ts`](../../../../hireos-written/hireos-written-backend/src/plan-items/plan-item.dto.ts) 的 `kind` 只允许 `required | optional`，无补证/修订值；[`plan-items.service.ts`](../../../../hireos-written/hireos-written-backend/src/plan-items/plan-items.service.ts) 可见创建计划项的快照字段，但本轮无生产数据库证据。
 

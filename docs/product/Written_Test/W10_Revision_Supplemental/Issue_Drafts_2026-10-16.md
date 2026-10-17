@@ -1,6 +1,6 @@
 # Written Test 线上观察问题草稿（2026-10-16）
 
-以下是本轮可见页面证据支持的 3 个待评审 Bug 草稿，尚未创建 GitHub Issue。截图均从线上 Chrome 采集并裁去候选人姓名与邮箱。`Severity` 使用 Issue Form 的 S1–S4；线上构建号、后端记录及用户决策链尚未取得，因此描述只限可见结果，不推断错误发生在哪一层。W10 功能缺口与测试环境阻塞见 [测试报告](Test_Report_2026-10-16.md)，没有用不相关的页面截图包装为已复现 Bug。
+以下是本轮可见页面证据支持的 3 个 Bug 草稿。2026-10-17 经用户确认后：草稿 1 与已有 [Issue #363](https://github.com/TelyAgent/HireOSV2/issues/363) 重复，已在原 Issue 补充 [W10 截图证据](https://github.com/user-attachments/assets/fc7b1442-ecdb-49c4-ac8e-7da0015709d5)；草稿 2、3 分别提交为 [Issue #397](https://github.com/TelyAgent/HireOSV2/issues/397)、[Issue #398](https://github.com/TelyAgent/HireOSV2/issues/398)，并在评论附图。截图均从线上 Chrome 采集并裁去候选人姓名与邮箱。`Severity` 使用 Issue Form 的 S1–S4；线上构建号、后端记录及用户决策链尚未取得，因此描述只限可见结果，不推断错误发生在哪一层。W10 功能缺口与测试环境阻塞见 [测试报告](Test_Report_2026-10-16.md)，没有用不相关的页面截图包装为已复现 Bug。
 
 ## 草稿 1｜任务页身份与全局账号不一致
 
