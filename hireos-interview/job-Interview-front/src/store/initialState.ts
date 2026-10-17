@@ -8,7 +8,7 @@ export const R1_SCORES: Record<string, number> = {
 
 export const initialState: AppState = {
   theme: "light",
-  accent: "teal",
+  accent: "blue",
   textSize: "medium",
   lang: "en",
   sidenavCollapsed: false,

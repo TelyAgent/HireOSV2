@@ -106,7 +106,7 @@ function reducer(state: AppState, action: Action): AppState {
       return {
         ...state,
         theme: "light",
-        accent: "teal",
+        accent: "blue",
         textSize: "medium",
         moreOpen: false,
         overviewStatsOpen: true,
@@ -158,7 +158,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
           type: "SET",
           payload: {
             theme: p.theme || "light",
-            accent: p.accent || "teal",
+            accent: p.accent || "blue",
             textSize: p.textSize || "medium",
             moreOpen: !!p.moreOpen,
             overviewStatsOpen:
@@ -240,7 +240,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         dispatch({ type: "SET_TEXT_SIZE", payload: textSize }),
       resetPrefs: () => {
         dispatch({ type: "RESET_PREFS" });
-        say(state.lang === "zh" ? "外观已重置为浅色、青绿色和中等字号。" : "Appearance reset to Light, Teal, Medium.");
+        say(state.lang === "zh" ? "外观已重置为浅色、蓝色和中等字号。" : "Appearance reset to Light, Blue, Medium.");
       },
       role,
       t,
