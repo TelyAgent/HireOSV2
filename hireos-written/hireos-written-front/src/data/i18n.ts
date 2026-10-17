@@ -102,6 +102,8 @@ export const ZH: Record<string, string> = {
   "Full resume preview is coming in a later phase — this shows the candidate's basic profile for now.":
     "完整简历预览将在后续阶段上线——目前先展示候选人的基本信息。",
   "No scored candidates to compare yet.": "暂无已评分的候选人可供对比。",
+  "Comparing needs at least 2 scored candidates — %s scored so far.": "至少需要 2 名已评分的候选人才能对比——目前已评分 %s 名。",
+  "%s/2 scored": "已评分 %s/2", "Score next candidate": "去评分下一位", "Checking scores…": "正在核对评分…", "No candidate is waiting for a score yet.": "暂无待评分的候选人。",
   "Awaiting next step": "待处理后续", "Pending test": "待测试", "Pending submission": "待提交",
   "Test sent": "已发送测试", "Pending result review": "待审核结果", "Waiting for result": "等待返回结果",
   "Invite pending": "待发送邀请", "Test pending": "待测试", "Submission pending": "待提交",

@@ -8,12 +8,12 @@ import { Icon } from "../components/ui/Icon";
 import { roundsForCase } from "../utils/cases";
 import { hasMoreRealWrittenTasks, loadMoreRealWrittenTasks, loadRealWrittenTasksIntoFixtures } from "../data/realTasksMerge";
 import { isWrittenTestTask, taskCountsFor, writtenStatusFromCase, writtenTaskJob, writtenTaskStatus, writtenTestTasks, type WrittenTaskStatus } from "../utils/writtenTasks";
-import { fetchCaseAiContext, fetchWrittenTaskStats, type WrittenTaskStats } from "../data/writtenApi";
+import { fetchCaseAiContext, fetchWrittenTaskStats, listCaseInvitations, type WrittenTaskStats } from "../data/writtenApi";
 import {
   PROJECT, INVITATIONS, MAIL, RESULTS, EVALUATIONS, TASKS, CASES, CORE_CANDIDATES, CORE_JOBS, COMPARISONS,
   fmtDateShort, nowISO, TZ, type CoreCandidate, type CoreJob, type Task,
 } from "../data/fixtures";
-import { latestResultForCase } from "../data/realPlanItemsMerge";
+import { applyRealEvaluation, latestResultForCase } from "../data/realPlanItemsMerge";
 import { CreateWrittenTaskModal } from "../components/CreateWrittenTaskModal";
 import type { QuickStartResult } from "../data/writtenApi";
 import { initials } from "../lib/initials";
@@ -29,6 +29,36 @@ function candidateOf(caseId: string): CoreCandidate | null {
 function isDueToday(iso: string, clockOffsetMin: number) {
   if (!iso) return false;
   return sameDayIn(iso, nowISO(clockOffsetMin), TZ);
+}
+
+const MIN_TO_COMPARE = 2;
+
+function scoredCasesOf(tasks: Task[]) {
+  return tasks.map((tk) => tk.sourceRef).filter((cid): cid is string => !!cid && hasScoreForCase(cid));
+}
+
+/**
+ * The role cluster's compare button (#403): with fewer than two scored candidates it is disabled and says how
+ * many are scored, and offers the next candidate waiting for a score -- or says there is none yet.
+ */
+function CompareEntry({ checking, scored, toScore, onCompare, onScore }: { checking: boolean; scored: number; toScore?: Task; onCompare: () => void; onScore: (task: Task) => void }) {
+  const { t } = useStore();
+  if (checking && scored < MIN_TO_COMPARE) return <span className="tiny muted">{t("Checking scores…")}</span>;
+  if (scored >= MIN_TO_COMPARE) return <Button size="sm" variant="ghost" onClick={onCompare}>{t("Compare candidates")}</Button>;
+  const why = t("Comparing needs at least 2 scored candidates — %s scored so far.").replace("%s", String(scored));
+  return (
+    <span style={{ display: "inline-flex", alignItems: "center", gap: 8 }}>
+      <span title={why}>
+        <Button size="sm" variant="ghost" disabled>{t("Compare candidates")}</Button>
+      </span>
+      <span className="tiny muted">{t("%s/2 scored").replace("%s", String(scored))}</span>
+      {toScore ? (
+        <Button size="sm" variant="ghost" onClick={() => onScore(toScore)}>{t("Score next candidate")}</Button>
+      ) : (
+        <span className="tiny muted">{t("No candidate is waiting for a score yet.")}</span>
+      )}
+    </span>
+  );
 }
 
 /** Mirrors ComparisonDetailPage's unexported comparableCells() gate: only candidates that
@@ -98,6 +128,18 @@ export function TasksPage() {
   // eslint can't see that writtenTestTasks() reads those mutable module dicts.
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const allWritten = useMemo(() => writtenTestTasks(), [state.realTasksVersion, refreshVersion]);
+  // The role clusters count scored candidates (#403), so their evaluations are read once the clusters are shown.
+  const [scoresChecked, setScoresChecked] = useState<Set<string>>(() => new Set());
+  useEffect(() => {
+    if (view !== "cluster") return;
+    const caseIds = [...new Set(allWritten.map((tk) => tk.sourceRef).filter((cid): cid is string => !!cid && !scoresChecked.has(cid)))];
+    if (!caseIds.length) return;
+    let cancelled = false;
+    void Promise.all(caseIds.map((cid) => listCaseInvitations(cid).then((invs) => invs.forEach((inv) => applyRealEvaluation(cid, inv))).catch(() => undefined)))
+      .then(() => { if (!cancelled) setScoresChecked((prev) => new Set([...prev, ...caseIds])); });
+    return () => { cancelled = true; };
+  }, [view, allWritten, scoresChecked]);
+
   // Back from a task to the same filter: once the list has loaded again, scroll to where it was left (#408).
   const restored = useRef(false);
   useEffect(() => {
@@ -170,11 +212,9 @@ export function TasksPage() {
   const handleViewResume = (candidate: CoreCandidate, job: CoreJob) => setResumeFor({ candidate, job });
 
   const handleCompare = (job: CoreJob, groupTasks: Task[]) => {
-    const scoredCaseIds = groupTasks.map((tk) => tk.sourceRef).filter((cid): cid is string => !!cid && hasScoreForCase(cid));
-    if (scoredCaseIds.length === 0) {
-      say(t("No scored candidates to compare yet."), { type: "danger" });
-      return;
-    }
+    const scoredCaseIds = scoredCasesOf(groupTasks);
+    // A comparison needs two scored candidates (#403); the button says so before it is clicked.
+    if (scoredCaseIds.length < MIN_TO_COMPARE) return;
     const cmpId = `cmp_job_${job.id}`;
     COMPARISONS[cmpId] = { id: cmpId, caseIds: scoredCaseIds, mode: "current_summary", createdAt: nowISO(state.clockOffsetMin), note: "Comparison created from the written test role cluster." };
     navigate(`/comparisons/${cmpId}`);
@@ -283,7 +323,13 @@ export function TasksPage() {
                   </div>
                   <div style={{ fontSize: 15 }}>{groupTasks.length} {t("candidates")}</div>
                   <div className="flex gap-2" style={{ display: "flex", gap: 8, flex: "none", whiteSpace: "nowrap" }} onClick={(e) => e.stopPropagation()}>
-                    <Button size="sm" variant="ghost" onClick={() => handleCompare(job, groupTasks)}>{t("Compare candidates")}</Button>
+                    <CompareEntry
+                      checking={groupTasks.some((tk) => tk.sourceRef && !scoresChecked.has(tk.sourceRef))}
+                      scored={scoredCasesOf(groupTasks).length}
+                      toScore={groupTasks.find((tk) => tk.sourceRef && !hasScoreForCase(tk.sourceRef) && writtenTaskStatus(tk) === "pending_result_review")}
+                      onCompare={() => handleCompare(job, groupTasks)}
+                      onScore={(tk) => navigate(`/cases/${tk.sourceRef}/plan?tab=evaluation`)}
+                    />
                     <Button size="sm" variant="ghost" onClick={handleLinkCandidate}>{t("Link candidate")}</Button>
                   </div>
                 </div>

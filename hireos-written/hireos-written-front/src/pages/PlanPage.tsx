@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useReducer, useState } from "react";
-import { useParams } from "react-router-dom";
+import { useParams, useSearchParams } from "react-router-dom";
 import { useStore } from "../store/StoreContext";
 import { StatusBadge } from "../utils/status";
 import { Badge, Breadcrumbs, Button, EmptyState, Tabs } from "../components/ui/Primitives";
@@ -43,7 +43,12 @@ export function PlanPage() {
   const { t, say, state } = useStore();
   const c = CASES[caseId];
 
-  const [activeTab, setActiveTabState] = useState<TabKey>(planPageSelectedTab[caseId] ?? "plan");
+  // A link can open a given tab, e.g. My Tasks' "score this candidate" (#403); otherwise the last one used.
+  const [searchParams] = useSearchParams();
+  const linkedTab = searchParams.get("tab");
+  const [activeTab, setActiveTabState] = useState<TabKey>(
+    linkedTab === "plan" || linkedTab === "submission" || linkedTab === "evaluation" || linkedTab === "result" ? linkedTab : planPageSelectedTab[caseId] ?? "plan",
+  );
   const setActiveTab = (key: TabKey) => {
     planPageSelectedTab[caseId] = key;
     setActiveTabState(key);
