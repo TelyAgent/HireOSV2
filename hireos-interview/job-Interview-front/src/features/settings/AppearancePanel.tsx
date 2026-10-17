@@ -34,6 +34,14 @@ export function AppearancePanel() {
           <Radio.Button value="large">{t("Large")}</Radio.Button>
         </Radio.Group>
       </div>
+      <div
+        className={`appearance-preview appearance-preview-${state.textSize}`}
+        aria-live="polite"
+        aria-label={t("Text size preview")}
+      >
+        <div className="appearance-preview-label">{t("Text size preview")}</div>
+        <p>{t("Review the details below before you continue. This preview updates immediately when you change the text size.")}</p>
+      </div>
     </>
   );
 }
