@@ -374,6 +374,11 @@ export class CopilotService {
   /** "Paste a link or text": reads a public job posting page, or takes pasted JD text, through the same extraction as an upload. */
   async importSource(identity: Identity, id: string, raw: unknown, meta: RequestMeta) {
     const input = importSourceInputSchema.parse(raw);
+    // A single unsupported URL must not enter the text-to-draft path either.
+    const source = input.url ?? input.text ?? '';
+    if (/^[a-z][a-z\d+.-]*:\/\/\S+$/i.test(source) && !/^https?:\/\//i.test(source)) {
+      throw new BadRequestException({ code: 'UNSUPPORTED_LINK_PROTOCOL', message: 'Only http:// and https:// links are supported. Paste the full JD text instead.' });
+    }
     const conversation = await this.loadConversation(identity, id);
     if (conversation.phase === 'completed') throw new ConflictException({ code: 'CONVERSATION_COMPLETED' });
     const key = meta.idempotencyKey?.trim();

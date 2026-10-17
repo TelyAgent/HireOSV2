@@ -18,6 +18,9 @@ import {
   TrendSvg,
 } from "../components/ui/Icons";
 import { characters, initials } from "../lib/initials";
+import { ResumePreview } from '../features/project-intake/ResumePreview';
+import { Input } from 'antd';
+import { SearchOutlined } from '@ant-design/icons';
 
 // By whole characters, never half of one (#240).
 function initialsFromTitle(title: string) {
@@ -35,7 +38,10 @@ export function HomePage() {
   const [loadError, setLoadError] = useState('');
   const [loading, setLoading] = useState(true);
   const [reload, setReload] = useState(0);
+  const dataReady = !loading && !loadError;
+  const metricValue = (value: number) => loading ? it.loading : loadError ? (state.lang === 'zh' ? '暂不可用' : 'Unavailable') : value;
   const [expandedRoles, setExpandedRoles] = useState<Record<string, boolean>>({});
+  const [resumeTaskId, setResumeTaskId] = useState<string | null>(null);
   useEffect(() => {
     let active = true;
     setLoading(true);
@@ -70,6 +76,7 @@ export function HomePage() {
   const jobsById = new Map(jobs.map((j) => [j.id, j]));
   // Phase-1 dedupe flag from the backend: the résumé's email matches another Core Record candidate.
   const duplicateCandidateIds = new Set(savedTasks.filter((t) => t.candidate.possibleDuplicate).map((t) => t.candidate.id));
+  const resumeTaskIds = new Set(savedTasks.filter(t => t.resume?.material?.id).map(t => t.id));
 
   const taskRows = tasks.map((task) => {
     const job = jobsById.get(task.jobId);
@@ -86,6 +93,7 @@ export function HomePage() {
       role: job?.title || it.notLinked,
       candidate: candidate?.name || it.notLinked,
       candidateLinked: !!candidate,
+      hasResume: resumeTaskIds.has(task.id),
       possibleDuplicate: duplicateCandidateIds.has(task.candidateId),
       status: task.status,
       statusLabel: state.lang === "zh" ? meta.zh : meta.en,
@@ -190,6 +198,8 @@ export function HomePage() {
     { label: t.cardAwaitingJoint, value: 0, sub: t.cardAwaitingJointSub, icon: <CheckCircleSvg /> },
     { label: t.cardAwaitingScheduling, value: 0, sub: t.cardAwaitingSchedulingSub, icon: <CalendarSvg /> },
     { label: t.cardUnknownRoles, value: unknownRolesCount, sub: t.cardUnknownRolesSub, icon: <HelpIcon /> },
+  ];
+  const trendCards = [
     { label: t.cardInterviewsCompleted, value: 0, sub: t.cardLast30, icon: <ChartSvg /> },
     { label: t.cardPackagesCompleted, value: 0, sub: t.cardLast30, icon: <BoxIcon /> },
     { label: t.cardProjectsOnHold, value: 0, sub: t.cardOnHoldStatus, icon: <PauseSvg /> },
@@ -272,8 +282,8 @@ export function HomePage() {
           {myWorkCards.map((c, i) => (
             <div key={i} style={statsCard}>
               <div>
-                <div style={{ fontSize: 22, fontWeight: 700, lineHeight: 1.15 }}>
-                  {c.value}
+                <div data-testid="home-metric" style={{ fontSize: dataReady ? 22 : 12, minHeight: 26, fontWeight: 700, lineHeight: 1.15 }}>
+                  {metricValue(c.value)}
                 </div>
                 <div style={{ fontWeight: 500 }}>{c.label}</div>
                 <div
@@ -341,8 +351,8 @@ export function HomePage() {
             {overviewCards.map((c, i) => (
               <div key={i} style={statsCard}>
                 <div>
-                  <div style={{ fontSize: 22, fontWeight: 700, lineHeight: 1.15 }}>
-                    {c.value}
+                  <div data-testid="home-metric" style={{ fontSize: dataReady ? 22 : 12, minHeight: 26, fontWeight: 700, lineHeight: 1.15 }}>
+                    {metricValue(c.value)}
                   </div>
                   <div
                     style={{
@@ -386,6 +396,8 @@ export function HomePage() {
       <div>
         <button
           onClick={() => set({ moreOpen: !state.moreOpen })}
+          aria-expanded={state.moreOpen}
+          aria-controls="additional-statistics"
           style={{
             display: "flex",
             alignItems: "center",
@@ -407,19 +419,25 @@ export function HomePage() {
               color: "var(--ink-3)",
             }}
           >
-            {t.moreStats}
+            {t.moreStats} ({moreCards.length + trendCards.length})
           </div>
           <div style={{ fontSize: 12, color: "var(--ink-3)" }}>
             {state.moreOpen ? (state.lang === "zh" ? "收起 ⌃" : "Show less ⌃") : (state.lang === "zh" ? "展开 ⌄" : "Show more ⌄")}
           </div>
         </button>
         {state.moreOpen && (
-          <div style={statsGrid}>
-            {moreCards.map((c, i) => (
+          <div id="additional-statistics">
+            {[
+              { id: 'supplementary', title: state.lang === 'zh' ? '补充指标' : 'Supplementary metrics', cards: moreCards },
+              { id: 'trends', title: state.lang === 'zh' ? '趋势与附加统计' : 'Trends & additional stats', cards: trendCards },
+            ].map(group => <section key={group.id} aria-labelledby={`${group.id}-heading`} style={{ marginTop: 16 }}>
+              <h3 id={`${group.id}-heading`} style={{ margin: 0, fontSize: 13, fontWeight: 600 }}>{group.title} ({group.cards.length})</h3>
+              <div style={statsGrid}>
+            {group.cards.map((c, i) => (
               <div key={i} style={statsCard}>
                 <div>
-                  <div style={{ fontSize: 22, fontWeight: 700, lineHeight: 1.15 }}>
-                    {c.value}
+                  <div data-testid="home-metric" style={{ fontSize: dataReady ? 22 : 12, minHeight: 26, fontWeight: 700, lineHeight: 1.15 }}>
+                    {metricValue(c.value)}
                   </div>
                   <div
                     style={{
@@ -456,6 +474,8 @@ export function HomePage() {
                 </div>
               </div>
             ))}
+              </div>
+            </section>)}
           </div>
         )}
       </div>
@@ -463,13 +483,23 @@ export function HomePage() {
       <div style={{ display: "flex", flexWrap: "wrap", gap: 20, alignItems: "start" }}>
         <div style={{ flex: "2 1 480px", minWidth: 0, display: "flex", flexDirection: "column", gap: 10 }}>
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, flexWrap: "wrap" }}>
+            <Input
+              type="search"
+              aria-label={state.lang === 'zh' ? '搜索项目或候选人' : 'Search projects or candidates'}
+              placeholder={state.lang === 'zh' ? '搜索项目或候选人' : 'Search projects or candidates'}
+              prefix={<SearchOutlined />}
+              allowClear
+              value={state.searchQuery}
+              onChange={event => set({ searchQuery: event.target.value })}
+              style={{ width: 280, maxWidth: '100%' }}
+            />
             <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
               {filters.map((f) => {
                 const active = state.homeFilter === f;
                 return (
                   <Chip
                     key={f}
-                    label={`${state.lang === 'zh' ? ({ 'All projects': '全部项目', 'Needs my confirmation': '待我确认', Draft: '草稿', Published: '已发布' })[f] : f} (${counts[f]})`}
+                    label={`${state.lang === 'zh' ? ({ 'All projects': '全部项目', 'Needs my confirmation': '待我确认', Draft: '草稿', Published: '已发布' })[f] : f}${dataReady ? ` (${counts[f]})` : ''}`}
                     active={active}
                     onClick={() => set({ homeFilter: f })}
                   />
@@ -505,6 +535,16 @@ export function HomePage() {
             </div>
           </div>
 
+          {dataReady && draftOnlyJobCount > 0 && (
+            <div style={{ fontSize: 12, color: 'var(--ink-3)', display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+              <span>{state.lang === 'zh'
+                ? `草稿 ${counts.Draft} = 候选人任务 ${counts.Draft - draftOnlyJobCount} + 未关联候选人的岗位 ${draftOnlyJobCount}。`
+                : `Draft ${counts.Draft} = ${counts.Draft - draftOnlyJobCount} candidate tasks + ${draftOnlyJobCount} ${draftOnlyJobCount === 1 ? 'job' : 'jobs'} without candidates.`}</span>
+              <button onClick={() => set({ homeViewMode: 'cluster', homeFilter: 'Draft', searchQuery: '' })} style={{ border: 0, padding: 0, background: 'none', color: 'var(--brand)', cursor: 'pointer' }}>
+                {state.lang === 'zh' ? '按 JD 查看草稿' : 'View drafts by JD'}
+              </button>
+            </div>
+          )}
           <div
             role="table"
             aria-label={t.interviewProjects}
@@ -523,9 +563,9 @@ export function HomePage() {
                 <button onClick={() => setReload((n) => n + 1)} style={{ color: "var(--brand)", background: "none", border: 0, cursor: "pointer", padding: 0 }}>{it.retry}</button>
               </div>
             )}
-            {!jobs.length && <div style={{ padding: 18 }}>{it.empty}</div>}
+            {dataReady && !jobs.length && <div style={{ padding: 18 }}>{it.empty}</div>}
 
-            {jobs.length > 0 && state.homeViewMode !== "cluster" && (
+            {dataReady && jobs.length > 0 && state.homeViewMode !== "cluster" && (
               <>
                 <div
                   style={{
@@ -555,7 +595,7 @@ export function HomePage() {
                     role="button"
                     tabIndex={0}
                     onClick={() => p.open()}
-                    onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); p.open(); } }}
+                    onKeyDown={(e) => { if (e.target === e.currentTarget && (e.key === "Enter" || e.key === " ")) { e.preventDefault(); p.open(); } }}
                     style={{
                       display: "grid",
                       gridTemplateColumns: "1.75fr 1.15fr 1.15fr .82fr .74fr",
@@ -611,13 +651,9 @@ export function HomePage() {
                       <button
                         onClick={(e) => {
                           e.stopPropagation();
-                          say(
-                            p.candidateLinked
-                              ? (state.lang === "zh" ? "简历预览功能即将上线。" : "Résumé preview is coming soon.")
-                              : (state.lang === "zh" ? "请先关联候选人简历。" : "Link a candidate résumé first."),
-                          );
+                          setResumeTaskId(p.id);
                         }}
-                        disabled={!p.candidateLinked}
+                        disabled={!p.hasResume}
                         style={{
                           height: 30,
                           width: "100%",
@@ -625,12 +661,12 @@ export function HomePage() {
                           border: "1px solid var(--line)",
                           borderRadius: 8,
                           background: "var(--surface)",
-                          color: p.candidateLinked ? "var(--brand)" : "var(--ink-3)",
+                          color: p.hasResume ? "var(--brand)" : "var(--ink-3)",
                           fontSize: 11.5,
-                          cursor: p.candidateLinked ? "pointer" : "not-allowed",
+                          cursor: p.hasResume ? "pointer" : "not-allowed",
                         }}
                       >
-                        {t.viewResume}
+                        {p.hasResume ? t.viewResume : (state.lang === 'zh' ? '未提供简历' : 'No resume')}
                       </button>
                     </div>
                   </div>
@@ -638,7 +674,7 @@ export function HomePage() {
               </>
             )}
 
-            {jobs.length > 0 && state.homeViewMode === "cluster" && (
+            {dataReady && jobs.length > 0 && state.homeViewMode === "cluster" && (
               <>
                 <div
                   style={{
@@ -730,10 +766,11 @@ export function HomePage() {
                                     {c.currentRound && <div style={{ fontSize: 10.5, color: "var(--ink-3)" }}>{c.currentRound.interviewer}</div>}
                                   </div>
                                   <button
-                                    onClick={() => say(state.lang === "zh" ? "简历预览功能即将上线。" : "Résumé preview is coming soon.")}
+                                    disabled={!c.hasResume}
+                                    onClick={() => setResumeTaskId(c.id)}
                                     style={{ height: 28, padding: "0 8px", border: "1px solid var(--line)", borderRadius: 7, background: "var(--surface)", color: "var(--brand)", fontSize: 10.5, cursor: "pointer" }}
                                   >
-                                    {t.viewResume}
+                                    {c.hasResume ? t.viewResume : (state.lang === 'zh' ? '未提供简历' : 'No resume')}
                                   </button>
                                 </div>
                               ))}
@@ -791,6 +828,7 @@ export function HomePage() {
           </div>
         </div>
       </div>
+      {resumeTaskId && <ResumePreview key={resumeTaskId} taskId={resumeTaskId} lang={state.lang} onClose={() => setResumeTaskId(null)} />}
     </div>
   );
 }

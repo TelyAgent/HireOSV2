@@ -27,11 +27,25 @@ function DebriefRow({ card, bar, open, onToggle, zh }: { card: DebriefCard; bar:
       {open && (
         <div style={{ padding: "0 16px 14px", display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(240px,1fr))", gap: 10 }}>
           <div style={{ padding: "10px 12px", border: "1px solid var(--line)", borderRadius: 9, background: "var(--surface-2)" }}>
+            {card.roundScores?.length ? card.roundScores.map(record => (
+              <section key={record.roundId} aria-label={zh ? `第 ${record.sequence} 轮人工记录` : `Round ${record.sequence} human record`} style={{ padding: '10px 0', borderBottom: '1px solid var(--line)', overflowWrap: 'anywhere' }}>
+                <strong style={{ fontSize: 12 }}>{zh ? `第 ${record.sequence} 轮` : `Round ${record.sequence}`} · {record.name}</strong>
+                <div style={{ marginTop: 4, fontSize: 12 }}>{zh ? '面试官：' : 'Interviewer: '}{record.interviewer?.name || (zh ? '未记录' : 'Not recorded')}</div>
+                <div style={{ marginTop: 4, fontSize: 13 }}>{zh ? '人工分：' : 'Human score: '}{record.score ?? (zh ? '未知' : 'Unknown')}</div>
+                <div style={{ marginTop: 4, fontSize: 12, whiteSpace: 'pre-wrap' }}>{record.note || (zh ? '未记录理由。' : 'No rationale recorded.')}</div>
+                {record.aiEvidence ? <blockquote style={{ margin: '8px 0 0', fontSize: 12 }}>
+                  <div>{zh ? '该轮 AI 引用的原文（非人工标注）' : 'Round AI-cited source (not a human annotation)'}</div>
+                  <div style={{ whiteSpace: 'pre-wrap' }}>{record.aiEvidence.quote}</div>
+                  <div style={{ color: 'var(--ink-3)' }}>{record.aiEvidence.segmentId}</div>
+                </blockquote> : <div style={{ marginTop: 4, fontSize: 12, color: 'var(--ink-3)' }}>{zh ? '未记录原文引用。' : 'No source citation recorded.'}</div>}
+              </section>
+            )) : <>
             <div style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: 10.5, fontWeight: 700, letterSpacing: ".04em", color: "var(--ink-3)" }}>
               {zh ? "记录分数（人工）" : "RECORDED (HUMAN)"}{card.round && ` · ${zh ? `第 ${card.round.sequence} 轮` : `Round ${card.round.sequence}`}`}
             </div>
             <div style={{ marginTop: 5, fontSize: 13, fontWeight: 700 }}>{card.score ?? (zh ? "未评分" : "Not scored")}</div>
             {card.note && <div style={{ marginTop: 5, fontSize: 12, lineHeight: 1.5, color: "var(--ink-2)" }}>{card.note}</div>}
+            </>}
           </div>
           <div style={{ padding: "10px 12px", border: "1px solid var(--ai)", borderRadius: 9, background: "var(--ai-soft)" }}>
             <div style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: 10.5, fontWeight: 700, letterSpacing: ".04em", color: "var(--ai)" }}>{zh ? "AI 草稿（跨轮）" : "AI DRAFT (ALL ROUNDS)"}</div>

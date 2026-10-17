@@ -65,6 +65,32 @@ beforeEach(() => {
 afterEach(cleanup);
 
 describe('Paste a link that cannot be read (#64)', () => {
+  it.each(['file:///tmp/uj-test-m4.txt', 'ftp://example.com/jd'])('#85: rejects %s before import, preserving input and no draft', async (url) => {
+    renderPanel();
+    await sendLink(url);
+    expect(await screen.findByRole('alert')).toHaveTextContent('Only http:// and https:// links are supported.');
+    expect(composerBox().value).toBe(url);
+    expect(api.importCopilotSource).not.toHaveBeenCalled();
+    expect(api.confirmCopilotDraft).not.toHaveBeenCalled();
+    expect(screen.queryByRole('button', { name: /^Create/ })).toBeNull();
+  });
+
+  it('#85: login failure offers a focused full-text recovery without creating a draft', async () => {
+    api.importCopilotSource.mockRejectedValue(new CopilotRequestError(400, { code: 'LINK_UNREADABLE', message: 'This page requires login. Paste the full JD text.' }));
+    renderPanel();
+    await sendLink(LINK);
+    expect(await screen.findByRole('alert')).toHaveTextContent('requires login');
+    fireEvent.click(screen.getByRole('button', { name: 'Paste full JD text' }));
+    expect(composerBox()).toHaveFocus();
+    expect(composerBox().value).toBe('');
+    expect(screen.getByText(LINK, { exact: true })).toBeInTheDocument();
+    const text = 'Platform engineer. Build and operate reliable infrastructure.';
+    api.importCopilotSource.mockResolvedValue({ ...conversation('conv-1'), reply: 'Please review the source.' } as never);
+    fireEvent.change(composerBox(), { target: { value: text } });
+    fireEvent.click(screen.getByRole('button', { name: 'Send' }));
+    await waitFor(() => expect(api.importCopilotSource).toHaveBeenLastCalledWith('conv-1', { text }));
+    expect(api.confirmCopilotDraft).not.toHaveBeenCalled();
+  });
   it('AC-3: says why, keeps the link in the composer for pasting the JD instead, and drafts nothing', async () => {
     api.importCopilotSource.mockRejectedValue(unreadable());
     renderPanel();

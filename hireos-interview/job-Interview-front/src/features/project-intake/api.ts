@@ -38,6 +38,7 @@ export type Job = JobSummary & {
 
 // GET /tasks — the flat, candidate-centric side. Each row is a unique (Job, Candidate) pair.
 export type TaskSummary = {
+  resume: { material: { id: string; name: string } } | null;
   id: string; jobId: string; status: string; reviewed: boolean; version: number;
   matchScore: number | null; matchRecommendation: string | null; createdAt: string;
   job: { title: string }; candidate: CandidateRef & { possibleDuplicate?: boolean };
@@ -72,6 +73,7 @@ export type CardInput = {
   competencyTags: string[]; expectedEvidence: string; levelAnchors: LevelAnchors; weight: number;
 };
 export type RubricVersion = {
+  sourceJdVersion?: number | null;
   id: string; jobId: string; versionNumber: number; status: 'draft' | 'confirmed'; version: number;
   confirmedBy: string | null; confirmedAt: string | null; createdAt: string; cards: CapabilityCard[];
 };
@@ -122,6 +124,7 @@ export type DecisionState = {
 export type DebriefCard = {
   id: string; requirement: string; cardPriority: CardPriority; weight: number;
   score: number | null; note: string; round: { sequence: number; name: string } | null;
+  roundScores?: { roundId: string; sequence: number; name: string; interviewer: { id: string; name: string } | null; score: number | null; note: string; updatedAt: string; aiEvidence: { segmentId: string; quote: string } | null }[];
   ai: { score: number | null; rationale: string; quote: string | null } | null;
 };
 export type DebriefSummary = {

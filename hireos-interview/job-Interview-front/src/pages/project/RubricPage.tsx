@@ -7,6 +7,7 @@ import { useProjectTask } from "../../features/project-intake/useTask";
 import { useRubric } from "../../features/project-intake/useRubric";
 import type { CapabilityCard, CardInput, CardPriority, ResponsibilityType } from "../../features/project-intake/api";
 import { errorText } from "../../features/project-intake/i18n";
+import { saveCardInputs } from '../../features/project-intake/rubric-card-inputs';
 
 const PRIORITY_TONE: Record<CardPriority, Tone> = { P0: "bad", P1: "warn", P2: "unknown" };
 const RESPONSIBILITY_OPTIONS: ResponsibilityType[] = ["lead", "collaborate", "support"];
@@ -73,7 +74,7 @@ export function RubricPage() {
   const saveCard = async () => {
     if (!draft || !rubric) return;
     if (!draft.requirement.trim()) { say(zh ? "请填写 JD 要求。" : "Enter the JD requirement."); return; }
-    const cards = rubric.cards.map((c) => c.id === draft.id ? draftToInput(draft) : draftToInput(draftFromCard(c)));
+    const cards = saveCardInputs(rubric.cards.map(c => draftToInput(draftFromCard(c))), draftToInput(draft));
     setSaving(true);
     try {
       await updateCards(rubric.version, cards);
@@ -146,6 +147,16 @@ export function RubricPage() {
         </span>
       </div>
 
+      {isConfirmed && rubric && (
+        <dl aria-label={zh ? '评分标准确认记录' : 'Rubric confirmation record'} style={{ margin: 0, fontSize: 12.5, overflowWrap: 'anywhere' }}>
+          <dt>{zh ? '确认人（账号 ID）' : 'Confirmed by (account ID)'}</dt>
+          <dd>{rubric.confirmedBy || (zh ? '未记录' : 'Not recorded')}</dd>
+          <dt>{zh ? '确认时间' : 'Confirmed at'}</dt>
+          <dd>{rubric.confirmedAt && Number.isFinite(Date.parse(rubric.confirmedAt)) ? new Date(rubric.confirmedAt).toLocaleString(zh ? 'zh-CN' : 'en-US') : (zh ? '未记录' : 'Not recorded')}</dd>
+          <dt>{zh ? '来源 JD 版本' : 'Source JD version'}</dt>
+          <dd>{rubric.sourceJdVersion != null ? `v${rubric.sourceJdVersion}` : (zh ? '未记录' : 'Not recorded')}</dd>
+        </dl>
+      )}
       {generation?.status === "failed" && (
         <div className="rounded-xl border border-[var(--bad)] bg-[var(--bad-soft)] px-3.5 py-2.5 text-[12.5px] text-[var(--ink)]">
           {errorText(generation.errorCode || "REQUEST_FAILED", state.lang)}{" "}

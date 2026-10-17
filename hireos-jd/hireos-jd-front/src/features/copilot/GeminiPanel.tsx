@@ -537,6 +537,11 @@ export function GeminiPanel({ ctx }: { ctx: GeminiCtx }) {
   };
 
   const runImport = async (text: string) => {
+    if (/^[a-z][a-z\d+.-]*:\/\//i.test(text) && !/^https?:\/\//i.test(text)) {
+      push({ role: 'ai', kind: 'request-failed', text: t('Only http:// and https:// links are supported. Paste the full JD text instead.'), retry: { action: 'link', text } });
+      setInput(text);
+      return;
+    }
     if (/^https?:\/\/\S+$/i.test(text)) {
       if (await runStep((conversationId) => importCopilotSource(conversationId, { url: text }), true, { path: "link", detail: text }, { action: "link", text }))
         setPath("home");
@@ -1130,6 +1135,7 @@ export function GeminiPanel({ ctx }: { ctx: GeminiCtx }) {
                 onSubmitForm={(fields, seniority) => void submitForm(i, fields, seniority)}
                 onRetryCreate={() => void retryCreate(i)}
                 onRetryRequest={() => retryRequest(i)}
+                onPasteText={() => { setPath('link'); setInput(''); composerRef.current?.focus(); }}
                 onStartOver={startNewConversation}
               />
             ))}
@@ -1957,6 +1963,7 @@ function GeminiMessage({
   onSubmitForm,
   onRetryCreate,
   onRetryRequest,
+  onPasteText,
   onStartOver,
 }: {
   msg: GeminiMsg;
@@ -1972,6 +1979,7 @@ function GeminiMessage({
   onSubmitForm: (fields: CopilotJdFields, seniority: string) => void;
   onRetryCreate: () => void;
   onRetryRequest: () => void;
+  onPasteText: () => void;
   onStartOver: () => void;
 }) {
   const { t } = useStore();
@@ -2016,6 +2024,11 @@ function GeminiMessage({
               <Button variant="primary" size="sm" disabled={busy} onClick={onRetryRequest}>
                 <Icon name="refresh" />
                 {msg.retry.action === "upload" ? t("Choose the file again") : t("Retry")}
+              </Button>
+            )}
+            {msg.retry?.action === 'link' && (
+              <Button variant="secondary" size="sm" disabled={busy} onClick={onPasteText}>
+                {t('Paste full JD text')}
               </Button>
             )}
             <Button variant="secondary" size="sm" disabled={busy} onClick={onStartOver}>

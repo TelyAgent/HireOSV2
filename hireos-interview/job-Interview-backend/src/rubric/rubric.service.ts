@@ -10,7 +10,7 @@ import type { z } from 'zod';
 
 const RUBRIC_SELECT = {
   id: true, jobId: true, versionNumber: true, status: true, version: true,
-  confirmedBy: true, confirmedAt: true, createdAt: true,
+  confirmedBy: true, confirmedAt: true, createdAt: true, sourceParseJobId: true,
   cards: {
     orderBy: { createdAt: 'asc' as const },
     select: {
@@ -58,7 +58,7 @@ export class RubricService {
     return {
       jobId, jdVersion: job.jdVersion, locked: await this.isLocked(workspaceId, jobId),
       generation: generationJob ? { id: generationJob.id, status: generationJob.status, errorCode: generationJob.errorCode } : null,
-      rubric,
+      rubric: rubric ? { ...rubric, sourceJdVersion: job.parseJobs.find(p => p.id === rubric.sourceParseJobId)?.inputVersion ?? null } : null,
     };
   }
 
@@ -106,6 +106,7 @@ export class RubricService {
     return this.db.rubricVersion.create({
       data: {
         workspaceId: identity.workspaceId, jobId, versionNumber: latest.versionNumber + 1, status: 'draft',
+        sourceParseJobId: latest.sourceParseJobId,
         cards: { create: latest.cards.map((c) => ({
           workspaceId: identity.workspaceId, requirement: c.requirement, responsibilityType: c.responsibilityType,
           cardPriority: c.cardPriority, competencyTags: c.competencyTags, expectedEvidence: c.expectedEvidence,

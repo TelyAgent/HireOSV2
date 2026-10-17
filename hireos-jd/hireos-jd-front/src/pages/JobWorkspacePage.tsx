@@ -2,7 +2,8 @@ import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { MainInner } from "../components/AppShell";
 import { Icon } from "../components/ui/Icons";
-import { Button, ErrorState, PersonAvatar, StatusBadge } from "../components/ui/Primitives";
+import { Button, ErrorState, PersonAvatar } from "../components/ui/Primitives";
+import { JobStateLabels } from '../features/workspace/JobStateLabels';
 import { useStore } from "../store/StoreContext";
 import { DocumentTab } from "../features/workspace/DocumentTab";
 import { ApprovalTab } from "../features/workspace/ApprovalTab";
@@ -190,7 +191,7 @@ export function JobWorkspacePage() {
           </div>
           <div className="jw-header-top">
             <h1 className="jw-title">{job.title}</h1>
-            <StatusBadge kind="hiring_status" value={job.hiringStatus} />
+            <JobStateLabels hiringStatus={job.hiringStatus} publishedVersion={versionInfo ? latestVersion?.versionNo ?? null : undefined} />
             {versionInfo && (
               <button
                 type="button"
@@ -204,13 +205,6 @@ export function JobWorkspacePage() {
                 <Icon name="tag" />
                 {versionInfo.jdCode}
               </button>
-            )}
-            {latestVersion ? (
-              <span className="badge badge-success" title={t("Latest published version")}>
-                v{latestVersion.versionNo} {t("published")}
-              </span>
-            ) : (
-              versionInfo && <span className="badge badge-neutral">{t("Not published")}</span>
             )}
             {latestVersion && unpublished > 0 && (
               <span className="badge badge-warning" title={t("The draft differs from v{n}").replace("{n}", String(latestVersion.versionNo))}>

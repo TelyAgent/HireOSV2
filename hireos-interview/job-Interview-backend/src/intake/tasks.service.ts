@@ -123,6 +123,7 @@ export class TasksService {
         matchScore: true, matchRecommendation: true, createdAt: true,
         job: { select: { title: true } },
         candidate: { select: { id: true, name: true, email: true, possibleDuplicate: true } },
+        resume: { select: { material: { select: { id: true, name: true } } } },
         rounds: { select: { status: true } },
       } });
   }
@@ -203,13 +204,13 @@ export class TasksService {
       select: { cards: { orderBy: { createdAt: 'asc' }, select: { id: true, requirement: true, cardPriority: true, weight: true } } },
     });
     const cards = rubric?.cards ?? [];
-    const rounds = await this.db.interviewRound.findMany({ where: { taskId, workspaceId }, select: { id: true, sequence: true, name: true } });
+    const rounds = await this.db.interviewRound.findMany({ where: { taskId, workspaceId }, select: { id: true, sequence: true, name: true, interviewer: { select: { id: true, name: true } } } });
     const roundById = new Map(rounds.map((r) => [r.id, r]));
     const scores = rounds.length && cards.length
-      ? await this.db.cardScore.findMany({ where: { roundId: { in: rounds.map((r) => r.id) }, cardId: { in: cards.map((c) => c.id) }, score: { not: null } }, orderBy: { updatedAt: 'desc' }, select: { cardId: true, roundId: true, score: true, note: true } })
+      ? await this.db.cardScore.findMany({ where: { workspaceId, roundId: { in: rounds.map((r) => r.id) }, cardId: { in: cards.map((c) => c.id) } }, orderBy: { updatedAt: 'desc' }, select: { cardId: true, roundId: true, score: true, note: true, updatedAt: true, aiQuoteSegmentId: true, aiQuote: true } })
       : [];
     const latestByCard = new Map<string, (typeof scores)[number]>();
-    for (const s of scores) if (!latestByCard.has(s.cardId)) latestByCard.set(s.cardId, s);
+    for (const s of scores) if (s.score != null && !latestByCard.has(s.cardId)) latestByCard.set(s.cardId, s);
     const humanScore = (cardId: string) => latestByCard.get(cardId)?.score ?? null;
 
     const job = await this.db.parseJob.findFirst({ where: { workspaceId, taskId, type: 'debrief_scores' }, orderBy: { inputVersion: 'desc' },
@@ -231,6 +232,14 @@ export class TasksService {
       return {
         id: c.id, requirement: c.requirement, cardPriority: c.cardPriority, weight: c.weight,
         score: human?.score ?? null, note: human?.note ?? '', round: round ? { sequence: round.sequence, name: round.name } : null,
+        roundScores: scores.filter(s => s.cardId === c.id).map(s => {
+          const sourceRound = roundById.get(s.roundId)!;
+          return {
+            roundId: s.roundId, sequence: sourceRound.sequence, name: sourceRound.name,
+            interviewer: sourceRound.interviewer ?? null, score: s.score, note: s.note, updatedAt: s.updatedAt,
+            aiEvidence: s.aiQuoteSegmentId && s.aiQuote ? { segmentId: s.aiQuoteSegmentId, quote: s.aiQuote } : null,
+          };
+        }).sort((a, b) => a.sequence - b.sequence),
         ai: ai ? { score: ai.score, rationale: ai.rationale, quote: ai.quote } : null,
       };
     });
