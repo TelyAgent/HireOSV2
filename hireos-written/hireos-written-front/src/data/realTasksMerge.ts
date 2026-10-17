@@ -54,8 +54,7 @@ function toTask(t: RealWrittenTask): Task {
   return { id: t.id, title: t.title, type: t.type, assignee: t.assignee, status: t.status, dueAt: t.dueAt ?? "", createdAt: t.createdAt, link: `/cases/${t.caseId}/plan`, sourceRef: t.caseId };
 }
 
-export async function loadRealWrittenTasksIntoFixtures(): Promise<void> {
-  const tasks = await listRealWrittenTasks();
+function merge(tasks: RealWrittenTask[]) {
   for (const t of tasks) {
     CORE_CANDIDATES[t.candidateId] = toCandidate(t);
     CORE_JOBS[t.jobId] = toJob(t);
@@ -63,4 +62,25 @@ export async function loadRealWrittenTasksIntoFixtures(): Promise<void> {
     CASES[t.caseId] = toCase(t);
     TASKS[t.id] = toTask(t);
   }
+}
+
+// The task list comes a page at a time (#412): where the next page starts, or null once all are loaded.
+let nextCursor: string | null = null;
+
+/** The newest page of tasks; pages loaded before stay merged. */
+export async function loadRealWrittenTasksIntoFixtures(): Promise<void> {
+  const page = await listRealWrittenTasks();
+  merge(page.items);
+  nextCursor = page.nextCursor;
+}
+
+export function hasMoreRealWrittenTasks(): boolean {
+  return nextCursor !== null;
+}
+
+export async function loadMoreRealWrittenTasks(): Promise<void> {
+  if (!nextCursor) return;
+  const page = await listRealWrittenTasks(nextCursor);
+  merge(page.items);
+  nextCursor = page.nextCursor;
 }

@@ -13,6 +13,26 @@ export function sameDayIn(a: string, b: string, timeZone: string): boolean {
   return dayIn(a, timeZone) === dayIn(b, timeZone);
 }
 
+/** The day `iso` falls on in the zone, as the instants it starts and the next day starts (#412: "Due today"). */
+export function dayRangeIn(iso: string, timeZone: string): { from: string; to: string } {
+  const [y, m, d] = dayIn(iso, timeZone).split("-").map(Number);
+  const startOf = (day: number) => {
+    const midnightUtc = Date.UTC(y, m - 1, day);
+    return new Date(midnightUtc - zoneOffsetMs(midnightUtc - zoneOffsetMs(midnightUtc, timeZone), timeZone)).toISOString();
+  };
+  return { from: startOf(d), to: startOf(d + 1) };
+}
+
+/** How far the zone's wall clock is ahead of UTC at this instant. */
+function zoneOffsetMs(utcMs: number, timeZone: string): number {
+  const parts = Object.fromEntries(
+    new Intl.DateTimeFormat("en-US", { timeZone, hourCycle: "h23", year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", second: "2-digit" })
+      .formatToParts(new Date(utcMs))
+      .map((p) => [p.type, p.value]),
+  );
+  return Date.UTC(+parts.year, +parts.month - 1, +parts.day, +parts.hour, +parts.minute, +parts.second) - Math.floor(utcMs / 1000) * 1000;
+}
+
 export type DisplayLang = "en" | "zh";
 
 /**

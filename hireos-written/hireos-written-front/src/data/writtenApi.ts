@@ -32,10 +32,29 @@ export interface RealWrittenTask {
   jobLocation: string | null;
 }
 
-export async function listRealWrittenTasks(): Promise<RealWrittenTask[]> {
-  const response = await authFetch(`${BASE}/tasks`);
+/** One page of tasks, newest first; pass `nextCursor` back for the next page (#412). */
+export interface RealWrittenTaskPage {
+  items: RealWrittenTask[];
+  nextCursor: string | null;
+}
+
+export async function listRealWrittenTasks(cursor?: string): Promise<RealWrittenTaskPage> {
+  const response = await authFetch(`${BASE}/tasks${cursor ? `?cursor=${encodeURIComponent(cursor)}` : ""}`);
   if (!response.ok) throw new Error(`Request failed (${response.status})`);
-  return response.json() as Promise<RealWrittenTask[]>;
+  return response.json() as Promise<RealWrittenTaskPage>;
+}
+
+/** My Tasks figures counted over every task in the workspace, not just the pages loaded (#412). */
+export interface WrittenTaskStats {
+  total: number;
+  byCaseStatus: Record<string, number>;
+  assignee: { open: number; inProgress: number; reviewsAwaiting: number; dueInRange: number | null };
+}
+
+export async function fetchWrittenTaskStats(query: { assignee: string; dueFrom: string; dueTo: string }): Promise<WrittenTaskStats> {
+  const response = await authFetch(`${BASE}/tasks/stats?${new URLSearchParams(query).toString()}`);
+  if (!response.ok) throw new Error(`Request failed (${response.status})`);
+  return response.json() as Promise<WrittenTaskStats>;
 }
 
 export interface CaseAiContext {

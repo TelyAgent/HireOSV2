@@ -40,3 +40,15 @@ test("#237 AC-2: relative time covers zero, the past and the future in both lang
   assert.deepEqual([relativeTime(minus(3 * 1440), now, "en"), relativeTime(minus(3 * 1440), now, "zh")], ["3d ago", "3 天前"]);
   assert.deepEqual([relativeTime(minus(-120), now, "en"), relativeTime(minus(-120), now, "zh")], ["in 2h", "2 小时后"], "the future, not \"-2h ago\"");
 });
+
+test("#412: a zone's day as the instants it starts and ends, so the server counts the same 'Due today'", async () => {
+  const { dayRangeIn } = await import("../../src/utils/calendar.ts");
+  assert.deepEqual(dayRangeIn(now, TZ), { from: "2026-10-15T16:00:00.000Z", to: "2026-10-16T16:00:00.000Z" });
+  assert.deepEqual(dayRangeIn("2026-10-15T15:59:59Z", TZ), { from: "2026-10-14T16:00:00.000Z", to: "2026-10-15T16:00:00.000Z" });
+  // New York, the day the clocks go back: 25 hours long.
+  assert.deepEqual(dayRangeIn("2026-11-01T15:00:00Z", "America/New_York"), { from: "2026-11-01T04:00:00.000Z", to: "2026-11-02T05:00:00.000Z" });
+  for (const iso of ["2026-10-15T23:00:00Z", "2026-10-16T15:59:00Z"]) {
+    const { from, to } = dayRangeIn(now, TZ);
+    assert.equal(iso >= from && iso < to, sameDayIn(iso, now, TZ), iso);
+  }
+});

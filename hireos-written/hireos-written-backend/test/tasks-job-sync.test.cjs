@@ -19,6 +19,6 @@ test('job fields changed in Core Record are copied to the local job; Core being 
 
   updates.length = 0;
   const down = { listJobs: async () => { throw new Error('CORE_RECORD_UNAVAILABLE'); } };
-  assert.deepEqual(await new TasksService(db, down).list(identity), []);
+  assert.deepEqual(await new TasksService(db, down).list(identity), { items: [], nextCursor: null });
   assert.equal(updates.length, 0);
 });

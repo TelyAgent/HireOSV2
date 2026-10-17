@@ -6,9 +6,9 @@ import { StatusBadge, taskTypeSource } from "../utils/status";
 import { Button, Card, EmptyState } from "../components/ui/Primitives";
 import { Icon } from "../components/ui/Icon";
 import { roundsForCase } from "../utils/cases";
-import { loadRealWrittenTasksIntoFixtures } from "../data/realTasksMerge";
-import { isWrittenTestTask, taskCountsFor, writtenTaskJob, writtenTaskStatus, writtenTestTasks, type WrittenTaskStatus } from "../utils/writtenTasks";
-import { fetchCaseAiContext } from "../data/writtenApi";
+import { hasMoreRealWrittenTasks, loadMoreRealWrittenTasks, loadRealWrittenTasksIntoFixtures } from "../data/realTasksMerge";
+import { isWrittenTestTask, taskCountsFor, writtenStatusFromCase, writtenTaskJob, writtenTaskStatus, writtenTestTasks, type WrittenTaskStatus } from "../utils/writtenTasks";
+import { fetchCaseAiContext, fetchWrittenTaskStats, type WrittenTaskStats } from "../data/writtenApi";
 import {
   PROJECT, INVITATIONS, MAIL, RESULTS, EVALUATIONS, TASKS, CASES, CORE_CANDIDATES, CORE_JOBS, COMPARISONS,
   fmtDateShort, nowISO, TZ, type CoreCandidate, type CoreJob, type Task,
@@ -17,7 +17,7 @@ import { latestResultForCase } from "../data/realPlanItemsMerge";
 import { CreateWrittenTaskModal } from "../components/CreateWrittenTaskModal";
 import type { QuickStartResult } from "../data/writtenApi";
 import { initials } from "../lib/initials";
-import { sameDayIn } from "../utils/calendar";
+import { dayRangeIn, sameDayIn } from "../utils/calendar";
 
 function candidateOf(caseId: string): CoreCandidate | null {
   const c = CASES[caseId];
@@ -83,11 +83,41 @@ export function TasksPage() {
   const allWritten = useMemo(() => writtenTestTasks(), [state.realTasksVersion, refreshVersion]);
   const counts = taskCountsFor(uid);
 
+  // The list comes a page at a time (#412), so the figures come from the backend, counted over every task; the
+  // local counts over what is loaded stand in only when the backend can't be reached.
+  const [stats, setStats] = useState<WrittenTaskStats | null>(null);
+  const [loadingMore, setLoadingMore] = useState(false);
+  useEffect(() => {
+    let cancelled = false;
+    const today = dayRangeIn(nowISO(state.clockOffsetMin), TZ);
+    fetchWrittenTaskStats({ assignee: uid, dueFrom: today.from, dueTo: today.to })
+      .then((next) => { if (!cancelled) setStats(next); })
+      .catch((error) => console.warn("Failed to load task figures from the backend:", error));
+    return () => { cancelled = true; };
+  }, [uid, state.clockOffsetMin, state.realTasksVersion, refreshVersion]);
+  const loadMore = async () => {
+    setLoadingMore(true);
+    try {
+      await loadMoreRealWrittenTasks();
+      setRefreshVersion((v) => v + 1);
+    } catch (error) {
+      console.warn("Failed to load more written tasks:", error);
+      say(t("Something went wrong — please try again."), { type: "danger" });
+    } finally {
+      setLoadingMore(false);
+    }
+  };
+  const statusCount = (key: FilterKey) => {
+    if (!stats) return key === "all" ? allWritten.length : allWritten.filter((x) => writtenTaskStatus(x) === key).length;
+    if (key === "all") return stats.total;
+    return Object.entries(stats.byCaseStatus).reduce((sum, [caseStatus, n]) => sum + (writtenStatusFromCase(caseStatus) === key ? n : 0), 0);
+  };
+
   const primaryMetrics = [
-    { label: "My open tasks", value: scoped ? 0 : counts.open, sub: "Unique task_id, open/in_progress/waiting", link: "/tasks" },
-    { label: "Reviews awaiting me", value: scoped ? 0 : allWritten.filter((tk) => tk.assignee === uid && ["evaluation_review", "result_release"].includes(tk.type) && tk.status !== "completed").length, sub: "Same filter as list view", link: "/tasks" },
-    { label: "Due today", value: scoped ? 0 : Object.values(TASKS).filter((tk) => tk.assignee === uid && isDueToday(tk.dueAt, state.clockOffsetMin)).length, sub: "Same filter as list view", link: "/tasks" },
-    { label: "In progress", value: allWritten.filter((tk) => tk.assignee === uid && tk.status === "in_progress").length, sub: "Same filter as list view", link: "/tasks" },
+    { label: "My open tasks", value: scoped ? 0 : stats?.assignee.open ?? counts.open, sub: "Unique task_id, open/in_progress/waiting", link: "/tasks" },
+    { label: "Reviews awaiting me", value: scoped ? 0 : stats?.assignee.reviewsAwaiting ?? allWritten.filter((tk) => tk.assignee === uid && ["evaluation_review", "result_release"].includes(tk.type) && tk.status !== "completed").length, sub: "Same filter as list view", link: "/tasks" },
+    { label: "Due today", value: scoped ? 0 : stats?.assignee.dueInRange ?? Object.values(TASKS).filter((tk) => tk.assignee === uid && isDueToday(tk.dueAt, state.clockOffsetMin)).length, sub: "Same filter as list view", link: "/tasks" },
+    { label: "In progress", value: stats?.assignee.inProgress ?? allWritten.filter((tk) => tk.assignee === uid && tk.status === "in_progress").length, sub: "Same filter as list view", link: "/tasks" },
   ];
   const moreMetrics = [
     { label: "Active projects", value: scoped ? 0 : (CORE_JOBS[PROJECT.jobId] && PROJECT.status === "active" ? 1 : 0), link: "/assessments" },
@@ -179,7 +209,7 @@ export function TasksPage() {
       <div className="flex items-center justify-between wrap gap-3" style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 12, marginBottom: 12 }}>
         <div className="flex gap-2 wrap" style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
           {FILTER_DEFS.map((def) => {
-            const count = def.key === "all" ? allWritten.length : allWritten.filter((x) => writtenTaskStatus(x) === def.key).length;
+            const count = statusCount(def.key);
             return (
               <button key={def.key} className={`btn sm ${filter === def.key ? "primary" : ""}`} onClick={() => setFilter(def.key)}>
                 {t(def.label)} ({count})
@@ -247,6 +277,11 @@ export function TasksPage() {
             );
           })}
         </Card>
+      )}
+      {hasMoreRealWrittenTasks() && (
+        <div style={{ display: "flex", justifyContent: "center", marginTop: 12 }}>
+          <Button onClick={() => void loadMore()} disabled={loadingMore}>{loadingMore ? t("Loading…") : t("Load more tasks")}</Button>
+        </div>
       )}
 
       <CandidateResumeModal entry={resumeFor} onClose={() => setResumeFor(null)} />
