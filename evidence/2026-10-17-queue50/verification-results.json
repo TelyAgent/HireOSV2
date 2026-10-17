@@ -1,0 +1,141 @@
+[
+  {
+    "name": "jd-backend",
+    "command": "npm run build",
+    "exit": 0,
+    "log": "jd-backend-build.log"
+  },
+  {
+    "name": "jd-backend",
+    "command": "npm run lint",
+    "exit": 0,
+    "log": "jd-backend-lint.log"
+  },
+  {
+    "name": "jd-backend",
+    "command": "npm run typecheck",
+    "exit": 0,
+    "log": "jd-backend-typecheck.log"
+  },
+  {
+    "name": "jd-backend",
+    "command": "npm run test",
+    "exit": 0,
+    "log": "jd-backend-test.log"
+  },
+  {
+    "name": "jd-front",
+    "command": "npm run build",
+    "exit": 0,
+    "log": "jd-front-build.log"
+  },
+  {
+    "name": "jd-front",
+    "command": "npm run lint",
+    "exit": 0,
+    "log": "jd-front-lint.log"
+  },
+  {
+    "name": "jd-front",
+    "command": "npm run typecheck",
+    "exit": 0,
+    "log": "jd-front-typecheck.log"
+  },
+  {
+    "name": "jd-front",
+    "command": "npm run test",
+    "exit": 0,
+    "log": "jd-front-test.log",
+    "NODE_OPTIONS": "--no-experimental-webstorage"
+  },
+  {
+    "name": "written-backend",
+    "command": "npm run build",
+    "exit": 0,
+    "log": "written-backend-build.log"
+  },
+  {
+    "name": "written-backend",
+    "command": "npm run lint",
+    "exit": 0,
+    "log": "written-backend-lint.log"
+  },
+  {
+    "name": "written-backend",
+    "command": "npm run typecheck",
+    "exit": 0,
+    "log": "written-backend-typecheck.log"
+  },
+  {
+    "name": "written-backend",
+    "command": "npm run test",
+    "exit": 0,
+    "log": "written-backend-test.log"
+  },
+  {
+    "name": "written-front",
+    "command": "npm run build",
+    "exit": 0,
+    "log": "written-front-build.log"
+  },
+  {
+    "name": "written-front",
+    "command": "npm run lint",
+    "exit": 0,
+    "log": "written-front-lint.log"
+  },
+  {
+    "name": "written-front",
+    "command": "npm run typecheck",
+    "exit": 0,
+    "log": "written-front-typecheck.log"
+  },
+  {
+    "name": "written-front",
+    "command": "npm run test",
+    "exit": 0,
+    "log": "written-front-test.log"
+  },
+  {
+    "name": "interview-backend",
+    "command": "npm run build",
+    "exit": 0,
+    "log": "interview-backend-build.log"
+  },
+  {
+    "name": "interview-backend",
+    "command": "npm run lint",
+    "exit": 0,
+    "log": "interview-backend-lint.log"
+  },
+  {
+    "name": "interview-backend",
+    "command": "npm run typecheck",
+    "exit": 0,
+    "log": "interview-backend-typecheck.log"
+  },
+  {
+    "name": "interview-backend",
+    "command": "npm run test",
+    "exit": 0,
+    "log": "interview-backend-test.log"
+  },
+  {
+    "name": "interview-front",
+    "command": "npm run build",
+    "exit": 0,
+    "log": "interview-front-build.log"
+  },
+  {
+    "name": "interview-front",
+    "command": "npm run typecheck",
+    "exit": 0,
+    "log": "interview-front-typecheck.log"
+  },
+  {
+    "name": "interview-front",
+    "command": "npm run test",
+    "exit": 0,
+    "log": "interview-front-test.log"
+  }
+]

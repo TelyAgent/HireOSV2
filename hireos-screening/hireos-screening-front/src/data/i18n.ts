@@ -9,6 +9,10 @@
  * and a matching entry exists, else the source string unchanged.
  */
 export const ZH: Record<string, string> = {
+  "This decision was already recorded; no new decision was created.": "该决定此前已记录，本次没有创建新决定。",
+  "Another decision or update conflicts with this submission. Your input was not submitted and is preserved below.": "已有决定或更新与本次提交冲突。本次输入未提交，已保留在下方。",
+  "A completed, current screening evaluation is required before advancing. Refresh the evaluation and confirm again.": "推进前需要已完成且有效的筛选评估。请重新评估后再次确认。",
+  "View current application in a new tab": "在新标签页查看当前申请",
   // New job entry (NewJobModal)
   "Start with a job description": "从职位描述开始",
   "Paste the JD — AI reads it for the title, location and requirements; you confirm the rubric before screening starts.": "粘贴 JD 即可——AI 会读取职位名称、地点和岗位要求，确认评分标准后即可开始筛选。",
@@ -930,6 +934,18 @@ export const ZH: Record<string, string> = {
   Decision: "决策",
   "Overall (role_match scale, 0–100)": "总分（职位匹配度评分，0–100）",
   "Insufficient evidence": "证据不足",
+  "Strong match signal": "匹配证据强",
+  "Some match signal": "有一定匹配证据",
+  "Limited match signal": "匹配证据有限",
+  "Not eligible — confidence not shown": "不符合资格，不显示匹配等级",
+  "Manually added — no AI confidence score": "人工添加，暂无 AI 匹配等级",
+  "Insufficient evidence to estimate confidence": "证据不足，无法确定匹配等级",
+  "What does this signal mean?": "如何理解此信号？",
+  "The current evidence conflicts with a role requirement. Review the reasons below; no match level is assigned.": "当前证据与岗位要求存在冲突，请核对下方理由；此状态不提供匹配等级。",
+  "A person proposed this role. No AI match level has been calculated.": "该岗位由人工添加，尚未计算 AI 匹配等级。",
+  "There is not enough evidence to assign a match level. Review the unknowns before deciding.": "现有证据不足以确定匹配等级，请先核对未知项再作决定。",
+  "Strong, some and limited describe the strength of matching evidence between the current profile and role criteria. Review the reasons and unknowns below.": "强、一定、有限表示当前档案与岗位标准之间匹配证据的强弱，请结合下方理由与未知项判断。",
+  "This signal is not a confirmed job link, an advancement decision or a hiring decision.": "此信号不表示已确认关联、已推进或已录用。",
   "Coverage ({c}) is below the {t} threshold — overall is intentionally left blank rather than guessed.":
     "覆盖率（{c}）低于 {t} 的阈值 —— 因此总分故意留空，而非凭空猜测。",
   "Top strengths": "主要优势",

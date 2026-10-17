@@ -15,20 +15,35 @@ import type { QuestionSnapshot } from "../data/writtenApi";
  * backend Invitation with a Submission attached.
  */
 export function RealSubmissionContent({
-  questions, answers, submittedAt, onGoToEvaluation,
+  questions, answers, submittedAt, caseId, invitationId, round, onGoToEvaluation,
 }: {
   questions: QuestionSnapshot[];
   answers: { questionId: string; answerText: string }[];
   submittedAt: string;
+  caseId?: string;
+  invitationId?: string;
+  round?: number;
   onGoToEvaluation: () => void;
 }) {
   const { t } = useStore();
+  const c = caseId ? CASES[caseId] : undefined;
+  const candidate = c ? CORE_CANDIDATES[c.candidateId] : undefined;
+  const unknown = t("Not recorded");
   return (
     <div>
       <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 16 }}>
         <StatusBadge status="submitted" />
-        <span className="tiny">{t("Received")} {fmtDate(submittedAt)}</span>
+        <span className="tiny">{t("Submitted")} {fmtDate(submittedAt)}</span>
       </div>
+      <dl style={{ display: "grid", gridTemplateColumns: "max-content minmax(0, 1fr)", gap: "8px 16px", marginBottom: 20, overflowWrap: "anywhere" }}>
+        <dt>{t("Submission source")}</dt><dd>{t("Online text answers")}</dd>
+        <dt>{t("Received")}</dt><dd>{unknown}</dd>
+        <dt>{t("Processed")}</dt><dd>{unknown}</dd>
+        <dt>{t("Candidate:")}</dt><dd>{candidate ? `${candidate.name} (${candidate.id})` : unknown}</dd>
+        <dt>{t("Round:")}</dt><dd>{round ?? unknown}</dd>
+        <dt>{t("Case ID")}</dt><dd>{c?.id ?? unknown}</dd>
+        <dt>{t("Invitation ID")}</dt><dd>{invitationId || unknown}</dd>
+      </dl>
       {questions.map((q) => {
         const answer = answers.find((a) => a.questionId === q.questionId);
         return (

@@ -13,8 +13,7 @@ import { closeCase, handoffCaseToInterview, holdCase, releaseCaseResult, resumeC
 import { latestResultForCase } from "../data/realPlanItemsMerge";
 
 type CloseReason = "passed" | "rejected" | "withdrawn";
-// "passed" is no longer offered -- a candidate who passes goes to Interview (hand-off), and closing
-// never creates an interview task. It stays here only to label cases closed that way before.
+// A manual Passed decision is separate from the assessment and never creates an interview task.
 const CLOSE_REASONS: { value: CloseReason; label: string }[] = [
   { value: "passed", label: "Passed" },
   { value: "rejected", label: "Not passed" },
@@ -40,9 +39,7 @@ const CLOSE_REASONS: { value: CloseReason; label: string }[] = [
 
 // Before 2026-10-14 every published result carried this prototype sentence as its feedback (#398).
 const LEGACY_DEMO_FEEDBACK = "Clear structure; accounting treatment mostly correct with one gap in variance analysis.";
-export function ReleaseContent({
-  caseId, invitationId, isLatestRound = true, inline = false, onGoToPlan, onChanged,
-}: {
+type ReleaseContentProps = {
   caseId: string;
   /** The round whose result this shows (#48); without it, the case's latest round. */
   invitationId?: string;
@@ -52,7 +49,19 @@ export function ReleaseContent({
   /** "Add supplemental test" -- the host opens the next draft round and switches to the plan. */
   onGoToPlan?: () => void;
   onChanged?: () => void;
-}) {
+};
+
+export function ReleaseContent(props: ReleaseContentProps) {
+  const result = props.invitationId ? RESULTS[`result_${props.invitationId}`] : latestResultForCase(props.caseId);
+  const evaluation = result ? EVALUATIONS[result.evaluationId] : undefined;
+  // Drafts and approval checkboxes belong to one finalized evaluation, never the next case/round.
+  const scope = JSON.stringify([props.caseId, props.invitationId, result?.id, result?.evaluationId, evaluation?.finalizedAt]);
+  return <ScopedReleaseContent key={scope} {...props} />;
+}
+
+function ScopedReleaseContent({
+  caseId, invitationId, isLatestRound = true, inline = false, onGoToPlan, onChanged,
+}: ReleaseContentProps) {
   const { t, say } = useStore();
   const navigate = useNavigate();
   const [, forceTick] = useReducer((n: number) => n + 1, 0);
@@ -65,24 +74,31 @@ export function ReleaseContent({
   const [chk2, setChk2] = useState(false);
   const [handoffOpen, setHandoffOpen] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [assessmentOutcome, setAssessmentOutcome] = useState<"met" | "not_met" | "">("");
+  const [passedOpen, setPassedOpen] = useState(false);
+  const [decisionReason, setDecisionReason] = useState("");
   // What the candidate is told. Null = not edited yet, so the defaults below (which depend on the
   // result, possibly loaded after mount) apply; HR reviews and edits them before publishing.
   const [outcomeDraft, setOutcomeDraft] = useState<string | null>(null);
   const [feedbackDraft, setFeedbackDraft] = useState<string | null>(null);
   const [nextStepDraft, setNextStepDraft] = useState<string | null>(null);
 
-  if (!c || !result) return <EmptyState title="No finalized result for this case yet." />;
+  if (!c || !result || result.caseId !== caseId || (release && release.caseId !== caseId)) return <EmptyState title="No finalized result for this case yet." />;
 
   const cand = CORE_CANDIDATES[c.candidateId];
   const evaluation = EVALUATIONS[result.evaluationId];
-  const inv = Object.values(INVITATIONS).find((i) => i.caseId === caseId);
+  if (!evaluation) return <EmptyState title="No finalized result for this case yet." />;
+  const inv = result.invitationId
+    ? INVITATIONS[result.invitationId]
+    : Object.values(INVITATIONS).find((i) => i.caseId === caseId);
   const disclosure = inv ? inv.disclosurePolicy : "score_and_summary";
-  const outcomeText = outcomeDraft ?? t(result.overall >= 65 ? "Strong performance on this assessment." : "Below the bar for this role on this assessment.");
+  const outcomeText = outcomeDraft ?? (assessmentOutcome === "met" ? t("Strong performance on this assessment.") : assessmentOutcome === "not_met" ? t("Below the bar for this role on this assessment.") : "");
   // Pre-filled from the AI evaluator's summary of these answers -- never a canned sentence.
   const feedbackText = feedbackDraft ?? (evaluation.summary ?? "");
   const nextStepText = nextStepDraft ?? t("HR will follow up with next steps.");
 
   const missingToPublish = [
+    ...(assessmentOutcome ? [] : ["Assessment outcome"]),
     ...(chk1 ? [] : ["Internal review complete"]),
     ...(chk2 ? [] : ["Disclosure content approved for release"]),
     ...(outcomeText.trim() ? [] : ["Outcome"]),
@@ -92,6 +108,7 @@ export function ReleaseContent({
 
   async function publish() {
     if (busy) return;
+    if (!assessmentOutcome) return;
     if (!chk1 || !chk2) {
       say(t("Both review and disclosure approval are required to publish."), { type: "danger" });
       return;
@@ -103,6 +120,7 @@ export function ReleaseContent({
     const relId = `rel_${result!.invitationId ?? caseId}`;
     const rel: Release = {
       id: relId, caseId, overall: result!.overall, showScore: disclosure === "score_and_summary",
+      assessmentOutcome,
       outcomeText: outcomeText.trim(), feedbackText: feedbackText.trim(), nextStepText: nextStepText.trim(),
       publishedAt: new Date().toISOString(),
     };
@@ -113,7 +131,7 @@ export function ReleaseContent({
       const { overall, showScore, outcomeText, feedbackText, nextStepText } = rel;
       setBusy(true);
       try {
-        await releaseCaseResult(caseId, { overall, showScore, outcomeText, feedbackText, nextStepText, invitationId: result!.invitationId, reviewComplete: chk1, disclosureApproved: chk2 });
+        await releaseCaseResult(caseId, { overall, showScore, outcomeText, feedbackText, nextStepText, assessmentOutcome, invitationId: result!.invitationId, reviewComplete: chk1, disclosureApproved: chk2 });
       } catch {
         say(t("Could not save to the server. Please refresh and try again."), { type: "danger" });
         return;
@@ -138,6 +156,7 @@ export function ReleaseContent({
       const next = await action();
       Object.assign(c, {
         status: next.status, closeReason: next.closeReason, closedAt: next.closedAt,
+        closeDecision: next.closeDecision ?? null,
         handedOffAt: next.handedOffAt, interviewTaskId: next.interviewTaskId,
       });
       forceTick();
@@ -157,7 +176,9 @@ export function ReleaseContent({
   }
 
   async function confirmClose(reason: CloseReason) {
-    await runAction(() => closeCase(caseId, reason), "Testing closed.");
+    if (busy) return;
+    if (reason === "passed" && release?.assessmentOutcome !== "met" && !decisionReason.trim()) return;
+    if (await runAction(() => closeCase(caseId, reason, reason === "passed" ? decisionReason.trim() : undefined), "Testing closed.")) setPassedOpen(false);
   }
 
   function goToPlan() {
@@ -226,6 +247,14 @@ export function ReleaseContent({
           ) : (
             <div className="card card-pad" style={{ background: "var(--canvas)" }}>
               <div className="field" style={{ marginBottom: 10 }}>
+                <label htmlFor="assessment-outcome">{t("Assessment outcome")}</label>
+                <select id="assessment-outcome" className="input" value={assessmentOutcome} onChange={e => setAssessmentOutcome(e.target.value as "met" | "not_met" | "")}>
+                  <option value="">{t("Select outcome")}</option>
+                  <option value="met">{t("Meets requirements")}</option>
+                  <option value="not_met">{t("Does not meet requirements")}</option>
+                </select>
+              </div>
+              <div className="field" style={{ marginBottom: 10 }}>
                 <label>{t("Outcome:")}</label>
                 <input className="input" value={outcomeText} onChange={(e) => setOutcomeDraft(e.target.value)} />
               </div>
@@ -280,13 +309,19 @@ export function ReleaseContent({
           {isLatestRound && (
           <div className="card card-pad" style={{ marginTop: 16 }}>
             <h4 style={{ marginBottom: 8 }}>{t("Next action")}</h4>
+            <p>{t("Assessment outcome")}: {t(release.assessmentOutcome === "met" ? "Meets requirements" : release.assessmentOutcome === "not_met" ? "Does not meet requirements" : "Not recorded")}</p>
             {c.status === "handed_off" ? (
               <div className="banner success">
                 {t("Handed off to interview")} {fmtDate(c.handedOffAt ?? null)}. {t("The interview task was created in Interview.")}
               </div>
             ) : c.status === "closed" ? (
-              <div className="banner info">
+              <div className="banner info" style={{ display: "block", overflowWrap: "anywhere" }}>
                 {t("Testing closed")} {fmtDate(c.closedAt ?? null)} · {t("Reason:")} {t(CLOSE_REASONS.find((r) => r.value === c.closeReason)?.label ?? "—")}
+                <div>{t("Manual closure decision; the published assessment is unchanged.")}</div>
+                {c.closeDecision?.overridesAssessment && <strong>{t("Manual override of assessment outcome")}</strong>}
+                <div>{t("Decision by")}: {c.closeDecision?.actorId ?? t("Not recorded")}</div>
+                <div>{t("Decision time")}: {c.closeDecision?.decidedAt ? fmtDate(c.closeDecision.decidedAt) : t("Not recorded")}</div>
+                <div>{t("Decision reason")}: {c.closeDecision?.reason ?? t("Not recorded")}</div>
               </div>
             ) : c.status === "on_hold" ? (
               <div className="banner warning" style={{ display: "flex", alignItems: "center", gap: 12 }}>
@@ -296,6 +331,8 @@ export function ReleaseContent({
             ) : (
               // Every option laid out with what it actually does, so nothing has to be guessed.
               <div className="next-actions">
+                <NextAction title={t("Passed")} hint={t("Close with a manual decision. The assessment result is unchanged.")}
+                  action={<Button disabled={busy} onClick={() => setPassedOpen(true)}>{t("Passed")}</Button>} />
                 <NextAction
                   title={t("Move to interview")}
                   hint={t("Creates an interview task in Interview; the written test ends. Cannot be undone.")}
@@ -336,6 +373,13 @@ export function ReleaseContent({
         </>
       )}
 
+      <Modal open={passedOpen} title={t("Confirm Passed decision")} okText={t("Confirm")} cancelText={t("Cancel")}
+        confirmLoading={busy} okButtonProps={{ disabled: release?.assessmentOutcome !== "met" && !decisionReason.trim() }}
+        onOk={() => void confirmClose("passed")} onCancel={() => !busy && setPassedOpen(false)}>
+        {release?.assessmentOutcome !== "met" && <p role="alert">{t("The assessment is unmet or unknown. A decision reason is required to choose Passed.")}</p>}
+        <label htmlFor="decision-reason">{t("Decision reason")}</label>
+        <textarea id="decision-reason" className="input" rows={4} maxLength={4000} value={decisionReason} onChange={e => setDecisionReason(e.target.value)} />
+      </Modal>
       <Modal
         open={handoffOpen}
         title={t("Hand off to Interview")}

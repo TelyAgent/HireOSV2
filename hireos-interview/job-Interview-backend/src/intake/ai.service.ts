@@ -8,6 +8,7 @@ import { roundSummaryGenerationSchema, ROUND_SUMMARY_SYSTEM_PROMPT, collectRound
 import { debriefGenerationSchema, DEBRIEF_DRAFT_SYSTEM_PROMPT, collectDebriefRefs, repairDebriefRefs } from '../rubric/debrief-contracts';
 import { decisionGenerationSchema, DECISION_SUMMARY_SYSTEM_PROMPT, collectDecisionRefs } from '../rubric/decision-contracts';
 import { questionGenerationSchema, QUESTION_GENERATION_SYSTEM_PROMPT, collectQuestionRefs } from '../brief/contracts';
+import { claimGenerationSchema, CLAIM_PROMPT, collectClaimRefs } from '../rubric/claim-contracts';
 
 export class ParseFailure extends Error {
   constructor(public readonly code: string, public readonly retryable = false) { super(code); }
@@ -53,8 +54,10 @@ const EXTRACTION_TYPES: Record<string, ExtractionConfig> = {
   // content (a short/near-empty JD or résumé finishes fast; a real one often doesn't) —
   // same lesson as capability_cards/brief_questions, just with a lighter task.
   resume: { schema: extractionSchema, systemPrompt: RESUME_EXTRACTION_PROMPT, collectRefs: collectFactRefs, timeoutSeconds: 120 },
+  rubric_claims: { schema: claimGenerationSchema, systemPrompt: CLAIM_PROMPT, collectRefs: collectClaimRefs, timeoutSeconds: 120 },
   capability_cards: { schema: cardGenerationSchema, systemPrompt: CARD_GENERATION_SYSTEM_PROMPT, collectRefs: collectCardRefs, timeoutSeconds: 240 },
   brief_questions: { schema: questionGenerationSchema, systemPrompt: QUESTION_GENERATION_SYSTEM_PROMPT, collectRefs: collectQuestionRefs, timeoutSeconds: 240 },
+  rubric_questions: { schema: questionGenerationSchema, systemPrompt: QUESTION_GENERATION_SYSTEM_PROMPT.replace('already-confirmed capability verification card', 'draft capability verification card for human review'), collectRefs: collectQuestionRefs, timeoutSeconds: 240 },
   round_scores: { schema: roundScoreGenerationSchema, systemPrompt: ROUND_SCORE_SYSTEM_PROMPT, collectRefs: collectRoundScoreRefs, timeoutSeconds: 240 },
   round_summary: { schema: roundSummaryGenerationSchema, systemPrompt: ROUND_SUMMARY_SYSTEM_PROMPT, collectRefs: collectRoundSummaryRefs, repairRefs: repairSummaryRefs, timeoutSeconds: 240 },
   debrief_scores: { schema: debriefGenerationSchema, systemPrompt: DEBRIEF_DRAFT_SYSTEM_PROMPT, collectRefs: collectDebriefRefs, repairRefs: repairDebriefRefs, timeoutSeconds: 240 },

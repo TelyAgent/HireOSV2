@@ -1,0 +1,84 @@
+npm run test
+exit=0
+
+> hireos-interview-backend@0.1.0 test
+> npm run build && node --test test/*.test.cjs
+
+
+> hireos-interview-backend@0.1.0 build
+> nest build
+
+✔ #324: conflicting rounds and Unknown keep their own notes, interviewer and citations (1.480416ms)
+▶ intake persistence, validation, parsing and recovery
+  ✔ an attached job is readable within its workspace (20.860208ms)
+  ✔ workspace isolation and production fail-closed guard (1.683459ms)
+  ✔ real TXT, PDF and DOCX extraction; OCR, invalid and oversized files (98.040792ms)
+  ✔ linking a résumé creates exactly one task per (job, candidate); relinking reuses it (79.911292ms)
+  ✔ quick start: new JD text + one résumé creates the job via JD and one task (31.669375ms)
+  ✔ quick start: a résumé another subsystem already knows reuses that Core candidate (19.712334ms)
+  ✔ quick start: the same JD again is reported as a duplicate of the existing job (5.830833ms)
+  ✔ the job list picks up fields filled in Core Record later (e.g. by JD structuring) (4.133834ms)
+  ✔ quick start: an existing Core Record job can be picked instead of new JD text (5.232208ms)
+  ✔ choosing an existing job: only published jobs are offered or accepted (6.663417ms)
+  ✔ quick start: a bad résumé is rejected before anything is created upstream (7.034583ms)
+  ✔ a task is created with two generic rounds automatically (4.039334ms)
+  ✔ a new round can be added manually and takes the next sequence number (14.362583ms)
+  ✔ round edits are versioned independently and validate the interviewer (14.116875ms)
+  ✔ AI extraction is sourced and never silently edits job or candidate fields (12.159708ms)
+  ✔ a parsed email matching another Core candidate flags (never merges) the candidate (29.230625ms)
+  ✔ invalid AI responses and missing configuration stay explicit (3.21625ms)
+  ✔ task status changes are versioned independently of the job (11.294875ms)
+  ✔ #250: registered preview and claims adapters validate real HTTP model responses (7.217417ms)
+  ✔ expired leases recover without overriding human edits (6.888417ms)
+  ✔ #325/#250: real persisted JD levels and task-scoped resume claims APIs (100.081542ms)
+✔ intake persistence, validation, parsing and recovery (901.3575ms)
+✔ interviewers: listed per workspace, ordered, safe fields only (405.703375ms)
+✔ a zod failure becomes 422 INVALID_SCHEMA with dotted field paths (3.718416ms)
+✔ class-validator errors (ValidationPipe) flatten nested properties the same way (0.141375ms)
+✔ persistent meeting notes: authorization, sessions, revisions and recovery (547.138208ms)
+✔ Zoom dev signing is attendee-only and cryptographically valid (1.000541ms)
+✔ Zoom production and disabled modes fail closed (0.4165ms)
+✔ Zoom missing or malformed configuration fails without leaking secrets (0.157708ms)
+✔ Zoom dev signature issuance is rate limited (0.2745ms)
+✔ offer handoff timeline accepts a strictly ordered package (0.421708ms)
+✔ offer handoff timeline rejects a handoff before any prerequisite (0.080458ms)
+✔ offer handoff timeline flags legacy records missing prerequisites (0.056959ms)
+✔ #317 persisted package versions, concurrent reads, history isolation and versioned PDF (655.643584ms)
+▶ #335/#296 persisted question skips and human decision audit
+  ✔ #287 recommendation requires a reason, persists independently, and clearing removes both (35.552541ms)
+  ✔ middle and last question persist once with first actor/time; reload is isolated by round (56.22025ms)
+  ✔ wrong workspace/question and completed/unscheduled rounds cannot gain skip records (49.449916ms)
+  ✔ legacy decision has no invented audit; new reasons/version/actor survive reload and duplicate requests (43.659083ms)
+  ✔ stale and invalid writes fail; concurrent decisions do not overwrite each other (47.821125ms)
+  ✔ audit write failure rolls back decision fields and both versions (11.309ms)
+  ✔ decision generation includes different required levels and snapshot citations do not follow later edits (32.112584ms)
+✔ #335/#296 persisted question skips and human decision audit (567.318166ms)
+✔ #325: only unique JD structured IDs and exact source quotes confer a required level (0.941708ms)
+✔ #325: generated cards use the captured source version and clones preserve its requirements (0.480083ms)
+✔ #325: same project L3/L4 compare independently; missing legacy levels never pass (0.528625ms)
+✔ #254: confirmation belongs to the rubric version and its original JD, not the current JD (0.758833ms)
+✔ #260 schedule rejects a missing interviewer before writes and saves an assigned round (7.676041ms)
+✔ #282 rejects blank reasons without writes; valid reason saves and reads back (2.381333ms)
+✔ marks a historical plan/schedule inconsistency for repair (0.650041ms)
+✔ keeps a confirmed rubric flow healthy and preserves later-stage completion (0.143208ms)
+✔ does not unlock live when brief questions exist but no round is scheduled (0.112291ms)
+✔ renders a downloadable PDF manifest with scores, evidence and confirmations (2.572417ms)
+✔ paginates long package manifests instead of overflowing the printable page (0.340375ms)
+✔ #230 AC-1: Chinese, English and mixed map to the RTMS transcript settings; the default stays Chinese (0.785834ms)
+✔ #230 AC-1/AC-3: an unsupported language gives no transcript settings, so no stream is opened; scheduling refuses it (2.1005ms)
+✔ #230 AC-1: the constants match the installed @zoom/rtms (34.09825ms)
+✔ #288: Unknown survives save/read as null with its note and expected evidence (1.864542ms)
+✔ #288: Unknown does not contribute evaluated weight or become a failing numeric score (0.877292ms)
+[Nest] 81070  - 10/17/2026, 8:05:06 PM     LOG [ZoomHostService] Authorize URL: https://zoom.us/oauth/authorize?response_type=code&client_id=public-id&redirect_uri=http%3A%2F%2F127.0.0.1%3A50591%2Fapi%2Fintegrations%2Fzoom%2Fcallback&state=BkQoOGpOteYWLw4ncIXc0lxTjPqV21qefP8lOkkTTPM&code_challenge=eVEKihD49gPzpgoNsnzLJiDEpOViqPRYwT8B78HeBe8&code_challenge_method=S256
+✔ PKCE callback, encryption, user isolation, host signing and duplicate create prevention (62.265125ms)
+✔ missing OAuth client and production fail closed (0.357625ms)
+✔ uncertain creation cannot create a second meeting on retry (8.380958ms)
+✔ #117 AC-1/AC-2: a recreated container on the same volume reads the account and meeting back; an empty volume asks to reconnect (6.870834ms)
+ℹ tests 63
+ℹ suites 0
+ℹ pass 63
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 4178.74775

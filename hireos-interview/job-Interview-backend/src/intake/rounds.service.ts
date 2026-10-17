@@ -13,12 +13,34 @@ const ROUND_SELECT = {
   competencies: true, questions: true, mandatory: true, notes: true, status: true, version: true,
   scheduledAt: true, timezone: true, meetingLink: true, interviewLanguage: true,
   transcriptStatus: true, transcriptError: true, completedAt: true, briefSnapshotAt: true, briefSnapshotRubricVersion: true, recommendation: true,
-  createdAt: true, interviewer: { select: { id: true, name: true, title: true } },
+  createdAt: true, recommendationReason: true, interviewer: { select: { id: true, name: true, title: true } },
 } satisfies Prisma.InterviewRoundSelect;
 
 @Injectable()
 export class RoundsService {
   constructor(private readonly db: PrismaService, private readonly zoomHost: ZoomHostService) {}
+
+  async skippedQuestions(workspaceId: string, roundId: string) {
+    const round = await this.db.interviewRound.findFirst({ where: { id: roundId, workspaceId }, select: { id: true } });
+    if (!round) throw new NotFoundException({ code: 'NOT_FOUND' });
+    return this.db.roundQuestionSkip.findMany({ where: { workspaceId, roundId }, orderBy: { skippedAt: 'asc' } });
+  }
+
+  async skipQuestion(identity: Identity, roundId: string, questionId: string) {
+    return this.db.$transaction(async tx => {
+      await tx.$queryRaw`SELECT id FROM "InterviewRound" WHERE id = ${roundId} AND "workspaceId" = ${identity.workspaceId} FOR UPDATE`;
+      const round = await tx.interviewRound.findFirst({ where: { id: roundId, workspaceId: identity.workspaceId }, include: { task: { select: { jobId: true } } } });
+      if (!round) throw new NotFoundException({ code: 'NOT_FOUND' });
+      const previous = await tx.roundQuestionSkip.findUnique({ where: { roundId_questionId: { roundId, questionId } } });
+      if (previous) return previous;
+      if (!round.scheduledAt || round.completedAt || round.status === 'completed') throw new ConflictException({ code: 'ROUND_NOT_ACTIVE' });
+      const question = await tx.interviewQuestion.findFirst({ where: { id: questionId, workspaceId: identity.workspaceId,
+        rubricVersion: { jobId: round.task.jobId, status: 'confirmed', ...(round.briefSnapshotRubricVersion == null ? {} : { versionNumber: round.briefSnapshotRubricVersion }) } },
+        select: { id: true, cardId: true, rubricVersionId: true, situationPrompt: true, taskPrompt: true, actionPrompt: true, resultPrompt: true, card: { select: { requirement: true } } } });
+      if (!question) throw new NotFoundException({ code: 'QUESTION_NOT_FOUND' });
+      return tx.roundQuestionSkip.create({ data: { workspaceId: identity.workspaceId, roundId, questionId, actorId: identity.actorId, snapshot: question } });
+    });
+  }
 
   /** Every task gets two generic rounds the moment it exists — content is filled in later. */
   async createDefaultRounds(tx: Prisma.TransactionClient, workspaceId: string, taskId: string) {
@@ -95,15 +117,20 @@ export class RoundsService {
     const existing = await this.db.interviewRound.findFirst({ where: { id: roundId, workspaceId: identity.workspaceId }, include: { task: { select: { planConfirmedAt: true, jobId: true } } } });
     if (!existing) throw new NotFoundException({ code: 'NOT_FOUND' });
     if (!existing.task.planConfirmedAt) throw new BadRequestException({ code: 'PLAN_NOT_CONFIRMED' });
-    if (!existing.interviewerId) throw new BadRequestException({ code: 'INTERVIEWER_REQUIRED' });
+    if (input.interviewerId && (existing.completedAt || existing.status === 'completed')) throw new ConflictException({ code: 'ROUND_COMPLETED' });
+    if (input.interviewerId && existing.interviewerId && input.interviewerId !== existing.interviewerId) throw new ConflictException({ code: 'INTERVIEWER_ALREADY_ASSIGNED' });
+    const interviewerId = existing.interviewerId ?? input.interviewerId;
+    if (!interviewerId) throw new BadRequestException({ code: 'INTERVIEWER_REQUIRED' });
+    if (input.interviewerId) await this.getInterviewer(identity.workspaceId, input.interviewerId);
     const stages = await taskStages(this.db, identity.workspaceId, existing.taskId);
     if (!stages.find((stage) => stage.stage === 'schedule')!.unlocked) {
       throw new BadRequestException({ code: 'RUBRIC_NOT_CONFIRMED' });
     }
     const rubric = await this.db.rubricVersion.findFirst({ where: { workspaceId: identity.workspaceId, jobId: existing.task.jobId, status: 'confirmed' }, orderBy: { versionNumber: 'desc' }, select: { versionNumber: true } });
     const updated = await this.db.interviewRound.updateMany({
-      where: { id: roundId, workspaceId: identity.workspaceId, version: input.version },
-      data: { scheduledAt: new Date(input.scheduledAt), timezone: input.timezone, meetingLink: input.meetingLink || null, ...(input.interviewLanguage ? { interviewLanguage: input.interviewLanguage } : {}), briefSnapshotAt: existing.briefSnapshotAt ?? new Date(), briefSnapshotRubricVersion: existing.briefSnapshotRubricVersion ?? rubric?.versionNumber ?? null, version: { increment: 1 } },
+      where: { id: roundId, workspaceId: identity.workspaceId, version: input.version,
+        ...(input.interviewerId ? { interviewerId: existing.interviewerId, completedAt: null, status: { not: 'completed' } } : {}) },
+      data: { scheduledAt: new Date(input.scheduledAt), timezone: input.timezone, meetingLink: input.meetingLink || null, ...(input.interviewerId ? { interviewerId } : {}), ...(input.interviewLanguage ? { interviewLanguage: input.interviewLanguage } : {}), briefSnapshotAt: existing.briefSnapshotAt ?? new Date(), briefSnapshotRubricVersion: existing.briefSnapshotRubricVersion ?? rubric?.versionNumber ?? null, version: { increment: 1 } },
     });
     if (!updated.count) throw new ConflictException({ code: 'VERSION_CONFLICT' });
     await advanceTaskStatus(this.db, identity.workspaceId, existing.taskId, 'interview_in_progress');
@@ -218,7 +245,7 @@ export class RoundsService {
     const input = validate(setRecommendationSchema, raw);
     const existing = await this.db.interviewRound.findFirst({ where: { id: roundId, workspaceId: identity.workspaceId } });
     if (!existing) throw new NotFoundException({ code: 'NOT_FOUND' });
-    const updated = await this.db.interviewRound.update({ where: { id: roundId }, data: { recommendation: input.recommendation }, select: ROUND_SELECT });
+    const updated = await this.db.interviewRound.update({ where: { id: roundId }, data: { recommendation: input.recommendation, recommendationReason: input.recommendation ? input.reason! : null }, select: ROUND_SELECT });
     return updated;
   }
 

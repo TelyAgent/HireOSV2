@@ -14,6 +14,7 @@ import { fieldsToDraftContent } from './draft-mapping';
 import { ReplyStreamExtractor } from './reply-stream-extractor';
 import { historyTurns } from './history-budget';
 import { keepSourced, withToConfirm } from './sourced-fields';
+import { changedImportedFields } from './import-verbatim';
 import { asFieldMeta, confirmFields, recordChanges } from './field-meta';
 import { QUICK_START_ASSESS_PROMPT, TITLE_UNCONFIRMED, followUp, parseAssessment, tooThinToAssess } from './quick-start';
 import { factsFromTitleOnly, factsInstruction, pickFacts, pinFacts, type JobFacts } from './variant-facts';
@@ -399,6 +400,7 @@ export class CopilotService {
         key,
         hash,
         llmContent: sourceContent(`职位链接 ${input.url}`, text),
+        verbatimSource: text,
         userMessage: { text: input.url, attachments: [{ kind: 'link', url: input.url }] },
       });
     }
@@ -408,7 +410,8 @@ export class CopilotService {
       key,
       hash,
       llmContent: sourceContent('粘贴的 JD 文案', text),
-      userMessage: { text },
+      verbatimSource: text,
+      userMessage: { text, attachments: [{ kind: 'pasted_text' }] },
     });
   }
 
@@ -417,7 +420,7 @@ export class CopilotService {
     identity: Identity,
     id: string,
     conversation: ConversationRow,
-    source: { operation: string; key: string; hash: string; llmContent: string; userMessage: { text: string; attachments?: unknown } },
+    source: { operation: string; key: string; hash: string; llmContent: string; verbatimSource?: string; userMessage: { text: string; attachments?: unknown } },
   ) {
     const history = await this.db.copilotMessage.findMany({ where: { conversationId: id }, orderBy: { sequence: 'asc' } });
     const turns: ChatTurn[] = [
@@ -425,6 +428,13 @@ export class CopilotService {
       { role: 'user', content: source.llmContent },
     ];
     const parsed = await this.runFileExtractTurn(identity, id, turns);
+    if (source.verbatimSource !== undefined) {
+      const changed = changedImportedFields(parsed.fields, source.verbatimSource);
+      if (changed.length) {
+        throw new BadRequestException({ code: 'IMPORT_CONTENT_CHANGED', fields: changed,
+          message: 'The extracted draft changed source wording. Nothing was saved. Retry with one responsibility or requirement per line; no translation or extra conditions will be accepted.' });
+      }
+    }
 
     const prep: Extract<TurnPrep, { cached: null }> = {
       cached: null,
@@ -438,7 +448,7 @@ export class CopilotService {
       baseRevision: conversation.stateRevision,
       source: sourceOf([...userTexts(history), source.llmContent], conversation.fields),
     };
-    return this.commitTurn(identity, id, prep, parsed);
+    return this.commitTurn(identity, id, prep, parsed, undefined, undefined, [], source.verbatimSource === undefined ? [] : ['responsibilities', 'mustHave']);
   }
 
   /**

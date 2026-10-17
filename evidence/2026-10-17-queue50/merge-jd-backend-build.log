@@ -1,0 +1,5 @@
+npm run build
+exit=0
+
+> hireos-jd-backend@0.1.0 build
+> nest build

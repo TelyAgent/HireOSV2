@@ -1,0 +1,3 @@
+node test/schedule-interviewer.browser.cjs
+exit=0
+PASS #260 missing interviewer blocked, directory failure/retry, assignment save failure/retry, reload and assigned reschedule

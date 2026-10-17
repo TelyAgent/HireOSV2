@@ -1,0 +1,67 @@
+const assert = require('node:assert/strict');
+const { chromium } = require('playwright');
+const base = process.env.INTERVIEW_TEST_URL || 'http://127.0.0.1:5197/interview/';
+(async () => {
+  const browser = await chromium.launch({ channel: 'chrome', headless: true });
+  try {
+    const page = await browser.newPage({ viewport: { width: 1366, height: 900 } });
+    page.setDefaultTimeout(10000);
+    await page.route('https://fonts.googleapis.com/**', r => r.abort());
+    await page.route('**/account/api/**', r => r.fulfill({ status: r.request().url().endsWith('/me') ? 401 : 200, json: { loginRequired: false } }));
+    const job = { id: 'j', title: 'Synthetic engineering role', jdText: 'Build APIs', jdVersion: 1 };
+    const task = { id: 'task', jobId: 'j', job, candidate: { id: 'c', name: 'Synthetic candidate' }, status: 'planning', rounds: [], parseJobs: [], materials: [], resume: null,
+      stages: ['overview', 'rubric', 'plan', 'schedule', 'brief', 'live', 'review', 'debrief', 'decision', 'package'].map(stage => ({ stage, unlocked: true, done: true })) };
+    const cards = [3, 4].map((requiredLevel, i) => ({ id: `card${i}`, requirement: `Capability ${i}`, cardPriority: 'P0', responsibilityType: 'lead', competencyTags: 'API', expectedEvidence: 'An example', levelAnchors: { l1: '1', l2: '2', l3: '3', l4: '4', l5: '5' }, weight: 50, sourceRefs: [], requiredLevel, sourceRequirementId: `req${i}` }));
+    let noResume = false;
+    const rubric = { id: 'rubric1', jobId: 'j', versionNumber: 1, version: 1, status: 'confirmed', confirmedBy: 'reviewer', confirmedAt: '2026-10-17T00:00:00Z', cards };
+    const questions = cards.map(c => ({ id: `q-${c.id}`, cardId: c.id, situationPrompt: `Situation for ${c.id}`, taskPrompt: 'What was your task?', actionPrompt: 'What did you do?', resultPrompt: 'What was the result?' }));
+    await page.route('**/interview/api/**', r => {
+      const p = new URL(r.request().url()).pathname;
+      if (p.endsWith('/tasks/task')) return r.fulfill({ json: task });
+      if (p.endsWith('/rubric')) return r.fulfill({ json: { jobId: 'j', jdVersion: 1, locked: false, generation: null, rubric } });
+      if (p.endsWith('/rubric-claims')) return r.fulfill({ json: { taskId: 'task', rubricVersionId: rubric.id, materialId: noResume ? null : 'resume1', materialName: 'synthetic-resume.txt', status: noResume ? 'missing_resume_or_rubric' : 'needs_review', cards: noResume ? [] : [{ cardId: 'card0', claims: [{ segmentId: 's1', quote: 'I built the payment API.' }] }, { cardId: 'card1', claims: [] }] } });
+      if (p.endsWith('/brief-questions') || p.endsWith('/rubric-questions')) return r.fulfill({ json: { jobId: 'j', rubricVersionId: rubric.id, generation: null, questions } });
+      if (p.endsWith('/debrief')) return r.fulfill({ json: { bar: null, totalCards: 2, scoredCount: 2, mustHaveTotal: 2, mustHaveMet: 1, evaluatedWeightPct: 100, overall: 'fail', unknownCards: [], cards: cards.map(c => ({ ...c, score: 3, note: '', round: null, ai: null })), mismatches: [], unresolved: [], generation: null } });
+      return r.fulfill({ json: [] });
+    });
+    await page.goto(`${base}project/task/rubric`, { waitUntil: 'domcontentloaded' });
+    await page.getByText('I built the payment API.', { exact: false }).waitFor();
+    await page.getByText('No matching experience found', { exact: true }).waitFor();
+    assert.equal(await page.getByText('Resume claims · Unverified', { exact: true }).count(), 2);
+    await page.getByText('Situation for card0', { exact: true }).waitFor();
+    await page.getByText('Situation for card1', { exact: true }).waitFor();
+    assert.match(await page.locator('body').innerText(), /JD Required L4/);
+    await page.screenshot({ path: '../../evidence/2026-10-17-queue50/interview-rubric-evidence.png', fullPage: true });
+    noResume = true;
+    await page.reload({ waitUntil: 'domcontentloaded' });
+    await page.getByText('Resume or rubric not provided', { exact: true }).first().waitFor();
+    assert.equal(await page.getByText('I built the payment API.', { exact: false }).count(), 0);
+    assert.equal(await page.getByText('No matching experience found', { exact: true }).count(), 0);
+    rubric.status = 'draft';
+    await page.reload({ waitUntil: 'domcontentloaded' });
+    await page.getByText('Draft questions · Unconfirmed', { exact: true }).first().waitFor();
+    await page.getByText('Situation for card0', { exact: true }).waitFor();
+    await page.getByText('Situation for card1', { exact: true }).waitFor();
+    await page.getByText('Resume or rubric not provided', { exact: true }).first().waitFor();
+    noResume = false;
+    await page.reload({ waitUntil: 'domcontentloaded' });
+    await page.getByText('I built the payment API.', { exact: false }).waitFor();
+    await page.getByText('Situation for card0', { exact: true }).waitFor();
+    await page.screenshot({ path: '../../evidence/2026-10-17-queue50/interview-draft-star.png', fullPage: true });
+    await page.goto(`${base}project/task/overview`, { waitUntil: 'domcontentloaded' });
+    await page.getByText('Required L3', { exact: true }).waitFor();
+    await page.getByText('Required L4', { exact: true }).waitFor();
+    await page.getByText('L3 · Meets bar', { exact: true }).waitFor();
+    await page.getByText('L3 · Below bar', { exact: true }).waitFor();
+    await page.screenshot({ path: '../../evidence/2026-10-17-queue50/interview-overview-levels.png', fullPage: true });
+    await page.goto(`${base}project/task/debrief`, { waitUntil: 'domcontentloaded' });
+    await page.getByText(/Required L4/).waitFor();
+    await page.getByText('Below bar', { exact: true }).first().waitFor();
+    await page.getByText('Meets bar', { exact: true }).first().waitFor();
+    cards[1].requiredLevel = null;
+    await page.reload({ waitUntil: 'domcontentloaded' });
+    await page.getByText(/Required level not recorded/).waitFor();
+    await page.screenshot({ path: '../../evidence/2026-10-17-queue50/interview-required-levels.png', fullPage: true });
+    console.log('PASS #250 candidate claim/source/empty/missing and STAR; #325 L3/L4 and historical unknown (mock API)');
+  } finally { await browser.close(); }
+})().catch(e => { console.error(e); process.exitCode = 1; });

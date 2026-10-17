@@ -42,6 +42,7 @@ function toCase(t: RealWrittenTask): Case {
     status: t.caseStatus,
     closeReason: t.closeReason,
     closedAt: t.closedAt,
+    closeDecision: t.closeDecision ?? null,
     handedOffAt: t.handedOffAt,
     interviewTaskId: t.interviewTaskId,
     ownership: { hrOwner: null, hiringManager: null, reviewAssignee: null },

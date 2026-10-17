@@ -271,6 +271,8 @@ export function DecisionPage() {
   const [submitting, setSubmitting] = useState(false);
   const [withdrawn, setWithdrawn] = useState<Decision[]>([]);
   const [loadFailed, setLoadFailed] = useState(false);
+  const [submitError, setSubmitError] = useState("");
+  const [conflictingDecision, setConflictingDecision] = useState<Decision | null>(null);
   const fields = useFieldValidation({ reason: () => (!reason.trim() ? t("Explain the basis for this decision.") : null) });
   /** Second confirmation when a blocker concern is still open (#27 AC-2). */
   const [blockerAcknowledged, setBlockerAcknowledged] = useState(false);
@@ -324,8 +326,10 @@ export function DecisionPage() {
     if (!outcome || submitting) return;
     const overrideAi = !!aiRec && aiRec !== outcome && !(aiRec === "strong_advance" && outcome === "advance");
     setSubmitting(true);
+    setSubmitError("");
+    setConflictingDecision(null);
     try {
-      await recordDecision(app.id, {
+      const result = await recordDecision(app.id, {
         outcome,
         reason,
         decidedBy: state.currentUser,
@@ -333,11 +337,20 @@ export function DecisionPage() {
         overrideAi,
         exceptionApproved,
       });
-      say(t("Decision recorded"), { type: "success" });
+      say(t(result.replayed ? "This decision was already recorded; no new decision was created." : "Decision recorded"), { type: "success" });
       setConfirmOpen(false);
       void load();
     } catch (err) {
-      say(decisionErrorMessage(err, t), { type: "error" });
+      if (err instanceof ApiError && err.code === "DECISION_CONFLICT") {
+        setSubmitError(t("Another decision or update conflicts with this submission. Your input was not submitted and is preserved below."));
+        setConflictingDecision((err.details.decision as Decision | null) ?? null);
+        setConfirmOpen(false);
+      } else if (err instanceof ApiError && err.code === "CURRENT_EVALUATION_REQUIRED") {
+        setSubmitError(t("A completed, current screening evaluation is required before advancing. Refresh the evaluation and confirm again."));
+        setConfirmOpen(false);
+      } else {
+        say(decisionErrorMessage(err, t), { type: "error" });
+      }
     } finally {
       setSubmitting(false);
     }
@@ -368,6 +381,14 @@ export function DecisionPage() {
         subtitle={`${job.title} · ${t("This candidate’s decision only — Comparison and other candidates are unaffected.")}`}
         back={`/applications/${app.id}`}
       />
+
+      {submitError && (
+        <div role="alert" className="banner warning" style={{ marginBottom: 16 }}>
+          <p>{submitError}</p>
+          {conflictingDecision && <p>{conflictingDecision.outcome} · {conflictingDecision.reason} · {db.people[conflictingDecision.decidedBy]?.name ?? conflictingDecision.decidedBy} · {fmtDateTime(conflictingDecision.decidedAt, state.lang)}</p>}
+          <Link to={`/applications/${app.id}`} target="_blank" rel="noopener noreferrer">{t("View current application in a new tab")}</Link>
+        </div>
+      )}
 
       <div className="two-col" style={{ gridTemplateColumns: "340px 1fr" }}>
         <div className="card card-pad">

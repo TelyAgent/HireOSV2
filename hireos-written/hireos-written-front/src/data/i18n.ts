@@ -7,6 +7,18 @@
  * literal (JS takes the last one); those are resolved here the same way.
  */
 export const ZH: Record<string, string> = {
+  "Assessment outcome": "测评结论",
+  "Select outcome": "请选择测评结论",
+  "Meets requirements": "达标",
+  "Does not meet requirements": "未达标",
+  "Manual closure decision; the published assessment is unchanged.": "人工关闭决定；已发布测评结果保持不变。",
+  "Manual override of assessment outcome": "人工覆盖测评结论",
+  "Decision by": "决定人",
+  "Decision time": "决定时间",
+  "Decision reason": "决定理由",
+  "Confirm Passed decision": "确认人工通过决定",
+  "Close with a manual decision. The assessment result is unchanged.": "以人工决定结束测评，不更改测评结果。",
+  "The assessment is unmet or unknown. A decision reason is required to choose Passed.": "测评未达标或结论未知，选择通过必须填写决定理由。",
   "Usage: Unknown": "使用情况：未知",
   "External usage records have not been retrieved. Unknown does not mean zero.": "尚未取得外部使用记录。未知不代表零次。",
   // New written test entry (CreateWrittenTaskModal)
@@ -159,6 +171,15 @@ export const ZH: Record<string, string> = {
   "On confirm, this demo will show a parsed preview: 1 prompt, 2 materials, 1 internal answer key. Old candidate submissions found inside a ZIP are never re-exported.":
     "确认后，本演示会展示解析预览：1 个题目、2 份材料、1 份内部参考答案。ZIP 中发现的旧候选人提交内容不会被重新导出。",
   "Parse (demo)": "解析（演示）",
+  "ZIP import is not available. No files have been uploaded or parsed.": "ZIP 导入暂不可用，尚未上传或解析任何文件。",
+  "Not recorded": "未记录",
+  "Submission source": "提交来源",
+  "Online text answers": "在线文本作答",
+  "Case ID": "测评任务 ID",
+  "Invitation ID": "邀请 ID",
+  "Unavailable": "暂不可用",
+  "Statistics unavailable.": "统计暂不可用。",
+  "Statistics snapshot time is not available.": "尚未取得统计快照时间。",
 
   "Question not found.": "未找到该题目。", "Preview candidate view": "预览候选人视图",
   "Prompt": "题目描述", "Materials": "材料", "Rubric": "评分标准", "Usage": "使用情况", "Versions": "版本记录",

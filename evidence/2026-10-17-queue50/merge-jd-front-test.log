@@ -1,0 +1,212 @@
+npm run test
+exit=0
+
+> hireos-jd-frontend@0.1.0 test
+> vitest run
+
+
+ RUN  v3.2.4 /Users/qmk/work/HireOS/hireos-jd/hireos-jd-front
+
+ ✓ test/field-provenance.test.tsx (7 tests) 1072ms
+ ✓ test/quick-start-flow.test.tsx (4 tests) 1108ms
+   ✓ Quick Start > #65 AC-1: a follow-up question shows no draft; the next answer is sent on its own (the backend keeps the earlier ones)  316ms
+   ✓ Quick Start > #66 AC-1/AC-2: an AI-suggested title is highlighted and Create stays disabled until it is confirmed or edited  343ms
+   ✓ Quick Start > #65 review: reopening a Quick Start from History resumes it — the next answer still goes through Quick Start  339ms
+ ✓ test/copilot-recovery.test.tsx (5 tests) 1211ms
+   ✓ Copilot request failure recovery (#33) > AC-2/AC-4: Retry re-sends the original input on the same conversation, once, however often it is clicked  314ms
+   ✓ Copilot request failure recovery (#33) > AC-4: when creating the conversation itself failed, the retry reuses its idempotency key  440ms
+ ✓ test/link-import-recovery.test.tsx (10 tests) 1254ms
+ ✓ test/job-copilot-ask.test.tsx (8 tests) 1184ms
+   ✓ job-page Copilot > #106 AC-1/AC-2: with nothing selected, a question is answered from the whole JD and the page status, with its basis shown  304ms
+ ✓ test/copilot-input-feedback.test.tsx (14 tests) 2396ms
+   ✓ #75: job title input feedback > an empty or symbols-only title says why and starts nothing; a short real title goes through  325ms
+   ✓ #88 / #90: manual form > #88: an untouched employment type is not sent; a picked one is  315ms
+   ✓ #99: refine only reports real changes > asked for salary but only other fields changed → says the salary was not changed, never "updated"  304ms
+   ✓ #99: refine only reports real changes > a small salary change (hourly 26–36 → 29–39) shows the new amount, highlighted, in the Workspace  338ms
+ ✓ test/ai-fix-review.test.tsx (11 tests) 2658ms
+   ✓ single AI change — paragraph, save round-trip, re-analysis (#94 review) > AC-3: a paragraph fix is kept, saved, undone and saved again — what is saved matches each step exactly  1111ms
+ ✓ test/manual-form-groups.test.tsx (8 tests) 229ms
+ ✓ test/job-meta-fields.test.tsx (2 tests) 280ms
+ ✓ test/copilot-create-job.test.tsx (3 tests) 623ms
+   ✓ Copilot → create job (#34) > AC-1/AC-4: in a brand-new panel, Create Manually confirms the conversation it just created and opens the real job  327ms
+ ✓ test/job-library-loading.test.tsx (2 tests) 129ms
+ ✓ test/variant-refine.test.tsx (1 test) 450ms
+   ✓ title variants (#71) > AC-2/AC-3: with B selected, refine says B is primary, B stays selected, and creating uses B’s refined facts  449ms
+ ✓ test/ask-budget.test.ts (7 tests) 40ms
+ ✓ test/salary-format.test.ts (1 test) 15ms
+ ✓ test/job-state-labels.test.tsx (4 tests) 65ms
+ ✓ test/suggestion-panel.test.tsx (4 tests) 157ms
+ ✓ test/account-locale.test.tsx (4 tests) 93ms
+ ✓ test/summary-no-sentence-rule.test.ts (2 tests) 3ms
+ ✓ test/salary-currency.test.ts (7 tests) 16ms
+ ✓ test/baseline-parity.test.ts (2 tests) 14ms
+ ✓ test/suggestion-gate.test.ts (5 tests) 7ms
+ ✓ test/publish-gate.test.ts (9 tests) 3ms
+ ✓ test/context-budget.test.ts (3 tests) 2ms
+ ✓ test/ai-not-configured.test.ts (1 test) 1ms
+
+ Test Files  24 passed (24)
+      Tests  124 passed (124)
+   Start at  20:15:09
+   Duration  10.02s (transform 1.04s, setup 2.77s, collect 37.50s, tests 13.01s, environment 8.69s, prepare 1.32s)
+
+stderr | test/copilot-recovery.test.tsx > Copilot request failure recovery (#33) > AC-2/AC-3/AC-5: a failed request shows a plain-language card with Retry + Start over and keeps the input
+Copilot request failed: CopilotRequestError: Sign-in service is unavailable.
+    at /Users/qmk/work/HireOS/hireos-jd/hireos-jd-front/test/copilot-recovery.test.tsx:36:22
+    at processTicksAndRejections (node:internal/process/task_queues:104:5)
+    at VitestExecutor.runModule (file:///Users/qmk/work/HireOS/hireos-jd/hireos-jd-front/node_modules/vite-node/dist/client.mjs:397:4)
+    at VitestExecutor.directRequest (file:///Users/qmk/work/HireOS/hireos-jd/hireos-jd-front/node_modules/vite-node/dist/client.mjs:375:3)
+    at VitestExecutor.cachedRequest (file:///Users/qmk/work/HireOS/hireos-jd/hireos-jd-front/node_modules/vite-node/dist/client.mjs:189:11)
+    at VitestExecutor.executeId (file:///Users/qmk/work/HireOS/hireos-jd/hireos-jd-front/node_modules/vite-node/dist/client.mjs:166:10)
+    at collectTests (file:///Users/qmk/work/HireOS/hireos-jd/hireos-jd-front/node_modules/@vitest/runner/dist/chunk-hooks.js:1174:4)
+    at startTests (file:///Users/qmk/work/HireOS/hireos-jd/hireos-jd-front/node_modules/@vitest/runner/dist/chunk-hooks.js:1817:17)
+    at file:///Users/qmk/work/HireOS/hireos-jd/hireos-jd-front/node_modules/vitest/dist/chunks/runBaseTests.9Ij9_de-.js:117:26
+    at withEnv (file:///Users/qmk/work/HireOS/hireos-jd/hireos-jd-front/node_modules/vitest/dist/chunks/runBaseTests.9Ij9_de-.js:84:3) {
+  status: 503,
+  code: 'IDENTITY_UNAVAILABLE',
+  fieldPaths: []
+}
+
+stderr | test/job-copilot-ask.test.tsx > job-page Copilot > #106 AC-1/AC-2: with nothing selected, a question is answered from the whole JD and the page status, with its basis shown
+`NaN` is an invalid value for the `height` css style property.
+
+stderr | test/copilot-recovery.test.tsx > Copilot request failure recovery (#33) > AC-2/AC-4: Retry re-sends the original input on the same conversation, once, however often it is clicked
+Copilot request failed: CopilotRequestError: Sign-in service is unavailable.
+    at /Users/qmk/work/HireOS/hireos-jd/hireos-jd-front/test/copilot-recovery.test.tsx:36:22
+    at processTicksAndRejections (node:internal/process/task_queues:104:5)
+    at VitestExecutor.runModule (file:///Users/qmk/work/HireOS/hireos-jd/hireos-jd-front/node_modules/vite-node/dist/client.mjs:397:4)
+    at VitestExecutor.directRequest (file:///Users/qmk/work/HireOS/hireos-jd/hireos-jd-front/node_modules/vite-node/dist/client.mjs:375:3)
+    at VitestExecutor.cachedRequest (file:///Users/qmk/work/HireOS/hireos-jd/hireos-jd-front/node_modules/vite-node/dist/client.mjs:189:11)
+    at VitestExecutor.executeId (file:///Users/qmk/work/HireOS/hireos-jd/hireos-jd-front/node_modules/vite-node/dist/client.mjs:166:10)
+    at collectTests (file:///Users/qmk/work/HireOS/hireos-jd/hireos-jd-front/node_modules/@vitest/runner/dist/chunk-hooks.js:1174:4)
+    at startTests (file:///Users/qmk/work/HireOS/hireos-jd/hireos-jd-front/node_modules/@vitest/runner/dist/chunk-hooks.js:1817:17)
+    at file:///Users/qmk/work/HireOS/hireos-jd/hireos-jd-front/node_modules/vitest/dist/chunks/runBaseTests.9Ij9_de-.js:117:26
+    at withEnv (file:///Users/qmk/work/HireOS/hireos-jd/hireos-jd-front/node_modules/vitest/dist/chunks/runBaseTests.9Ij9_de-.js:84:3) {
+  status: 503,
+  code: 'IDENTITY_UNAVAILABLE',
+  fieldPaths: []
+}
+
+stderr | test/link-import-recovery.test.tsx > Paste a link that cannot be read (#64) > #85: login failure offers a focused full-text recovery without creating a draft
+Copilot request failed: CopilotRequestError: This page requires login. Paste the full JD text.
+    at /Users/qmk/work/HireOS/hireos-jd/hireos-jd-front/test/link-import-recovery.test.tsx:105:47
+    at file:///Users/qmk/work/HireOS/hireos-jd/hireos-jd-front/node_modules/@vitest/runner/dist/chunk-hooks.js:155:11
+    at file:///Users/qmk/work/HireOS/hireos-jd/hireos-jd-front/node_modules/@vitest/runner/dist/chunk-hooks.js:752:26
+    at file:///Users/qmk/work/HireOS/hireos-jd/hireos-jd-front/node_modules/@vitest/runner/dist/chunk-hooks.js:1897:20
+    at new Promise (<anonymous>)
+    at runWithTimeout (file:///Users/qmk/work/HireOS/hireos-jd/hireos-jd-front/node_modules/@vitest/runner/dist/chunk-hooks.js:1863:10)
+    at runTest (file:///Users/qmk/work/HireOS/hireos-jd/hireos-jd-front/node_modules/@vitest/runner/dist/chunk-hooks.js:1574:12)
+    at runSuite (file:///Users/qmk/work/HireOS/hireos-jd/hireos-jd-front/node_modules/@vitest/runner/dist/chunk-hooks.js:1729:8)
+    at runSuite (file:///Users/qmk/work/HireOS/hireos-jd/hireos-jd-front/node_modules/@vitest/runner/dist/chunk-hooks.js:1729:8)
+    at runFiles (file:///Users/qmk/work/HireOS/hireos-jd/hireos-jd-front/node_modules/@vitest/runner/dist/chunk-hooks.js:1787:3) {
+  status: 400,
+  code: 'LINK_UNREADABLE',
+  fieldPaths: []
+}
+
+stderr | test/copilot-recovery.test.tsx > Copilot request failure recovery (#33) > AC-4: when creating the conversation itself failed, the retry reuses its idempotency key
+Copilot request failed: TypeError: Failed to fetch
+    at /Users/qmk/work/HireOS/hireos-jd/hireos-jd-front/test/copilot-recovery.test.tsx:127:57
+    at file:///Users/qmk/work/HireOS/hireos-jd/hireos-jd-front/node_modules/@vitest/runner/dist/chunk-hooks.js:155:11
+    at file:///Users/qmk/work/HireOS/hireos-jd/hireos-jd-front/node_modules/@vitest/runner/dist/chunk-hooks.js:752:26
+    at file:///Users/qmk/work/HireOS/hireos-jd/hireos-jd-front/node_modules/@vitest/runner/dist/chunk-hooks.js:1897:20
+    at new Promise (<anonymous>)
+    at runWithTimeout (file:///Users/qmk/work/HireOS/hireos-jd/hireos-jd-front/node_modules/@vitest/runner/dist/chunk-hooks.js:1863:10)
+    at runTest (file:///Users/qmk/work/HireOS/hireos-jd/hireos-jd-front/node_modules/@vitest/runner/dist/chunk-hooks.js:1574:12)
+    at runSuite (file:///Users/qmk/work/HireOS/hireos-jd/hireos-jd-front/node_modules/@vitest/runner/dist/chunk-hooks.js:1729:8)
+    at runSuite (file:///Users/qmk/work/HireOS/hireos-jd/hireos-jd-front/node_modules/@vitest/runner/dist/chunk-hooks.js:1729:8)
+    at runFiles (file:///Users/qmk/work/HireOS/hireos-jd/hireos-jd-front/node_modules/@vitest/runner/dist/chunk-hooks.js:1787:3)
+
+stderr | test/link-import-recovery.test.tsx > Paste a link that cannot be read (#64) > AC-3: says why, keeps the link in the composer for pasting the JD instead, and drafts nothing
+Copilot request failed: CopilotRequestError: 页面已打开，但没有找到职位内容，可能需要登录，或职位已下线。请打开链接复制 JD 全文，粘贴到下方。
+    at unreadable (/Users/qmk/work/HireOS/hireos-jd/hireos-jd-front/test/link-import-recovery.test.tsx:38:26)
+    at /Users/qmk/work/HireOS/hireos-jd/hireos-jd-front/test/link-import-recovery.test.tsx:121:47
+    at file:///Users/qmk/work/HireOS/hireos-jd/hireos-jd-front/node_modules/@vitest/runner/dist/chunk-hooks.js:155:11
+    at file:///Users/qmk/work/HireOS/hireos-jd/hireos-jd-front/node_modules/@vitest/runner/dist/chunk-hooks.js:752:26
+    at file:///Users/qmk/work/HireOS/hireos-jd/hireos-jd-front/node_modules/@vitest/runner/dist/chunk-hooks.js:1897:20
+    at new Promise (<anonymous>)
+    at runWithTimeout (file:///Users/qmk/work/HireOS/hireos-jd/hireos-jd-front/node_modules/@vitest/runner/dist/chunk-hooks.js:1863:10)
+    at runTest (file:///Users/qmk/work/HireOS/hireos-jd/hireos-jd-front/node_modules/@vitest/runner/dist/chunk-hooks.js:1574:12)
+    at runSuite (file:///Users/qmk/work/HireOS/hireos-jd/hireos-jd-front/node_modules/@vitest/runner/dist/chunk-hooks.js:1729:8)
+    at runSuite (file:///Users/qmk/work/HireOS/hireos-jd/hireos-jd-front/node_modules/@vitest/runner/dist/chunk-hooks.js:1729:8) {
+  status: 400,
+  code: 'LINK_UNREADABLE',
+  fieldPaths: []
+}
+
+stderr | test/link-import-recovery.test.tsx > Paste a link that cannot be read (#64) > AC-4: Retry on the same failing link shows only the current error, not a second identical card
+Copilot request failed: CopilotRequestError: 页面已打开，但没有找到职位内容，可能需要登录，或职位已下线。请打开链接复制 JD 全文，粘贴到下方。
+    at unreadable (/Users/qmk/work/HireOS/hireos-jd/hireos-jd-front/test/link-import-recovery.test.tsx:38:26)
+    at /Users/qmk/work/HireOS/hireos-jd/hireos-jd-front/test/link-import-recovery.test.tsx:134:47
+    at file:///Users/qmk/work/HireOS/hireos-jd/hireos-jd-front/node_modules/@vitest/runner/dist/chunk-hooks.js:155:11
+    at file:///Users/qmk/work/HireOS/hireos-jd/hireos-jd-front/node_modules/@vitest/runner/dist/chunk-hooks.js:752:26
+    at file:///Users/qmk/work/HireOS/hireos-jd/hireos-jd-front/node_modules/@vitest/runner/dist/chunk-hooks.js:1897:20
+    at new Promise (<anonymous>)
+    at runWithTimeout (file:///Users/qmk/work/HireOS/hireos-jd/hireos-jd-front/node_modules/@vitest/runner/dist/chunk-hooks.js:1863:10)
+    at runTest (file:///Users/qmk/work/HireOS/hireos-jd/hireos-jd-front/node_modules/@vitest/runner/dist/chunk-hooks.js:1574:12)
+    at runSuite (file:///Users/qmk/work/HireOS/hireos-jd/hireos-jd-front/node_modules/@vitest/runner/dist/chunk-hooks.js:1729:8)
+    at runSuite (file:///Users/qmk/work/HireOS/hireos-jd/hireos-jd-front/node_modules/@vitest/runner/dist/chunk-hooks.js:1729:8) {
+  status: 400,
+  code: 'LINK_UNREADABLE',
+  fieldPaths: []
+}
+
+stderr | test/link-import-recovery.test.tsx > Paste a link that cannot be read (#64) > AC-4: Retry on the same failing link shows only the current error, not a second identical card
+Copilot request failed: CopilotRequestError: 页面已打开，但没有找到职位内容，可能需要登录，或职位已下线。请打开链接复制 JD 全文，粘贴到下方。
+    at unreadable (/Users/qmk/work/HireOS/hireos-jd/hireos-jd-front/test/link-import-recovery.test.tsx:38:26)
+    at /Users/qmk/work/HireOS/hireos-jd/hireos-jd-front/test/link-import-recovery.test.tsx:134:47
+    at file:///Users/qmk/work/HireOS/hireos-jd/hireos-jd-front/node_modules/@vitest/runner/dist/chunk-hooks.js:155:11
+    at file:///Users/qmk/work/HireOS/hireos-jd/hireos-jd-front/node_modules/@vitest/runner/dist/chunk-hooks.js:752:26
+    at file:///Users/qmk/work/HireOS/hireos-jd/hireos-jd-front/node_modules/@vitest/runner/dist/chunk-hooks.js:1897:20
+    at new Promise (<anonymous>)
+    at runWithTimeout (file:///Users/qmk/work/HireOS/hireos-jd/hireos-jd-front/node_modules/@vitest/runner/dist/chunk-hooks.js:1863:10)
+    at runTest (file:///Users/qmk/work/HireOS/hireos-jd/hireos-jd-front/node_modules/@vitest/runner/dist/chunk-hooks.js:1574:12)
+    at runSuite (file:///Users/qmk/work/HireOS/hireos-jd/hireos-jd-front/node_modules/@vitest/runner/dist/chunk-hooks.js:1729:8)
+    at runSuite (file:///Users/qmk/work/HireOS/hireos-jd/hireos-jd-front/node_modules/@vitest/runner/dist/chunk-hooks.js:1729:8) {
+  status: 400,
+  code: 'LINK_UNREADABLE',
+  fieldPaths: []
+}
+
+stderr | test/link-import-recovery.test.tsx > Paste a link that cannot be read (#64) > AC-4: Retry on the same failing link shows only the current error, not a second identical card
+Copilot request failed: CopilotRequestError: 页面已打开，但没有找到职位内容，可能需要登录，或职位已下线。请打开链接复制 JD 全文，粘贴到下方。
+    at unreadable (/Users/qmk/work/HireOS/hireos-jd/hireos-jd-front/test/link-import-recovery.test.tsx:38:26)
+    at /Users/qmk/work/HireOS/hireos-jd/hireos-jd-front/test/link-import-recovery.test.tsx:134:47
+    at file:///Users/qmk/work/HireOS/hireos-jd/hireos-jd-front/node_modules/@vitest/runner/dist/chunk-hooks.js:155:11
+    at file:///Users/qmk/work/HireOS/hireos-jd/hireos-jd-front/node_modules/@vitest/runner/dist/chunk-hooks.js:752:26
+    at file:///Users/qmk/work/HireOS/hireos-jd/hireos-jd-front/node_modules/@vitest/runner/dist/chunk-hooks.js:1897:20
+    at new Promise (<anonymous>)
+    at runWithTimeout (file:///Users/qmk/work/HireOS/hireos-jd/hireos-jd-front/node_modules/@vitest/runner/dist/chunk-hooks.js:1863:10)
+    at runTest (file:///Users/qmk/work/HireOS/hireos-jd/hireos-jd-front/node_modules/@vitest/runner/dist/chunk-hooks.js:1574:12)
+    at runSuite (file:///Users/qmk/work/HireOS/hireos-jd/hireos-jd-front/node_modules/@vitest/runner/dist/chunk-hooks.js:1729:8)
+    at runSuite (file:///Users/qmk/work/HireOS/hireos-jd/hireos-jd-front/node_modules/@vitest/runner/dist/chunk-hooks.js:1729:8) {
+  status: 400,
+  code: 'LINK_UNREADABLE',
+  fieldPaths: []
+}
+
+stderr | test/copilot-create-job.test.tsx > Copilot → create job (#34) > AC-3/AC-5: a failed confirm creates no local job, keeps the input and retries on the same conversation
+Creating the job failed: Error: Core Record is unavailable.
+    at /Users/qmk/work/HireOS/hireos-jd/hireos-jd-front/test/copilot-create-job.test.tsx:88:30
+    at file:///Users/qmk/work/HireOS/hireos-jd/hireos-jd-front/node_modules/@vitest/runner/dist/chunk-hooks.js:155:11
+    at file:///Users/qmk/work/HireOS/hireos-jd/hireos-jd-front/node_modules/@vitest/runner/dist/chunk-hooks.js:752:26
+    at file:///Users/qmk/work/HireOS/hireos-jd/hireos-jd-front/node_modules/@vitest/runner/dist/chunk-hooks.js:1897:20
+    at new Promise (<anonymous>)
+    at runWithTimeout (file:///Users/qmk/work/HireOS/hireos-jd/hireos-jd-front/node_modules/@vitest/runner/dist/chunk-hooks.js:1863:10)
+    at runTest (file:///Users/qmk/work/HireOS/hireos-jd/hireos-jd-front/node_modules/@vitest/runner/dist/chunk-hooks.js:1574:12)
+    at runSuite (file:///Users/qmk/work/HireOS/hireos-jd/hireos-jd-front/node_modules/@vitest/runner/dist/chunk-hooks.js:1729:8)
+    at runSuite (file:///Users/qmk/work/HireOS/hireos-jd/hireos-jd-front/node_modules/@vitest/runner/dist/chunk-hooks.js:1729:8)
+    at runFiles (file:///Users/qmk/work/HireOS/hireos-jd/hireos-jd-front/node_modules/@vitest/runner/dist/chunk-hooks.js:1787:3)
+
+stderr | test/job-library-loading.test.tsx > Job Library loading states (#35) > AC-1/AC-2: a failure shows the error and Retry; the empty state appears only after a real empty answer
+Failed to load real jobs from the backend: Error: HTTP 504
+    at /Users/qmk/work/HireOS/hireos-jd/hireos-jd-front/test/job-library-loading.test.tsx:59:40
+    at file:///Users/qmk/work/HireOS/hireos-jd/hireos-jd-front/node_modules/@vitest/runner/dist/chunk-hooks.js:155:11
+    at file:///Users/qmk/work/HireOS/hireos-jd/hireos-jd-front/node_modules/@vitest/runner/dist/chunk-hooks.js:752:26
+    at file:///Users/qmk/work/HireOS/hireos-jd/hireos-jd-front/node_modules/@vitest/runner/dist/chunk-hooks.js:1897:20
+    at new Promise (<anonymous>)
+    at runWithTimeout (file:///Users/qmk/work/HireOS/hireos-jd/hireos-jd-front/node_modules/@vitest/runner/dist/chunk-hooks.js:1863:10)
+    at runTest (file:///Users/qmk/work/HireOS/hireos-jd/hireos-jd-front/node_modules/@vitest/runner/dist/chunk-hooks.js:1574:12)
+    at runSuite (file:///Users/qmk/work/HireOS/hireos-jd/hireos-jd-front/node_modules/@vitest/runner/dist/chunk-hooks.js:1729:8)
+    at runSuite (file:///Users/qmk/work/HireOS/hireos-jd/hireos-jd-front/node_modules/@vitest/runner/dist/chunk-hooks.js:1729:8)
+    at runFiles (file:///Users/qmk/work/HireOS/hireos-jd/hireos-jd-front/node_modules/@vitest/runner/dist/chunk-hooks.js:1787:3)

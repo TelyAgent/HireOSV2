@@ -1096,6 +1096,8 @@ export const ZH: Record<string, string> = {
   "Your input": "你的输入",
   "Source file: %s": "来源文件：%s",
   "Source: %s": "来源：%s",
+  "Link source": "链接来源",
+  "Text source": "文案来源",
   "Was: %s": "原为：%s",
   "%s openings": "招聘 %s 人",
   "Nice-to-have": "加分项",

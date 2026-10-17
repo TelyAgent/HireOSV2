@@ -30,7 +30,7 @@ import * as copilot from '../src/features/copilot/copilotApi';
 import { CopilotRequestError } from '../src/features/copilot/copilotApi';
 import { sourceLinks } from '../src/features/workspace/documentsApi';
 import { StoreProvider } from '../src/store/StoreContext';
-import { GeminiPanel } from '../src/features/copilot/GeminiPanel';
+import { GeminiPanel, conversationToGeminiMsgs } from '../src/features/copilot/GeminiPanel';
 
 const api = vi.mocked(copilot);
 const LINK = 'https://careers.example.com/position/42';
@@ -65,6 +65,32 @@ beforeEach(() => {
 afterEach(cleanup);
 
 describe('Paste a link that cannot be read (#64)', () => {
+  it.each([LINK, 'Original pasted job description'])('#84: the draft identifies its source for %s', async (source) => {
+    api.importCopilotSource.mockResolvedValue({ ...conversation('conv-1'), phase: 'ready_to_confirm', fields: { title: 'Synthetic role' } } as never);
+    renderPanel();
+    await sendLink(source);
+    const note = await screen.findByTestId('draft-source');
+    expect(note).toHaveTextContent(source === LINK ? 'Link source' : 'Text source');
+    if (source === LINK) expect(note.querySelector('a')).toHaveAttribute('href', LINK);
+    else expect(note.querySelector('a')).toBeNull();
+  });
+
+  it('#84: reopening a conversation restores recorded import provenance without guessing from message text', () => {
+    const dto = (attachments: unknown) => ({ ...conversation('conv-1'), phase: 'ready_to_confirm', fields: { title: 'Synthetic role' }, messages: [{ role: 'user', text: LINK, attachments }] }) as never;
+    expect(conversationToGeminiMsgs(dto([{ kind: 'link', url: LINK }])).at(-1)?.origin).toEqual({ path: 'link', detail: LINK, sourceType: 'link' });
+    expect(conversationToGeminiMsgs(dto([{ kind: 'pasted_text' }])).at(-1)?.origin).toEqual({ path: 'link', detail: LINK, sourceType: 'text' });
+    expect(conversationToGeminiMsgs(dto(null)).at(-1)?.origin).toBeUndefined();
+  });
+  it('#83: an incomplete import never automatically generates missing requirements', async () => {
+    api.importCopilotSource.mockResolvedValue({ ...conversation('conv-1'), missingFields: ['responsibilities', 'mustHave'], messages: [{ id: 'm83', role: 'assistant', text: 'Please review the source.', sequence: 2, createdAt: '' }] } as never);
+    renderPanel();
+    await sendLink(LINK);
+    await waitFor(() => expect(api.importCopilotSource).toHaveBeenCalledWith('conv-1', { url: LINK }));
+    await screen.findByText('Please review the source.');
+    expect(api.autoCompleteCopilotConversation).not.toHaveBeenCalled();
+    expect(api.confirmCopilotDraft).not.toHaveBeenCalled();
+  });
+
   it.each(['file:///tmp/uj-test-m4.txt', 'ftp://example.com/jd'])('#85: rejects %s before import, preserving input and no draft', async (url) => {
     renderPanel();
     await sendLink(url);

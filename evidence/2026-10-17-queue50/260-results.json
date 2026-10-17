@@ -1,0 +1,68 @@
+[
+  {
+    "name": "interview-backend-build",
+    "command": "npm run build",
+    "exit": 0,
+    "log": "260-interview-backend-build.log"
+  },
+  {
+    "name": "interview-backend-lint",
+    "command": "npm run lint",
+    "exit": 0,
+    "log": "260-interview-backend-lint.log"
+  },
+  {
+    "name": "interview-backend-typecheck",
+    "command": "npm run typecheck",
+    "exit": 0,
+    "log": "260-interview-backend-typecheck.log"
+  },
+  {
+    "name": "interview-backend-test",
+    "command": "npm run test",
+    "exit": 0,
+    "log": "260-interview-backend-test.log"
+  },
+  {
+    "name": "interview-front-build",
+    "command": "npm run build",
+    "exit": 0,
+    "log": "260-interview-front-build.log"
+  },
+  {
+    "name": "interview-front-typecheck",
+    "command": "npm run typecheck",
+    "exit": 0,
+    "log": "260-interview-front-typecheck.log"
+  },
+  {
+    "name": "interview-front-test",
+    "command": "npm run test",
+    "exit": 0,
+    "log": "260-interview-front-test.log"
+  },
+  {
+    "name": "question-decision",
+    "command": "node test/question-decision.browser.cjs",
+    "exit": 0,
+    "log": "260-question-decision.log"
+  },
+  {
+    "name": "rubric-evidence",
+    "command": "node test/rubric-evidence.browser.cjs",
+    "exit": 0,
+    "log": "260-rubric-evidence.log"
+  },
+  {
+    "name": "score-reason",
+    "command": "node test/score-reason.browser.cjs",
+    "exit": 0,
+    "log": "260-score-reason.log"
+  },
+  {
+    "name": "schedule-interviewer",
+    "command": "node test/schedule-interviewer.browser.cjs",
+    "exit": 0,
+    "log": "260-schedule-interviewer.log"
+  }
+]

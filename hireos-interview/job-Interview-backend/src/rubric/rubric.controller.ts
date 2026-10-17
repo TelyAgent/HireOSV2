@@ -7,9 +7,19 @@ import { WorkspaceGuard, type Identity } from '../intake/workspace.guard';
 export class RubricController {
   constructor(private readonly rubric: RubricService) {}
 
+  @Get('tasks/:id/rubric-claims')
+  claims(@Req() req: { identity: Identity }, @Param('id') id: string) {
+    return this.rubric.candidateClaims(req.identity.workspaceId, id);
+  }
+
+  @Post('tasks/:id/rubric-claims')
+  generateClaims(@Req() req: { identity: Identity }, @Param('id') id: string) {
+    return this.rubric.candidateClaims(req.identity.workspaceId, id, true);
+  }
+
   @Post('jobs/:id/capability-cards')
   generate(@Req() req: { identity: Identity }, @Param('id') id: string) {
-    return this.rubric.generate(req.identity.workspaceId, id);
+    return this.rubric.generate(req.identity.workspaceId, id, req.identity);
   }
 
   @Get('jobs/:id/rubric')

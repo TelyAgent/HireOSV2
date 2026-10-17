@@ -1,0 +1,33 @@
+node --test test/intake.test.cjs
+exit=0
+▶ intake persistence, validation, parsing and recovery
+  ✔ an attached job is readable within its workspace (17.656833ms)
+  ✔ workspace isolation and production fail-closed guard (1.622916ms)
+  ✔ real TXT, PDF and DOCX extraction; OCR, invalid and oversized files (104.970375ms)
+  ✔ linking a résumé creates exactly one task per (job, candidate); relinking reuses it (45.28875ms)
+  ✔ quick start: new JD text + one résumé creates the job via JD and one task (29.420834ms)
+  ✔ quick start: a résumé another subsystem already knows reuses that Core candidate (17.485083ms)
+  ✔ quick start: the same JD again is reported as a duplicate of the existing job (5.144125ms)
+  ✔ the job list picks up fields filled in Core Record later (e.g. by JD structuring) (3.592791ms)
+  ✔ quick start: an existing Core Record job can be picked instead of new JD text (3.526833ms)
+  ✔ choosing an existing job: only published jobs are offered or accepted (7.936875ms)
+  ✔ quick start: a bad résumé is rejected before anything is created upstream (7.210333ms)
+  ✔ a task is created with two generic rounds automatically (4.104042ms)
+  ✔ a new round can be added manually and takes the next sequence number (17.950958ms)
+  ✔ round edits are versioned independently and validate the interviewer (14.146916ms)
+  ✔ AI extraction is sourced and never silently edits job or candidate fields (13.122708ms)
+  ✔ a parsed email matching another Core candidate flags (never merges) the candidate (30.841458ms)
+  ✔ invalid AI responses and missing configuration stay explicit (3.859125ms)
+  ✔ task status changes are versioned independently of the job (12.389833ms)
+  ✔ #250: registered preview and claims adapters validate real HTTP model responses (7.934958ms)
+  ✔ expired leases recover without overriding human edits (7.658542ms)
+  ✔ #325/#250: real persisted JD levels and task-scoped resume claims APIs (64.599834ms)
+✔ intake persistence, validation, parsing and recovery (591.185083ms)
+ℹ tests 22
+ℹ suites 0
+ℹ pass 22
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 1020.912667

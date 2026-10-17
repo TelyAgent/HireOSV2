@@ -1,0 +1,5 @@
+npm run typecheck
+exit=0
+
+> hireos-written-frontend@0.1.0 typecheck
+> tsc -b --noEmit

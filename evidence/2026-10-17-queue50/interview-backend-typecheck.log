@@ -1,0 +1,5 @@
+npm run typecheck
+exit=0
+
+> hireos-interview-backend@0.1.0 typecheck
+> tsc --noEmit

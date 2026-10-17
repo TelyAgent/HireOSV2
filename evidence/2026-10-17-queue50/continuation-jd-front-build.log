@@ -1,0 +1,20 @@
+npm run build
+exit=0
+
+> hireos-jd-frontend@0.1.0 build
+> tsc -b && vite build
+
+vite v7.3.6 building client environment for production...
+transforming...
+✓ 1608 modules transformed.
+rendering chunks...
+computing gzip size...
+dist/index.html                     0.94 kB │ gzip:   0.52 kB
+dist/assets/index-v4XfgQw2.css     83.55 kB │ gzip:  15.62 kB
+dist/assets/index-DBKh7O6o.js   1,622.72 kB │ gzip: 518.08 kB
+✓ built in 2.91s
+
+(!) Some chunks are larger than 500 kB after minification. Consider:
+- Using dynamic import() to code-split the application
+- Use build.rollupOptions.output.manualChunks to improve chunking: https://rollupjs.org/configuration-options/#output-manualchunks
+- Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.

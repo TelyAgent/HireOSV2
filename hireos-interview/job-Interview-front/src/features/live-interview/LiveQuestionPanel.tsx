@@ -3,19 +3,23 @@ import { useStore } from '../../store/StoreContext';
 import { useProjectTask } from '../project-intake/useTask';
 import { useBrief } from '../project-intake/useBrief';
 import { Pill } from '../../utils/status';
+import { api } from '../project-intake/api';
+import { useSkippedQuestions, type QuestionSkip } from './useSkippedQuestions';
 
 const btn = { height: 30, padding: '0 12px', border: '1px solid var(--line)', borderRadius: 9, background: 'transparent', color: 'var(--ink-2)', fontSize: 12.5, cursor: 'pointer' } as const;
 
 /** The Interview Brief's real questions — one STAR set per confirmed capability card — walked
- * through one at a time. Progress (current / skipped) is local to this visit of the round. */
-export function LiveQuestionPanel() {
+ * through one at a time. Skip records belong to the selected real round. */
+export function LiveQuestionPanel({ roundId, completed = false }: { roundId: string | null; completed?: boolean }) {
   const { state, t } = useStore();
   const zh = state.lang === 'zh';
   const { task } = useProjectTask();
   const { state: brief, loading } = useBrief(task?.job.id ?? null);
   const questions = brief?.questions ?? [];
   const [index, setIndex] = useState(0);
-  const [skipped, setSkipped] = useState<Set<string>>(new Set());
+  const skipped = useSkippedQuestions(roundId);
+  const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState('');
 
   const card = { marginTop: 12, padding: '14px 16px', border: '1px solid var(--line)', borderRadius: 14, background: 'var(--surface)' } as const;
   if (loading || !brief) return <div style={{ ...card, fontSize: 12.5, color: 'var(--ink-3)' }}>{zh ? '加载中…' : 'Loading…'}</div>;
@@ -27,7 +31,13 @@ export function LiveQuestionPanel() {
   const star = [q.situationPrompt, q.taskPrompt, q.actionPrompt, q.resultPrompt];
   const tags = q.card.competencyTags.split(',').map((s) => s.trim()).filter(Boolean);
   const move = (delta: number) => setIndex((i) => Math.max(0, Math.min(questions.length - 1, i + delta)));
-  const skip = () => { setSkipped((s) => new Set(s).add(q.id)); move(1); };
+  const skip = async () => {
+    if (!roundId || saving) return;
+    setSaving(true); setSaveError('');
+    try { skipped.record(await api<QuestionSkip>(`/rounds/${roundId}/questions/${q.id}/skip`, { method: 'POST' })); move(1); }
+    catch { setSaveError(zh ? '跳题保存失败，请重试' : 'Could not save skip. Please retry.'); }
+    finally { setSaving(false); }
+  };
 
   return <div style={card}>
     <div style={{ display: 'flex', alignItems: 'center', gap: 9, flexWrap: 'wrap' }}>
@@ -36,7 +46,7 @@ export function LiveQuestionPanel() {
       </div>
       {q.card.cardPriority === 'P0' && <Pill label={zh ? '必须项' : 'Must-have'} tone="bad" />}
       {q.mandatory && <Pill label={zh ? '必问' : 'Mandatory'} tone="warn" />}
-      {skipped.has(q.id) && <Pill label={zh ? '已跳过' : 'Skipped'} tone="unknown" />}
+      {skipped.rows.some(row => row.questionId === q.id) && <Pill label={zh ? '未问' : 'Not asked'} tone="unknown" />}
     </div>
     <div style={{ marginTop: 8, fontSize: 14.5, fontWeight: 600 }}>{q.card.requirement}</div>
     {tags.length > 0 && <div style={{ marginTop: 4, fontSize: 11.5, color: 'var(--ink-3)' }}>{t.targetsLabel}{tags.join(zh ? '、' : ', ')}</div>}
@@ -56,9 +66,11 @@ export function LiveQuestionPanel() {
       <button disabled={last} onClick={() => move(1)} style={{ ...btn, border: '1px solid var(--line-strong)', background: 'var(--surface)', color: 'var(--ink)', cursor: last ? 'not-allowed' : 'pointer', opacity: last ? 0.5 : 1 }}>
         {t.nextQuestionBtn}
       </button>
-      <button disabled={last} onClick={skip} style={{ ...btn, cursor: last ? 'not-allowed' : 'pointer', opacity: last ? 0.5 : 1 }}>
+      <button disabled={!roundId || completed || saving || skipped.loading || !!skipped.error} onClick={() => void skip()} style={btn}>
         {t.skipBtn}
       </button>
     </div>
+    {saveError && <p role="alert">{saveError}</p>}
+    {skipped.error && <p role="alert">{zh ? '题目记录读取失败' : skipped.error} <button onClick={skipped.reload}>{zh ? '重试' : 'Retry'}</button></p>}
   </div>;
 }

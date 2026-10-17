@@ -19,7 +19,7 @@ import type { Application } from "../data/fixtures/applications";
 import type { Job } from "../data/fixtures/jobs";
 import type { CandidateJobRecommendation } from "../data/fixtures/recommendations";
 import { fmtDateTime, relTime } from "../lib/format";
-import { confidenceLabel } from "../lib/scoring";
+import { confidenceExplanation, confidenceLabel } from "../lib/scoring";
 import { Button, EmptyState, PageHeader } from "../components/ui/Primitives";
 import { Modal } from "../components/ui/Overlays";
 import { Icon } from "../components/ui/Icons";
@@ -299,7 +299,7 @@ export function JobRecommendationsPage() {
   const resumeFile = [...detail.resumeVersions].sort((a, b) => b.version - a.version)[0];
 
   return (
-    <>
+    <div className="recommendations-page">
       <PageHeader
         title={t("Job recommendations")}
         subtitle={subtitle}
@@ -350,7 +350,7 @@ export function JobRecommendationsPage() {
                   <div style={{ fontWeight: 600, fontSize: "var(--fs-lg)" }}>
                     {job.title} <span className="tiny muted">{job.team} · {job.location}</span>
                   </div>
-                  <div className="flex items-center gap-8" style={{ marginTop: 4 }}>
+                  <div className="flex items-center flex-wrap gap-8" style={{ marginTop: 4 }}>
                     {statusChip}
                     {notEligible && <span className="badge badge-danger" data-testid="not-eligible">{t("Not eligible")}</span>}
                     {roleClosed && <span className="badge badge-warning">{t("Role closed")}</span>}
@@ -364,6 +364,15 @@ export function JobRecommendationsPage() {
                   </div>
                 </div>
               </div>
+              {rec.status !== "stale" && (
+                <details style={{ marginTop: 8 }} data-testid="signal-explanation">
+                  <summary style={{ cursor: "pointer", color: "var(--accent)" }}>{t("What does this signal mean?")}</summary>
+                  <p className="tiny" style={{ margin: "8px 0", overflowWrap: "anywhere", color: "var(--text-secondary)" }}>
+                    {confidenceExplanation(rec, state.lang)}{" "}
+                    {t("This signal is not a confirmed job link, an advancement decision or a hiring decision.")}
+                  </p>
+                </details>
+              )}
               {staleReason(rec) && (
                 <p className="tiny muted" style={{ margin: "8px 0 0" }} data-testid="stale-reason">
                   {t(staleReason(rec)!)} {t("It can no longer be confirmed.")}
@@ -483,6 +492,6 @@ export function JobRecommendationsPage() {
           onPending={(pending) => setBusyRec(pending ? confirmRec.id : null)}
         />
       )}
-    </>
+    </div>
   );
 }

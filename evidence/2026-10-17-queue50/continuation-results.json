@@ -1,0 +1,68 @@
+[
+  {
+    "name": "jd-front",
+    "command": "npm run build",
+    "exit": 0,
+    "log": "continuation-jd-front-build.log"
+  },
+  {
+    "name": "jd-front",
+    "command": "npm run lint",
+    "exit": 0,
+    "log": "continuation-jd-front-lint.log"
+  },
+  {
+    "name": "jd-front",
+    "command": "npm run typecheck",
+    "exit": 0,
+    "log": "continuation-jd-front-typecheck.log"
+  },
+  {
+    "name": "jd-front",
+    "command": "npm run test",
+    "exit": 0,
+    "log": "continuation-jd-front-test.log"
+  },
+  {
+    "name": "interview-backend",
+    "command": "npm run build",
+    "exit": 0,
+    "log": "continuation-interview-backend-build.log"
+  },
+  {
+    "name": "interview-backend",
+    "command": "npm run lint",
+    "exit": 0,
+    "log": "continuation-interview-backend-lint.log"
+  },
+  {
+    "name": "interview-backend",
+    "command": "npm run typecheck",
+    "exit": 0,
+    "log": "continuation-interview-backend-typecheck.log"
+  },
+  {
+    "name": "interview-backend",
+    "command": "npm run test",
+    "exit": 0,
+    "log": "continuation-interview-backend-test.log"
+  },
+  {
+    "name": "interview-front",
+    "command": "npm run build",
+    "exit": 0,
+    "log": "continuation-interview-front-build.log"
+  },
+  {
+    "name": "interview-front",
+    "command": "npm run typecheck",
+    "exit": 0,
+    "log": "continuation-interview-front-typecheck.log"
+  },
+  {
+    "name": "interview-front",
+    "command": "npm run test",
+    "exit": 0,
+    "log": "continuation-interview-front-test.log"
+  }
+]

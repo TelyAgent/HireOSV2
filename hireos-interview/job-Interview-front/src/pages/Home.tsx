@@ -22,6 +22,7 @@ import { ResumePreview } from '../features/project-intake/ResumePreview';
 import { LinkCandidateModal } from '../features/project-intake/LinkCandidateModal';
 import { Input } from 'antd';
 import { SearchOutlined } from '@ant-design/icons';
+import { taskLandingScreen } from '../utils/taskLanding';
 
 // By whole characters, never half of one (#240).
 function initialsFromTitle(title: string) {
@@ -110,7 +111,7 @@ export function HomePage() {
         : null,
       created: new Date(task.createdAt).toLocaleDateString(state.lang === "zh" ? "zh-CN" : "en-US"),
       createdAt: task.createdAt,
-      open: () => openTask(task.id, "overview"),
+      open: () => openTask(task.id, taskLandingScreen(task.status)),
     };
   });
 

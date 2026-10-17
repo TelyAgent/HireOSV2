@@ -1,0 +1,188 @@
+[
+  {
+    "name": "jd-backend",
+    "command": "npm run build",
+    "exit": 0,
+    "log": "merge-jd-backend-build.log"
+  },
+  {
+    "name": "jd-backend",
+    "command": "npm run lint",
+    "exit": 0,
+    "log": "merge-jd-backend-lint.log"
+  },
+  {
+    "name": "jd-backend",
+    "command": "npm run typecheck",
+    "exit": 0,
+    "log": "merge-jd-backend-typecheck.log"
+  },
+  {
+    "name": "jd-backend",
+    "command": "npm run test",
+    "exit": 0,
+    "log": "merge-jd-backend-test.log"
+  },
+  {
+    "name": "jd-front",
+    "command": "npm run build",
+    "exit": 0,
+    "log": "merge-jd-front-build.log"
+  },
+  {
+    "name": "jd-front",
+    "command": "npm run lint",
+    "exit": 0,
+    "log": "merge-jd-front-lint.log"
+  },
+  {
+    "name": "jd-front",
+    "command": "npm run typecheck",
+    "exit": 0,
+    "log": "merge-jd-front-typecheck.log"
+  },
+  {
+    "name": "jd-front",
+    "command": "npm run test",
+    "exit": 0,
+    "log": "merge-jd-front-test.log"
+  },
+  {
+    "name": "screening-backend",
+    "command": "npm run build",
+    "exit": 0,
+    "log": "merge-screening-backend-build.log"
+  },
+  {
+    "name": "screening-backend",
+    "command": "npm run lint",
+    "exit": 0,
+    "log": "merge-screening-backend-lint.log"
+  },
+  {
+    "name": "screening-backend",
+    "command": "npm run typecheck",
+    "exit": 0,
+    "log": "merge-screening-backend-typecheck.log"
+  },
+  {
+    "name": "screening-backend",
+    "command": "npm run test",
+    "exit": 0,
+    "log": "merge-screening-backend-test.log"
+  },
+  {
+    "name": "screening-front",
+    "command": "npm run build",
+    "exit": 0,
+    "log": "merge-screening-front-build.log"
+  },
+  {
+    "name": "screening-front",
+    "command": "npm run lint",
+    "exit": 0,
+    "log": "merge-screening-front-lint.log"
+  },
+  {
+    "name": "screening-front",
+    "command": "npm run typecheck",
+    "exit": 0,
+    "log": "merge-screening-front-typecheck.log"
+  },
+  {
+    "name": "screening-front",
+    "command": "npm run test",
+    "exit": 0,
+    "log": "merge-screening-front-test.log"
+  },
+  {
+    "name": "written-backend",
+    "command": "npm run build",
+    "exit": 0,
+    "log": "merge-written-backend-build.log"
+  },
+  {
+    "name": "written-backend",
+    "command": "npm run lint",
+    "exit": 0,
+    "log": "merge-written-backend-lint.log"
+  },
+  {
+    "name": "written-backend",
+    "command": "npm run typecheck",
+    "exit": 0,
+    "log": "merge-written-backend-typecheck.log"
+  },
+  {
+    "name": "written-backend",
+    "command": "npm run test",
+    "exit": 0,
+    "log": "merge-written-backend-test.log"
+  },
+  {
+    "name": "written-front",
+    "command": "npm run build",
+    "exit": 0,
+    "log": "merge-written-front-build.log"
+  },
+  {
+    "name": "written-front",
+    "command": "npm run lint",
+    "exit": 0,
+    "log": "merge-written-front-lint.log"
+  },
+  {
+    "name": "written-front",
+    "command": "npm run typecheck",
+    "exit": 0,
+    "log": "merge-written-front-typecheck.log"
+  },
+  {
+    "name": "written-front",
+    "command": "npm run test",
+    "exit": 0,
+    "log": "merge-written-front-test.log"
+  },
+  {
+    "name": "interview-backend",
+    "command": "npm run build",
+    "exit": 0,
+    "log": "merge-interview-backend-build.log"
+  },
+  {
+    "name": "interview-backend",
+    "command": "npm run lint",
+    "exit": 0,
+    "log": "merge-interview-backend-lint.log"
+  },
+  {
+    "name": "interview-backend",
+    "command": "npm run typecheck",
+    "exit": 0,
+    "log": "merge-interview-backend-typecheck.log"
+  },
+  {
+    "name": "interview-backend",
+    "command": "npm run test",
+    "exit": 0,
+    "log": "merge-interview-backend-test.log"
+  },
+  {
+    "name": "interview-front",
+    "command": "npm run build",
+    "exit": 0,
+    "log": "merge-interview-front-build.log"
+  },
+  {
+    "name": "interview-front",
+    "command": "npm run typecheck",
+    "exit": 0,
+    "log": "merge-interview-front-typecheck.log"
+  },
+  {
+    "name": "interview-front",
+    "command": "npm run test",
+    "exit": 0,
+    "log": "merge-interview-front-test.log"
+  }
+]

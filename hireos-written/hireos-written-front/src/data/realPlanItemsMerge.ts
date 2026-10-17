@@ -134,7 +134,7 @@ export function applyRealEvaluation(caseId: string, invitation: RealInvitation):
   const attemptId = `att_real_${key}`;
   const attempt: Attempt = {
     id: attemptId, caseId, questionId: invitation.questions[0]?.questionId ?? "", round: invitation.round, invitationId: invitation.id, status: "submitted",
-    submittedAt: submission.submittedAt, fileRef: "", receivedAt: submission.submittedAt, processedAt: submission.submittedAt,
+    submittedAt: submission.submittedAt, fileRef: "",
   };
   ATTEMPTS[attemptId] = attempt;
   ANSWERS[attemptId] = invitation.questions.map((q) => ({

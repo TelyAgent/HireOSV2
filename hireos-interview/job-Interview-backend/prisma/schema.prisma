@@ -45,6 +45,7 @@ model Job {
   // on every attach/hand-off -- Interview has no recruiting-status workflow of its own.
   recruitingStatus String @default("unknown")
   jdText         String
+  jdRequirements Json     @default("[]")
   jdVersion      Int      @default(1)
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
@@ -117,6 +118,9 @@ model InterviewTask {
   // rubric/decision-contracts.ts); `decision` is the human's final call, never the AI's.
   decision             String?   // continue_next_round | hold | request_more_evidence | do_not_proceed | recommend_offer
   decisionAt           DateTime?
+  decisionReason       String?
+  decisionBy           String?
+  decisionVersion      Int       @default(0)
   decisionConclusion   String?
   decisionSuggested    String?   // what the AI draft suggested, kept for comparison
   decisionSourceJobId  String?   // which ParseJob's draft is materialized above
@@ -224,6 +228,7 @@ model InterviewRound {
   briefSnapshotAt DateTime?
   briefSnapshotRubricVersion Int?
   recommendation String? // strong_advance | advance | hold | do_not_advance | request_info
+  recommendationReason String?
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
   task          InterviewTask @relation(fields: [taskId], references: [id], onDelete: Cascade)
@@ -231,8 +236,22 @@ model InterviewRound {
   transcript    TranscriptLine[]
   scores        CardScore[]
   parseJobs     ParseJob[]
+  skippedQuestions RoundQuestionSkip[]
   @@unique([taskId, sequence])
   @@index([taskId])
+}
+
+model RoundQuestionSkip {
+  id          String @id @default(uuid())
+  workspaceId String
+  roundId     String
+  questionId  String
+  actorId     String
+  skippedAt   DateTime @default(now())
+  snapshot    Json
+  round       InterviewRound @relation(fields: [roundId], references: [id], onDelete: Cascade)
+  @@unique([roundId, questionId])
+  @@index([workspaceId, roundId])
 }
 
 // One reviewer's score for one capability card in one round — every round can score every
@@ -307,6 +326,8 @@ model CapabilityCard {
   workspaceId        String
   rubricVersionId    String
   requirement        String
+  requiredLevel      Int?
+  sourceRequirementId String?
   responsibilityType String   // lead | collaborate | support
   cardPriority       String   // P0 | P1 | P2
   competencyTags     String   // comma-separated, same convention as InterviewRound.competencies

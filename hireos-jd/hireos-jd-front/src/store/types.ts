@@ -88,6 +88,7 @@ export interface GeminiVariant {
 
 /** Where a draft came from — shown as the Workspace's source badge and "Captured inputs". */
 export interface GeminiOrigin {
+  sourceType?: 'link' | 'text';
   path: GeminiCreatePath;
   detail?: string;
 }

@@ -1,0 +1,91 @@
+{
+  "issue": {
+    "url": "https://api.github.com/repos/TelyAgent/HireOSV2/issues/296",
+    "repository_url": "https://api.github.com/repos/TelyAgent/HireOSV2",
+    "labels_url": "https://api.github.com/repos/TelyAgent/HireOSV2/issues/296/labels{/name}",
+    "comments_url": "https://api.github.com/repos/TelyAgent/HireOSV2/issues/296/comments",
+    "events_url": "https://api.github.com/repos/TelyAgent/HireOSV2/issues/296/events",
+    "html_url": "https://github.com/TelyAgent/HireOSV2/issues/296",
+    "id": 5876845760,
+    "node_id": "I_kwDOUm32Us8AAAABXkmMwA",
+    "number": 296,
+    "title": "[Bug] I10 决定页缺少人工理由与可定位的 AI 证据引用",
+    "user": {
+      "login": "mincai2010-maker",
+      "id": 230296377,
+      "node_id": "U_kgDODboLOQ",
+      "avatar_url": "https://avatars.githubusercontent.com/u/230296377?v=4",
+      "gravatar_id": "",
+      "url": "https://api.github.com/users/mincai2010-maker",
+      "html_url": "https://github.com/mincai2010-maker",
+      "followers_url": "https://api.github.com/users/mincai2010-maker/followers",
+      "following_url": "https://api.github.com/users/mincai2010-maker/following{/other_user}",
+      "gists_url": "https://api.github.com/users/mincai2010-maker/gists{/gist_id}",
+      "starred_url": "https://api.github.com/users/mincai2010-maker/starred{/owner}{/repo}",
+      "subscriptions_url": "https://api.github.com/users/mincai2010-maker/subscriptions",
+      "organizations_url": "https://api.github.com/users/mincai2010-maker/orgs",
+      "repos_url": "https://api.github.com/users/mincai2010-maker/repos",
+      "events_url": "https://api.github.com/users/mincai2010-maker/events{/privacy}",
+      "received_events_url": "https://api.github.com/users/mincai2010-maker/received_events",
+      "type": "User",
+      "user_view_type": "public",
+      "site_admin": false
+    },
+    "labels": [
+      {
+        "id": 12644484249,
+        "node_id": "LA_kwDOUm32Us8AAAAC8auEmQ",
+        "url": "https://api.github.com/repos/TelyAgent/HireOSV2/labels/needs-triage",
+        "name": "needs-triage",
+        "color": "FBCA04",
+        "default": false,
+        "description": "新 Issue，尚未完成分诊",
+        "archived_at": null,
+        "archived_by": null
+      }
+    ],
+    "state": "open",
+    "locked": false,
+    "assignees": [],
+    "milestone": null,
+    "comments": 0,
+    "created_at": "2026-10-16T01:50:33Z",
+    "updated_at": "2026-10-16T04:39:02Z",
+    "closed_at": null,
+    "assignee": null,
+    "author_association": "MEMBER",
+    "issue_field_values": [],
+    "type": null,
+    "active_lock_reason": null,
+    "sub_issues_summary": {
+      "total": 0,
+      "completed": 0,
+      "percent_completed": 0
+    },
+    "issue_dependencies_summary": {
+      "blocked_by": 0,
+      "total_blocked_by": 0,
+      "blocking": 0,
+      "total_blocking": 0
+    },
+    "body": "### Type\n\nBug\n\n### Subsystem\n\nhireos-interview\n\n### Problem\n\n已发布项目的决定页只有决定选项和记录时间，未显示人工理由、记录人或决定版本；线上 AI 草稿引用呈现为 UUID 与评分文本，没有可从页面打开的来源入口。HR/HM 难以复核人工决定与 AI 建议各自依据。\n\n### User Outcome\n\nHR、HM 和后续复核者能区分 AI 建议与人工决定，并追溯相应证据。\n\n### Scope\n\n人工阶段决定的理由、记录人、时间和版本；AI 草稿证据引用的展示与定位。\n\n\n#### Estimate analysis\n\nEstimate: TBD\n\n状态：建议值，待 Owner 确认。全部现有评论未提供本项具体点数确认，不代表获准实施。\n\n工作与验证（原 AC 逐项映射）：\n\n- AC-1:记录人工阶段决定时可以填写理由，查看时显示理由、记录人、时间和决定版本。 → 实现该行为并以受控数据和适用的自动回归验证，保存证据。\n- AC-2:AI 草稿中的证据引用可以打开并定位相应评分或原始证据，且引用对象与当前决定上下文匹配。 → 实现该行为并以受控数据和适用的自动回归验证，保存证据。\n- AC-3:自动测试覆盖人工理由持久化、版本展示及引用导航。 → 实现该行为并以受控数据和适用的自动回归验证，保存证据。\n\n规模判断：现有正文及规格仍缺可限定实现与验收范围的契约/根因证据，当前无法可靠收敛点数；不强行选具体档位。 使用 a2a_dev_process.md 起始尺度；未取得已验收且有确认点数的有效历史参照。\n\n实现与复用：人工阶段决定的理由、记录人、时间和版本；AI 草稿证据引用的展示与定位。；参考现有 Home、StoreContext、Appearance 组件或原 Issue 列出的实现入口，保持原业务范围。接口与数据、依赖与协调：依赖记录：确认现有决定与证据引用的数据结构，以及旧决定记录的展示方式。；需核实原 Scope 的接口与数据、权限/兼容、可复用入口及受控验收证据后重新估算。涉及 I12 时，PRD 第 10 节仍有聚合服务归属、状态映射和角色规则未决；涉及 I08/I10 时，运行/证据或决定/确认契约、角色与历史兼容未完全闭合。不能以缺乏证据当作已实现或已批准。\n\n文档与交接：同步本项改动所需规格/接口说明和 PR 验收证据；本次只修复契约，未执行产品测试。下一步：Owner 确认；TBD 项先补齐上述契约/证据再估算，保持 AI Ready=No。\n\n### Non-goals\n\n不改变 AI 评分算法或 Offer 审批规则。\n\n### Acceptance Criteria\n\n- AC-1:记录人工阶段决定时可以填写理由，查看时显示理由、记录人、时间和决定版本。\n- AC-2:AI 草稿中的证据引用可以打开并定位相应评分或原始证据，且引用对象与当前决定上下文匹配。\n- AC-3:自动测试覆盖人工理由持久化、版本展示及引用导航。\n\n### References\n\n- `docs/product/Interview/I10_Decision_Confirmation/PRD.md`：FR-1、FR-2、数据要求（当前产品文档，待合入仓库）。\n- `docs/product/Interview/I10_Decision_Confirmation/Test_Report_2026-10-15.md`：I10-UX-01（测试报告，待合入仓库）。\n- [Interview PRD v1.5](https://github.com/TelyAgent/HireOSV2/blob/main/docs/product/Interview/HireOS_Command_Interview_PRD_v1.5.md)。\n\n### Dependencies\n\n确认现有决定与证据引用的数据结构，以及旧决定记录的展示方式。\n\n### Risk\n\nmedium\n\n### Owner\n\n@JsonSuCoder\n\n### Estimate\n\nTBD\n\n### AI Ready\n\nNo\n\n### Reproduction\n\n打开已有已发布项目的 Decision & Next Steps，查看已记录决定与 AI 草稿。只读观察，不修改真实决定。\n\n### Expected / Actual\n\n预期：可查看人工理由、记录人和版本，并从 AI 引用打开来源。实际：决定区只显示选项和时间；AI 草稿引用未提供来源入口。\n\n### Environment\n\nHireOS Command Interview 线上环境；Chrome 桌面端；2026-10-15 观察；线上构建号未知。公开截图只展示决定区域，不包含真实候选人评分；AI 引用问题以文字观察记录，需在隔离数据上复测。\n\n![决定区仅显示选项及记录时间](https://raw.githubusercontent.com/TelyAgent/HireOSV2/codex/i10-issue-evidence/docs/product/Interview/I10_Decision_Confirmation/evidence/decision-controls.jpg)\n\n### Severity\n\nS2\n",
+    "closed_by": null,
+    "reactions": {
+      "url": "https://api.github.com/repos/TelyAgent/HireOSV2/issues/296/reactions",
+      "total_count": 0,
+      "+1": 0,
+      "-1": 0,
+      "laugh": 0,
+      "hooray": 0,
+      "confused": 0,
+      "heart": 0,
+      "rocket": 0,
+      "eyes": 0
+    },
+    "timeline_url": "https://api.github.com/repos/TelyAgent/HireOSV2/issues/296/timeline",
+    "performed_via_github_app": null,
+    "state_reason": null,
+    "pinned_comment": null
+  },
+  "comments": []
+}

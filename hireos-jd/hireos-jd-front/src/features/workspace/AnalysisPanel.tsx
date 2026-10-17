@@ -176,7 +176,7 @@ export function AnalysisPanel({ jobId }: { jobId: string }) {
           {ev.suggestions.map((s) => (
             <CheckRow key={s.id} icon="lightbulb" tone="tip" name={t(s.label)} note={t(s.hint)}>
               {aiDraftLink(s)}
-              <button className="req-link" onClick={() => actions.fillRequired(s)}>
+              <button className="req-link" onClick={() => s.field ? actions.focusField(s.field) : actions.fillRequired(s)}>
                 {t("Add")}
               </button>
             </CheckRow>

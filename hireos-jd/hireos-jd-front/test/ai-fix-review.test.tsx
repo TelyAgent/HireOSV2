@@ -243,7 +243,7 @@ describe('batch AI fix (#95)', () => {
     renderPanel(false, '');
     expect(await screen.findByText(/AI handles/)).toHaveTextContent(/Core responsibilities/);
     const manual = screen.getByText('Needs you — AI won’t fill these').closest('.ck-sec, section, div') as HTMLElement;
-    expect(manual.parentElement!.textContent).toMatch(/Level/);
+    expect(manual.parentElement!.textContent).not.toMatch(/Level/);
     expect(manual.parentElement!.textContent).toMatch(/Public salary range/);
   });
 

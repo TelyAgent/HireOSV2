@@ -4,6 +4,7 @@ import { Banner } from "../../components/ui/Primitives";
 import { useProjectTask } from "../../features/project-intake/useTask";
 import { useDebriefSummary } from "../../features/project-intake/useDebriefSummary";
 import type { Screen } from "../../store/types";
+import type { Material } from "../../features/project-intake/api";
 
 const row = { padding: "12px 16px", borderBottom: "1px solid var(--line)", display: "flex", alignItems: "center", gap: 10 } as const;
 const emptyRow = { padding: "11px 16px", fontSize: 13, color: "var(--ink-3)" } as const;
@@ -33,11 +34,11 @@ export function ProjectOverviewPage() {
     if (!items.length) return { name, tag: L("Not provided", "未提供"), tone: "unknown" as Tone };
     const worst = items.find((m) => m.material.readStatus !== "available") ?? items[0];
     const { tag, tone } = readTag(worst.material.readStatus);
-    return { name: items.length > 1 ? `${name} ×${items.length}` : name, tag, tone };
+    return { name: items.length > 1 ? `${name} ×${items.length}` : name, tag, tone, files: items.map(item => item.material) };
   };
-  const materials = [
+  const materials: { name: string; tag: string; tone: Tone; files?: Material[] }[] = [
     { name: L("Job Description", "职位描述（JD）"), ...(task.job.jdText.trim() ? { tag: L("Provided", "已提供"), tone: "ok" as Tone } : { tag: L("Not provided", "未提供"), tone: "unknown" as Tone }) },
-    task.resume ? { name: L("Résumé", "简历"), ...readTag(task.resume.material.readStatus) } : { name: L("Résumé", "简历"), tag: L("Not provided", "未提供"), tone: "unknown" as Tone },
+    task.resume ? { name: L("Résumé", "简历"), ...readTag(task.resume.material.readStatus), files: [task.resume.material] } : { name: L("Résumé", "简历"), tag: L("Not provided", "未提供"), tone: "unknown" as Tone },
     materialRow(L("Screening package", "初筛资料包"), "screening"),
     materialRow(L("Assessment results", "测评结果"), "assessment"),
     ...(attached("other").length ? [materialRow(L("Other attachments", "其他附件"), "other")] : []),
@@ -132,7 +133,16 @@ export function ProjectOverviewPage() {
         <OverviewCard title={t.overviewSourceMaterials}>
           {materials.map((m, i) => (
             <div key={i} style={row}>
-              <div style={{ flex: 1, fontSize: 13 }}>{m.name}</div>
+              <div style={{ flex: 1, minWidth: 0, fontSize: 13 }}>
+                {m.name}
+                {m.files?.map(file => (
+                  <div key={file.id} data-testid="source-material" style={{ marginTop: 8, overflowWrap: "anywhere" }}>
+                    <div>{file.name || L("Filename not recorded", "文件名未记录")}</div>
+                    <div style={{ fontSize: 12, color: "var(--ink-2)" }}>{readTag(file.readStatus).tag} · {file.id}</div>
+                    <div style={{ fontSize: 12, color: "var(--ink-2)" }}>{L("Source and version not recorded", "来源与版本未记录")}</div>
+                  </div>
+                ))}
+              </div>
               <Pill label={m.tag} tone={m.tone} />
             </div>
           ))}
@@ -155,10 +165,15 @@ export function ProjectOverviewPage() {
             <div style={emptyRow}>{L("The rubric hasn't been confirmed yet", "评分标准尚未确认")}</div>
           ) : (
             summary.cards.map((c) => {
-              const cov = coverage(c.score, summary.bar);
+              const cov = c.requiredLevel == null ? { tag: L("Required level not recorded", "要求等级未记录"), tone: "unknown" as Tone } : coverage(c.score, c.requiredLevel);
               return (
                 <div key={c.id} style={{ ...row, padding: "11px 16px" }}>
-                  <div style={{ flex: 1, fontSize: 13 }}>{c.requirement}</div>
+                  <div style={{ flex: 1, minWidth: 0, fontSize: 13, overflowWrap: "anywhere" }}>
+                    {c.requirement}
+                    <div style={{ fontSize: 12, color: "var(--ink-3)", marginTop: 4 }}>
+                      {c.requiredLevel == null ? L("Required level not recorded", "要求等级未记录") : L(`Required L${c.requiredLevel}`, `要求 L${c.requiredLevel}`)}
+                    </div>
+                  </div>
                   {c.cardPriority === "P0" && <Pill label={L("Must-have", "必须项")} tone="bad" />}
                   <Pill label={cov.tag} tone={cov.tone} />
                 </div>

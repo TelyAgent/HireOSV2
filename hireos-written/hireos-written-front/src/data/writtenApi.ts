@@ -21,6 +21,7 @@ export interface RealWrittenTask {
   caseStatus: string;
   closeReason: "passed" | "rejected" | "withdrawn" | null;
   closedAt: string | null;
+  closeDecision?: import('./fixtures').CloseDecision | null;
   handedOffAt: string | null;
   interviewTaskId: string | null;
   candidateId: string;
@@ -208,7 +209,7 @@ export interface RealInvitation {
 }
 
 export interface RealFinalCriterion { name: string; max: number; ai: number; human: number; overridden?: boolean; overrideReason?: string }
-export interface RealReleaseInput { overall: number; showScore: boolean; outcomeText: string; feedbackText: string; nextStepText: string }
+export interface RealReleaseInput { overall: number; showScore: boolean; outcomeText: string; feedbackText: string; nextStepText: string; assessmentOutcome?: "met" | "not_met" }
 
 export interface RealSubmission {
   answers: { questionId: string; answerText: string }[];
@@ -280,6 +281,7 @@ export async function createInvitation(
 
 /** What a lifecycle action (hold / resume / close / interview handoff) leaves the case as. */
 export interface CaseLifecycleState {
+  closeDecision?: import('./fixtures').CloseDecision | null;
   status: string;
   statusBeforeHold: string | null;
   closeReason: "passed" | "rejected" | "withdrawn" | null;
@@ -300,7 +302,7 @@ async function caseAction(caseId: string, action: string, body?: unknown): Promi
 
 export const holdCase = (caseId: string) => caseAction(caseId, "hold");
 export const resumeCase = (caseId: string) => caseAction(caseId, "resume");
-export const closeCase = (caseId: string, reason: "passed" | "rejected" | "withdrawn") => caseAction(caseId, "close", { reason });
+export const closeCase = (caseId: string, reason: "passed" | "rejected" | "withdrawn", decisionReason?: string) => caseAction(caseId, "close", { reason, decisionReason });
 /** Creates the candidate's interview task in hireos-interview (real cross-service call, via this backend). */
 export const handoffCaseToInterview = (caseId: string) => caseAction(caseId, "interview-handoff");
 

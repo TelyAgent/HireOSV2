@@ -1,5 +1,5 @@
 import { Type } from 'class-transformer';
-import { Equals, IsArray, IsBoolean, IsNumber, IsOptional, IsString, ValidateNested } from 'class-validator';
+import { Equals, IsArray, IsBoolean, IsIn, IsNumber, IsOptional, IsString, ValidateNested } from 'class-validator';
 
 export class FinalCriterionDto {
   @IsString()
@@ -47,6 +47,9 @@ export class FinalizeEvaluationDto {
 }
 
 export class ReleaseResultDto {
+  @IsIn(['met', 'not_met'])
+  assessmentOutcome!: 'met' | 'not_met';
+
   @IsNumber()
   overall!: number;
 

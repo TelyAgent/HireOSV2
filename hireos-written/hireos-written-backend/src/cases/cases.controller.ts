@@ -1,11 +1,16 @@
 import { Body, Controller, Delete, Get, Param, Post, Req, UseGuards } from '@nestjs/common';
-import { IsIn } from 'class-validator';
+import { IsIn, IsOptional, IsString, MaxLength } from 'class-validator';
 import { WorkspaceGuard, type Identity } from '../auth/workspace.guard';
 import { CLOSE_REASONS, CaseLifecycleService, type CloseReason } from './case-lifecycle.service';
 
 class CloseCaseDto {
   @IsIn(CLOSE_REASONS)
   reason!: CloseReason;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(4000)
+  decisionReason?: string;
 }
 
 /** HR's post-result actions on a case: hold / resume, end testing, hand off to interview. */
@@ -41,7 +46,7 @@ export class CasesController {
 
   @Post('close')
   close(@Param('caseId') caseId: string, @Body() dto: CloseCaseDto, @Req() req: { identity: Identity }) {
-    return this.lifecycle.close(req.identity, caseId, dto.reason);
+    return this.lifecycle.close(req.identity, caseId, dto.reason, dto.decisionReason);
   }
 
   @Post('interview-handoff')

@@ -51,7 +51,13 @@ test('intake persistence, validation, parsing and recovery', async (t) => {
     const source = JSON.parse(request.messages[1].content);
     const segment = source.segments[0];
     const fact = { value: segment.text, segmentId: segment.id, quote: mode === 'bad-source' ? 'invented source' : segment.text };
-    const result = { title: fact, name: null, email: mode === 'email' ? { value: 'ada@example.com', segmentId: segment.id, quote: segment.text } : null, facts: [], missingFields: [], warnings: [] };
+    let result = { title: fact, name: null, email: mode === 'email' ? { value: 'ada@example.com', segmentId: segment.id, quote: segment.text } : null, facts: [], missingFields: [], warnings: [] };
+    if (mode.startsWith('star')) {
+      assert.match(request.messages[0].content, /draft capability verification card/);
+      result = { questions: [{ segmentId: segment.id, quote: mode.endsWith('invalid') ? 'invented source' : segment.text,
+        situationPrompt: 'What was the context?', taskPrompt: 'What was your task?', actionPrompt: 'What did you do?', resultPrompt: 'What changed?' }], warnings: [] };
+    }
+    if (mode.startsWith('claims')) result = { cards: [{ cardId: 'card-test', claims: [{ segmentId: segment.id, quote: mode.endsWith('invalid') ? 'invented experience' : segment.text }] }] };
     res.setHeader('Content-Type', 'application/json');
     res.end(JSON.stringify({ choices: [{ message: { content: mode === 'bad-json' ? '{' : JSON.stringify(result) } }], usage: { total_tokens: 10 } }));
   });
@@ -292,6 +298,20 @@ test('intake persistence, validation, parsing and recovery', async (t) => {
       assert.equal(saved.status, 'ready_to_schedule'); assert.equal(saved.reviewed, true);
       assert.equal(await db.revision.count({ where: { taskId: task.id } }), 1);
     });
+    await t.test('#250: registered preview and claims adapters validate real HTTP model responses', async () => {
+      const ai = app.get(AiService);
+      const source = { sourceId: 'test', segments: [{ id: 'card-test', text: 'Build reliable APIs' }] };
+      try {
+        mode = 'star';
+        assert.equal((await ai.extract('rubric_questions', source)).result.questions[0].segmentId, 'card-test');
+        mode = 'star-invalid';
+        await assert.rejects(ai.extract('rubric_questions', source), e => e.code === 'AI_SOURCE_INVALID');
+        mode = 'claims';
+        assert.equal((await ai.extract('rubric_claims', { ...source, cards: [{ id: 'card-test' }] })).result.cards[0].claims[0].quote, 'Build reliable APIs');
+        mode = 'claims-invalid';
+        await assert.rejects(ai.extract('rubric_claims', source), e => e.code === 'AI_SOURCE_INVALID');
+      } finally { mode = 'ok'; }
+    });
     await t.test('expired leases recover without overriding human edits', async () => {
       const resumeParse = await db.parseJob.findFirst({ where: { workspaceId, type: 'resume', materialId: resumeMaterial.id } });
       await db.candidate.update({ where: { id: task.candidate.id }, data: { name: 'Ada Reviewed' } });
@@ -299,6 +319,101 @@ test('intake persistence, validation, parsing and recovery', async (t) => {
       await worker.tick();
       assert.equal((await db.parseJob.findUnique({ where: { id: resumeParse.id } })).status, 'needs_review');
       assert.equal((await db.candidate.findUnique({ where: { id: task.candidate.id } })).name, 'Ada Reviewed');
+    });
+    await t.test('#325/#250: real persisted JD levels and task-scoped resume claims APIs', async () => {
+      const { RubricService } = require('../dist/rubric/rubric.service');
+      const svc = app.get(RubricService);
+      const originalGet = jdContent.get;
+      const requirements = [
+        { id: 'req-api', label: 'Build reliable APIs', requiredLevel: 4 },
+        { id: 'req-sql', label: 'Design SQL schemas', requiredLevel: 3 },
+      ];
+      jdContent.get = async () => ({ requirements, responsibilities: [], roleSummary: 'Backend Engineer' });
+      try {
+        const queued = await svc.generate(workspaceId, job.id, identity);
+        assert.deepEqual(queued.input.requirements, requirements);
+        const cards = requirements.map((r, i) => ({ requirement: r.label, responsibilityType: 'lead', cardPriority: 'P0', competencyTags: ['API'], expectedEvidence: 'Specific project', levelAnchors: { l1: '1', l2: '2', l3: '3', l4: '4', l5: '5' }, weight: 50, segmentId: `jd-requirement:${r.id}`, quote: r.label }));
+        await db.parseJob.update({ where: { id: queued.id }, data: { status: 'needs_review', result: { cards, warnings: [] } } });
+        const rubric = (await svc.getRubric(workspaceId, job.id)).rubric;
+        assert.deepEqual(rubric.cards.map(c => c.requiredLevel), [4, 3]);
+        assert.deepEqual(rubric.cards.map(c => c.sourceRequirementId), ['req-api', 'req-sql']);
+        const [one, two] = await Promise.all([send(`/tasks/${task.id}/rubric-claims`, {}), send(`/tasks/${task.id}/rubric-claims`, {})]);
+        assert.equal(one.status, 201); assert.equal(two.status, 201);
+        assert.equal(await db.parseJob.count({ where: { taskId: task.id, type: 'rubric_claims' } }), 1);
+        const parse = await db.parseJob.findFirst({ where: { taskId: task.id, type: 'rubric_claims' } });
+        const segment = parse.input.segments.find(s => s.text.includes('Built APIs'));
+        const result = { cards: [{ cardId: rubric.cards[0].id, claims: [{ segmentId: segment.id, quote: 'Built APIs with NestJS.' }] }, { cardId: rubric.cards[1].id, claims: [] }] };
+        await db.parseJob.update({ where: { id: parse.id }, data: { status: 'needs_review', result } });
+        const read = await (await fetch(`${base}/tasks/${task.id}/rubric-claims`)).json();
+        assert.equal(read.materialId, resumeMaterial.id);
+        assert.equal(read.cards.find(c => c.cardId === rubric.cards[0].id).claims[0].quote, 'Built APIs with NestJS.');
+        assert.deepEqual(read.cards.find(c => c.cardId === rubric.cards[1].id).claims, []);
+        await assert.rejects(svc.candidateClaims('other-workspace', task.id), e => e.getStatus() === 404);
+        const candidate = await db.candidate.create({ data: { workspaceId, name: 'Other synthetic candidate' } });
+        const other = await db.interviewTask.create({ data: { workspaceId, createdBy: identity.actorId, jobId: job.id, candidateId: candidate.id } });
+        const noResume = await svc.candidateClaims(workspaceId, other.id);
+        assert.equal(noResume.status, 'missing_resume_or_rubric');
+        assert.deepEqual(noResume.cards, []);
+        result.cards[0].claims[0].quote = 'Invented experience';
+        await db.parseJob.update({ where: { id: parse.id }, data: { result } });
+        assert.equal((await svc.candidateClaims(workspaceId, task.id)).status, 'failed');
+        assert.equal((await svc.candidateClaims(workspaceId, task.id, true)).status, 'queued');
+        const { BriefService } = require('../dist/brief/brief.service');
+        const brief = app.get(BriefService);
+        const beforeQuestions = await db.interviewQuestion.count({ where: { workspaceId } });
+        const previews = await Promise.all([send(`/jobs/${job.id}/rubric-questions`, {}), send(`/jobs/${job.id}/rubric-questions`, {})]);
+        assert.deepEqual(previews.map(r => r.status), [201, 201]);
+        assert.equal(await db.parseJob.count({ where: { jobId: job.id, type: 'rubric_questions' } }), 1);
+        const preview = await db.parseJob.findFirst({ where: { jobId: job.id, type: 'rubric_questions' } });
+        const questions = preview.input.segments.map(s => ({ segmentId: s.id, quote: s.text, situationPrompt: 'What was the context?', taskPrompt: 'What was your task?', actionPrompt: 'What did you do?', resultPrompt: 'What changed?' }));
+        await db.parseJob.update({ where: { id: preview.id }, data: { status: 'needs_review', result: { questions, warnings: [] } } });
+        const displayed = await (await fetch(`${base}/jobs/${job.id}/rubric-questions`)).json();
+        assert.equal(displayed.questions.length, 2);
+        assert.equal(displayed.rubricVersionId, rubric.id);
+        assert.equal(await db.interviewQuestion.count({ where: { workspaceId } }), beforeQuestions, 'draft preview does not become formal interview questions');
+        await assert.rejects(brief.generate(workspaceId, job.id), e => e.getResponse().code === 'RUBRIC_NOT_CONFIRMED');
+        await assert.rejects(brief.rubricPreview('other-workspace', job.id), e => e.getStatus() === 404);
+        questions[0].quote = 'Invented requirement';
+        await db.parseJob.update({ where: { id: preview.id }, data: { result: { questions, warnings: [] } } });
+        assert.equal((await brief.rubricPreview(workspaceId, job.id)).generation.status, 'failed');
+        assert.equal((await brief.rubricPreview(workspaceId, job.id, true)).generation.status, 'queued');
+        await db.capabilityCard.update({ where: { id: rubric.cards[0].id }, data: { requirement: 'Changed requirement' } });
+        const changed = await brief.rubricPreview(workspaceId, job.id);
+        assert.equal(changed.generation, null);
+        assert.deepEqual(changed.questions, [], 'edits invalidate old preview even before the next generation');
+        await db.rubricVersion.update({ where: { id: rubric.id }, data: { status: 'confirmed' } });
+        const question = await db.interviewQuestion.create({ data: { workspaceId, rubricVersionId: rubric.id, cardId: rubric.cards[0].id,
+          situationPrompt: 'HTTP scenario', taskPrompt: 'Task?', actionPrompt: 'Action?', resultPrompt: 'Result?' } });
+        const round = await db.interviewRound.create({ data: { workspaceId, taskId: task.id, sequence: 99, name: 'HTTP skip verification',
+          format: 'Onsite panel', duration: 45, competencies: '', questions: 1, mandatory: 0, notes: '',
+          scheduledAt: new Date(), briefSnapshotRubricVersion: rubric.versionNumber } });
+        const skipResponse = await send(`/rounds/${round.id}/questions/${question.id}/skip`, {});
+        assert.equal(skipResponse.status, 201);
+        const skip = await skipResponse.json();
+        assert.equal(skip.actorId, identity.actorId);
+        const skipRead = await (await fetch(`${base}/rounds/${round.id}/skipped-questions`)).json();
+        assert.equal(skipRead[0].id, skip.id);
+        const repeated = await (await send(`/rounds/${round.id}/questions/${question.id}/skip`, {})).json();
+        assert.equal(repeated.id, skip.id);
+        await db.interviewTask.update({ where: { id: task.id }, data: { debriefConfirmedAt: new Date() } });
+        const decisionResponse = await send(`/tasks/${task.id}/decision`, { decision: 'hold', reason: 'HTTP audit reason', version: 0 }, '', 'PATCH');
+        assert.equal(decisionResponse.status, 200);
+        const decision = await decisionResponse.json();
+        assert.equal(decision.decisionReason, 'HTTP audit reason');
+        assert.equal(decision.decisionBy, identity.actorId);
+        assert.equal(decision.decisionVersion, 1);
+        const stale = await send(`/tasks/${task.id}/decision`, { decision: 'do_not_proceed', reason: 'Stale', version: 0 }, '', 'PATCH');
+        assert.equal(stale.status, 409);
+        const emptyRecommendation = await send(`/rounds/${round.id}/recommendation`, { recommendation: 'advance', reason: ' ' }, '', 'PATCH');
+        assert.equal(emptyRecommendation.status, 422);
+        const recommended = await send(`/rounds/${round.id}/recommendation`, { recommendation: 'advance', reason: 'HTTP recommendation evidence' }, '', 'PATCH');
+        assert.equal(recommended.status, 200);
+        assert.equal((await recommended.json()).recommendationReason, 'HTTP recommendation evidence');
+        await db.interviewTask.update({ where: { id: task.id }, data: { planConfirmedAt: new Date() } });
+        const schedule = await send(`/rounds/${round.id}/schedule`, { version: round.version, scheduledAt: '2026-11-01T10:00:00.000Z', timezone: 'UTC', meetingLink: '', interviewerId: interviewer.id });
+        assert.equal(schedule.status, 201);
+        assert.equal((await schedule.json()).interviewer.id, interviewer.id);
+      } finally { jdContent.get = originalGet; }
     });
   } finally {
     const materials = await db.material.findMany({ where: { workspaceId } });

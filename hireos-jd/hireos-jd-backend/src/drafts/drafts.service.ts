@@ -10,7 +10,7 @@ import { findIdempotent, json, storeIdempotency, type RequestMeta } from '../rec
 const inputSchema = z.object({
   roleSummary: z.string().trim().max(10000).optional(),
   responsibilities: z.array(z.string().trim().min(1)).max(100).optional(),
-  requirements: z.array(z.record(z.string(), z.unknown())).max(200).optional(),
+  requirements: z.array(z.object({ requiredLevel: z.number().int().min(1).max(5).nullable().optional() }).passthrough()).max(200).optional(),
   dimensions: z.array(z.record(z.string(), z.unknown())).max(20).optional(),
   hiringContext: z.record(z.string(), z.unknown()).optional(),
   successCriteria: z.array(z.record(z.string(), z.unknown())).optional(),

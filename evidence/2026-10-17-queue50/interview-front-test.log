@@ -1,0 +1,29 @@
+npm run test
+exit=0
+
+> hireos-interview-frontend@0.1.0 test
+> node --test test/*.test.cjs
+
+✔ #295: appearance defaults stay Light + Blue + Medium (0.568417ms)
+✔ #291: the portal dialog receives theme tokens and readable controls (0.15775ms)
+✔ #288: Unknown scores explain the missing evidence and are not presented as zero (0.076625ms)
+✔ classifies request failures as generation failures (21.8685ms)
+✔ classifies a generated blob failure as a download failure (2.240459ms)
+✔ downloads a generated PDF blob successfully (32.198375ms)
+✔ reports generation and post-generation download failures separately (8.986208ms)
+✔ #252: edit first/middle cards and append new cards without reordering or mutating existing cards (27.52375ms)
+✔ #303: each unambiguous task state opens its specified screen (28.444667ms)
+✔ #303: navigation continues to enforce the existing locked-stage guard (2.414ms)
+✔ the known codes read as a reason and a next step in both languages, never the bare code (0.559791ms)
+✔ a Zoom start refusal keeps its status code; an unknown code shows after a general explanation (0.11125ms)
+✔ #231 AC-1: Shanghai and New York wall times become the right instants, from a browser in any zone (251.156042ms)
+✔ #231 AC-2: reopening shows the same wall time; daylight-saving gaps and repeats get explicit feedback (1.599083ms)
+✔ #231 AC-3: old free-text labels are recognised as not a zone, so they are shown as labels, never used for math (0.240791ms)
+ℹ tests 15
+ℹ suites 0
+ℹ pass 15
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 305.738333

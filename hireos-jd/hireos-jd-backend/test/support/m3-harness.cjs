@@ -75,4 +75,4 @@ async function runUpload(llm, file, uploadName = file) {
   return { fields: result.fields, phase: result.phase, reply: result.messages[result.messages.length - 1]?.text ?? '' };
 }
 
-module.exports = { FIXTURES, runUpload, recordingLlm };
+module.exports = { FIXTURES, runUpload, recordingLlm, memoryDb };

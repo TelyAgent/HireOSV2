@@ -48,17 +48,26 @@ export function conversationToGeminiMsgs(dto: CopilotConversationDto): GeminiMsg
   );
   if (dto.phase === "ready_to_confirm") {
     if (msgs.length && msgs[msgs.length - 1].role === "ai") msgs.pop();
-    msgs.push({ role: "ai", draft: jdFieldsToGeminiDraft(dto.fields), titlePending: titlePendingIn(dto), fieldMeta: dto.fieldMeta, origin: quickStartOrigin(dto) });
+    msgs.push({ role: "ai", draft: jdFieldsToGeminiDraft(dto.fields), titlePending: titlePendingIn(dto), fieldMeta: dto.fieldMeta, origin: conversationOrigin(dto) });
   }
   return msgs;
 }
 
-/** A reopened Quick Start conversation keeps its entry and answers, so its draft still shows per-field confirmation (#68). */
-function quickStartOrigin(dto: CopilotConversationDto): GeminiOrigin | undefined {
+/** Restore recorded provenance, never infer an import merely from a URL in chat text. */
+function conversationOrigin(dto: CopilotConversationDto): GeminiOrigin | undefined {
   const answers = dto.messages.filter(
     (m) => m.role === "user" && Array.isArray(m.attachments) && m.attachments.some((a) => (a as { kind?: unknown })?.kind === "quick_start"),
   );
-  return answers.length ? { path: "questions", detail: answers.map((m) => m.text ?? "").join("\n") } : undefined;
+  for (const message of [...dto.messages].reverse()) {
+    if (message.role !== 'user' || !Array.isArray(message.attachments)) continue;
+    for (const item of message.attachments) {
+      const source = item as { kind?: string; url?: string } | null;
+      if (source?.kind === 'link' && typeof source.url === 'string' && /^https?:\/\//i.test(source.url)) return { path: 'link', detail: source.url, sourceType: 'link' };
+      if (source?.kind === 'pasted_text') return { path: 'link', detail: message.text || '', sourceType: 'text' };
+      if (source?.kind === 'quick_start') return { path: 'questions', detail: answers.map(m => m.text || '').join('\n') };
+    }
+  }
+  return undefined;
 }
 
 function titlePendingIn(dto: Pick<CopilotConversationDto, "missingFields">): boolean {
@@ -543,7 +552,7 @@ export function GeminiPanel({ ctx }: { ctx: GeminiCtx }) {
       return;
     }
     if (/^https?:\/\/\S+$/i.test(text)) {
-      if (await runStep((conversationId) => importCopilotSource(conversationId, { url: text }), true, { path: "link", detail: text }, { action: "link", text }))
+      if (await runStep((conversationId) => importCopilotSource(conversationId, { url: text }), false, { path: "link", detail: text, sourceType: 'link' }, { action: "link", text }))
         setPath("home");
       return;
     }
@@ -551,7 +560,7 @@ export function GeminiPanel({ ctx }: { ctx: GeminiCtx }) {
       push({ role: "ai", text: t("That doesn’t look like a link or a JD. Paste a job posting URL (starting with http:// or https://) or the full JD text.") });
       return;
     }
-    if (await runStep((conversationId) => importCopilotSource(conversationId, { text }), true, { path: "link", detail: text }, { action: "link", text }))
+    if (await runStep((conversationId) => importCopilotSource(conversationId, { text }), false, { path: "link", detail: text, sourceType: 'text' }, { action: "link", text }))
       setPath("home");
   };
 
@@ -1656,8 +1665,10 @@ function WorkspaceDoc({ d, changes, origin, provenance }: { d: GeminiDraft; chan
   const sourceNote =
     origin?.path === "upload" && origin.detail
       ? t("Source file: %s").replace("%s", origin.detail)
-      : origin?.path === "link" && origin.detail && /^https?:\/\//i.test(origin.detail)
-        ? t("Source: %s").replace("%s", origin.detail)
+      : origin?.path === "link" && origin.sourceType !== 'text' && origin.detail && /^https?:\/\//i.test(origin.detail)
+        ? <><span>{t("Link source")}:</span> <a href={origin.detail} target="_blank" rel="noopener noreferrer">{origin.detail}</a></>
+        : origin?.path === "link" && origin.detail
+          ? t("Text source")
         : null;
   return (
     <div className="gm-ws-doc">
@@ -1688,7 +1699,7 @@ function WorkspaceDoc({ d, changes, origin, provenance }: { d: GeminiDraft; chan
         {d.department && mark("department")}
       </div>
       <div className="gm-draft-meta">
-        {origin && <span className="badge badge-info">{t(ORIGIN_LABELS[origin.path])}</span>}
+        {origin && <span className="badge badge-info">{t(origin.path === 'link' ? origin.sourceType !== 'text' && /^https?:\/\//i.test(origin.detail || '') ? 'Link source' : 'Text source' : ORIGIN_LABELS[origin.path])}</span>}
         {meta("location", d.location)}
         {d.location && mark("location")}
         {meta("employmentType", d.employmentType ? t(d.employmentType) : undefined)}
@@ -1696,7 +1707,7 @@ function WorkspaceDoc({ d, changes, origin, provenance }: { d: GeminiDraft; chan
         {meta("headcount", d.headcount ? t("%s openings").replace("%s", String(d.headcount)) : undefined)}
         {d.headcount ? mark("headcount") : null}
       </div>
-      {sourceNote && <div className="tiny gm-ws-source">{sourceNote}</div>}
+      {sourceNote && <div className="tiny gm-ws-source" data-testid="draft-source" style={{ overflowWrap: 'anywhere' }}>{sourceNote}</div>}
       {d.summary && (
         <p className={`${changed("summary") ? "gm-changed" : ""}${pendingCls("summary")}`} title={was("summary")}>
           {d.summary}

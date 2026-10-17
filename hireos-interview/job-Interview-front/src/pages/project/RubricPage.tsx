@@ -8,6 +8,8 @@ import { useRubric } from "../../features/project-intake/useRubric";
 import type { CapabilityCard, CardInput, CardPriority, ResponsibilityType } from "../../features/project-intake/api";
 import { errorText } from "../../features/project-intake/i18n";
 import { saveCardInputs } from '../../features/project-intake/rubric-card-inputs';
+import { useCandidateClaims } from '../../features/project-intake/useCandidateClaims';
+import { useBrief } from '../../features/project-intake/useBrief';
 
 const PRIORITY_TONE: Record<CardPriority, Tone> = { P0: "bad", P1: "warn", P2: "unknown" };
 const RESPONSIBILITY_OPTIONS: ResponsibilityType[] = ["lead", "collaborate", "support"];
@@ -47,6 +49,8 @@ export function RubricPage() {
   const { state: rubricState, loading, error, generate, updateCards, confirm, newVersion, reload } = useRubric(jobId);
 
   const rubric = rubricState?.rubric ?? null;
+  const claims = useCandidateClaims(task?.id ?? null, rubric?.id ?? null, rubric?.version);
+  const brief = useBrief(jobId, rubric?.status === 'draft' ? `${rubric.id}:${rubric.version}` : undefined);
   const generation = rubricState?.generation ?? null;
   const isDraft = rubric?.status === "draft";
   const isConfirmed = rubric?.status === "confirmed";
@@ -219,6 +223,26 @@ export function RubricPage() {
                 )}
                 <div className="mt-2 text-[12.5px] leading-[1.55] text-[var(--ink-2)]">
                   <span className="text-[var(--ink-3)]">{t.expectedEvidenceLabel}: </span>{c.expectedEvidence}
+                  <div>{c.requiredLevel == null ? (zh ? "要求等级未记录" : "Required level not recorded") : (zh ? `JD 要求等级 L${c.requiredLevel}` : `JD Required L${c.requiredLevel}`)}{c.sourceRequirementId ? ` · ${c.sourceRequirementId}` : ""}</div>
+                  <div className="mt-3 border-t border-[var(--line)] pt-3">
+                    <strong>{zh ? "简历经历 · 待核实" : "Resume claims · Unverified"}</strong>
+                    {claims.error ? <p role="alert">{zh ? "简历匹配读取失败" : "Could not load resume matches"}</p>
+                      : !claims.data ? <p>{zh ? "加载中" : "Loading"}</p>
+                      : claims.data.status === 'needs_review' ? (() => {
+                        const matches = claims.data.cards.find(row => row.cardId === c.id)?.claims ?? [];
+                        return matches.length ? matches.map((ref, i) => <blockquote key={`${ref.segmentId}-${i}`} className="my-2 whitespace-pre-wrap break-words">
+                          {ref.quote}<div className="text-[var(--ink-3)]">{claims.data?.materialName} · {claims.data?.materialId} · {ref.segmentId}</div>
+                        </blockquote>) : <p>{zh ? "未找到匹配经历" : "No matching experience found"}</p>;
+                      })() : <p>{zh ? ({ missing_resume_or_rubric: '未提供简历或评分标准', unreadable_resume: '简历不可读', not_generated: '尚未匹配简历', queued: '等待匹配', parsing: '正在匹配', failed: '匹配失败' }[claims.data.status] ?? '匹配状态未知') : ({ missing_resume_or_rubric: 'Resume or rubric not provided', unreadable_resume: 'Resume unreadable', not_generated: 'Resume not matched yet', queued: 'Matching queued', parsing: 'Matching in progress', failed: 'Matching failed' }[claims.data.status] ?? 'Unknown matching status')}</p>}
+                    {(claims.error || ['not_generated', 'failed'].includes(claims.data?.status ?? '')) && <button type="button" disabled={claims.busy} onClick={() => void claims.generate()} className="underline">{zh ? "匹配简历经历" : "Match resume experience"}</button>}
+                    <strong className="mt-3 block">{zh ? "STAR 追问" : "STAR follow-up questions"}</strong>
+                    {brief.state?.jobId === jobId && brief.state.rubricVersionId === rubric.id && brief.state.questions.some(q => q.cardId === c.id)
+                      ? brief.state.questions.filter(q => q.cardId === c.id).map(q => <dl key={q.id}>
+                        <dt>S</dt><dd>{q.situationPrompt}</dd><dt>T</dt><dd>{q.taskPrompt}</dd><dt>A</dt><dd>{q.actionPrompt}</dd><dt>R</dt><dd>{q.resultPrompt}</dd>
+                      </dl>) : <p>{brief.error || brief.state?.generation?.status === 'failed' ? (zh ? '追问读取或生成失败' : 'Could not load or generate questions') : brief.loading || ['queued', 'parsing'].includes(brief.state?.generation?.status ?? '') ? (zh ? '追问生成中' : 'Generating questions') : (zh ? '追问尚未生成' : 'Questions not generated yet')}</p>}
+                    {isDraft && <span>{zh ? '草稿追问 · 待确认' : 'Draft questions · Unconfirmed'}</span>}
+                    {!['queued', 'parsing'].includes(brief.state?.generation?.status ?? '') && (!brief.state?.questions.length || brief.error) && <button type="button" className="ml-2 underline" onClick={() => void brief.generate().catch(() => say(zh ? '生成失败，请重试' : 'Generation failed. Please retry.'))}>{zh ? '生成 STAR 追问' : 'Generate STAR questions'}</button>}
+                  </div>
                 </div>
                 <div className="mt-2 flex items-center gap-3">
                   <button

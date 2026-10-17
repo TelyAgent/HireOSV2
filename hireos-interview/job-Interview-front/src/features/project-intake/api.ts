@@ -26,6 +26,7 @@ export type Round = {
   briefSnapshotAt: string | null; briefSnapshotRubricVersion: number | null;
   transcriptStatus: string; transcriptError: string | null;
   completedAt: string | null; recommendation: Recommendation | null;
+  recommendationReason?: string | null;
   interviewer: { id: string; name: string; title: string | null } | null;
 };
 
@@ -64,6 +65,7 @@ export type ResponsibilityType = 'lead' | 'collaborate' | 'support';
 export type CardPriority = 'P0' | 'P1' | 'P2';
 export type LevelAnchors = { l1: string; l2: string; l3: string; l4: string; l5: string };
 export type CapabilityCard = {
+  requiredLevel?: number | null; sourceRequirementId?: string | null;
   id: string; requirement: string; responsibilityType: ResponsibilityType; cardPriority: CardPriority;
   competencyTags: string; expectedEvidence: string; levelAnchors: LevelAnchors; weight: number;
   sourceRefs: { segmentId: string; quote: string }[];
@@ -114,6 +116,8 @@ export type RoundSummaryState = {
 export type Decision = 'continue_next_round' | 'hold' | 'request_more_evidence' | 'do_not_proceed' | 'recommend_offer';
 export type DecisionState = {
   decision: Decision | null; decisionAt: string | null;
+  decisionReason?: string | null; decisionBy?: string | null; decisionVersion?: number | null;
+  citations?: { segmentId: string; quote: string; sourceJobId: string; generatedAt: string; snapshot: string | null }[];
   conclusion: string | null; suggestedDecision: Decision | null;
   generation: { id: string; status: 'queued' | 'parsing' | 'needs_review' | 'failed'; errorCode: string | null } | null;
 };
@@ -122,13 +126,14 @@ export type DecisionState = {
 // `ai` is the cross-round AI draft for the card ("Continue to debrief" queues it — see
 // backend TasksService.generateDebriefDraft); headline numbers only ever count human scores.
 export type DebriefCard = {
+  requiredLevel?: number | null; sourceRequirementId?: string | null;
   id: string; requirement: string; cardPriority: CardPriority; weight: number;
   score: number | null; note: string; round: { sequence: number; name: string } | null;
   roundScores?: { roundId: string; sequence: number; name: string; interviewer: { id: string; name: string } | null; score: number | null; note: string; updatedAt: string; aiEvidence: { segmentId: string; quote: string } | null }[];
   ai: { score: number | null; rationale: string; quote: string | null } | null;
 };
 export type DebriefSummary = {
-  bar: number;
+  bar: number | null;
   totalCards: number; scoredCount: number;
   mustHaveTotal: number; mustHaveMet: number;
   evaluatedWeightPct: number;

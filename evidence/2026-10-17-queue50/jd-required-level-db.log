@@ -1,0 +1,25 @@
+node --test test/intake.test.cjs
+exit=0
+[Nest] 69760  - 10/17/2026, 7:38:16 PM     LOG [IntakeService] jd_intake_extract succeeded in 2ms
+▶ intake: a JD becomes a Core job + structured draft only once AI has read it; the same JD is deduplicated
+  ✔ creates the Core job from the fields AI extracted, with the structured draft (18.228166ms)
+  ✔ a person editing the draft afterwards takes over from the raw text (3.589542ms)
+  ✔ #325: structured required levels persist; invalid levels cannot change the draft (4.677ms)
+  ✔ the same JD (whitespace aside) resolves to the existing job without another AI call (0.526833ms)
+[Nest] 69760  - 10/17/2026, 7:38:16 PM     LOG [IntakeService] jd_intake_extract succeeded in 0ms
+  ✔ a job deleted in Core Record no longer counts as a duplicate (4.12775ms)
+[Nest] 69760  - 10/17/2026, 7:38:16 PM    WARN [IntakeService] jd_intake_extract failed after 0ms: Service Unavailable Exception
+[Nest] 69760  - 10/17/2026, 7:38:16 PM    WARN [IntakeService] jd_intake_extract failed after 0ms: Expected property name or '}' in JSON at position 2 (line 1 column 3)
+  ✔ nothing is created when AI is unavailable, returns bad output, or finds no job / no title (4.183541ms)
+  ✔ validation: empty text, unknown fields and a missing idempotency key are rejected (0.354541ms)
+[Nest] 69760  - 10/17/2026, 7:38:16 PM     LOG [IntakeService] jd_intake_extract succeeded in 0ms
+  ✔ #178: preview reads the JD without creating anything; create right after reuses that reading with the confirmed title and team (4.7495ms)
+✔ intake: a JD becomes a Core job + structured draft only once AI has read it; the same JD is deduplicated (356.728708ms)
+ℹ tests 9
+ℹ suites 0
+ℹ pass 9
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 418.374458

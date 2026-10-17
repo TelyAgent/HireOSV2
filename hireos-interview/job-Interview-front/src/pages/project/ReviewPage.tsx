@@ -5,6 +5,7 @@ import { Pill, toneBg, toneFg, type Tone } from "../../utils/status";
 import { api, type CardScoreEntry, type Recommendation, type Round, type RoundScoresState, type RoundSummaryState } from "../../features/project-intake/api";
 import { useRounds } from "../../features/project-intake/useRounds";
 import { SummaryPoints } from "../../components/SummaryPoints";
+import { SkippedQuestions } from "../../features/live-interview/SkippedQuestions";
 
 const REC_OPTIONS: { value: Recommendation; label: (t: ReturnType<typeof useStore>["t"]) => string; tone: Tone }[] = [
   { value: "strong_advance", label: (t) => t.recStrongAdvance, tone: "ok" },
@@ -13,6 +14,37 @@ const REC_OPTIONS: { value: Recommendation; label: (t: ReturnType<typeof useStor
   { value: "do_not_advance", label: (t) => t.recDoNotAdvance, tone: "bad" },
   { value: "request_info", label: (t) => t.recRequestInfo, tone: "warn" },
 ];
+
+function RoundRecommendation({ round, zh, t, onSaved }: { round: Round; zh: boolean; t: ReturnType<typeof useStore>['t']; onSaved: (round: Round) => void }) {
+  const [recommendation, setRecommendation] = useState(round.recommendation);
+  const [savedReason, setSavedReason] = useState(round.recommendationReason ?? '');
+  const [reason, setReason] = useState(round.recommendationReason ?? '');
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState('');
+  const reasonId = `recommendation-reason-${round.id}`;
+  const save = async (next: Recommendation | null) => {
+    if (next && !reason.trim()) { setError(zh ? '请填写推荐理由。' : 'A recommendation reason is required.'); return; }
+    setSaving(true); setError('');
+    try {
+      const value = await api<Round>(`/rounds/${round.id}/recommendation`, { method: 'PATCH', body: JSON.stringify({ recommendation: next, reason }) });
+      setRecommendation(value.recommendation); setSavedReason(value.recommendationReason ?? ''); setReason(value.recommendationReason ?? '');
+      onSaved(value);
+    } catch (e) { setError(e instanceof Error ? e.message : 'REQUEST_FAILED'); }
+    finally { setSaving(false); }
+  };
+  return <section aria-label={t.roundRecommendationLabel} style={{ padding: '15px 17px', borderTop: '1px solid var(--line)' }}>
+    <h3 style={{ fontSize: 13 }}>{t.roundRecommendationLabel}</h3>
+    <label htmlFor={reasonId}>{zh ? '推荐理由' : 'Recommendation reason'}</label>
+    <textarea id={reasonId} maxLength={4000} disabled={saving} value={reason} onChange={e => setReason(e.target.value)} style={{ display: 'block', width: '100%', boxSizing: 'border-box', minHeight: 72, padding: 8, border: '1px solid var(--line)', borderRadius: 6, background: 'var(--surface)', color: 'var(--ink)' }} />
+    {error && <div role="alert" style={{ color: 'var(--bad)' }}>{error}</div>}
+    <div style={{ marginTop: 10, display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+      {REC_OPTIONS.map(opt => <button key={opt.value} disabled={saving || (recommendation !== opt.value && !reason.trim())} onClick={() => void save(recommendation === opt.value ? null : opt.value)}
+        style={{ minHeight: 32, padding: '0 13px', border: `1px solid ${recommendation === opt.value ? toneFg[opt.tone] : 'var(--line)'}`, borderRadius: 8, background: recommendation === opt.value ? toneBg[opt.tone] : 'var(--surface)', color: 'var(--ink)' }}>{opt.label(t)}</button>)}
+      {recommendation && reason !== savedReason && <button disabled={saving || !reason.trim()} onClick={() => void save(recommendation)}>{zh ? '保存推荐理由' : 'Save recommendation reason'}</button>}
+    </div>
+    {recommendation && <p style={{ overflowWrap: 'anywhere' }}>{zh ? '已保存理由' : 'Saved reason'}: {savedReason || (zh ? '未记录' : 'Not recorded')}</p>}
+  </section>;
+}
 
 function ScoreCard({ roundId, entry, t, zh, onSaved }: { roundId: string; entry: CardScoreEntry; t: ReturnType<typeof useStore>["t"]; zh: boolean; onSaved: (score: number | null, note: string) => void }) {
   const [score, setScore] = useState(entry.score);
@@ -191,7 +223,7 @@ export function ReviewPage() {
   const { state, set, t } = useStore();
   const { advance, isDone } = useProjectTask();
   const zh = state.lang === "zh";
-  const { rounds, loading: roundsLoading } = useRounds(state.currentTaskId);
+  const { rounds, loading: roundsLoading, updateRound } = useRounds(state.currentTaskId);
   const round: Round | null = rounds.find((r) => r.sequence === (state.roundView === "r2" ? 2 : 1)) ?? null;
   const started = round?.status === "completed";
   // Debrief rolls up every round's scores into one weighted result — fetching it before
@@ -201,13 +233,9 @@ export function ReviewPage() {
   const [entries, setEntries] = useState<CardScoreEntry[] | null>(null);
   const [generation, setGeneration] = useState<RoundScoresState["generation"]>(null);
   const [loadError, setLoadError] = useState("");
-  const [recommendation, setRecommendationState] = useState<Recommendation | null>(null);
-  const [recSaving, setRecSaving] = useState(false);
   const [triggering, setTriggering] = useState(false);
   const [triggerError, setTriggerError] = useState("");
   const [pollKey, setPollKey] = useState(0);
-
-  useEffect(() => { setRecommendationState(round?.recommendation ?? null); }, [round?.id, round?.recommendation]);
 
   useEffect(() => {
     if (!round || !started) { setEntries(null); setGeneration(null); return; }
@@ -224,16 +252,6 @@ export function ReviewPage() {
     void poll();
     return () => { stopped = true; clearTimeout(timer); };
   }, [round?.id, started, pollKey]);
-
-  const setRecommendation = async (value: Recommendation) => {
-    if (!round) return;
-    const next = recommendation === value ? null : value;
-    setRecSaving(true);
-    try {
-      await api(`/rounds/${round.id}/recommendation`, { method: "PATCH", body: JSON.stringify({ recommendation: next }) });
-      setRecommendationState(next);
-    } finally { setRecSaving(false); }
-  };
 
   const generateAiScores = async () => {
     if (!round) return;
@@ -291,24 +309,9 @@ export function ReviewPage() {
       {generation?.status === "failed" && <div role="alert" style={{ padding: "12px 15px", border: "1px solid var(--bad)", borderRadius: 12, background: "var(--bad-soft)", color: "var(--bad)", fontSize: 12.5 }}>{zh ? `AI 评分生成失败：${generation.errorCode}` : `AI score generation failed: ${generation.errorCode}`}</div>}
 
       {round && started && <TranscriptSummary key={round.id} roundId={round.id} zh={zh} />}
+      {round && <SkippedQuestions key={`skipped-${round.id}`} roundId={round.id} zh={zh} />}
 
-      {round && started && (
-        <div style={{ padding: "15px 17px", border: "1px solid var(--line)", borderRadius: 14, background: "var(--surface)" }}>
-          <div style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: 10.5, letterSpacing: ".05em", color: "var(--ink-3)" }}>{t.roundRecommendationLabel}</div>
-          <div style={{ marginTop: 5, fontSize: 11.5, color: "var(--ink-3)", lineHeight: 1.5 }}>{t.roundRecommendationHint}</div>
-          <div style={{ marginTop: 10, display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
-            {REC_OPTIONS.map((opt) => {
-              const active = recommendation === opt.value;
-              return (
-                <button key={opt.value} disabled={recSaving} onClick={() => void setRecommendation(opt.value)}
-                  style={{ height: 32, padding: "0 13px", border: `1px solid ${active ? toneFg[opt.tone] : "var(--line)"}`, borderRadius: 9, background: active ? toneBg[opt.tone] : "var(--surface)", color: active ? toneFg[opt.tone] : "var(--ink-2)", fontSize: 12.5, fontWeight: active ? 700 : 500, cursor: recSaving ? "not-allowed" : "pointer" }}>
-                  {opt.label(t)}
-                </button>
-              );
-            })}
-          </div>
-        </div>
-      )}
+      {round && started && <RoundRecommendation key={round.id} round={round} zh={zh} t={t} onSaved={updateRound} />}
 
       {entries?.map((entry) => (
         <ScoreCard key={entry.card.id} roundId={round!.id} entry={entry} t={t} zh={zh}

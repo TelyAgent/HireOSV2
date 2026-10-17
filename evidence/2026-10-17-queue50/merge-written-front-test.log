@@ -1,0 +1,28 @@
+npm run test
+exit=0
+
+> hireos-written-frontend@0.1.0 test
+> node --test test/unit/*.test.mjs
+
+✔ #369 AC-2: filters round-trip through the URL, defaults left out (0.8945ms)
+✔ #369 AC-2/AC-3: a bare visit restores the last filters; a link with its own filters keeps them (0.158542ms)
+✔ #352 AC-1: due 07:00 the same Shanghai day counts as today; the day before and after don't (14.381458ms)
+✔ #352 AC-2: around local midnight, and a zone with daylight saving, the zone's own date is used (0.622167ms)
+✔ #237 AC-1: the same instant is written in the interface language, in the shown zone (1.401083ms)
+✔ #237 AC-2: relative time covers zero, the past and the future in both languages (0.60825ms)
+✔ #412: a zone's day as the instants it starts and ends, so the server counts the same 'Due today' (1.457875ms)
+✔ #378 AC-3: rationale or excerpts to show, else the reason there are none (0.446541ms)
+✔ #354: the person who acts triggers it; the original assignee is the one notified, and stays on record (0.483125ms)
+✔ #355: the AI overall is a draft and not a hiring probability — no promise that it doesn't count (0.097125ms)
+✔ #356: every 'internal answer key' message says reference answer, never rubric/scoring criteria (0.259459ms)
+✔ #408 AC-1: the filter and view round-trip through the URL; defaults stay out of it (0.911166ms)
+✔ #408 AC-2: unknown values fall back to All tasks in the list view (0.087667ms)
+✔ #408 AC-1: the breadcrumb back goes to the list as it was left, with its scroll position (0.07125ms)
+ℹ tests 14
+ℹ suites 0
+ℹ pass 14
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 108.796459

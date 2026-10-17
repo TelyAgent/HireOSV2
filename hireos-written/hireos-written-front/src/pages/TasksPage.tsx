@@ -7,28 +7,22 @@ import { Button, Card, EmptyState } from "../components/ui/Primitives";
 import { Icon } from "../components/ui/Icon";
 import { roundsForCase } from "../utils/cases";
 import { hasMoreRealWrittenTasks, loadMoreRealWrittenTasks, loadRealWrittenTasksIntoFixtures } from "../data/realTasksMerge";
-import { isWrittenTestTask, taskCountsFor, writtenStatusFromCase, writtenTaskJob, writtenTaskStatus, writtenTestTasks, type WrittenTaskStatus } from "../utils/writtenTasks";
+import { isWrittenTestTask, writtenStatusFromCase, writtenTaskJob, writtenTaskStatus, writtenTestTasks, type WrittenTaskStatus } from "../utils/writtenTasks";
 import { fetchCaseAiContext, fetchWrittenTaskStats, listCaseInvitations, type WrittenTaskStats } from "../data/writtenApi";
 import {
-  PROJECT, INVITATIONS, MAIL, RESULTS, EVALUATIONS, TASKS, CASES, CORE_CANDIDATES, CORE_JOBS, COMPARISONS,
+  PROJECT, INVITATIONS, MAIL, RESULTS, EVALUATIONS, CASES, CORE_CANDIDATES, CORE_JOBS, COMPARISONS,
   fmtDateShort, nowISO, TZ, type CoreCandidate, type CoreJob, type Task,
 } from "../data/fixtures";
 import { applyRealEvaluation, latestResultForCase } from "../data/realPlanItemsMerge";
 import { CreateWrittenTaskModal } from "../components/CreateWrittenTaskModal";
 import type { QuickStartResult } from "../data/writtenApi";
 import { initials } from "../lib/initials";
-import { dayRangeIn, sameDayIn } from "../utils/calendar";
+import { dayRangeIn } from "../utils/calendar";
 import { lastTasksScroll, readTasksParams, rememberTasksView, tasksHref, tasksSearch, type TasksView } from "../utils/tasksReturn";
 
 function candidateOf(caseId: string): CoreCandidate | null {
   const c = CASES[caseId];
   return c ? CORE_CANDIDATES[c.candidateId] : null;
-}
-
-/** Due on today's date in the zone task dates are shown in (TZ), the same day the list shows (#352). */
-function isDueToday(iso: string, clockOffsetMin: number) {
-  if (!iso) return false;
-  return sameDayIn(iso, nowISO(clockOffsetMin), TZ);
 }
 
 const MIN_TO_COMPARE = 2;
@@ -147,20 +141,21 @@ export function TasksPage() {
     restored.current = true;
     window.scrollTo(0, returnScroll);
   }, [refreshVersion, returnScroll]);
-  const counts = taskCountsFor(uid);
-
-  // The list comes a page at a time (#412), so the figures come from the backend, counted over every task; the
-  // local counts over what is loaded stand in only when the backend can't be reached.
+  // A loaded page is not a fallback for a failed workspace-wide aggregate.
   const [stats, setStats] = useState<WrittenTaskStats | null>(null);
+  const [statsState, setStatsState] = useState<'loading' | 'ready' | 'error'>('loading');
+  const [statsRetry, setStatsRetry] = useState(0);
   const [loadingMore, setLoadingMore] = useState(false);
   useEffect(() => {
     let cancelled = false;
+    setStats(null);
+    setStatsState('loading');
     const today = dayRangeIn(nowISO(state.clockOffsetMin), TZ);
     fetchWrittenTaskStats({ assignee: uid, dueFrom: today.from, dueTo: today.to })
-      .then((next) => { if (!cancelled) setStats(next); })
-      .catch((error) => console.warn("Failed to load task figures from the backend:", error));
+      .then((next) => { if (!cancelled) { setStats(next); setStatsState('ready'); } })
+      .catch((error) => { if (!cancelled) setStatsState('error'); console.warn("Failed to load task figures from the backend:", error); });
     return () => { cancelled = true; };
-  }, [uid, state.clockOffsetMin, state.realTasksVersion, refreshVersion]);
+  }, [uid, state.clockOffsetMin, state.realTasksVersion, refreshVersion, statsRetry]);
   const loadMore = async () => {
     setLoadingMore(true);
     try {
@@ -174,16 +169,17 @@ export function TasksPage() {
     }
   };
   const statusCount = (key: FilterKey) => {
-    if (!stats) return key === "all" ? allWritten.length : allWritten.filter((x) => writtenTaskStatus(x) === key).length;
+    if (!stats) return t(statsState === 'loading' ? 'Loading…' : 'Unavailable');
     if (key === "all") return stats.total;
     return Object.entries(stats.byCaseStatus).reduce((sum, [caseStatus, n]) => sum + (writtenStatusFromCase(caseStatus) === key ? n : 0), 0);
   };
+  const metricValue = (value: number | null | undefined) => statsState === 'loading' ? t('Loading…') : statsState === 'error' || value == null ? t('Unavailable') : value;
 
   const primaryMetrics = [
-    { label: "My open tasks", value: scoped ? 0 : stats?.assignee.open ?? counts.open, sub: "Unique task_id, open/in_progress/waiting", link: "/tasks" },
-    { label: "Reviews awaiting me", value: scoped ? 0 : stats?.assignee.reviewsAwaiting ?? allWritten.filter((tk) => tk.assignee === uid && ["evaluation_review", "result_release"].includes(tk.type) && tk.status !== "completed").length, sub: "Same filter as list view", link: "/tasks" },
-    { label: "Due today", value: scoped ? 0 : stats?.assignee.dueInRange ?? Object.values(TASKS).filter((tk) => tk.assignee === uid && isDueToday(tk.dueAt, state.clockOffsetMin)).length, sub: "Same filter as list view", link: "/tasks" },
-    { label: "In progress", value: stats?.assignee.inProgress ?? allWritten.filter((tk) => tk.assignee === uid && tk.status === "in_progress").length, sub: "Same filter as list view", link: "/tasks" },
+    { label: "My open tasks", value: metricValue(stats?.assignee.open), sub: "Unique task_id, open/in_progress/waiting", link: "/tasks" },
+    { label: "Reviews awaiting me", value: metricValue(stats?.assignee.reviewsAwaiting), sub: "Same filter as list view", link: "/tasks" },
+    { label: "Due today", value: metricValue(stats?.assignee.dueInRange), sub: "Same filter as list view", link: "/tasks" },
+    { label: "In progress", value: metricValue(stats?.assignee.inProgress), sub: "Same filter as list view", link: "/tasks" },
   ];
   const moreMetrics = [
     { label: "Active projects", value: scoped ? 0 : (CORE_JOBS[PROJECT.jobId] && PROJECT.status === "active" ? 1 : 0), link: "/assessments" },
@@ -252,10 +248,13 @@ export function TasksPage() {
         {t("Signed in as")} {user.name} · {user.role} · Aurora Studio
       </div>
 
-      <div className="grid-4" style={{ marginBottom: 8 }}>
+      <div className="grid-4" data-testid="primary-metrics" aria-busy={statsState === 'loading'} style={{ marginBottom: 8 }}>
         {primaryMetrics.map((m) => (
           <MetricCard key={m.label} {...m} />
         ))}
+      </div>
+      <div className="tiny" style={{ marginBottom: 8 }}>
+        {statsState === 'error' ? <span role="alert">{t("Statistics unavailable.")} <Button size="sm" onClick={() => setStatsRetry(n => n + 1)}>{t("Retry")}</Button></span> : t("Statistics snapshot time is not available.")}
       </div>
       <div style={{ marginBottom: 24 }}>
         <button className="btn ghost sm" style={{ paddingLeft: 0 }} onClick={() => setExpanded((v) => !v)}>
