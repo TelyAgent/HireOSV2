@@ -69,6 +69,48 @@ test('#317 persisted package versions, concurrent reads, history isolation and v
     assert.equal(sent.offerPackageVersion, 2);
     assert.equal(sent.packageVersion, 2);
     assert.equal(await db.evaluationPackageVersion.count(), 2);
+    // #320: a handoff retains the exact confirmations even after unconfirm/reconfirm.
+    const handoff = (await service.packageEvents('ws', task.id))[0];
+    assert.equal(handoff.action, 'handoff_requested');
+    assert.equal(handoff.packageVersion, 2);
+    assert.equal(handoff.hrConfirmedAt.toISOString(), first.hrConfirmedAt);
+    assert.ok(handoff.createdAt >= handoff.hrConfirmedAt);
+    assert.ok(handoff.createdAt >= handoff.hmConfirmedAt);
+    const identity = { workspaceId: 'ws', actorId: 'reviewer' };
+    await service.confirmPackage(identity, task.id, { role: 'hr', confirmed: false });
+    await service.confirmPackage(identity, task.id, { role: 'hr', confirmed: true });
+    const events = await (await fetch(`${base}/events`)).json();
+    assert.deepEqual(events.map(e => e.action), ['handoff_requested', 'unconfirmed', 'confirmed']);
+    assert.deepEqual(events.map(e => e.packageVersion), [2, 3, 4]);
+    assert.equal(events[2].actorId, 'reviewer');
+    assert.equal(events[0].hrConfirmedAt, first.hrConfirmedAt);
+    assert.notEqual(events[2].hrConfirmedAt, first.hrConfirmedAt);
+    const sentSnapshot = await service.packageVersion('ws', task.id, handoff.packageVersion);
+    assert.equal(sentSnapshot.hrConfirmedAt.toISOString(), events[0].hrConfirmedAt);
+    assert.equal(sentSnapshot.hmConfirmedAt.toISOString(), events[0].hmConfirmedAt);
+    assert.equal((await fetch(`${base}/events`, { headers: { 'test-workspace': 'other' } })).status, 404);
+    // An audit-write failure rolls the confirmation and snapshot back as one unit.
+    const beforeFailure = await db.interviewTask.findUnique({ where: { id: task.id } });
+    await db.$executeRawUnsafe('ALTER TABLE "EvaluationPackageEvent" ADD CONSTRAINT reject_test_actor CHECK ("actorId" <> \'reject-test\')');
+    await assert.rejects(service.confirmPackage({ ...identity, actorId: 'reject-test' }, task.id, { role: 'hm', confirmed: false }));
+    assert.deepEqual(await db.interviewTask.findUnique({ where: { id: task.id } }), beforeFailure);
+    assert.equal(await db.evaluationPackageVersion.count(), 4);
+    assert.equal(await db.evaluationPackageEvent.count(), 3);
+    const freshCandidate = await db.candidate.create({ data: { workspaceId: 'ws', name: 'Fresh candidate' } });
+    const fresh = await db.interviewTask.create({ data: { workspaceId: 'ws', createdBy: 'owner', jobId: job.id, candidateId: freshCandidate.id, decision: 'recommend_offer', decisionAt: new Date('2026-10-01') } });
+    await service.confirmPackage(identity, fresh.id, { role: 'hr', confirmed: true });
+    await assert.rejects(service.sendOffer(identity, fresh.id), /Bad Request/);
+    assert.equal((await service.packageEvents('ws', fresh.id)).length, 1);
+    const both = await service.confirmPackage(identity, fresh.id, { role: 'hm', confirmed: true });
+    const handedOff = await service.sendOffer(identity, fresh.id);
+    assert.equal(handedOff.offerPackageVersion, both.packageVersion);
+    const freshEvents = await service.packageEvents('ws', fresh.id);
+    assert.deepEqual(freshEvents.map(e => e.action), ['confirmed', 'confirmed', 'handoff_requested']);
+    assert.equal(freshEvents[2].packageVersion, both.packageVersion);
+    assert.equal(freshEvents[2].hrConfirmedAt.getTime(), both.hrConfirmedAt.getTime());
+    assert.equal(freshEvents[2].hmConfirmedAt.getTime(), both.hmConfirmedAt.getTime());
+    assert.ok(freshEvents[2].createdAt >= both.hrConfirmedAt);
+    assert.ok(freshEvents[2].createdAt >= both.hmConfirmedAt);
   } finally {
     if (app) await app.close();
     await db.$executeRawUnsafe(`DROP SCHEMA IF EXISTS "${schema}" CASCADE`);

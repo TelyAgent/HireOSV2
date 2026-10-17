@@ -30,14 +30,31 @@ create content revisions. Historical responses do not replay those fields as
 current state; the UI hides handoff actions and disables confirmations. New local
 Offer handoffs reference the actual saved package version. Legacy handoff counters
 are not reinterpreted or backfilled. This change does not implement upstream
-invalidation, a versioned audit trail, or role authorization (#319/#320/#318).
+invalidation or role authorization (#319/#318).
+
+## Confirmation and handoff events (#320)
+
+`GET /tasks/:id/package/events` returns workspace-scoped events in database
+sequence order. Each event identifies the actor, action, package version, time,
+and (for confirmation actions) HR/HM slot. Handoff-request events also retain the
+two confirmation timestamps in that exact snapshot. They mean a local handoff
+request, not downstream acceptance. No old timestamps are backfilled as events.
+
+Confirmation/cancellation, snapshot creation and event insertion share a
+serializable transaction. A failed event insert rolls back the operation. Handoff
+claiming and its event likewise commit together. Reconfirmation creates a new
+snapshot/event without rewriting the original handoff or its confirmations.
+The UI displays the cross-version timeline separately from frozen package content.
+Existing role authorization is unchanged; a recorded HR/HM slot is not proof of
+the actor's business-role authorization.
 
 ## Deployment and rollback
 
 Before running the new backend, from `hireos-interview/job-Interview-backend` run
 `npm run prisma:migrate:deploy` against the intended database, then
 `npm run prisma:generate` and `npm run build`. The additive migration is
-`20261017100000_evaluation_package_versions`. It was exercised only in isolated
+`20261017100000_evaluation_package_versions`, followed by
+`20261017110000_evaluation_package_events`. Both were exercised only in isolated
 test schemas during local validation; no shared/production database was migrated.
 
 Deploy the backend before the frontend that calls the new history routes. For

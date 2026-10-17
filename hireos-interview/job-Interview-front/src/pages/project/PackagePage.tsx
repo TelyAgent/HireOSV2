@@ -43,6 +43,18 @@ export function PackagePage() {
   const selectedVersion = selection?.taskId === taskId ? selection.version : null;
   const [versions, setVersions] = useState<{ version: number; createdAt: string }[]>([]);
   const [versionsError, setVersionsError] = useState("");
+  const [events, setEvents] = useState<{ id: string; packageVersion: number; action: string; actorId: string; role: string | null; createdAt: string; hrConfirmedAt: string | null; hmConfirmedAt: string | null }[]>([]);
+  const [eventsError, setEventsError] = useState(false);
+
+  useEffect(() => {
+    if (!taskId || !data) return;
+    let active = true;
+    setEvents([]); setEventsError(false);
+    api<typeof events>(`/tasks/${taskId}/package/events`)
+      .then(value => { if (active) setEvents(value); })
+      .catch(() => { if (active) setEventsError(true); });
+    return () => { active = false; };
+  }, [taskId, data]);
 
   useEffect(() => {
     if (!taskId) { setData(null); return; }
@@ -121,6 +133,9 @@ export function PackagePage() {
         {selectedVersion !== null && <button style={{ ...btn, marginLeft: 12 }} onClick={() => setSelection(null)}>{zh ? "返回当前内容" : "Back to current content"}</button>}
       </div>
     : <p style={{ fontSize: 12.5, color: "var(--ink-3)" }}>{zh ? "加载中…" : "Loading…"}</p>;
+
+  const recordedHandoff = events.some(event => event.action === "handoff_requested"
+    && event.packageVersion === data.offerPackageVersion && event.createdAt === data.offerSentAt);
 
   return (
     <>
@@ -218,7 +233,9 @@ export function PackagePage() {
 
           {!data.historical && <div style={{ ...card, padding: "14px 16px" }}>
             <div style={eyebrow}>{t.offerHandoffStatus}</div>
-            {data.offerTimelineIssue && <div role="alert" style={{ marginTop: 8, color: "var(--bad)", fontSize: 11.5, lineHeight: 1.45 }}>{zh ? "检测到交接时间早于决定或确认，已暂停 Offer 交接，请先修正记录。" : "Handoff timeline is invalid: it predates the decision or a confirmation. Handoff is paused until the record is corrected."}</div>}
+            {data.offerTimelineIssue && <div role="alert" style={{ marginTop: 8, color: "var(--bad)", fontSize: 11.5, lineHeight: 1.45 }}>{recordedHandoff
+              ? (zh ? `交接后决定或确认已变化。原交接属于版本 ${data.offerPackageVersion}，详见操作记录。` : `The decision or confirmations changed after handoff. The original handoff belongs to version ${data.offerPackageVersion}; see the history below.`)
+              : (zh ? "交接时间早于当前决定或确认，且缺少对应版本记录；无法据此判断原交接顺序。请先核对记录。" : "Handoff predates the current decision or confirmation, with no matching versioned event. The original sequence cannot be verified; review the records first.")}</div>}
             <div style={statusPill}>
               {data.offerState === "acknowledged" ? `${zh ? "Offer 已接收" : "Acknowledged by Offer"} · ${data.offerAckAt ? new Date(data.offerAckAt).toLocaleString(zh ? "zh-CN" : "en-US") : ""}` : data.offerState === "sent" ? (zh ? "历史交接未确认，可重试" : "Legacy handoff unconfirmed; retry available") : data.offerState === "pending" && data.offerSentAt && now - new Date(data.offerSentAt).getTime() >= 5 * 60 * 1000 ? (zh ? "确认超时，可重试" : "ACK timed out; retry available") : data.offerState === "pending" ? (zh ? "等待 Offer 接收确认" : "Awaiting Offer ACK") : data.offerState === "failed" ? `${zh ? "交接失败" : "Handoff failed"}${data.offerError ? ` · ${data.offerError}` : ""}` : (zh ? "未连接" : "Not connected")}
             </div>
@@ -232,6 +249,18 @@ export function PackagePage() {
         </div>
       </div>
 
+      <section aria-label={zh ? "确认与交接记录" : "Confirmation and handoff history"} style={{ borderTop: "1px solid var(--line)", paddingTop: 16 }}>
+        <h3 style={{ fontSize: 14 }}>{zh ? "确认与交接记录" : "Confirmation and handoff history"}</h3>
+        {eventsError ? <p role="alert">{zh ? "记录暂不可用，请刷新重试。" : "History is unavailable. Refresh to retry."}</p>
+          : events.length === 0 ? <p>{zh ? "尚无版本化操作记录；历史时间戳不能还原操作顺序。" : "No versioned events recorded. Legacy timestamps cannot reconstruct the operation sequence."}</p>
+          : <ol style={{ paddingLeft: 20 }}>{events.map(event => <li key={event.id} style={{ marginBottom: 12, overflowWrap: "anywhere" }}>
+            <div>{event.action === "handoff_requested" ? (zh ? "已请求交接" : "Handoff requested") : event.action === "confirmed" ? (zh ? "已确认" : "Confirmed") : (zh ? "已取消确认" : "Unconfirmed")}
+              {event.role ? ` · ${event.role.toUpperCase()}` : ""} · Version {event.packageVersion} · {event.actorId} · {new Date(event.createdAt).toLocaleString(zh ? "zh-CN" : "en-US")}</div>
+            {event.action === "handoff_requested" && <div style={{ fontSize: 12, color: "var(--ink-3)" }}>
+              {zh ? "交接版本的确认时间" : "Confirmation times in the handed-off version"}: HR {event.hrConfirmedAt ? new Date(event.hrConfirmedAt).toLocaleString(zh ? "zh-CN" : "en-US") : "—"} · HM {event.hmConfirmedAt ? new Date(event.hmConfirmedAt).toLocaleString(zh ? "zh-CN" : "en-US") : "—"}
+            </div>}
+          </li>)}</ol>}
+      </section>
     </>
   );
 }

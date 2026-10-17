@@ -154,10 +154,28 @@ model InterviewTask {
   interviewSessions    InterviewSession[]
   rounds               InterviewRound[]
   packageVersions      EvaluationPackageVersion[]
+  packageEvents        EvaluationPackageEvent[]
   @@unique([jobId, candidateId])
   @@index([workspaceId, createdAt])
   @@index([jobId])
   @@index([candidateId])
+}
+
+model EvaluationPackageEvent {
+  id             String   @id @default(uuid())
+  sequence       Int      @unique @default(autoincrement())
+  workspaceId    String
+  taskId         String
+  packageVersion Int
+  action         String
+  actorId        String
+  role           String?
+  hrConfirmedAt  DateTime?
+  hmConfirmedAt  DateTime?
+  createdAt      DateTime @default(now())
+  task           InterviewTask @relation(fields: [taskId], references: [id], onDelete: Cascade)
+
+  @@index([workspaceId, taskId, createdAt])
 }
 
 model EvaluationPackageVersion {

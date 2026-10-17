@@ -11,7 +11,7 @@ const base = process.env.INTERVIEW_TEST_URL || 'http://127.0.0.1:5197/interview/
     let failHistory = false;
     await page.route('https://fonts.googleapis.com/**', route => route.abort());
     page.on('pageerror', e => errors.push(e.message));
-    const state = { candidateName: 'Test candidate', jobTitle: 'Engineer', packageId: 'project', packageVersion: 2, rubricVersion: 3, generatedAt: '2026-10-17T00:00:00Z', published: true, evidence: [], hrConfirmedAt: '2026-10-16T00:00:00Z', hmConfirmedAt: '2026-10-16T00:00:00Z', decision: 'recommend_offer', offerState: 'none', needsReview: false };
+    const state = { candidateName: 'Test candidate', jobTitle: 'Engineer', packageId: 'project', packageVersion: 2, rubricVersion: 3, generatedAt: '2026-10-17T00:00:00Z', published: true, evidence: [], hrConfirmedAt: '2026-10-17T00:00:00Z', hmConfirmedAt: '2026-10-16T00:00:00Z', decision: 'recommend_offer', offerState: 'none', needsReview: false, offerPackageVersion: 1, offerSentAt: '2026-10-16T01:00:00Z', offerTimelineIssue: 'HANDOFF_BEFORE_CONFIRMATION' };
     await page.route('**/account/api/**', route => route.fulfill({ json: { loginRequired: false }, status: route.request().url().endsWith('/me') ? 401 : 200 }));
     await page.route('**/interview/api/**', route => {
       const url = new URL(route.request().url());
@@ -21,6 +21,11 @@ const base = process.env.INTERVIEW_TEST_URL || 'http://127.0.0.1:5197/interview/
       if (path.endsWith('/tasks/project')) json = { id: 'project', job: { id: 'job', title: 'Engineer' }, candidate: { id: 'c', name: 'Test candidate' }, rounds: [], materials: [], parseJobs: [], resume: null, stages: ['overview', 'rubric', 'plan', 'live', 'review', 'debrief', 'decision', 'package'].map(stage => ({ stage, unlocked: true, done: true })) };
       if (path.endsWith('/package')) json = state;
       if (path.endsWith('/package/versions')) json = [{ version: 2, createdAt: state.generatedAt }, { version: 1, createdAt: '2026-10-15T00:00:00Z' }];
+      if (path.endsWith('/package/events')) json = [
+        { id: 'event1', action: 'handoff_requested', packageVersion: 1, actorId: 'original-reviewer', createdAt: '2026-10-16T01:00:00Z', hrConfirmedAt: '2026-10-16T00:00:00Z', hmConfirmedAt: '2026-10-16T00:01:00Z' },
+        { id: 'event2', action: 'unconfirmed', role: 'hr', packageVersion: 2, actorId: 'new-reviewer', createdAt: '2026-10-17T00:00:00Z' },
+        { id: 'event3', action: 'confirmed', role: 'hr', packageVersion: 3, actorId: 'new-reviewer', createdAt: '2026-10-17T00:01:00Z' },
+      ];
       if (path.endsWith('/versions/1')) {
         if (failHistory) return route.fulfill({ status: 503, json: { message: 'History unavailable' } });
         json = { ...state, packageVersion: 1, historical: true, generatedAt: '2026-10-15T00:00:00Z', decision: 'hold' };
@@ -31,6 +36,12 @@ const base = process.env.INTERVIEW_TEST_URL || 'http://127.0.0.1:5197/interview/
     const select = page.getByRole('combobox', { name: 'Package version' });
     await select.locator('option[value="1"]').waitFor({ state: 'attached' });
     await page.getByText(/Package project.*Version 2.*Rubric v3/).waitFor();
+    const history = page.getByRole('region', { name: 'Confirmation and handoff history' });
+    await history.getByText(/Handoff requested.*Version 1.*original-reviewer/).waitFor();
+    assert.match(await history.locator('li').nth(1).innerText(), /Unconfirmed.*Version 2/);
+    assert.match(await history.locator('li').nth(2).innerText(), /Confirmed.*Version 3/);
+    await history.getByText(/Confirmation times in the handed-off version/).waitFor();
+    await page.getByText(/The original handoff belongs to version 1/).waitFor();
     await select.selectOption('1');
     await page.getByRole('status').filter({ hasText: 'Historical snapshot (read-only)' }).waitFor();
     await page.getByText('Hold', { exact: true }).waitFor();
@@ -53,6 +64,6 @@ const base = process.env.INTERVIEW_TEST_URL || 'http://127.0.0.1:5197/interview/
     await page.getByRole('button', { name: 'Back to current content' }).click();
     await page.getByText('Recommend for offer', { exact: true }).waitFor();
     assert.deepEqual(errors, []);
-    console.log('PASS #317 current/history, readonly actions, original version PDF, history after reload');
+    console.log('PASS #317/#320 snapshots, readonly/export/recovery, versioned handoff and later reconfirmation history');
   } finally { await browser.close(); }
 })().catch(e => { console.error(e); process.exitCode = 1; });

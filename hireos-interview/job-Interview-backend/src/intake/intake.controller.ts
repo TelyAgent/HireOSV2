@@ -94,6 +94,9 @@ export class IntakeController {
   taskPackage(@Req() req: { identity: Identity }, @Param('id') id: string) { return this.tasks.package(req.identity.workspaceId, id); }
   @Get('tasks/:id/package/versions')
   taskPackageVersions(@Req() req: { identity: Identity }, @Param('id') id: string) { return this.tasks.packageVersions(req.identity.workspaceId, id); }
+
+  @Get('tasks/:id/package/events')
+  taskPackageEvents(@Req() req: { identity: Identity }, @Param('id') id: string) { return this.tasks.packageEvents(req.identity.workspaceId, id); }
   @Get('tasks/:id/package/versions/:version')
   taskPackageVersion(@Req() req: { identity: Identity }, @Param('id') id: string, @Param('version') version: string) { return this.tasks.packageVersion(req.identity.workspaceId, id, Number(version)); }
   @Get('tasks/:id/package.pdf')

@@ -463,28 +463,17 @@ export class TasksService {
   }
 
   async package(workspaceId: string, taskId: string) {
+    return this.packageTransaction(reader => reader.materializePackage(workspaceId, taskId));
+  }
+
+  private async packageTransaction<T>(operation: (reader: TasksService) => Promise<T>): Promise<T> {
     // Read and freeze one consistent source snapshot. Concurrent readers retry rather
     // than assigning duplicate versions or freezing a mixture of two revisions.
     for (let attempt = 0; attempt < 3; attempt++) {
       try {
         return await this.db.$transaction(async (tx) => {
           const reader = new TasksService(tx as PrismaService, this.candidates, this.rounds, this.coreRecord);
-          const current = await reader.packageCurrent(workspaceId, taskId);
-          const { offerState, offerSentAt, offerAckAt, offerAttemptId, offerPackageVersion, offerError, offerTimelineIssue,
-            needsReview, reviewReason, invalidatedAt, ...content } = current;
-          // Delivery/invalidations are live operational state, not new content revisions.
-          const serialized = JSON.stringify(content);
-          const contentHash = createHash('sha256').update(serialized).digest('hex');
-          let record = await tx.evaluationPackageVersion.findFirst({ where: { workspaceId, taskId }, orderBy: { version: 'desc' } });
-          if (!record || record.contentHash !== contentHash) {
-            record = await tx.evaluationPackageVersion.create({ data: {
-              workspaceId, taskId, version: (record?.version ?? 0) + 1, contentHash,
-              content: JSON.parse(serialized) as Prisma.InputJsonValue,
-            } });
-          }
-          return { ...content, packageVersion: record.version, generatedAt: record.createdAt, historical: false,
-            needsReview, reviewReason, invalidatedAt,
-            offerState, offerSentAt, offerAckAt, offerAttemptId, offerPackageVersion, offerError, offerTimelineIssue };
+          return operation(reader);
         }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
       } catch (error) {
         if (attempt < 2 && error instanceof Prisma.PrismaClientKnownRequestError && ['P2034', 'P2002'].includes(error.code)) continue;
@@ -492,6 +481,30 @@ export class TasksService {
       }
     }
     throw new ConflictException({ code: 'PACKAGE_VERSION_CONFLICT' });
+  }
+
+  private async materializePackage(workspaceId: string, taskId: string) {
+    const current = await this.packageCurrent(workspaceId, taskId);
+    const { offerState, offerSentAt, offerAckAt, offerAttemptId, offerPackageVersion, offerError, offerTimelineIssue,
+      needsReview, reviewReason, invalidatedAt, ...content } = current;
+    // Delivery/invalidations are live operational state, not new content revisions.
+    const serialized = JSON.stringify(content);
+    const contentHash = createHash('sha256').update(serialized).digest('hex');
+    let record = await this.db.evaluationPackageVersion.findFirst({ where: { workspaceId, taskId }, orderBy: { version: 'desc' } });
+    if (!record || record.contentHash !== contentHash) {
+      record = await this.db.evaluationPackageVersion.create({ data: {
+        workspaceId, taskId, version: (record?.version ?? 0) + 1, contentHash, createdAt: new Date(),
+        content: JSON.parse(serialized) as Prisma.InputJsonValue,
+      } });
+    }
+    return { ...content, packageVersion: record.version, generatedAt: record.createdAt, historical: false,
+      needsReview, reviewReason, invalidatedAt,
+      offerState, offerSentAt, offerAckAt, offerAttemptId, offerPackageVersion, offerError, offerTimelineIssue };
+  }
+
+  async packageEvents(workspaceId: string, taskId: string) {
+    if (!await this.db.interviewTask.findFirst({ where: { id: taskId, workspaceId }, select: { id: true } })) throw new NotFoundException({ code: 'NOT_FOUND' });
+    return this.db.evaluationPackageEvent.findMany({ where: { workspaceId, taskId }, orderBy: { sequence: 'asc' } });
   }
 
   async packageVersions(workspaceId: string, taskId: string) {
@@ -521,6 +534,10 @@ export class TasksService {
    * prototype, so this just records who (the current dev identity) confirmed which slot and
    * when, toggleable like setDecision's null-clears-it pattern. */
   async confirmPackage(identity: Identity, taskId: string, raw: unknown) {
+    return this.packageTransaction(reader => reader.confirmPackageWithEvent(identity, taskId, raw));
+  }
+
+  private async confirmPackageWithEvent(identity: Identity, taskId: string, raw: unknown) {
     const input = validate(confirmPackageSchema, raw);
     const existing = await this.db.interviewTask.findFirst({ where: { id: taskId, workspaceId: identity.workspaceId } });
     if (!existing) throw new NotFoundException({ code: 'NOT_FOUND' });
@@ -529,13 +546,24 @@ export class TasksService {
       : { hmConfirmedBy: input.confirmed ? identity.actorId : null, hmConfirmedAt: input.confirmed ? new Date() : null, hmConfirmationNote: input.confirmed ? input.note ?? null : null };
     await this.db.interviewTask.update({ where: { id: taskId }, data });
     await this.syncPackageStatus(identity.workspaceId, taskId);
-    return this.package(identity.workspaceId, taskId);
+    const result = await this.materializePackage(identity.workspaceId, taskId);
+    await this.db.evaluationPackageEvent.create({ data: {
+      workspaceId: identity.workspaceId, taskId, packageVersion: result.packageVersion,
+      action: input.confirmed ? 'confirmed' : 'unconfirmed', role: input.role, actorId: identity.actorId,
+      createdAt: new Date(),
+      hrConfirmedAt: result.hrConfirmedAt, hmConfirmedAt: result.hmConfirmedAt,
+    } });
+    return result;
   }
 
   /** Marks the package as handed off to Offer. No real Offer module exists in this codebase
    * to call, so this is a local, deterministic state transition — not a live downstream ack. */
   async sendOffer(identity: Identity, taskId: string) {
-    const packageData = await this.package(identity.workspaceId, taskId);
+    return this.packageTransaction(reader => reader.sendOfferWithEvent(identity, taskId));
+  }
+
+  private async sendOfferWithEvent(identity: Identity, taskId: string) {
+    const packageData = await this.materializePackage(identity.workspaceId, taskId);
     const task = await this.db.interviewTask.findFirst({ where: { id: taskId, workspaceId: identity.workspaceId },
       select: { decision: true, decisionAt: true, version: true, hrConfirmedAt: true, hmConfirmedAt: true, offerState: true, offerSentAt: true } });
     if (!task) throw new NotFoundException({ code: 'NOT_FOUND' });
@@ -563,7 +591,12 @@ export class TasksService {
       if (current?.offerState === 'pending') throw new ConflictException({ code: 'OFFER_PENDING' });
       throw new ConflictException({ code: 'OFFER_STATE_CHANGED' });
     }
-    return { ...(await this.package(identity.workspaceId, taskId)), offerAttemptId: attemptId };
+    await this.db.evaluationPackageEvent.create({ data: {
+      workspaceId: identity.workspaceId, taskId, packageVersion: packageData.packageVersion,
+      action: 'handoff_requested', actorId: identity.actorId, createdAt: now,
+      hrConfirmedAt: task.hrConfirmedAt, hmConfirmedAt: task.hmConfirmedAt,
+    } });
+    return { ...(await this.materializePackage(identity.workspaceId, taskId)), offerAttemptId: attemptId };
   }
 
   /** Offer's idempotent delivery callback. A stale attempt can never overwrite a newer one. */
