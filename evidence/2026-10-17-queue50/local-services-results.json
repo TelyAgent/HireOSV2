@@ -1,0 +1,3511 @@
+{
+  "checkedAt": "2026-10-17T12:29:46.493Z",
+  "databases": [
+    {
+      "project": "core-record",
+      "target": {
+        "host": "127.0.0.1",
+        "port": "55432",
+        "database": "/hireos_core_record",
+        "schema": "core_record"
+      },
+      "status": {
+        "exit": 0,
+        "output": "Prisma schema loaded from prisma/schema.prisma\nDatasource \"db\": PostgreSQL database \"hireos_core_record\", schema \"core_record\" at \"127.0.0.1:55432\"\n\n2 migrations found in prisma/migrations\n\nDatabase schema is up to date!\nEnvironment variables loaded from .env"
+      },
+      "drift": {
+        "exit": 2,
+        "output": "[*] Changed the `ApplicationStatusHistory` table\n  [*] Renamed index `ApplicationStatusHistory_workspaceId_applicationId_createdAt_id` to `ApplicationStatusHistory_workspaceId_applicationId_createdA_idx`\n\n[*] Changed the `JobRequirementSnapshot` table\n  [*] Renamed index `JobRequirementSnapshot_workspaceId_roleVersionId_purpose_consum` to `JobRequirementSnapshot_workspaceId_roleVersionId_purpose_co_key`"
+      }
+    },
+    {
+      "project": "jd-backend",
+      "target": {
+        "host": "127.0.0.1",
+        "port": "55432",
+        "database": "/hireos_jd",
+        "schema": "public"
+      },
+      "status": {
+        "exit": 0,
+        "output": "Prisma schema loaded from prisma/schema.prisma\nDatasource \"db\": PostgreSQL database \"hireos_jd\", schema \"public\" at \"127.0.0.1:55432\"\n\n11 migrations found in prisma/migrations\n\nDatabase schema is up to date!\nEnvironment variables loaded from .env"
+      },
+      "drift": {
+        "exit": 0,
+        "output": "No difference detected."
+      }
+    },
+    {
+      "project": "interview-backend",
+      "target": {
+        "host": "127.0.0.1",
+        "port": "55432",
+        "database": "/hireos_interview",
+        "schema": "public"
+      },
+      "status": {
+        "exit": 0,
+        "output": "Prisma schema loaded from prisma/schema.prisma\nDatasource \"db\": PostgreSQL database \"hireos_interview\", schema \"public\" at \"127.0.0.1:55432\"\n\n31 migrations found in prisma/migrations\n\nDatabase schema is up to date!\nEnvironment variables loaded from .env"
+      },
+      "drift": {
+        "exit": 0,
+        "output": "No difference detected."
+      }
+    },
+    {
+      "project": "screening-backend",
+      "target": {
+        "host": "127.0.0.1",
+        "port": "55432",
+        "database": "/hireos_screening",
+        "schema": "public"
+      },
+      "status": {
+        "exit": 0,
+        "output": "Prisma schema loaded from prisma/schema.prisma\nDatasource \"db\": PostgreSQL database \"hireos_screening\", schema \"public\" at \"127.0.0.1:55432\"\n\n25 migrations found in prisma/migrations\n\nDatabase schema is up to date!\nEnvironment variables loaded from .env"
+      },
+      "drift": {
+        "exit": 0,
+        "output": "No difference detected."
+      }
+    },
+    {
+      "project": "written-backend",
+      "target": {
+        "host": "127.0.0.1",
+        "port": "55432",
+        "database": "/hireos_written",
+        "schema": "public"
+      },
+      "status": {
+        "exit": 0,
+        "output": "Prisma schema loaded from prisma/schema.prisma\nDatasource \"db\": PostgreSQL database \"hireos_written\", schema \"public\" at \"127.0.0.1:55432\"\n\n16 migrations found in prisma/migrations\n\nDatabase schema is up to date!\nEnvironment variables loaded from .env"
+      },
+      "drift": {
+        "exit": 0,
+        "output": "No difference detected."
+      }
+    },
+    {
+      "project": "identity-backend",
+      "target": {
+        "host": "127.0.0.1",
+        "port": "55432",
+        "database": "/hireos_identity",
+        "schema": "public"
+      },
+      "status": {
+        "exit": 0,
+        "output": "Prisma schema loaded from prisma/schema.prisma\nDatasource \"db\": PostgreSQL database \"hireos_identity\", schema \"public\" at \"127.0.0.1:55432\"\n\n3 migrations found in prisma/migrations\n\nDatabase schema is up to date!\nEnvironment variables loaded from .env"
+      },
+      "drift": {
+        "exit": 0,
+        "output": "No difference detected."
+      }
+    }
+  ],
+  "requests": [
+    {
+      "route": "/jd/api/jobs",
+      "port": 8080,
+      "allowed": [
+        200
+      ],
+      "status": 200,
+      "ok": true
+    },
+    {
+      "route": "/jd/api/jobs/ad1c9bf2-939d-4a4f-acf0-5251c2e40390",
+      "port": 8080,
+      "allowed": [
+        200
+      ],
+      "status": 200,
+      "ok": true
+    },
+    {
+      "route": "/jd/api/jobs/ad1c9bf2-939d-4a4f-acf0-5251c2e40390/drafts/current",
+      "port": 8080,
+      "allowed": [
+        200,
+        404
+      ],
+      "status": 200,
+      "ok": true
+    },
+    {
+      "route": "/jd/api/jobs/ad1c9bf2-939d-4a4f-acf0-5251c2e40390/documents/internal",
+      "port": 8080,
+      "allowed": [
+        200,
+        404
+      ],
+      "status": 404,
+      "ok": true,
+      "code": "DOCUMENT_NOT_FOUND"
+    },
+    {
+      "route": "/jd/api/jobs/ad1c9bf2-939d-4a4f-acf0-5251c2e40390/documents/external",
+      "port": 8080,
+      "allowed": [
+        200,
+        404
+      ],
+      "status": 404,
+      "ok": true,
+      "code": "DOCUMENT_NOT_FOUND"
+    },
+    {
+      "route": "/jd/api/jobs/ad1c9bf2-939d-4a4f-acf0-5251c2e40390/versions",
+      "port": 8080,
+      "allowed": [
+        200
+      ],
+      "status": 200,
+      "ok": true
+    },
+    {
+      "route": "/jd/api/jobs/26d8ee2e-54d3-4211-a04e-38691b433830",
+      "port": 8080,
+      "allowed": [
+        200
+      ],
+      "status": 200,
+      "ok": true
+    },
+    {
+      "route": "/jd/api/jobs/26d8ee2e-54d3-4211-a04e-38691b433830/drafts/current",
+      "port": 8080,
+      "allowed": [
+        200,
+        404
+      ],
+      "status": 200,
+      "ok": true
+    },
+    {
+      "route": "/jd/api/jobs/26d8ee2e-54d3-4211-a04e-38691b433830/documents/internal",
+      "port": 8080,
+      "allowed": [
+        200,
+        404
+      ],
+      "status": 404,
+      "ok": true,
+      "code": "DOCUMENT_NOT_FOUND"
+    },
+    {
+      "route": "/jd/api/jobs/26d8ee2e-54d3-4211-a04e-38691b433830/documents/external",
+      "port": 8080,
+      "allowed": [
+        200,
+        404
+      ],
+      "status": 404,
+      "ok": true,
+      "code": "DOCUMENT_NOT_FOUND"
+    },
+    {
+      "route": "/jd/api/jobs/26d8ee2e-54d3-4211-a04e-38691b433830/versions",
+      "port": 8080,
+      "allowed": [
+        200
+      ],
+      "status": 200,
+      "ok": true
+    },
+    {
+      "route": "/jd/api/jobs/f3f1e75d-5a11-4f9d-9614-69d4afa85e14",
+      "port": 8080,
+      "allowed": [
+        200
+      ],
+      "status": 200,
+      "ok": true
+    },
+    {
+      "route": "/jd/api/jobs/f3f1e75d-5a11-4f9d-9614-69d4afa85e14/drafts/current",
+      "port": 8080,
+      "allowed": [
+        200,
+        404
+      ],
+      "status": 200,
+      "ok": true
+    },
+    {
+      "route": "/jd/api/jobs/f3f1e75d-5a11-4f9d-9614-69d4afa85e14/documents/internal",
+      "port": 8080,
+      "allowed": [
+        200,
+        404
+      ],
+      "status": 404,
+      "ok": true,
+      "code": "DOCUMENT_NOT_FOUND"
+    },
+    {
+      "route": "/jd/api/jobs/f3f1e75d-5a11-4f9d-9614-69d4afa85e14/documents/external",
+      "port": 8080,
+      "allowed": [
+        200,
+        404
+      ],
+      "status": 404,
+      "ok": true,
+      "code": "DOCUMENT_NOT_FOUND"
+    },
+    {
+      "route": "/jd/api/jobs/f3f1e75d-5a11-4f9d-9614-69d4afa85e14/versions",
+      "port": 8080,
+      "allowed": [
+        200
+      ],
+      "status": 200,
+      "ok": true
+    },
+    {
+      "route": "/jd/api/jobs/f4036477-1dc0-40f2-a8bf-0d9844e9728e",
+      "port": 8080,
+      "allowed": [
+        200
+      ],
+      "status": 200,
+      "ok": true
+    },
+    {
+      "route": "/jd/api/jobs/f4036477-1dc0-40f2-a8bf-0d9844e9728e/drafts/current",
+      "port": 8080,
+      "allowed": [
+        200,
+        404
+      ],
+      "status": 200,
+      "ok": true
+    },
+    {
+      "route": "/jd/api/jobs/f4036477-1dc0-40f2-a8bf-0d9844e9728e/documents/internal",
+      "port": 8080,
+      "allowed": [
+        200,
+        404
+      ],
+      "status": 404,
+      "ok": true,
+      "code": "DOCUMENT_NOT_FOUND"
+    },
+    {
+      "route": "/jd/api/jobs/f4036477-1dc0-40f2-a8bf-0d9844e9728e/documents/external",
+      "port": 8080,
+      "allowed": [
+        200,
+        404
+      ],
+      "status": 404,
+      "ok": true,
+      "code": "DOCUMENT_NOT_FOUND"
+    },
+    {
+      "route": "/jd/api/jobs/f4036477-1dc0-40f2-a8bf-0d9844e9728e/versions",
+      "port": 8080,
+      "allowed": [
+        200
+      ],
+      "status": 200,
+      "ok": true
+    },
+    {
+      "route": "/jd/api/jobs/1eea85d8-3e46-4154-8375-4774707cff69",
+      "port": 8080,
+      "allowed": [
+        200
+      ],
+      "status": 200,
+      "ok": true
+    },
+    {
+      "route": "/jd/api/jobs/1eea85d8-3e46-4154-8375-4774707cff69/drafts/current",
+      "port": 8080,
+      "allowed": [
+        200,
+        404
+      ],
+      "status": 200,
+      "ok": true
+    },
+    {
+      "route": "/jd/api/jobs/1eea85d8-3e46-4154-8375-4774707cff69/documents/internal",
+      "port": 8080,
+      "allowed": [
+        200,
+        404
+      ],
+      "status": 404,
+      "ok": true,
+      "code": "DOCUMENT_NOT_FOUND"
+    },
+    {
+      "route": "/jd/api/jobs/1eea85d8-3e46-4154-8375-4774707cff69/documents/external",
+      "port": 8080,
+      "allowed": [
+        200,
+        404
+      ],
+      "status": 404,
+      "ok": true,
+      "code": "DOCUMENT_NOT_FOUND"
+    },
+    {
+      "route": "/jd/api/jobs/1eea85d8-3e46-4154-8375-4774707cff69/versions",
+      "port": 8080,
+      "allowed": [
+        200
+      ],
+      "status": 200,
+      "ok": true
+    },
+    {
+      "route": "/jd/api/jobs/c5ade33b-e456-4692-a050-b30af070e804",
+      "port": 8080,
+      "allowed": [
+        200
+      ],
+      "status": 200,
+      "ok": true
+    },
+    {
+      "route": "/jd/api/jobs/c5ade33b-e456-4692-a050-b30af070e804/drafts/current",
+      "port": 8080,
+      "allowed": [
+        200,
+        404
+      ],
+      "status": 200,
+      "ok": true
+    },
+    {
+      "route": "/jd/api/jobs/c5ade33b-e456-4692-a050-b30af070e804/documents/internal",
+      "port": 8080,
+      "allowed": [
+        200,
+        404
+      ],
+      "status": 404,
+      "ok": true,
+      "code": "DOCUMENT_NOT_FOUND"
+    },
+    {
+      "route": "/jd/api/jobs/c5ade33b-e456-4692-a050-b30af070e804/documents/external",
+      "port": 8080,
+      "allowed": [
+        200,
+        404
+      ],
+      "status": 404,
+      "ok": true,
+      "code": "DOCUMENT_NOT_FOUND"
+    },
+    {
+      "route": "/jd/api/jobs/c5ade33b-e456-4692-a050-b30af070e804/versions",
+      "port": 8080,
+      "allowed": [
+        200
+      ],
+      "status": 200,
+      "ok": true
+    },
+    {
+      "route": "/jd/api/jobs/00a6d2c8-a468-4ea7-85b0-5fa03c566504",
+      "port": 8080,
+      "allowed": [
+        200
+      ],
+      "status": 200,
+      "ok": true
+    },
+    {
+      "route": "/jd/api/jobs/00a6d2c8-a468-4ea7-85b0-5fa03c566504/drafts/current",
+      "port": 8080,
+      "allowed": [
+        200,
+        404
+      ],
+      "status": 200,
+      "ok": true
+    },
+    {
+      "route": "/jd/api/jobs/00a6d2c8-a468-4ea7-85b0-5fa03c566504/documents/internal",
+      "port": 8080,
+      "allowed": [
+        200,
+        404
+      ],
+      "status": 404,
+      "ok": true,
+      "code": "DOCUMENT_NOT_FOUND"
+    },
+    {
+      "route": "/jd/api/jobs/00a6d2c8-a468-4ea7-85b0-5fa03c566504/documents/external",
+      "port": 8080,
+      "allowed": [
+        200,
+        404
+      ],
+      "status": 404,
+      "ok": true,
+      "code": "DOCUMENT_NOT_FOUND"
+    },
+    {
+      "route": "/jd/api/jobs/00a6d2c8-a468-4ea7-85b0-5fa03c566504/versions",
+      "port": 8080,
+      "allowed": [
+        200
+      ],
+      "status": 200,
+      "ok": true
+    },
+    {
+      "route": "/jd/api/jobs/a49f0e86-4db8-4989-8f80-3ae25c6c93f6",
+      "port": 8080,
+      "allowed": [
+        200
+      ],
+      "status": 200,
+      "ok": true
+    },
+    {
+      "route": "/jd/api/jobs/a49f0e86-4db8-4989-8f80-3ae25c6c93f6/drafts/current",
+      "port": 8080,
+      "allowed": [
+        200,
+        404
+      ],
+      "status": 200,
+      "ok": true
+    },
+    {
+      "route": "/jd/api/jobs/a49f0e86-4db8-4989-8f80-3ae25c6c93f6/documents/internal",
+      "port": 8080,
+      "allowed": [
+        200,
+        404
+      ],
+      "status": 404,
+      "ok": true,
+      "code": "DOCUMENT_NOT_FOUND"
+    },
+    {
+      "route": "/jd/api/jobs/a49f0e86-4db8-4989-8f80-3ae25c6c93f6/documents/external",
+      "port": 8080,
+      "allowed": [
+        200,
+        404
+      ],
+      "status": 404,
+      "ok": true,
+      "code": "DOCUMENT_NOT_FOUND"
+    },
+    {
+      "route": "/jd/api/jobs/a49f0e86-4db8-4989-8f80-3ae25c6c93f6/versions",
+      "port": 8080,
+      "allowed": [
+        200
+      ],
+      "status": 200,
+      "ok": true
+    },
+    {
+      "route": "/jd/api/jobs/6c4bbbb7-ff1d-49b2-b2c3-428290db99ee",
+      "port": 8080,
+      "allowed": [
+        200
+      ],
+      "status": 200,
+      "ok": true
+    },
+    {
+      "route": "/jd/api/jobs/6c4bbbb7-ff1d-49b2-b2c3-428290db99ee/drafts/current",
+      "port": 8080,
+      "allowed": [
+        200,
+        404
+      ],
+      "status": 200,
+      "ok": true
+    },
+    {
+      "route": "/jd/api/jobs/6c4bbbb7-ff1d-49b2-b2c3-428290db99ee/documents/internal",
+      "port": 8080,
+      "allowed": [
+        200,
+        404
+      ],
+      "status": 404,
+      "ok": true,
+      "code": "DOCUMENT_NOT_FOUND"
+    },
+    {
+      "route": "/jd/api/jobs/6c4bbbb7-ff1d-49b2-b2c3-428290db99ee/documents/external",
+      "port": 8080,
+      "allowed": [
+        200,
+        404
+      ],
+      "status": 404,
+      "ok": true,
+      "code": "DOCUMENT_NOT_FOUND"
+    },
+    {
+      "route": "/jd/api/jobs/6c4bbbb7-ff1d-49b2-b2c3-428290db99ee/versions",
+      "port": 8080,
+      "allowed": [
+        200
+      ],
+      "status": 200,
+      "ok": true
+    },
+    {
+      "route": "/jd/api/jobs/24bd91f1-d3d0-4518-b121-c446faaf83c0",
+      "port": 8080,
+      "allowed": [
+        200
+      ],
+      "status": 200,
+      "ok": true
+    },
+    {
+      "route": "/jd/api/jobs/24bd91f1-d3d0-4518-b121-c446faaf83c0/drafts/current",
+      "port": 8080,
+      "allowed": [
+        200,
+        404
+      ],
+      "status": 200,
+      "ok": true
+    },
+    {
+      "route": "/jd/api/jobs/24bd91f1-d3d0-4518-b121-c446faaf83c0/documents/internal",
+      "port": 8080,
+      "allowed": [
+        200,
+        404
+      ],
+      "status": 404,
+      "ok": true,
+      "code": "DOCUMENT_NOT_FOUND"
+    },
+    {
+      "route": "/jd/api/jobs/24bd91f1-d3d0-4518-b121-c446faaf83c0/documents/external",
+      "port": 8080,
+      "allowed": [
+        200,
+        404
+      ],
+      "status": 404,
+      "ok": true,
+      "code": "DOCUMENT_NOT_FOUND"
+    },
+    {
+      "route": "/jd/api/jobs/24bd91f1-d3d0-4518-b121-c446faaf83c0/versions",
+      "port": 8080,
+      "allowed": [
+        200
+      ],
+      "status": 200,
+      "ok": true
+    },
+    {
+      "route": "/jd/api/jobs/3d7a99f7-a2ba-4702-a55c-21641a5da799",
+      "port": 8080,
+      "allowed": [
+        200
+      ],
+      "status": 200,
+      "ok": true
+    },
+    {
+      "route": "/jd/api/jobs/3d7a99f7-a2ba-4702-a55c-21641a5da799/drafts/current",
+      "port": 8080,
+      "allowed": [
+        200,
+        404
+      ],
+      "status": 200,
+      "ok": true
+    },
+    {
+      "route": "/jd/api/jobs/3d7a99f7-a2ba-4702-a55c-21641a5da799/documents/internal",
+      "port": 8080,
+      "allowed": [
+        200,
+        404
+      ],
+      "status": 200,
+      "ok": true
+    },
+    {
+      "route": "/jd/api/jobs/3d7a99f7-a2ba-4702-a55c-21641a5da799/documents/external",
+      "port": 8080,
+      "allowed": [
+        200,
+        404
+      ],
+      "status": 404,
+      "ok": true,
+      "code": "DOCUMENT_NOT_FOUND"
+    },
+    {
+      "route": "/jd/api/jobs/3d7a99f7-a2ba-4702-a55c-21641a5da799/versions",
+      "port": 8080,
+      "allowed": [
+        200
+      ],
+      "status": 200,
+      "ok": true
+    },
+    {
+      "route": "/jd/api/jobs/15a18d63-b45d-41ca-8491-08a876bdfaa4",
+      "port": 8080,
+      "allowed": [
+        200
+      ],
+      "status": 200,
+      "ok": true
+    },
+    {
+      "route": "/jd/api/jobs/15a18d63-b45d-41ca-8491-08a876bdfaa4/drafts/current",
+      "port": 8080,
+      "allowed": [
+        200,
+        404
+      ],
+      "status": 200,
+      "ok": true
+    },
+    {
+      "route": "/jd/api/jobs/15a18d63-b45d-41ca-8491-08a876bdfaa4/documents/internal",
+      "port": 8080,
+      "allowed": [
+        200,
+        404
+      ],
+      "status": 404,
+      "ok": true,
+      "code": "DOCUMENT_NOT_FOUND"
+    },
+    {
+      "route": "/jd/api/jobs/15a18d63-b45d-41ca-8491-08a876bdfaa4/documents/external",
+      "port": 8080,
+      "allowed": [
+        200,
+        404
+      ],
+      "status": 404,
+      "ok": true,
+      "code": "DOCUMENT_NOT_FOUND"
+    },
+    {
+      "route": "/jd/api/jobs/15a18d63-b45d-41ca-8491-08a876bdfaa4/versions",
+      "port": 8080,
+      "allowed": [
+        200
+      ],
+      "status": 200,
+      "ok": true
+    },
+    {
+      "route": "/jd/api/jobs/1774a0ff-7037-4416-a599-a24dd02ba10d",
+      "port": 8080,
+      "allowed": [
+        200
+      ],
+      "status": 200,
+      "ok": true
+    },
+    {
+      "route": "/jd/api/jobs/1774a0ff-7037-4416-a599-a24dd02ba10d/drafts/current",
+      "port": 8080,
+      "allowed": [
+        200,
+        404
+      ],
+      "status": 200,
+      "ok": true
+    },
+    {
+      "route": "/jd/api/jobs/1774a0ff-7037-4416-a599-a24dd02ba10d/documents/internal",
+      "port": 8080,
+      "allowed": [
+        200,
+        404
+      ],
+      "status": 200,
+      "ok": true
+    },
+    {
+      "route": "/jd/api/jobs/1774a0ff-7037-4416-a599-a24dd02ba10d/documents/external",
+      "port": 8080,
+      "allowed": [
+        200,
+        404
+      ],
+      "status": 404,
+      "ok": true,
+      "code": "DOCUMENT_NOT_FOUND"
+    },
+    {
+      "route": "/jd/api/jobs/1774a0ff-7037-4416-a599-a24dd02ba10d/versions",
+      "port": 8080,
+      "allowed": [
+        200
+      ],
+      "status": 200,
+      "ok": true
+    },
+    {
+      "route": "/jd/api/jobs/7c122588-884c-4a7f-8e50-944311c31d0c",
+      "port": 8080,
+      "allowed": [
+        200
+      ],
+      "status": 200,
+      "ok": true
+    },
+    {
+      "route": "/jd/api/jobs/7c122588-884c-4a7f-8e50-944311c31d0c/drafts/current",
+      "port": 8080,
+      "allowed": [
+        200,
+        404
+      ],
+      "status": 200,
+      "ok": true
+    },
+    {
+      "route": "/jd/api/jobs/7c122588-884c-4a7f-8e50-944311c31d0c/documents/internal",
+      "port": 8080,
+      "allowed": [
+        200,
+        404
+      ],
+      "status": 404,
+      "ok": true,
+      "code": "DOCUMENT_NOT_FOUND"
+    },
+    {
+      "route": "/jd/api/jobs/7c122588-884c-4a7f-8e50-944311c31d0c/documents/external",
+      "port": 8080,
+      "allowed": [
+        200,
+        404
+      ],
+      "status": 404,
+      "ok": true,
+      "code": "DOCUMENT_NOT_FOUND"
+    },
+    {
+      "route": "/jd/api/jobs/7c122588-884c-4a7f-8e50-944311c31d0c/versions",
+      "port": 8080,
+      "allowed": [
+        200
+      ],
+      "status": 200,
+      "ok": true
+    },
+    {
+      "route": "/jd/api/jobs/552431ee-14d4-43ae-82d1-9da87d50826d",
+      "port": 8080,
+      "allowed": [
+        200
+      ],
+      "status": 200,
+      "ok": true
+    },
+    {
+      "route": "/jd/api/jobs/552431ee-14d4-43ae-82d1-9da87d50826d/drafts/current",
+      "port": 8080,
+      "allowed": [
+        200,
+        404
+      ],
+      "status": 200,
+      "ok": true
+    },
+    {
+      "route": "/jd/api/jobs/552431ee-14d4-43ae-82d1-9da87d50826d/documents/internal",
+      "port": 8080,
+      "allowed": [
+        200,
+        404
+      ],
+      "status": 404,
+      "ok": true,
+      "code": "DOCUMENT_NOT_FOUND"
+    },
+    {
+      "route": "/jd/api/jobs/552431ee-14d4-43ae-82d1-9da87d50826d/documents/external",
+      "port": 8080,
+      "allowed": [
+        200,
+        404
+      ],
+      "status": 404,
+      "ok": true,
+      "code": "DOCUMENT_NOT_FOUND"
+    },
+    {
+      "route": "/jd/api/jobs/552431ee-14d4-43ae-82d1-9da87d50826d/versions",
+      "port": 8080,
+      "allowed": [
+        200
+      ],
+      "status": 200,
+      "ok": true
+    },
+    {
+      "route": "/jd/api/jobs/96c6d4f3-54f7-4cc1-984b-fac92162131b",
+      "port": 8080,
+      "allowed": [
+        200
+      ],
+      "status": 200,
+      "ok": true
+    },
+    {
+      "route": "/jd/api/jobs/96c6d4f3-54f7-4cc1-984b-fac92162131b/drafts/current",
+      "port": 8080,
+      "allowed": [
+        200,
+        404
+      ],
+      "status": 200,
+      "ok": true
+    },
+    {
+      "route": "/jd/api/jobs/96c6d4f3-54f7-4cc1-984b-fac92162131b/documents/internal",
+      "port": 8080,
+      "allowed": [
+        200,
+        404
+      ],
+      "status": 404,
+      "ok": true,
+      "code": "DOCUMENT_NOT_FOUND"
+    },
+    {
+      "route": "/jd/api/jobs/96c6d4f3-54f7-4cc1-984b-fac92162131b/documents/external",
+      "port": 8080,
+      "allowed": [
+        200,
+        404
+      ],
+      "status": 404,
+      "ok": true,
+      "code": "DOCUMENT_NOT_FOUND"
+    },
+    {
+      "route": "/jd/api/jobs/96c6d4f3-54f7-4cc1-984b-fac92162131b/versions",
+      "port": 8080,
+      "allowed": [
+        200
+      ],
+      "status": 200,
+      "ok": true
+    },
+    {
+      "route": "/jd/api/jobs/52f40139-9392-4023-9391-117bed09bd28",
+      "port": 8080,
+      "allowed": [
+        200
+      ],
+      "status": 200,
+      "ok": true
+    },
+    {
+      "route": "/jd/api/jobs/52f40139-9392-4023-9391-117bed09bd28/drafts/current",
+      "port": 8080,
+      "allowed": [
+        200,
+        404
+      ],
+      "status": 200,
+      "ok": true
+    },
+    {
+      "route": "/jd/api/jobs/52f40139-9392-4023-9391-117bed09bd28/documents/internal",
+      "port": 8080,
+      "allowed": [
+        200,
+        404
+      ],
+      "status": 404,
+      "ok": true,
+      "code": "DOCUMENT_NOT_FOUND"
+    },
+    {
+      "route": "/jd/api/jobs/52f40139-9392-4023-9391-117bed09bd28/documents/external",
+      "port": 8080,
+      "allowed": [
+        200,
+        404
+      ],
+      "status": 404,
+      "ok": true,
+      "code": "DOCUMENT_NOT_FOUND"
+    },
+    {
+      "route": "/jd/api/jobs/52f40139-9392-4023-9391-117bed09bd28/versions",
+      "port": 8080,
+      "allowed": [
+        200
+      ],
+      "status": 200,
+      "ok": true
+    },
+    {
+      "route": "/jd/api/jobs/d7493d4f-071f-44b6-8f5b-b3ae075ec3c4",
+      "port": 8080,
+      "allowed": [
+        200
+      ],
+      "status": 200,
+      "ok": true
+    },
+    {
+      "route": "/jd/api/jobs/d7493d4f-071f-44b6-8f5b-b3ae075ec3c4/drafts/current",
+      "port": 8080,
+      "allowed": [
+        200,
+        404
+      ],
+      "status": 200,
+      "ok": true
+    },
+    {
+      "route": "/jd/api/jobs/d7493d4f-071f-44b6-8f5b-b3ae075ec3c4/documents/internal",
+      "port": 8080,
+      "allowed": [
+        200,
+        404
+      ],
+      "status": 404,
+      "ok": true,
+      "code": "DOCUMENT_NOT_FOUND"
+    },
+    {
+      "route": "/jd/api/jobs/d7493d4f-071f-44b6-8f5b-b3ae075ec3c4/documents/external",
+      "port": 8080,
+      "allowed": [
+        200,
+        404
+      ],
+      "status": 404,
+      "ok": true,
+      "code": "DOCUMENT_NOT_FOUND"
+    },
+    {
+      "route": "/jd/api/jobs/d7493d4f-071f-44b6-8f5b-b3ae075ec3c4/versions",
+      "port": 8080,
+      "allowed": [
+        200
+      ],
+      "status": 200,
+      "ok": true
+    },
+    {
+      "route": "/jd/api/jobs/a33efd46-8443-459b-8108-9d8ab402380a",
+      "port": 8080,
+      "allowed": [
+        200
+      ],
+      "status": 200,
+      "ok": true
+    },
+    {
+      "route": "/jd/api/jobs/a33efd46-8443-459b-8108-9d8ab402380a/drafts/current",
+      "port": 8080,
+      "allowed": [
+        200,
+        404
+      ],
+      "status": 200,
+      "ok": true
+    },
+    {
+      "route": "/jd/api/jobs/a33efd46-8443-459b-8108-9d8ab402380a/documents/internal",
+      "port": 8080,
+      "allowed": [
+        200,
+        404
+      ],
+      "status": 404,
+      "ok": true,
+      "code": "DOCUMENT_NOT_FOUND"
+    },
+    {
+      "route": "/jd/api/jobs/a33efd46-8443-459b-8108-9d8ab402380a/documents/external",
+      "port": 8080,
+      "allowed": [
+        200,
+        404
+      ],
+      "status": 404,
+      "ok": true,
+      "code": "DOCUMENT_NOT_FOUND"
+    },
+    {
+      "route": "/jd/api/jobs/a33efd46-8443-459b-8108-9d8ab402380a/versions",
+      "port": 8080,
+      "allowed": [
+        200
+      ],
+      "status": 200,
+      "ok": true
+    },
+    {
+      "route": "/jd/api/jobs/7e2b0c65-a2d6-43a9-865a-5085b2846915",
+      "port": 8080,
+      "allowed": [
+        200
+      ],
+      "status": 200,
+      "ok": true
+    },
+    {
+      "route": "/jd/api/jobs/7e2b0c65-a2d6-43a9-865a-5085b2846915/drafts/current",
+      "port": 8080,
+      "allowed": [
+        200,
+        404
+      ],
+      "status": 200,
+      "ok": true
+    },
+    {
+      "route": "/jd/api/jobs/7e2b0c65-a2d6-43a9-865a-5085b2846915/documents/internal",
+      "port": 8080,
+      "allowed": [
+        200,
+        404
+      ],
+      "status": 200,
+      "ok": true
+    },
+    {
+      "route": "/jd/api/jobs/7e2b0c65-a2d6-43a9-865a-5085b2846915/documents/external",
+      "port": 8080,
+      "allowed": [
+        200,
+        404
+      ],
+      "status": 404,
+      "ok": true,
+      "code": "DOCUMENT_NOT_FOUND"
+    },
+    {
+      "route": "/jd/api/jobs/7e2b0c65-a2d6-43a9-865a-5085b2846915/versions",
+      "port": 8080,
+      "allowed": [
+        200
+      ],
+      "status": 200,
+      "ok": true
+    },
+    {
+      "route": "/jd/api/copilot/conversations",
+      "port": 8080,
+      "allowed": [
+        200
+      ],
+      "status": 200,
+      "ok": true
+    },
+    {
+      "route": "/screening/api/jobs",
+      "port": 8080,
+      "allowed": [
+        200
+      ],
+      "status": 200,
+      "ok": true
+    },
+    {
+      "route": "/screening/api/tasks",
+      "port": 8080,
+      "allowed": [
+        200
+      ],
+      "status": 200,
+      "ok": true
+    },
+    {
+      "route": "/screening/api/library",
+      "port": 8080,
+      "allowed": [
+        200
+      ],
+      "status": 200,
+      "ok": true
+    },
+    {
+      "route": "/screening/api/connections",
+      "port": 8080,
+      "allowed": [
+        200
+      ],
+      "status": 200,
+      "ok": true
+    },
+    {
+      "route": "/screening/api/jobs/ad1c9bf2-939d-4a4f-acf0-5251c2e40390",
+      "port": 8080,
+      "allowed": [
+        200
+      ],
+      "status": 200,
+      "ok": true
+    },
+    {
+      "route": "/screening/api/jobs/ad1c9bf2-939d-4a4f-acf0-5251c2e40390/recommendations",
+      "port": 8080,
+      "allowed": [
+        200
+      ],
+      "status": 200,
+      "ok": true
+    },
+    {
+      "route": "/screening/api/applications?jobId=ad1c9bf2-939d-4a4f-acf0-5251c2e40390",
+      "port": 8080,
+      "allowed": [
+        200
+      ],
+      "status": 200,
+      "ok": true
+    },
+    {
+      "route": "/screening/api/jobs/f4036477-1dc0-40f2-a8bf-0d9844e9728e",
+      "port": 8080,
+      "allowed": [
+        200
+      ],
+      "status": 200,
+      "ok": true
+    },
+    {
+      "route": "/screening/api/jobs/f4036477-1dc0-40f2-a8bf-0d9844e9728e/recommendations",
+      "port": 8080,
+      "allowed": [
+        200
+      ],
+      "status": 200,
+      "ok": true
+    },
+    {
+      "route": "/screening/api/applications?jobId=f4036477-1dc0-40f2-a8bf-0d9844e9728e",
+      "port": 8080,
+      "allowed": [
+        200
+      ],
+      "status": 200,
+      "ok": true
+    },
+    {
+      "route": "/screening/api/jobs/1eea85d8-3e46-4154-8375-4774707cff69",
+      "port": 8080,
+      "allowed": [
+        200
+      ],
+      "status": 200,
+      "ok": true
+    },
+    {
+      "route": "/screening/api/jobs/1eea85d8-3e46-4154-8375-4774707cff69/recommendations",
+      "port": 8080,
+      "allowed": [
+        200
+      ],
+      "status": 200,
+      "ok": true
+    },
+    {
+      "route": "/screening/api/applications?jobId=1eea85d8-3e46-4154-8375-4774707cff69",
+      "port": 8080,
+      "allowed": [
+        200
+      ],
+      "status": 200,
+      "ok": true
+    },
+    {
+      "route": "/screening/api/applications/fc8516fb-2eb9-43a2-84ca-d73f620b0963",
+      "port": 8080,
+      "allowed": [
+        200
+      ],
+      "status": 200,
+      "ok": true
+    },
+    {
+      "route": "/screening/api/applications/fc8516fb-2eb9-43a2-84ca-d73f620b0963/screening",
+      "port": 8080,
+      "allowed": [
+        200
+      ],
+      "status": 200,
+      "ok": true
+    },
+    {
+      "route": "/screening/api/applications/fc8516fb-2eb9-43a2-84ca-d73f620b0963/evaluations",
+      "port": 8080,
+      "allowed": [
+        200
+      ],
+      "status": 200,
+      "ok": true
+    },
+    {
+      "route": "/screening/api/jobs/15a18d63-b45d-41ca-8491-08a876bdfaa4",
+      "port": 8080,
+      "allowed": [
+        200
+      ],
+      "status": 200,
+      "ok": true
+    },
+    {
+      "route": "/screening/api/jobs/15a18d63-b45d-41ca-8491-08a876bdfaa4/recommendations",
+      "port": 8080,
+      "allowed": [
+        200
+      ],
+      "status": 200,
+      "ok": true
+    },
+    {
+      "route": "/screening/api/applications?jobId=15a18d63-b45d-41ca-8491-08a876bdfaa4",
+      "port": 8080,
+      "allowed": [
+        200
+      ],
+      "status": 200,
+      "ok": true
+    },
+    {
+      "route": "/screening/api/jobs/1774a0ff-7037-4416-a599-a24dd02ba10d",
+      "port": 8080,
+      "allowed": [
+        200
+      ],
+      "status": 200,
+      "ok": true
+    },
+    {
+      "route": "/screening/api/jobs/1774a0ff-7037-4416-a599-a24dd02ba10d/recommendations",
+      "port": 8080,
+      "allowed": [
+        200
+      ],
+      "status": 200,
+      "ok": true
+    },
+    {
+      "route": "/screening/api/applications?jobId=1774a0ff-7037-4416-a599-a24dd02ba10d",
+      "port": 8080,
+      "allowed": [
+        200
+      ],
+      "status": 200,
+      "ok": true
+    },
+    {
+      "route": "/screening/api/applications/999d140f-66dd-4c7e-b56c-ae31b55921dc",
+      "port": 8080,
+      "allowed": [
+        200
+      ],
+      "status": 200,
+      "ok": true
+    },
+    {
+      "route": "/screening/api/applications/999d140f-66dd-4c7e-b56c-ae31b55921dc/screening",
+      "port": 8080,
+      "allowed": [
+        200
+      ],
+      "status": 200,
+      "ok": true
+    },
+    {
+      "route": "/screening/api/applications/999d140f-66dd-4c7e-b56c-ae31b55921dc/evaluations",
+      "port": 8080,
+      "allowed": [
+        200
+      ],
+      "status": 200,
+      "ok": true
+    },
+    {
+      "route": "/screening/api/applications/f6585b47-ca06-4710-a9de-5c39b5604a9e",
+      "port": 8080,
+      "allowed": [
+        200
+      ],
+      "status": 200,
+      "ok": true
+    },
+    {
+      "route": "/screening/api/applications/f6585b47-ca06-4710-a9de-5c39b5604a9e/screening",
+      "port": 8080,
+      "allowed": [
+        200
+      ],
+      "status": 200,
+      "ok": true
+    },
+    {
+      "route": "/screening/api/applications/f6585b47-ca06-4710-a9de-5c39b5604a9e/evaluations",
+      "port": 8080,
+      "allowed": [
+        200
+      ],
+      "status": 200,
+      "ok": true
+    },
+    {
+      "route": "/screening/api/jobs/7c122588-884c-4a7f-8e50-944311c31d0c",
+      "port": 8080,
+      "allowed": [
+        200
+      ],
+      "status": 200,
+      "ok": true
+    },
+    {
+      "route": "/screening/api/jobs/7c122588-884c-4a7f-8e50-944311c31d0c/recommendations",
+      "port": 8080,
+      "allowed": [
+        200
+      ],
+      "status": 200,
+      "ok": true
+    },
+    {
+      "route": "/screening/api/applications?jobId=7c122588-884c-4a7f-8e50-944311c31d0c",
+      "port": 8080,
+      "allowed": [
+        200
+      ],
+      "status": 200,
+      "ok": true
+    },
+    {
+      "route": "/written/api/tasks",
+      "port": 8080,
+      "allowed": [
+        200
+      ],
+      "status": 200,
+      "ok": true
+    },
+    {
+      "route": "/written/api/tasks/stats",
+      "port": 8080,
+      "allowed": [
+        200
+      ],
+      "status": 200,
+      "ok": true
+    },
+    {
+      "route": "/written/api/questions",
+      "port": 8080,
+      "allowed": [
+        200
+      ],
+      "status": 200,
+      "ok": true
+    },
+    {
+      "route": "/written/api/settings/mail-accounts",
+      "port": 8080,
+      "allowed": [
+        200
+      ],
+      "status": 200,
+      "ok": true
+    },
+    {
+      "route": "/written/api/cases/f61b79e1-9429-45f5-9e03-b86a81369ef5/rounds",
+      "port": 8080,
+      "allowed": [
+        200
+      ],
+      "status": 200,
+      "ok": true
+    },
+    {
+      "route": "/written/api/cases/f61b79e1-9429-45f5-9e03-b86a81369ef5/plan-items",
+      "port": 8080,
+      "allowed": [
+        200
+      ],
+      "status": 200,
+      "ok": true
+    },
+    {
+      "route": "/written/api/cases/f61b79e1-9429-45f5-9e03-b86a81369ef5/invitations",
+      "port": 8080,
+      "allowed": [
+        200
+      ],
+      "status": 200,
+      "ok": true
+    },
+    {
+      "route": "/written/api/cases/f61b79e1-9429-45f5-9e03-b86a81369ef5/context",
+      "port": 8080,
+      "allowed": [
+        200
+      ],
+      "status": 200,
+      "ok": true
+    },
+    {
+      "route": "/written/api/cases/d09422e2-8a39-4492-9edb-014af705d51b/rounds",
+      "port": 8080,
+      "allowed": [
+        200
+      ],
+      "status": 200,
+      "ok": true
+    },
+    {
+      "route": "/written/api/cases/d09422e2-8a39-4492-9edb-014af705d51b/plan-items",
+      "port": 8080,
+      "allowed": [
+        200
+      ],
+      "status": 200,
+      "ok": true
+    },
+    {
+      "route": "/written/api/cases/d09422e2-8a39-4492-9edb-014af705d51b/invitations",
+      "port": 8080,
+      "allowed": [
+        200
+      ],
+      "status": 200,
+      "ok": true
+    },
+    {
+      "route": "/written/api/cases/d09422e2-8a39-4492-9edb-014af705d51b/context",
+      "port": 8080,
+      "allowed": [
+        200
+      ],
+      "status": 200,
+      "ok": true
+    },
+    {
+      "route": "/written/api/cases/5c818a2c-8f8e-4802-8d69-f063420b052f/rounds",
+      "port": 8080,
+      "allowed": [
+        200
+      ],
+      "status": 200,
+      "ok": true
+    },
+    {
+      "route": "/written/api/cases/5c818a2c-8f8e-4802-8d69-f063420b052f/plan-items",
+      "port": 8080,
+      "allowed": [
+        200
+      ],
+      "status": 200,
+      "ok": true
+    },
+    {
+      "route": "/written/api/cases/5c818a2c-8f8e-4802-8d69-f063420b052f/invitations",
+      "port": 8080,
+      "allowed": [
+        200
+      ],
+      "status": 200,
+      "ok": true
+    },
+    {
+      "route": "/written/api/cases/5c818a2c-8f8e-4802-8d69-f063420b052f/context",
+      "port": 8080,
+      "allowed": [
+        200
+      ],
+      "status": 200,
+      "ok": true
+    },
+    {
+      "route": "/written/api/cases/a256f080-d373-49fa-a228-61f6c955ffe3/rounds",
+      "port": 8080,
+      "allowed": [
+        200
+      ],
+      "status": 200,
+      "ok": true
+    },
+    {
+      "route": "/written/api/cases/a256f080-d373-49fa-a228-61f6c955ffe3/plan-items",
+      "port": 8080,
+      "allowed": [
+        200
+      ],
+      "status": 200,
+      "ok": true
+    },
+    {
+      "route": "/written/api/cases/a256f080-d373-49fa-a228-61f6c955ffe3/invitations",
+      "port": 8080,
+      "allowed": [
+        200
+      ],
+      "status": 200,
+      "ok": true
+    },
+    {
+      "route": "/written/api/cases/a256f080-d373-49fa-a228-61f6c955ffe3/context",
+      "port": 8080,
+      "allowed": [
+        200
+      ],
+      "status": 200,
+      "ok": true
+    },
+    {
+      "route": "/written/api/cases/9b0868b3-b718-4ca6-a0e0-3df31b9600fe/rounds",
+      "port": 8080,
+      "allowed": [
+        200
+      ],
+      "status": 200,
+      "ok": true
+    },
+    {
+      "route": "/written/api/cases/9b0868b3-b718-4ca6-a0e0-3df31b9600fe/plan-items",
+      "port": 8080,
+      "allowed": [
+        200
+      ],
+      "status": 200,
+      "ok": true
+    },
+    {
+      "route": "/written/api/cases/9b0868b3-b718-4ca6-a0e0-3df31b9600fe/invitations",
+      "port": 8080,
+      "allowed": [
+        200
+      ],
+      "status": 200,
+      "ok": true
+    },
+    {
+      "route": "/written/api/cases/9b0868b3-b718-4ca6-a0e0-3df31b9600fe/context",
+      "port": 8080,
+      "allowed": [
+        200
+      ],
+      "status": 200,
+      "ok": true
+    },
+    {
+      "route": "/interview/api/tasks",
+      "port": 8080,
+      "allowed": [
+        200
+      ],
+      "status": 200,
+      "ok": true
+    },
+    {
+      "route": "/interview/api/jobs",
+      "port": 8080,
+      "allowed": [
+        200
+      ],
+      "status": 200,
+      "ok": true
+    },
+    {
+      "route": "/interview/api/interviewers",
+      "port": 8080,
+      "allowed": [
+        200
+      ],
+      "status": 200,
+      "ok": true
+    },
+    {
+      "route": "/interview/api/tasks/d0cac81a-6a68-4e9c-9102-428d3d6b1043",
+      "port": 8080,
+      "allowed": [
+        200
+      ],
+      "status": 200,
+      "ok": true
+    },
+    {
+      "route": "/interview/api/tasks/d0cac81a-6a68-4e9c-9102-428d3d6b1043/debrief",
+      "port": 8080,
+      "allowed": [
+        200
+      ],
+      "status": 200,
+      "ok": true
+    },
+    {
+      "route": "/interview/api/tasks/d0cac81a-6a68-4e9c-9102-428d3d6b1043/decision",
+      "port": 8080,
+      "allowed": [
+        200
+      ],
+      "status": 200,
+      "ok": true
+    },
+    {
+      "route": "/interview/api/tasks/d0cac81a-6a68-4e9c-9102-428d3d6b1043/package/versions",
+      "port": 8080,
+      "allowed": [
+        200
+      ],
+      "status": 200,
+      "ok": true
+    },
+    {
+      "route": "/interview/api/tasks/d0cac81a-6a68-4e9c-9102-428d3d6b1043/package/events",
+      "port": 8080,
+      "allowed": [
+        200
+      ],
+      "status": 200,
+      "ok": true
+    },
+    {
+      "route": "/interview/api/tasks/d0cac81a-6a68-4e9c-9102-428d3d6b1043/rounds",
+      "port": 8080,
+      "allowed": [
+        200
+      ],
+      "status": 200,
+      "ok": true
+    },
+    {
+      "route": "/interview/api/rounds/ab73ec5b-cfde-495e-86ea-a5d2cddac8a1/scores",
+      "port": 8080,
+      "allowed": [
+        200
+      ],
+      "status": 200,
+      "ok": true
+    },
+    {
+      "route": "/interview/api/rounds/ab73ec5b-cfde-495e-86ea-a5d2cddac8a1/summary",
+      "port": 8080,
+      "allowed": [
+        200
+      ],
+      "status": 200,
+      "ok": true
+    },
+    {
+      "route": "/interview/api/rounds/ab73ec5b-cfde-495e-86ea-a5d2cddac8a1/skipped-questions",
+      "port": 8080,
+      "allowed": [
+        200
+      ],
+      "status": 200,
+      "ok": true
+    },
+    {
+      "route": "/interview/api/rounds/ab73ec5b-cfde-495e-86ea-a5d2cddac8a1/transcript",
+      "port": 8080,
+      "allowed": [
+        200
+      ],
+      "status": 200,
+      "ok": true
+    },
+    {
+      "route": "/interview/api/rounds/7baa8377-4607-4c25-9344-9d5d0167e45e/scores",
+      "port": 8080,
+      "allowed": [
+        200
+      ],
+      "status": 200,
+      "ok": true
+    },
+    {
+      "route": "/interview/api/rounds/7baa8377-4607-4c25-9344-9d5d0167e45e/summary",
+      "port": 8080,
+      "allowed": [
+        200
+      ],
+      "status": 200,
+      "ok": true
+    },
+    {
+      "route": "/interview/api/rounds/7baa8377-4607-4c25-9344-9d5d0167e45e/skipped-questions",
+      "port": 8080,
+      "allowed": [
+        200
+      ],
+      "status": 200,
+      "ok": true
+    },
+    {
+      "route": "/interview/api/rounds/7baa8377-4607-4c25-9344-9d5d0167e45e/transcript",
+      "port": 8080,
+      "allowed": [
+        200
+      ],
+      "status": 200,
+      "ok": true
+    },
+    {
+      "route": "/interview/api/tasks/a090c5b3-3bbe-4750-a112-c49e79849573",
+      "port": 8080,
+      "allowed": [
+        200
+      ],
+      "status": 200,
+      "ok": true
+    },
+    {
+      "route": "/interview/api/tasks/a090c5b3-3bbe-4750-a112-c49e79849573/debrief",
+      "port": 8080,
+      "allowed": [
+        200
+      ],
+      "status": 200,
+      "ok": true
+    },
+    {
+      "route": "/interview/api/tasks/a090c5b3-3bbe-4750-a112-c49e79849573/decision",
+      "port": 8080,
+      "allowed": [
+        200
+      ],
+      "status": 200,
+      "ok": true
+    },
+    {
+      "route": "/interview/api/tasks/a090c5b3-3bbe-4750-a112-c49e79849573/package/versions",
+      "port": 8080,
+      "allowed": [
+        200
+      ],
+      "status": 200,
+      "ok": true
+    },
+    {
+      "route": "/interview/api/tasks/a090c5b3-3bbe-4750-a112-c49e79849573/package/events",
+      "port": 8080,
+      "allowed": [
+        200
+      ],
+      "status": 200,
+      "ok": true
+    },
+    {
+      "route": "/interview/api/tasks/a090c5b3-3bbe-4750-a112-c49e79849573/rounds",
+      "port": 8080,
+      "allowed": [
+        200
+      ],
+      "status": 200,
+      "ok": true
+    },
+    {
+      "route": "/interview/api/rounds/45f6cac1-17d4-48f2-8f4b-b37b73e8af2d/scores",
+      "port": 8080,
+      "allowed": [
+        200
+      ],
+      "status": 200,
+      "ok": true
+    },
+    {
+      "route": "/interview/api/rounds/45f6cac1-17d4-48f2-8f4b-b37b73e8af2d/summary",
+      "port": 8080,
+      "allowed": [
+        200
+      ],
+      "status": 200,
+      "ok": true
+    },
+    {
+      "route": "/interview/api/rounds/45f6cac1-17d4-48f2-8f4b-b37b73e8af2d/skipped-questions",
+      "port": 8080,
+      "allowed": [
+        200
+      ],
+      "status": 200,
+      "ok": true
+    },
+    {
+      "route": "/interview/api/rounds/45f6cac1-17d4-48f2-8f4b-b37b73e8af2d/transcript",
+      "port": 8080,
+      "allowed": [
+        200
+      ],
+      "status": 200,
+      "ok": true
+    },
+    {
+      "route": "/interview/api/rounds/dfd70336-dd88-4dbe-befa-91ee236dca0a/scores",
+      "port": 8080,
+      "allowed": [
+        200
+      ],
+      "status": 200,
+      "ok": true
+    },
+    {
+      "route": "/interview/api/rounds/dfd70336-dd88-4dbe-befa-91ee236dca0a/summary",
+      "port": 8080,
+      "allowed": [
+        200
+      ],
+      "status": 200,
+      "ok": true
+    },
+    {
+      "route": "/interview/api/rounds/dfd70336-dd88-4dbe-befa-91ee236dca0a/skipped-questions",
+      "port": 8080,
+      "allowed": [
+        200
+      ],
+      "status": 200,
+      "ok": true
+    },
+    {
+      "route": "/interview/api/rounds/dfd70336-dd88-4dbe-befa-91ee236dca0a/transcript",
+      "port": 8080,
+      "allowed": [
+        200
+      ],
+      "status": 200,
+      "ok": true
+    },
+    {
+      "route": "/interview/api/tasks/edd2d95e-87db-4c83-90cb-666d39cbd20c",
+      "port": 8080,
+      "allowed": [
+        200
+      ],
+      "status": 200,
+      "ok": true
+    },
+    {
+      "route": "/interview/api/tasks/edd2d95e-87db-4c83-90cb-666d39cbd20c/debrief",
+      "port": 8080,
+      "allowed": [
+        200
+      ],
+      "status": 200,
+      "ok": true
+    },
+    {
+      "route": "/interview/api/tasks/edd2d95e-87db-4c83-90cb-666d39cbd20c/decision",
+      "port": 8080,
+      "allowed": [
+        200
+      ],
+      "status": 200,
+      "ok": true
+    },
+    {
+      "route": "/interview/api/tasks/edd2d95e-87db-4c83-90cb-666d39cbd20c/package/versions",
+      "port": 8080,
+      "allowed": [
+        200
+      ],
+      "status": 200,
+      "ok": true
+    },
+    {
+      "route": "/interview/api/tasks/edd2d95e-87db-4c83-90cb-666d39cbd20c/package/events",
+      "port": 8080,
+      "allowed": [
+        200
+      ],
+      "status": 200,
+      "ok": true
+    },
+    {
+      "route": "/interview/api/tasks/edd2d95e-87db-4c83-90cb-666d39cbd20c/rounds",
+      "port": 8080,
+      "allowed": [
+        200
+      ],
+      "status": 200,
+      "ok": true
+    },
+    {
+      "route": "/interview/api/rounds/150a55f7-ff44-404f-85dd-13a0ba6d409d/scores",
+      "port": 8080,
+      "allowed": [
+        200
+      ],
+      "status": 200,
+      "ok": true
+    },
+    {
+      "route": "/interview/api/rounds/150a55f7-ff44-404f-85dd-13a0ba6d409d/summary",
+      "port": 8080,
+      "allowed": [
+        200
+      ],
+      "status": 200,
+      "ok": true
+    },
+    {
+      "route": "/interview/api/rounds/150a55f7-ff44-404f-85dd-13a0ba6d409d/skipped-questions",
+      "port": 8080,
+      "allowed": [
+        200
+      ],
+      "status": 200,
+      "ok": true
+    },
+    {
+      "route": "/interview/api/rounds/150a55f7-ff44-404f-85dd-13a0ba6d409d/transcript",
+      "port": 8080,
+      "allowed": [
+        200
+      ],
+      "status": 200,
+      "ok": true
+    },
+    {
+      "route": "/interview/api/rounds/0c85b984-b5ee-4644-894f-34ef787c2b14/scores",
+      "port": 8080,
+      "allowed": [
+        200
+      ],
+      "status": 200,
+      "ok": true
+    },
+    {
+      "route": "/interview/api/rounds/0c85b984-b5ee-4644-894f-34ef787c2b14/summary",
+      "port": 8080,
+      "allowed": [
+        200
+      ],
+      "status": 200,
+      "ok": true
+    },
+    {
+      "route": "/interview/api/rounds/0c85b984-b5ee-4644-894f-34ef787c2b14/skipped-questions",
+      "port": 8080,
+      "allowed": [
+        200
+      ],
+      "status": 200,
+      "ok": true
+    },
+    {
+      "route": "/interview/api/rounds/0c85b984-b5ee-4644-894f-34ef787c2b14/transcript",
+      "port": 8080,
+      "allowed": [
+        200
+      ],
+      "status": 200,
+      "ok": true
+    },
+    {
+      "route": "/interview/api/tasks/decd731c-4c9e-4d5c-b020-37084d81734f",
+      "port": 8080,
+      "allowed": [
+        200
+      ],
+      "status": 200,
+      "ok": true
+    },
+    {
+      "route": "/interview/api/tasks/decd731c-4c9e-4d5c-b020-37084d81734f/debrief",
+      "port": 8080,
+      "allowed": [
+        200
+      ],
+      "status": 200,
+      "ok": true
+    },
+    {
+      "route": "/interview/api/tasks/decd731c-4c9e-4d5c-b020-37084d81734f/decision",
+      "port": 8080,
+      "allowed": [
+        200
+      ],
+      "status": 200,
+      "ok": true
+    },
+    {
+      "route": "/interview/api/tasks/decd731c-4c9e-4d5c-b020-37084d81734f/package/versions",
+      "port": 8080,
+      "allowed": [
+        200
+      ],
+      "status": 200,
+      "ok": true
+    },
+    {
+      "route": "/interview/api/tasks/decd731c-4c9e-4d5c-b020-37084d81734f/package/events",
+      "port": 8080,
+      "allowed": [
+        200
+      ],
+      "status": 200,
+      "ok": true
+    },
+    {
+      "route": "/interview/api/tasks/decd731c-4c9e-4d5c-b020-37084d81734f/rounds",
+      "port": 8080,
+      "allowed": [
+        200
+      ],
+      "status": 200,
+      "ok": true
+    },
+    {
+      "route": "/interview/api/rounds/8c78eb76-e286-41ee-901f-121332b3cffe/scores",
+      "port": 8080,
+      "allowed": [
+        200
+      ],
+      "status": 200,
+      "ok": true
+    },
+    {
+      "route": "/interview/api/rounds/8c78eb76-e286-41ee-901f-121332b3cffe/summary",
+      "port": 8080,
+      "allowed": [
+        200
+      ],
+      "status": 200,
+      "ok": true
+    },
+    {
+      "route": "/interview/api/rounds/8c78eb76-e286-41ee-901f-121332b3cffe/skipped-questions",
+      "port": 8080,
+      "allowed": [
+        200
+      ],
+      "status": 200,
+      "ok": true
+    },
+    {
+      "route": "/interview/api/rounds/8c78eb76-e286-41ee-901f-121332b3cffe/transcript",
+      "port": 8080,
+      "allowed": [
+        200
+      ],
+      "status": 200,
+      "ok": true
+    },
+    {
+      "route": "/interview/api/rounds/e7f797e4-2aa5-4def-8639-0caec8db791f/scores",
+      "port": 8080,
+      "allowed": [
+        200
+      ],
+      "status": 200,
+      "ok": true
+    },
+    {
+      "route": "/interview/api/rounds/e7f797e4-2aa5-4def-8639-0caec8db791f/summary",
+      "port": 8080,
+      "allowed": [
+        200
+      ],
+      "status": 200,
+      "ok": true
+    },
+    {
+      "route": "/interview/api/rounds/e7f797e4-2aa5-4def-8639-0caec8db791f/skipped-questions",
+      "port": 8080,
+      "allowed": [
+        200
+      ],
+      "status": 200,
+      "ok": true
+    },
+    {
+      "route": "/interview/api/rounds/e7f797e4-2aa5-4def-8639-0caec8db791f/transcript",
+      "port": 8080,
+      "allowed": [
+        200
+      ],
+      "status": 200,
+      "ok": true
+    },
+    {
+      "route": "/interview/api/tasks/708ee67a-2982-444c-a5c7-4fe0cb57171d",
+      "port": 8080,
+      "allowed": [
+        200
+      ],
+      "status": 200,
+      "ok": true
+    },
+    {
+      "route": "/interview/api/tasks/708ee67a-2982-444c-a5c7-4fe0cb57171d/debrief",
+      "port": 8080,
+      "allowed": [
+        200
+      ],
+      "status": 200,
+      "ok": true
+    },
+    {
+      "route": "/interview/api/tasks/708ee67a-2982-444c-a5c7-4fe0cb57171d/decision",
+      "port": 8080,
+      "allowed": [
+        200
+      ],
+      "status": 200,
+      "ok": true
+    },
+    {
+      "route": "/interview/api/tasks/708ee67a-2982-444c-a5c7-4fe0cb57171d/package/versions",
+      "port": 8080,
+      "allowed": [
+        200
+      ],
+      "status": 200,
+      "ok": true
+    },
+    {
+      "route": "/interview/api/tasks/708ee67a-2982-444c-a5c7-4fe0cb57171d/package/events",
+      "port": 8080,
+      "allowed": [
+        200
+      ],
+      "status": 200,
+      "ok": true
+    },
+    {
+      "route": "/interview/api/tasks/708ee67a-2982-444c-a5c7-4fe0cb57171d/rounds",
+      "port": 8080,
+      "allowed": [
+        200
+      ],
+      "status": 200,
+      "ok": true
+    },
+    {
+      "route": "/interview/api/rounds/6fd0b84d-3675-4d8b-98cb-fc42bb5ccbf7/scores",
+      "port": 8080,
+      "allowed": [
+        200
+      ],
+      "status": 200,
+      "ok": true
+    },
+    {
+      "route": "/interview/api/rounds/6fd0b84d-3675-4d8b-98cb-fc42bb5ccbf7/summary",
+      "port": 8080,
+      "allowed": [
+        200
+      ],
+      "status": 200,
+      "ok": true
+    },
+    {
+      "route": "/interview/api/rounds/6fd0b84d-3675-4d8b-98cb-fc42bb5ccbf7/skipped-questions",
+      "port": 8080,
+      "allowed": [
+        200
+      ],
+      "status": 200,
+      "ok": true
+    },
+    {
+      "route": "/interview/api/rounds/6fd0b84d-3675-4d8b-98cb-fc42bb5ccbf7/transcript",
+      "port": 8080,
+      "allowed": [
+        200
+      ],
+      "status": 200,
+      "ok": true
+    },
+    {
+      "route": "/interview/api/rounds/bce38deb-3196-4371-a06a-aaafa3ed175e/scores",
+      "port": 8080,
+      "allowed": [
+        200
+      ],
+      "status": 200,
+      "ok": true
+    },
+    {
+      "route": "/interview/api/rounds/bce38deb-3196-4371-a06a-aaafa3ed175e/summary",
+      "port": 8080,
+      "allowed": [
+        200
+      ],
+      "status": 200,
+      "ok": true
+    },
+    {
+      "route": "/interview/api/rounds/bce38deb-3196-4371-a06a-aaafa3ed175e/skipped-questions",
+      "port": 8080,
+      "allowed": [
+        200
+      ],
+      "status": 200,
+      "ok": true
+    },
+    {
+      "route": "/interview/api/rounds/bce38deb-3196-4371-a06a-aaafa3ed175e/transcript",
+      "port": 8080,
+      "allowed": [
+        200
+      ],
+      "status": 200,
+      "ok": true
+    },
+    {
+      "route": "/interview/api/tasks/2438434b-5695-452d-aa87-0154e5ae6e42",
+      "port": 8080,
+      "allowed": [
+        200
+      ],
+      "status": 200,
+      "ok": true
+    },
+    {
+      "route": "/interview/api/tasks/2438434b-5695-452d-aa87-0154e5ae6e42/debrief",
+      "port": 8080,
+      "allowed": [
+        200
+      ],
+      "status": 200,
+      "ok": true
+    },
+    {
+      "route": "/interview/api/tasks/2438434b-5695-452d-aa87-0154e5ae6e42/decision",
+      "port": 8080,
+      "allowed": [
+        200
+      ],
+      "status": 200,
+      "ok": true
+    },
+    {
+      "route": "/interview/api/tasks/2438434b-5695-452d-aa87-0154e5ae6e42/package/versions",
+      "port": 8080,
+      "allowed": [
+        200
+      ],
+      "status": 200,
+      "ok": true
+    },
+    {
+      "route": "/interview/api/tasks/2438434b-5695-452d-aa87-0154e5ae6e42/package/events",
+      "port": 8080,
+      "allowed": [
+        200
+      ],
+      "status": 200,
+      "ok": true
+    },
+    {
+      "route": "/interview/api/tasks/2438434b-5695-452d-aa87-0154e5ae6e42/rounds",
+      "port": 8080,
+      "allowed": [
+        200
+      ],
+      "status": 200,
+      "ok": true
+    },
+    {
+      "route": "/interview/api/rounds/29c8fcac-5e80-459a-9d4b-bdf32f8bfd03/scores",
+      "port": 8080,
+      "allowed": [
+        200
+      ],
+      "status": 200,
+      "ok": true
+    },
+    {
+      "route": "/interview/api/rounds/29c8fcac-5e80-459a-9d4b-bdf32f8bfd03/summary",
+      "port": 8080,
+      "allowed": [
+        200
+      ],
+      "status": 200,
+      "ok": true
+    },
+    {
+      "route": "/interview/api/rounds/29c8fcac-5e80-459a-9d4b-bdf32f8bfd03/skipped-questions",
+      "port": 8080,
+      "allowed": [
+        200
+      ],
+      "status": 200,
+      "ok": true
+    },
+    {
+      "route": "/interview/api/rounds/29c8fcac-5e80-459a-9d4b-bdf32f8bfd03/transcript",
+      "port": 8080,
+      "allowed": [
+        200
+      ],
+      "status": 200,
+      "ok": true
+    },
+    {
+      "route": "/interview/api/rounds/e933a364-a740-4fc3-8a11-c5ba5d78a986/scores",
+      "port": 8080,
+      "allowed": [
+        200
+      ],
+      "status": 200,
+      "ok": true
+    },
+    {
+      "route": "/interview/api/rounds/e933a364-a740-4fc3-8a11-c5ba5d78a986/summary",
+      "port": 8080,
+      "allowed": [
+        200
+      ],
+      "status": 200,
+      "ok": true
+    },
+    {
+      "route": "/interview/api/rounds/e933a364-a740-4fc3-8a11-c5ba5d78a986/skipped-questions",
+      "port": 8080,
+      "allowed": [
+        200
+      ],
+      "status": 200,
+      "ok": true
+    },
+    {
+      "route": "/interview/api/rounds/e933a364-a740-4fc3-8a11-c5ba5d78a986/transcript",
+      "port": 8080,
+      "allowed": [
+        200
+      ],
+      "status": 200,
+      "ok": true
+    },
+    {
+      "route": "/interview/api/rounds/24492c11-d62b-4e65-9e2f-018acf74b498/scores",
+      "port": 8080,
+      "allowed": [
+        200
+      ],
+      "status": 200,
+      "ok": true
+    },
+    {
+      "route": "/interview/api/rounds/24492c11-d62b-4e65-9e2f-018acf74b498/summary",
+      "port": 8080,
+      "allowed": [
+        200
+      ],
+      "status": 200,
+      "ok": true
+    },
+    {
+      "route": "/interview/api/rounds/24492c11-d62b-4e65-9e2f-018acf74b498/skipped-questions",
+      "port": 8080,
+      "allowed": [
+        200
+      ],
+      "status": 200,
+      "ok": true
+    },
+    {
+      "route": "/interview/api/rounds/24492c11-d62b-4e65-9e2f-018acf74b498/transcript",
+      "port": 8080,
+      "allowed": [
+        200
+      ],
+      "status": 200,
+      "ok": true
+    },
+    {
+      "route": "/interview/api/tasks/11b66c3a-8b11-4c97-933c-83d400cf467e",
+      "port": 8080,
+      "allowed": [
+        200
+      ],
+      "status": 200,
+      "ok": true
+    },
+    {
+      "route": "/interview/api/tasks/11b66c3a-8b11-4c97-933c-83d400cf467e/debrief",
+      "port": 8080,
+      "allowed": [
+        200
+      ],
+      "status": 200,
+      "ok": true
+    },
+    {
+      "route": "/interview/api/tasks/11b66c3a-8b11-4c97-933c-83d400cf467e/decision",
+      "port": 8080,
+      "allowed": [
+        200
+      ],
+      "status": 200,
+      "ok": true
+    },
+    {
+      "route": "/interview/api/tasks/11b66c3a-8b11-4c97-933c-83d400cf467e/package/versions",
+      "port": 8080,
+      "allowed": [
+        200
+      ],
+      "status": 200,
+      "ok": true
+    },
+    {
+      "route": "/interview/api/tasks/11b66c3a-8b11-4c97-933c-83d400cf467e/package/events",
+      "port": 8080,
+      "allowed": [
+        200
+      ],
+      "status": 200,
+      "ok": true
+    },
+    {
+      "route": "/interview/api/tasks/11b66c3a-8b11-4c97-933c-83d400cf467e/rounds",
+      "port": 8080,
+      "allowed": [
+        200
+      ],
+      "status": 200,
+      "ok": true
+    },
+    {
+      "route": "/interview/api/rounds/d067bfdc-9a1a-4ae3-b65f-e98bbafe668a/scores",
+      "port": 8080,
+      "allowed": [
+        200
+      ],
+      "status": 200,
+      "ok": true
+    },
+    {
+      "route": "/interview/api/rounds/d067bfdc-9a1a-4ae3-b65f-e98bbafe668a/summary",
+      "port": 8080,
+      "allowed": [
+        200
+      ],
+      "status": 200,
+      "ok": true
+    },
+    {
+      "route": "/interview/api/rounds/d067bfdc-9a1a-4ae3-b65f-e98bbafe668a/skipped-questions",
+      "port": 8080,
+      "allowed": [
+        200
+      ],
+      "status": 200,
+      "ok": true
+    },
+    {
+      "route": "/interview/api/rounds/d067bfdc-9a1a-4ae3-b65f-e98bbafe668a/transcript",
+      "port": 8080,
+      "allowed": [
+        200
+      ],
+      "status": 200,
+      "ok": true
+    },
+    {
+      "route": "/interview/api/rounds/6477d7f1-7359-4f19-8584-34058d541303/scores",
+      "port": 8080,
+      "allowed": [
+        200
+      ],
+      "status": 200,
+      "ok": true
+    },
+    {
+      "route": "/interview/api/rounds/6477d7f1-7359-4f19-8584-34058d541303/summary",
+      "port": 8080,
+      "allowed": [
+        200
+      ],
+      "status": 200,
+      "ok": true
+    },
+    {
+      "route": "/interview/api/rounds/6477d7f1-7359-4f19-8584-34058d541303/skipped-questions",
+      "port": 8080,
+      "allowed": [
+        200
+      ],
+      "status": 200,
+      "ok": true
+    },
+    {
+      "route": "/interview/api/rounds/6477d7f1-7359-4f19-8584-34058d541303/transcript",
+      "port": 8080,
+      "allowed": [
+        200
+      ],
+      "status": 200,
+      "ok": true
+    },
+    {
+      "route": "/interview/api/tasks/e98982f9-ec25-45c6-bc68-dd9a13d2c5ea",
+      "port": 8080,
+      "allowed": [
+        200
+      ],
+      "status": 200,
+      "ok": true
+    },
+    {
+      "route": "/interview/api/tasks/e98982f9-ec25-45c6-bc68-dd9a13d2c5ea/debrief",
+      "port": 8080,
+      "allowed": [
+        200
+      ],
+      "status": 200,
+      "ok": true
+    },
+    {
+      "route": "/interview/api/tasks/e98982f9-ec25-45c6-bc68-dd9a13d2c5ea/decision",
+      "port": 8080,
+      "allowed": [
+        200
+      ],
+      "status": 200,
+      "ok": true
+    },
+    {
+      "route": "/interview/api/tasks/e98982f9-ec25-45c6-bc68-dd9a13d2c5ea/package/versions",
+      "port": 8080,
+      "allowed": [
+        200
+      ],
+      "status": 200,
+      "ok": true
+    },
+    {
+      "route": "/interview/api/tasks/e98982f9-ec25-45c6-bc68-dd9a13d2c5ea/package/events",
+      "port": 8080,
+      "allowed": [
+        200
+      ],
+      "status": 200,
+      "ok": true
+    },
+    {
+      "route": "/interview/api/tasks/e98982f9-ec25-45c6-bc68-dd9a13d2c5ea/rounds",
+      "port": 8080,
+      "allowed": [
+        200
+      ],
+      "status": 200,
+      "ok": true
+    },
+    {
+      "route": "/interview/api/rounds/c7324baf-c9db-4d3a-8790-0fc7d019b3c9/scores",
+      "port": 8080,
+      "allowed": [
+        200
+      ],
+      "status": 200,
+      "ok": true
+    },
+    {
+      "route": "/interview/api/rounds/c7324baf-c9db-4d3a-8790-0fc7d019b3c9/summary",
+      "port": 8080,
+      "allowed": [
+        200
+      ],
+      "status": 200,
+      "ok": true
+    },
+    {
+      "route": "/interview/api/rounds/c7324baf-c9db-4d3a-8790-0fc7d019b3c9/skipped-questions",
+      "port": 8080,
+      "allowed": [
+        200
+      ],
+      "status": 200,
+      "ok": true
+    },
+    {
+      "route": "/interview/api/rounds/c7324baf-c9db-4d3a-8790-0fc7d019b3c9/transcript",
+      "port": 8080,
+      "allowed": [
+        200
+      ],
+      "status": 200,
+      "ok": true
+    },
+    {
+      "route": "/interview/api/rounds/a45966e0-ed2f-432a-a860-5c675cc1ea1b/scores",
+      "port": 8080,
+      "allowed": [
+        200
+      ],
+      "status": 200,
+      "ok": true
+    },
+    {
+      "route": "/interview/api/rounds/a45966e0-ed2f-432a-a860-5c675cc1ea1b/summary",
+      "port": 8080,
+      "allowed": [
+        200
+      ],
+      "status": 200,
+      "ok": true
+    },
+    {
+      "route": "/interview/api/rounds/a45966e0-ed2f-432a-a860-5c675cc1ea1b/skipped-questions",
+      "port": 8080,
+      "allowed": [
+        200
+      ],
+      "status": 200,
+      "ok": true
+    },
+    {
+      "route": "/interview/api/rounds/a45966e0-ed2f-432a-a860-5c675cc1ea1b/transcript",
+      "port": 8080,
+      "allowed": [
+        200
+      ],
+      "status": 200,
+      "ok": true
+    },
+    {
+      "route": "/interview/api/tasks/3027ca2b-7aa1-42db-aa76-4a941d39f2f3",
+      "port": 8080,
+      "allowed": [
+        200
+      ],
+      "status": 200,
+      "ok": true
+    },
+    {
+      "route": "/interview/api/tasks/3027ca2b-7aa1-42db-aa76-4a941d39f2f3/debrief",
+      "port": 8080,
+      "allowed": [
+        200
+      ],
+      "status": 200,
+      "ok": true
+    },
+    {
+      "route": "/interview/api/tasks/3027ca2b-7aa1-42db-aa76-4a941d39f2f3/decision",
+      "port": 8080,
+      "allowed": [
+        200
+      ],
+      "status": 200,
+      "ok": true
+    },
+    {
+      "route": "/interview/api/tasks/3027ca2b-7aa1-42db-aa76-4a941d39f2f3/package/versions",
+      "port": 8080,
+      "allowed": [
+        200
+      ],
+      "status": 200,
+      "ok": true
+    },
+    {
+      "route": "/interview/api/tasks/3027ca2b-7aa1-42db-aa76-4a941d39f2f3/package/events",
+      "port": 8080,
+      "allowed": [
+        200
+      ],
+      "status": 200,
+      "ok": true
+    },
+    {
+      "route": "/interview/api/tasks/3027ca2b-7aa1-42db-aa76-4a941d39f2f3/rounds",
+      "port": 8080,
+      "allowed": [
+        200
+      ],
+      "status": 200,
+      "ok": true
+    },
+    {
+      "route": "/interview/api/rounds/dd83db72-3d6f-4d97-89bd-90cc5ec3026d/scores",
+      "port": 8080,
+      "allowed": [
+        200
+      ],
+      "status": 200,
+      "ok": true
+    },
+    {
+      "route": "/interview/api/rounds/dd83db72-3d6f-4d97-89bd-90cc5ec3026d/summary",
+      "port": 8080,
+      "allowed": [
+        200
+      ],
+      "status": 200,
+      "ok": true
+    },
+    {
+      "route": "/interview/api/rounds/dd83db72-3d6f-4d97-89bd-90cc5ec3026d/skipped-questions",
+      "port": 8080,
+      "allowed": [
+        200
+      ],
+      "status": 200,
+      "ok": true
+    },
+    {
+      "route": "/interview/api/rounds/dd83db72-3d6f-4d97-89bd-90cc5ec3026d/transcript",
+      "port": 8080,
+      "allowed": [
+        200
+      ],
+      "status": 200,
+      "ok": true
+    },
+    {
+      "route": "/interview/api/rounds/797caa88-295b-4d63-b13a-5c629bdb1ee6/scores",
+      "port": 8080,
+      "allowed": [
+        200
+      ],
+      "status": 200,
+      "ok": true
+    },
+    {
+      "route": "/interview/api/rounds/797caa88-295b-4d63-b13a-5c629bdb1ee6/summary",
+      "port": 8080,
+      "allowed": [
+        200
+      ],
+      "status": 200,
+      "ok": true
+    },
+    {
+      "route": "/interview/api/rounds/797caa88-295b-4d63-b13a-5c629bdb1ee6/skipped-questions",
+      "port": 8080,
+      "allowed": [
+        200
+      ],
+      "status": 200,
+      "ok": true
+    },
+    {
+      "route": "/interview/api/rounds/797caa88-295b-4d63-b13a-5c629bdb1ee6/transcript",
+      "port": 8080,
+      "allowed": [
+        200
+      ],
+      "status": 200,
+      "ok": true
+    },
+    {
+      "route": "/interview/api/rounds/0089f146-1101-4d7f-9a37-42d75f61de98/scores",
+      "port": 8080,
+      "allowed": [
+        200
+      ],
+      "status": 200,
+      "ok": true
+    },
+    {
+      "route": "/interview/api/rounds/0089f146-1101-4d7f-9a37-42d75f61de98/summary",
+      "port": 8080,
+      "allowed": [
+        200
+      ],
+      "status": 200,
+      "ok": true
+    },
+    {
+      "route": "/interview/api/rounds/0089f146-1101-4d7f-9a37-42d75f61de98/skipped-questions",
+      "port": 8080,
+      "allowed": [
+        200
+      ],
+      "status": 200,
+      "ok": true
+    },
+    {
+      "route": "/interview/api/rounds/0089f146-1101-4d7f-9a37-42d75f61de98/transcript",
+      "port": 8080,
+      "allowed": [
+        200
+      ],
+      "status": 200,
+      "ok": true
+    },
+    {
+      "route": "/interview/api/tasks/4636accf-54e6-4c6b-85c7-81aac02ba916",
+      "port": 8080,
+      "allowed": [
+        200
+      ],
+      "status": 200,
+      "ok": true
+    },
+    {
+      "route": "/interview/api/tasks/4636accf-54e6-4c6b-85c7-81aac02ba916/debrief",
+      "port": 8080,
+      "allowed": [
+        200
+      ],
+      "status": 200,
+      "ok": true
+    },
+    {
+      "route": "/interview/api/tasks/4636accf-54e6-4c6b-85c7-81aac02ba916/decision",
+      "port": 8080,
+      "allowed": [
+        200
+      ],
+      "status": 200,
+      "ok": true
+    },
+    {
+      "route": "/interview/api/tasks/4636accf-54e6-4c6b-85c7-81aac02ba916/package/versions",
+      "port": 8080,
+      "allowed": [
+        200
+      ],
+      "status": 200,
+      "ok": true
+    },
+    {
+      "route": "/interview/api/tasks/4636accf-54e6-4c6b-85c7-81aac02ba916/package/events",
+      "port": 8080,
+      "allowed": [
+        200
+      ],
+      "status": 200,
+      "ok": true
+    },
+    {
+      "route": "/interview/api/tasks/4636accf-54e6-4c6b-85c7-81aac02ba916/rounds",
+      "port": 8080,
+      "allowed": [
+        200
+      ],
+      "status": 200,
+      "ok": true
+    },
+    {
+      "route": "/interview/api/rounds/62e99515-b3bd-4e85-8a94-a5c16cfb65ce/scores",
+      "port": 8080,
+      "allowed": [
+        200
+      ],
+      "status": 200,
+      "ok": true
+    },
+    {
+      "route": "/interview/api/rounds/62e99515-b3bd-4e85-8a94-a5c16cfb65ce/summary",
+      "port": 8080,
+      "allowed": [
+        200
+      ],
+      "status": 200,
+      "ok": true
+    },
+    {
+      "route": "/interview/api/rounds/62e99515-b3bd-4e85-8a94-a5c16cfb65ce/skipped-questions",
+      "port": 8080,
+      "allowed": [
+        200
+      ],
+      "status": 200,
+      "ok": true
+    },
+    {
+      "route": "/interview/api/rounds/62e99515-b3bd-4e85-8a94-a5c16cfb65ce/transcript",
+      "port": 8080,
+      "allowed": [
+        200
+      ],
+      "status": 200,
+      "ok": true
+    },
+    {
+      "route": "/interview/api/rounds/8cdaeb9e-8be0-48f0-ab5a-e87095ec9457/scores",
+      "port": 8080,
+      "allowed": [
+        200
+      ],
+      "status": 200,
+      "ok": true
+    },
+    {
+      "route": "/interview/api/rounds/8cdaeb9e-8be0-48f0-ab5a-e87095ec9457/summary",
+      "port": 8080,
+      "allowed": [
+        200
+      ],
+      "status": 200,
+      "ok": true
+    },
+    {
+      "route": "/interview/api/rounds/8cdaeb9e-8be0-48f0-ab5a-e87095ec9457/skipped-questions",
+      "port": 8080,
+      "allowed": [
+        200
+      ],
+      "status": 200,
+      "ok": true
+    },
+    {
+      "route": "/interview/api/rounds/8cdaeb9e-8be0-48f0-ab5a-e87095ec9457/transcript",
+      "port": 8080,
+      "allowed": [
+        200
+      ],
+      "status": 200,
+      "ok": true
+    },
+    {
+      "route": "/interview/api/tasks/1cbc3fb1-48f8-4a2b-ae68-27ebcc1af804",
+      "port": 8080,
+      "allowed": [
+        200
+      ],
+      "status": 200,
+      "ok": true
+    },
+    {
+      "route": "/interview/api/tasks/1cbc3fb1-48f8-4a2b-ae68-27ebcc1af804/debrief",
+      "port": 8080,
+      "allowed": [
+        200
+      ],
+      "status": 200,
+      "ok": true
+    },
+    {
+      "route": "/interview/api/tasks/1cbc3fb1-48f8-4a2b-ae68-27ebcc1af804/decision",
+      "port": 8080,
+      "allowed": [
+        200
+      ],
+      "status": 200,
+      "ok": true
+    },
+    {
+      "route": "/interview/api/tasks/1cbc3fb1-48f8-4a2b-ae68-27ebcc1af804/package/versions",
+      "port": 8080,
+      "allowed": [
+        200
+      ],
+      "status": 200,
+      "ok": true
+    },
+    {
+      "route": "/interview/api/tasks/1cbc3fb1-48f8-4a2b-ae68-27ebcc1af804/package/events",
+      "port": 8080,
+      "allowed": [
+        200
+      ],
+      "status": 200,
+      "ok": true
+    },
+    {
+      "route": "/interview/api/tasks/1cbc3fb1-48f8-4a2b-ae68-27ebcc1af804/rounds",
+      "port": 8080,
+      "allowed": [
+        200
+      ],
+      "status": 200,
+      "ok": true
+    },
+    {
+      "route": "/interview/api/rounds/b48aaedf-8347-4cbc-b123-b4b66c9f0f78/scores",
+      "port": 8080,
+      "allowed": [
+        200
+      ],
+      "status": 200,
+      "ok": true
+    },
+    {
+      "route": "/interview/api/rounds/b48aaedf-8347-4cbc-b123-b4b66c9f0f78/summary",
+      "port": 8080,
+      "allowed": [
+        200
+      ],
+      "status": 200,
+      "ok": true
+    },
+    {
+      "route": "/interview/api/rounds/b48aaedf-8347-4cbc-b123-b4b66c9f0f78/skipped-questions",
+      "port": 8080,
+      "allowed": [
+        200
+      ],
+      "status": 200,
+      "ok": true
+    },
+    {
+      "route": "/interview/api/rounds/b48aaedf-8347-4cbc-b123-b4b66c9f0f78/transcript",
+      "port": 8080,
+      "allowed": [
+        200
+      ],
+      "status": 200,
+      "ok": true
+    },
+    {
+      "route": "/interview/api/rounds/3b5bbd6b-323a-49a1-be74-772e8bb31521/scores",
+      "port": 8080,
+      "allowed": [
+        200
+      ],
+      "status": 200,
+      "ok": true
+    },
+    {
+      "route": "/interview/api/rounds/3b5bbd6b-323a-49a1-be74-772e8bb31521/summary",
+      "port": 8080,
+      "allowed": [
+        200
+      ],
+      "status": 200,
+      "ok": true
+    },
+    {
+      "route": "/interview/api/rounds/3b5bbd6b-323a-49a1-be74-772e8bb31521/skipped-questions",
+      "port": 8080,
+      "allowed": [
+        200
+      ],
+      "status": 200,
+      "ok": true
+    },
+    {
+      "route": "/interview/api/rounds/3b5bbd6b-323a-49a1-be74-772e8bb31521/transcript",
+      "port": 8080,
+      "allowed": [
+        200
+      ],
+      "status": 200,
+      "ok": true
+    },
+    {
+      "route": "/interview/api/tasks/49c26022-5365-4787-815f-5f2576cf9c05",
+      "port": 8080,
+      "allowed": [
+        200
+      ],
+      "status": 200,
+      "ok": true
+    },
+    {
+      "route": "/interview/api/tasks/49c26022-5365-4787-815f-5f2576cf9c05/debrief",
+      "port": 8080,
+      "allowed": [
+        200
+      ],
+      "status": 200,
+      "ok": true
+    },
+    {
+      "route": "/interview/api/tasks/49c26022-5365-4787-815f-5f2576cf9c05/decision",
+      "port": 8080,
+      "allowed": [
+        200
+      ],
+      "status": 200,
+      "ok": true
+    },
+    {
+      "route": "/interview/api/tasks/49c26022-5365-4787-815f-5f2576cf9c05/package/versions",
+      "port": 8080,
+      "allowed": [
+        200
+      ],
+      "status": 200,
+      "ok": true
+    },
+    {
+      "route": "/interview/api/tasks/49c26022-5365-4787-815f-5f2576cf9c05/package/events",
+      "port": 8080,
+      "allowed": [
+        200
+      ],
+      "status": 200,
+      "ok": true
+    },
+    {
+      "route": "/interview/api/tasks/49c26022-5365-4787-815f-5f2576cf9c05/rounds",
+      "port": 8080,
+      "allowed": [
+        200
+      ],
+      "status": 200,
+      "ok": true
+    },
+    {
+      "route": "/interview/api/rounds/201d4213-f51e-47c6-b587-354a3d0884ba/scores",
+      "port": 8080,
+      "allowed": [
+        200
+      ],
+      "status": 200,
+      "ok": true
+    },
+    {
+      "route": "/interview/api/rounds/201d4213-f51e-47c6-b587-354a3d0884ba/summary",
+      "port": 8080,
+      "allowed": [
+        200
+      ],
+      "status": 200,
+      "ok": true
+    },
+    {
+      "route": "/interview/api/rounds/201d4213-f51e-47c6-b587-354a3d0884ba/skipped-questions",
+      "port": 8080,
+      "allowed": [
+        200
+      ],
+      "status": 200,
+      "ok": true
+    },
+    {
+      "route": "/interview/api/rounds/201d4213-f51e-47c6-b587-354a3d0884ba/transcript",
+      "port": 8080,
+      "allowed": [
+        200
+      ],
+      "status": 200,
+      "ok": true
+    },
+    {
+      "route": "/interview/api/rounds/23c0a634-0abd-418b-a655-d5e1bc85569c/scores",
+      "port": 8080,
+      "allowed": [
+        200
+      ],
+      "status": 200,
+      "ok": true
+    },
+    {
+      "route": "/interview/api/rounds/23c0a634-0abd-418b-a655-d5e1bc85569c/summary",
+      "port": 8080,
+      "allowed": [
+        200
+      ],
+      "status": 200,
+      "ok": true
+    },
+    {
+      "route": "/interview/api/rounds/23c0a634-0abd-418b-a655-d5e1bc85569c/skipped-questions",
+      "port": 8080,
+      "allowed": [
+        200
+      ],
+      "status": 200,
+      "ok": true
+    },
+    {
+      "route": "/interview/api/rounds/23c0a634-0abd-418b-a655-d5e1bc85569c/transcript",
+      "port": 8080,
+      "allowed": [
+        200
+      ],
+      "status": 200,
+      "ok": true
+    },
+    {
+      "route": "/interview/api/tasks/c0bdad93-2b5b-46e7-9540-ac4ba1efe609",
+      "port": 8080,
+      "allowed": [
+        200
+      ],
+      "status": 200,
+      "ok": true
+    },
+    {
+      "route": "/interview/api/tasks/c0bdad93-2b5b-46e7-9540-ac4ba1efe609/debrief",
+      "port": 8080,
+      "allowed": [
+        200
+      ],
+      "status": 200,
+      "ok": true
+    },
+    {
+      "route": "/interview/api/tasks/c0bdad93-2b5b-46e7-9540-ac4ba1efe609/decision",
+      "port": 8080,
+      "allowed": [
+        200
+      ],
+      "status": 200,
+      "ok": true
+    },
+    {
+      "route": "/interview/api/tasks/c0bdad93-2b5b-46e7-9540-ac4ba1efe609/package/versions",
+      "port": 8080,
+      "allowed": [
+        200
+      ],
+      "status": 200,
+      "ok": true
+    },
+    {
+      "route": "/interview/api/tasks/c0bdad93-2b5b-46e7-9540-ac4ba1efe609/package/events",
+      "port": 8080,
+      "allowed": [
+        200
+      ],
+      "status": 200,
+      "ok": true
+    },
+    {
+      "route": "/interview/api/tasks/c0bdad93-2b5b-46e7-9540-ac4ba1efe609/rounds",
+      "port": 8080,
+      "allowed": [
+        200
+      ],
+      "status": 200,
+      "ok": true
+    },
+    {
+      "route": "/interview/api/rounds/fc4be44e-4920-436d-afc5-69b1e5e78519/scores",
+      "port": 8080,
+      "allowed": [
+        200
+      ],
+      "status": 200,
+      "ok": true
+    },
+    {
+      "route": "/interview/api/rounds/fc4be44e-4920-436d-afc5-69b1e5e78519/summary",
+      "port": 8080,
+      "allowed": [
+        200
+      ],
+      "status": 200,
+      "ok": true
+    },
+    {
+      "route": "/interview/api/rounds/fc4be44e-4920-436d-afc5-69b1e5e78519/skipped-questions",
+      "port": 8080,
+      "allowed": [
+        200
+      ],
+      "status": 200,
+      "ok": true
+    },
+    {
+      "route": "/interview/api/rounds/fc4be44e-4920-436d-afc5-69b1e5e78519/transcript",
+      "port": 8080,
+      "allowed": [
+        200
+      ],
+      "status": 200,
+      "ok": true
+    },
+    {
+      "route": "/interview/api/rounds/04d0305e-548a-4469-a2fb-b5a71f076a9b/scores",
+      "port": 8080,
+      "allowed": [
+        200
+      ],
+      "status": 200,
+      "ok": true
+    },
+    {
+      "route": "/interview/api/rounds/04d0305e-548a-4469-a2fb-b5a71f076a9b/summary",
+      "port": 8080,
+      "allowed": [
+        200
+      ],
+      "status": 200,
+      "ok": true
+    },
+    {
+      "route": "/interview/api/rounds/04d0305e-548a-4469-a2fb-b5a71f076a9b/skipped-questions",
+      "port": 8080,
+      "allowed": [
+        200
+      ],
+      "status": 200,
+      "ok": true
+    },
+    {
+      "route": "/interview/api/rounds/04d0305e-548a-4469-a2fb-b5a71f076a9b/transcript",
+      "port": 8080,
+      "allowed": [
+        200
+      ],
+      "status": 200,
+      "ok": true
+    },
+    {
+      "route": "/core-record/api/v1/health",
+      "port": 8090,
+      "allowed": [
+        200
+      ],
+      "status": 200,
+      "ok": true
+    },
+    {
+      "route": "/core-record/api/v1/jobs",
+      "port": 8090,
+      "allowed": [
+        200
+      ],
+      "status": 200,
+      "ok": true
+    },
+    {
+      "route": "/core-record/api/v1/jobs/ad1c9bf2-939d-4a4f-acf0-5251c2e40390",
+      "port": 8090,
+      "allowed": [
+        200
+      ],
+      "status": 200,
+      "ok": true
+    },
+    {
+      "route": "/core-record/api/v1/jobs/ad1c9bf2-939d-4a4f-acf0-5251c2e40390/role-versions",
+      "port": 8090,
+      "allowed": [
+        200
+      ],
+      "status": 200,
+      "ok": true
+    },
+    {
+      "route": "/core-record/api/v1/jobs/26d8ee2e-54d3-4211-a04e-38691b433830",
+      "port": 8090,
+      "allowed": [
+        200
+      ],
+      "status": 200,
+      "ok": true
+    },
+    {
+      "route": "/core-record/api/v1/jobs/26d8ee2e-54d3-4211-a04e-38691b433830/role-versions",
+      "port": 8090,
+      "allowed": [
+        200
+      ],
+      "status": 200,
+      "ok": true
+    },
+    {
+      "route": "/core-record/api/v1/jobs/f3f1e75d-5a11-4f9d-9614-69d4afa85e14",
+      "port": 8090,
+      "allowed": [
+        200
+      ],
+      "status": 200,
+      "ok": true
+    },
+    {
+      "route": "/core-record/api/v1/jobs/f3f1e75d-5a11-4f9d-9614-69d4afa85e14/role-versions",
+      "port": 8090,
+      "allowed": [
+        200
+      ],
+      "status": 200,
+      "ok": true
+    },
+    {
+      "route": "/core-record/api/v1/jobs/f4036477-1dc0-40f2-a8bf-0d9844e9728e",
+      "port": 8090,
+      "allowed": [
+        200
+      ],
+      "status": 200,
+      "ok": true
+    },
+    {
+      "route": "/core-record/api/v1/jobs/f4036477-1dc0-40f2-a8bf-0d9844e9728e/role-versions",
+      "port": 8090,
+      "allowed": [
+        200
+      ],
+      "status": 200,
+      "ok": true
+    },
+    {
+      "route": "/core-record/api/v1/jobs/1eea85d8-3e46-4154-8375-4774707cff69",
+      "port": 8090,
+      "allowed": [
+        200
+      ],
+      "status": 200,
+      "ok": true
+    },
+    {
+      "route": "/core-record/api/v1/jobs/1eea85d8-3e46-4154-8375-4774707cff69/role-versions",
+      "port": 8090,
+      "allowed": [
+        200
+      ],
+      "status": 200,
+      "ok": true
+    },
+    {
+      "route": "/core-record/api/v1/candidates",
+      "port": 8090,
+      "allowed": [
+        422
+      ],
+      "status": 422,
+      "ok": true,
+      "code": "INVALID_SCHEMA"
+    },
+    {
+      "route": "/core-record/api/v1/candidates?email=local-migration-audit%40example.invalid",
+      "port": 8090,
+      "allowed": [
+        200
+      ],
+      "status": 200,
+      "ok": true
+    },
+    {
+      "route": "/account/api/health",
+      "port": 8080,
+      "allowed": [
+        200
+      ],
+      "status": 200,
+      "ok": true
+    },
+    {
+      "route": "/account/api/auth/config",
+      "port": 8080,
+      "allowed": [
+        200
+      ],
+      "status": 200,
+      "ok": true
+    },
+    {
+      "route": "/account/api/auth/me",
+      "port": 8080,
+      "allowed": [
+        401
+      ],
+      "status": 401,
+      "ok": true,
+      "code": "AUTH_REQUIRED"
+    }
+  ]
+}
