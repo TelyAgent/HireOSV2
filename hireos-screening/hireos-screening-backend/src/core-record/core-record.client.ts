@@ -3,6 +3,9 @@ import { ConfigService } from '@nestjs/config';
 import { createHash, randomUUID } from 'node:crypto';
 import type { Identity } from '../auth/workspace.guard';
 
+// A Core Record call's deadline when CORE_RECORD_TIMEOUT_MS isn't set; under the gateway's 60 s (#386).
+const DEFAULT_TIMEOUT_MS = 30_000;
+
 type CoreRecordMode = 'mock' | 'remote';
 
 export type CoreCandidate = {
@@ -160,8 +163,9 @@ export class CoreRecordClient {
     // BlobPart's type doesn't accept -- Uint8Array.from copies into a plain, freshly
     // allocated ArrayBuffer to satisfy that.
     form.append('file', new Blob([Uint8Array.from(file.buffer)], { type: file.mimetype }), file.originalname);
-    const response = await globalThis.fetch(`${this.baseUrl}/materials`, {
+    const response = await withDeadline(globalThis.fetch(`${this.baseUrl}/materials`, {
       method: 'POST',
+      signal: this.signalFor(identity, 'POST'),
       headers: {
         'x-request-id': randomUUID(),
         'x-correlation-id': `${this.serviceName}:${randomUUID()}`,
@@ -172,8 +176,8 @@ export class CoreRecordClient {
         'idempotency-key': randomUUID(),
       },
       body: form,
-    });
-    const body = await parseBody(response);
+    }));
+    const body = await withDeadline(parseBody(response));
     if (!response.ok) {
       const error = body as { code?: string; message?: string };
       throw new ServiceUnavailableException({
@@ -184,13 +188,24 @@ export class CoreRecordClient {
     return body as CoreMaterial;
   }
 
+  /**
+   * Every call has a deadline under the gateway's 60 s (CORE_RECORD_TIMEOUT_MS, default 30 s), past which it fails
+   * with CORE_RECORD_TIMEOUT. A read also stops when the caller has gone away, since nobody is left to receive it;
+   * a write runs on to its deadline, as stopping it halfway could leave the caller's own records half-written (#386).
+   */
+  private signalFor(identity: Identity, method: 'GET' | 'POST') {
+    const deadline = AbortSignal.timeout(Number(process.env.CORE_RECORD_TIMEOUT_MS) || DEFAULT_TIMEOUT_MS);
+    return method === 'GET' && identity.signal ? AbortSignal.any([deadline, identity.signal]) : deadline;
+  }
+
   private async request<T>(
     path: string,
     identity: Identity,
     input: { method: 'GET' | 'POST'; idempotencyKey?: string; body?: unknown; notFoundAsNull?: boolean },
   ): Promise<T> {
-    const response = await globalThis.fetch(`${this.baseUrl}${path}`, {
+    const response = await withDeadline(globalThis.fetch(`${this.baseUrl}${path}`, {
       method: input.method,
+      signal: this.signalFor(identity, input.method),
       headers: {
         'content-type': 'application/json',
         'x-request-id': randomUUID(),
@@ -202,9 +217,9 @@ export class CoreRecordClient {
         ...(input.idempotencyKey ? { 'idempotency-key': hashIdempotencyKey(input.idempotencyKey) } : {}),
       },
       body: input.body === undefined ? undefined : JSON.stringify(input.body),
-    });
+    }));
     if (input.notFoundAsNull && response.status === 404) return null as T;
-    const body = await parseBody(response);
+    const body = await withDeadline(parseBody(response));
     if (!response.ok) {
       const error = body as { code?: string; message?: string };
       if (response.status === 409) {
@@ -230,4 +245,16 @@ async function parseBody(response: Response) {
   const contentType = response.headers.get('content-type') || '';
   if (contentType.includes('application/json')) return response.json();
   return response.text();
+}
+
+/** A call past its deadline (#386) as Core Record being unavailable, with a code saying why. */
+async function withDeadline<T>(call: Promise<T>): Promise<T> {
+  try {
+    return await call;
+  } catch (error) {
+    if ((error as { name?: string } | null)?.name === 'TimeoutError') {
+      throw new ServiceUnavailableException({ code: 'CORE_RECORD_TIMEOUT', message: 'Core Record did not answer in time.' });
+    }
+    throw error;
+  }
 }

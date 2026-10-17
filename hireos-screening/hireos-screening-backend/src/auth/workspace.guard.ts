@@ -26,6 +26,8 @@ export type Identity = {
   kind?: 'user' | 'service' | 'dev';
   email?: string;
   displayName?: string;
+  /** Aborted when the caller goes away before its response is sent (#386); absent outside a request. */
+  signal?: AbortSignal;
 };
 
 type Headers = Record<string, string | string[] | undefined>;
@@ -62,7 +64,12 @@ export class WorkspaceGuard implements CanActivate {
 
   async canActivate(context: ExecutionContext) {
     const request = context.switchToHttp().getRequest<{ headers: Headers; method: string; identity: Identity }>();
-    request.identity = await this.authenticate(request);
+    const response = context.switchToHttp().getResponse<{ writableEnded?: boolean; once?: (event: 'close', listener: () => void) => void }>();
+    const caller = new AbortController();
+    response.once?.('close', () => {
+      if (!response.writableEnded) caller.abort(new Error('CALLER_DISCONNECTED'));
+    });
+    request.identity = { ...(await this.authenticate(request)), signal: caller.signal };
     return true;
   }
 

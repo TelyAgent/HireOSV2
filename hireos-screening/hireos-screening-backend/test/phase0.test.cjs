@@ -17,7 +17,13 @@ test('phase 0 health payload is stable', () => {
 });
 
 function guardContext(request) {
-  return { switchToHttp: () => ({ getRequest: () => request }) };
+  return { switchToHttp: () => ({ getRequest: () => request, getResponse: () => ({ once: () => undefined }) }) };
+}
+
+/** The identity without the per-request disconnect signal (#386), for comparing values. */
+function withoutSignal({ signal, ...identity }) {
+  assert.ok(signal instanceof AbortSignal);
+  return identity;
 }
 
 test('workspace guard rejects production, missing development auth and session mode without a session', async () => {
@@ -36,7 +42,7 @@ test('workspace guard rejects production, missing development auth and session m
 test('workspace guard injects an explicit local development identity in dev mode', async () => {
   const request = { headers: {}, method: 'GET' };
   assert.equal(await new WorkspaceGuard(new ConfigService({ NODE_ENV: 'development', DEV_AUTH_ENABLED: 'true' })).canActivate(guardContext(request)), true);
-  assert.deepEqual(request.identity, {
+  assert.deepEqual(withoutSignal(request.identity), {
     workspaceId: 'local-screening-workspace',
     actorId: 'local-screening-user',
     roles: ['admin', 'hr', 'interviewer'],
@@ -48,7 +54,7 @@ test('workspace guard trusts other backends only with the shared service token',
   const guard = new WorkspaceGuard(new ConfigService({ AUTH_MODE: 'session', SERVICE_TOKEN: 'svc-secret' }));
   const request = { method: 'POST', headers: { 'x-hireos-service-token': 'svc-secret', 'x-workspace-id': 'ws-1', 'x-actor-id': 'user-1' } };
   assert.equal(await guard.canActivate(guardContext(request)), true);
-  assert.deepEqual(request.identity, { workspaceId: 'ws-1', actorId: 'user-1', roles: [], kind: 'service' });
+  assert.deepEqual(withoutSignal(request.identity), { workspaceId: 'ws-1', actorId: 'user-1', roles: [], kind: 'service' });
   await assert.rejects(
     guard.canActivate(guardContext({ method: 'GET', headers: { 'x-hireos-service-token': 'wrong', 'x-workspace-id': 'ws-1' } })),
     (error) => error.getStatus() === 401 && error.response.code === 'INVALID_SERVICE_TOKEN',
