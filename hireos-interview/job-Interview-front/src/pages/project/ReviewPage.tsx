@@ -47,6 +47,14 @@ function ScoreCard({ roundId, entry, t, zh, onSaved }: { roundId: string; entry:
         <div style={{ fontSize: 10.5, color: "var(--ink-3)" }}>{zh ? `权重 ${entry.card.weight}%` : `${entry.card.weight}% weight`}</div>
       </div>
 
+      {score == null && (
+        <div role="status" style={{ marginTop: 9, padding: "9px 11px", border: "1px solid var(--warn)", borderRadius: 9, background: "var(--warn-soft)", color: "var(--ink-2)", fontSize: 12, lineHeight: 1.5 }}>
+          <strong>{zh ? "未知不是零分。" : "Unknown is not zero."}</strong>{" "}
+          {zh ? "当前还缺少足够的人工证据。" : "There is not enough human evidence to score this requirement yet."}{" "}
+          {entry.card.expectedEvidence && (zh ? `需要补充：${entry.card.expectedEvidence}` : `Missing evidence: ${entry.card.expectedEvidence}`)}
+        </div>
+      )}
+
       {hasAi && (
         <div style={{ marginTop: 10, padding: "10px 12px", border: "1px solid var(--ai)", borderRadius: 9, background: "var(--ai-soft)" }}>
           <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
