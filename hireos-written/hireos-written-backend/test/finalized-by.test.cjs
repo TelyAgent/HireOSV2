@@ -20,7 +20,7 @@ function setup(finalizedAt = null) {
     case: { updateMany: async () => ({ count: 1 }) },
   };
   db.$transaction = async (fn) => fn(db);
-  const lifecycle = { advance: async () => {} };
+  const lifecycle = { advance: async () => {}, lockCase: async () => ({ status: 'review_pending' }) };
   return { service: new InvitationsService(db, {}, { get: (_k, d) => d }, {}, lifecycle), writes };
 }
 const body = (extra = {}) => ({ overall: 80, criteria: [{ name: 'Design', max: 10, ai: 7, human: 8 }], ...extra });

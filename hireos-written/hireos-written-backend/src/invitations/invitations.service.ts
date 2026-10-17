@@ -169,6 +169,8 @@ export class InvitationsService implements OnModuleInit, OnModuleDestroy {
     const finalizedAt = new Date();
     // Only the first of two concurrent finalizations is saved (#132), together with the case's move (#118).
     const saved = await this.db.$transaction(async (tx) => {
+      // Case row first, the order every transaction here takes its locks in, so none of them deadlock.
+      await this.lifecycle.lockCase(tx, caseId);
       const { count } = await tx.submission.updateMany({
         where: { id: submission.id, finalizedAt: null },
         data: {
@@ -195,6 +197,8 @@ export class InvitationsService implements OnModuleInit, OnModuleDestroy {
     const releasedAt = new Date();
     // Only the first of two concurrent publications is kept (#132), together with the case's move (#118).
     const saved = await this.db.$transaction(async (tx) => {
+      // Case row first, the order every transaction here takes its locks in, so none of them deadlock.
+      await this.lifecycle.lockCase(tx, caseId);
       const { count } = await tx.submission.updateMany({
         where: { id: submission.id, finalizedAt: { not: null }, releasedAt: null },
         data: { release: { overall: dto.overall, showScore: dto.showScore, outcomeText: dto.outcomeText, feedbackText: dto.feedbackText, nextStepText: dto.nextStepText } as unknown as object, releasedAt },
@@ -220,6 +224,9 @@ export class InvitationsService implements OnModuleInit, OnModuleDestroy {
     if (invitation.status === 'sent') {
       const openedAt = new Date();
       await this.db.$transaction(async (tx) => {
+        // The case row first, as a submission locks it: both take their locks in the same order, so an open racing
+        // the submission waits its turn instead of deadlocking with it.
+        await this.lifecycle.lockCase(tx, invitation.caseId);
         const { count } = await tx.invitation.updateMany({ where: { id: invitation.id, status: 'sent' }, data: { status: 'opened', openedAt } });
         if (!count) return;
         invitation.openedAt = openedAt;
