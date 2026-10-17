@@ -183,8 +183,15 @@ export interface QuestionSnapshot {
 export interface RealEvaluation {
   overall: number;
   summary: string;
-  criteria: { name: string; max: number; score: number; evidence: string }[];
+  criteria: {
+    name: string; max: number; score: number; evidence: string;
+    /** Excerpts of the answers behind the score, placed by question and lines (#378); absent on older evaluations. */
+    quotes?: QuoteRef[];
+    unlocatedQuotes?: number;
+  }[];
 }
+
+export interface QuoteRef { questionId: string; text: string; lineFrom: number; lineTo: number }
 
 export interface RealInvitation {
   id: string;

@@ -124,7 +124,16 @@ export const INVITATIONS: Record<string, Invitation> = {};
 export interface Attempt { id: string; caseId: string; questionId: string; round: number; /** Real cases: the round's invitation (#48). */ invitationId?: string; status: string; submittedAt?: string; fileRef: string; receivedAt: string; processedAt?: string; missing?: string[] }
 export const ATTEMPTS: Record<string, Attempt> = {};
 
-export interface Criterion { name: string; max: number; ai: number; human: number | null; confidence: string; coverage: string; overridden?: boolean; overrideReason?: string; evidence: string; source: string; /** Scored by hand: there is no AI score for it (#121). */ manual?: boolean }
+export interface Criterion {
+  name: string; max: number; ai: number; human: number | null; confidence: string; coverage: string; overridden?: boolean; overrideReason?: string; evidence: string; source: string;
+  /** Scored by hand: there is no AI score for it (#121). */ manual?: boolean;
+  /** Answer excerpts behind the AI score (#378): undefined when the evaluation predates them. */
+  quotes?: { questionId: string; text: string; lineFrom: number; lineTo: number }[];
+  /** Excerpts the AI gave that the answers don't contain, left out. */
+  unlocatedQuotes?: number;
+}
+/** A round's answers in question order, for showing an excerpt in its answer (#378). Filled with real submissions. */
+export const ANSWERS: Record<string, { questionId: string; title: string; answerText: string }[]> = {};
 export interface Evaluation { id: string; attemptId: string; status: "ai_draft" | "final"; finalizedBy: string | null; finalizedAt: string | null; criteria: Criterion[]; /** Real cases: the AI evaluator's overall comment on the answers. */ summary?: string; /** Real cases: where the automatic scoring stands when there is none yet (#121). */ aiStatus?: "pending" | "running" | "done" | "failed" | "skipped"; aiError?: string | null }
 export const EVALUATIONS: Record<string, Evaluation> = {};
 
