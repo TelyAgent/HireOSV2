@@ -24,7 +24,11 @@ function ScoreCard({ roundId, entry, t, zh, onSaved }: { roundId: string; entry:
   // Score and note are a draft until "Save" — a reviewer changing their mind mid-thought
   // shouldn't be writing half-formed judgments to the record on every click.
   const dirty = score !== entry.score || note !== entry.note;
+  const reasonMissing = score !== null && !note.trim();
+  const reasonMessage = zh ? "请填写人工评分理由。" : "A reason is required for a human score.";
+  const reasonId = `score-reason-${roundId}-${entry.card.id}`;
   const save = async () => {
+    if (reasonMissing) { setError(reasonMessage); return; }
     setSaving(true); setError("");
     try {
       await api(`/rounds/${roundId}/scores/${entry.card.id}`, { method: "PATCH", body: JSON.stringify({ score, note }) });
@@ -90,10 +94,12 @@ function ScoreCard({ roundId, entry, t, zh, onSaved }: { roundId: string; entry:
             {t.markUnknownLabel}
           </button>
         </div>
-        <textarea value={note} disabled={saving} onChange={(e) => setNote(e.target.value)} placeholder={t.scoreNotePlaceholder}
+        <textarea value={note} disabled={saving} onChange={(e) => { setNote(e.target.value); setError(""); }} placeholder={t.scoreNotePlaceholder}
+          aria-label={zh ? "人工评分理由" : "Human score reason"} aria-invalid={reasonMissing} aria-describedby={reasonMissing ? reasonId : undefined}
           style={{ marginTop: 9, width: "100%", height: 64, border: "1px solid var(--line-strong)", borderRadius: 9, padding: "8px 10px", fontSize: 12, lineHeight: 1.5, color: "var(--ink)", background: "var(--surface)", resize: "vertical" }} />
+        {reasonMissing && <div id={reasonId} role="status" style={{ marginTop: 6, fontSize: 12, color: "var(--bad)" }}>{reasonMessage}</div>}
         <div style={{ marginTop: 8, display: "flex", alignItems: "center", gap: 9, flexWrap: "wrap" }}>
-          <button disabled={!dirty || saving} onClick={() => void save()}
+          <button disabled={!dirty || saving || reasonMissing} onClick={() => void save()}
             style={{ height: 30, padding: "0 14px", border: `1px solid ${dirty ? "var(--brand)" : "var(--line)"}`, borderRadius: 9, background: dirty ? "var(--brand)" : "var(--surface-2)", color: dirty ? "var(--brand-ink)" : "var(--ink-3)", fontSize: 12, fontWeight: 600, cursor: !dirty || saving ? "not-allowed" : "pointer" }}>
             {saving ? (zh ? "保存中…" : "Saving…") : (zh ? "保存评分" : "Save score")}
           </button>

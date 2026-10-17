@@ -20,8 +20,8 @@ test('#295: appearance defaults stay Light + Blue + Medium', () => {
 test('#291: the portal dialog receives theme tokens and readable controls', () => {
   assert.match(modalSource, /className=\{`appearance-modal appearance-\$\{state\.textSize\}`\}/);
   assert.match(stylesSource, /\.appearance-modal \.ant-modal-content[\s\S]*?background: var\(--surface\) !important/);
-  assert.match(stylesSource, /\.appearance-modal \.ant-radio-button-wrapper[\s\S]*?color: var\(--ink-2\) !important/);
-  assert.match(stylesSource, /\.appearance-modal \.ant-radio-button-wrapper-checked[^\{]*\{[\s\S]*?color: var\(--brand\) !important/);
+  assert.match(stylesSource, /\.appearance-options \.ant-radio-button-wrapper[\s\S]*?color: var\(--ink-2\) !important/);
+  assert.match(stylesSource, /\.appearance-options \.ant-radio-button-wrapper-checked[^\{]*\{[\s\S]*?color: var\(--ink\) !important/);
 });
 
 test('#288: Unknown scores explain the missing evidence and are not presented as zero', () => {

@@ -30,8 +30,8 @@ function toQuestion(item: RealPlanItem): Question {
     prompt: item.questionPrompt,
     materials: [],
     deliverables: item.deliverables ?? [],
-    usageCount: 0,
-    seenByCount: 0,
+    usageCount: null,
+    seenByCount: null,
     caseScoped: true,
   };
 }
@@ -82,8 +82,8 @@ function toOrphanedQuestion(snapshot: QuestionSnapshot): Question {
     prompt: snapshot.prompt,
     materials: [],
     deliverables: [],
-    usageCount: 0,
-    seenByCount: 0,
+    usageCount: null,
+    seenByCount: null,
     caseScoped: true,
   };
 }

@@ -375,19 +375,38 @@ textarea::placeholder {
 .appearance-modal .ant-modal-title { color: var(--ink) !important; }
 .appearance-modal .ant-modal-close { color: var(--ink-2) !important; }
 .appearance-modal .ant-modal-close:hover { color: var(--ink) !important; background: var(--surface-2) !important; }
-.appearance-modal .ant-radio-button-wrapper {
+.appearance-modal .ant-btn,
+.hs-content > .ant-btn {
+  color: var(--ink) !important;
+  background: var(--surface-2) !important;
+  border-color: var(--line-strong) !important;
+}
+.appearance-modal .ant-btn-primary {
+  color: #ffffff !important;
+  background: var(--brand-strong) !important;
+}
+.appearance-options .ant-radio-button-wrapper {
   background: var(--surface) !important;
   border-color: var(--line-strong) !important;
   color: var(--ink-2) !important;
 }
-.appearance-modal .ant-radio-button-wrapper:hover { color: var(--brand) !important; }
-.appearance-modal .ant-radio-button-wrapper-checked:not(.ant-radio-button-wrapper-disabled) {
+.appearance-options .ant-radio-button-wrapper:hover { color: var(--ink) !important; }
+.appearance-options .ant-radio-button-wrapper-checked:not(.ant-radio-button-wrapper-disabled) {
   background: var(--brand-soft) !important;
   border-color: var(--brand) !important;
-  color: var(--brand) !important;
+  color: var(--ink) !important;
 }
 .appearance-modal .ant-radio-button-wrapper-checked:not(.ant-radio-button-wrapper-disabled)::before {
   background-color: var(--brand) !important;
+}
+.appearance-options .ant-radio-button-wrapper-checked {
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.appearance-options .ant-radio-button-wrapper:has(input:focus-visible) {
+  outline: 2px solid var(--ink);
+  outline-offset: 3px;
+  z-index: 2;
 }
 .appearance-modal.appearance-large .hs-label { font-size: 12px; }
 .appearance-modal.appearance-large .ant-radio-button-wrapper { font-size: 15px; }

@@ -25,8 +25,8 @@ export function toBankQuestion(q: RealBankQuestion): Question {
     prompt: q.prompt,
     materials: [],
     deliverables: q.deliverables,
-    usageCount: 0,
-    seenByCount: 0,
+    usageCount: null,
+    seenByCount: null,
   };
 }
 
