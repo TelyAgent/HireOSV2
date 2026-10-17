@@ -239,6 +239,7 @@ textarea.input { height: auto; padding: var(--space-3); resize: vertical; }
 .table td { padding: 0 var(--space-4); height: var(--row-h); border-bottom: 1px solid var(--border); font-size: calc(var(--text-base) * .94); vertical-align: middle; }
 .table tr.clickable { cursor: pointer; }
 .table tr.clickable:hover td { background: var(--canvas); }
+.table tr.selected td, .table tr.selected:hover td { background: var(--accent-50); }
 .table-wrap { overflow-x: auto; border: 1px solid var(--border); border-radius: var(--radius-card); }
 .table-wrap .table { border: none; }
 .table-wrap .table th:first-child, .table-wrap .table td:first-child { padding-left: var(--space-4); }
