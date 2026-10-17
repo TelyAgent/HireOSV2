@@ -1174,6 +1174,10 @@ export const ZH: Record<string, string> = {
   "Sorry, Copilot couldn’t process that just now. Your input is kept — please retry.": "抱歉，Copilot 暂时无法处理这条请求，你的输入已保留，请重试。",
   "Choose the file again": "重新选择文件",
   "Start over": "重新开始",
+  "Recruiting status": "招聘状态",
+  "JD publication": "JD 发布状态",
+  "Paste full JD text": "粘贴 JD 全文",
+  "Only http:// and https:// links are supported. Paste the full JD text instead.": "仅支持 http:// 和 https:// 链接，请改为粘贴 JD 全文。",
   // #239: names read out by screen readers, and the resize handle's tooltip.
   "Primary navigation": "主导航",
   "Resize Copilot sidebar": "调整 Copilot 侧栏宽度",
