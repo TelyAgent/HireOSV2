@@ -48,6 +48,12 @@ const base = process.env.INTERVIEW_TEST_URL || 'http://127.0.0.1:5197/interview/
     const dialog = page.getByRole('dialog');
     await open();
     assert.equal(await dialog.getByRole('button', { name: 'Link candidate', exact: true }).isDisabled(), true);
+    const choose = dialog.getByRole('button', { name: 'Choose resume', exact: true });
+    await choose.focus();
+    const chooserEvent = page.waitForEvent('filechooser');
+    await page.keyboard.press('Enter');
+    await (await chooserEvent).setFiles([]);
+    await dialog.getByText('No file selected', { exact: true }).waitFor();
     await page.waitForFunction(() => {
       const modal = document.querySelector('.ant-modal');
       return modal && !/appear|enter|leave/.test(modal.className) && getComputedStyle(modal).opacity === '1';
