@@ -5,6 +5,7 @@ import { api } from '../project-intake/api';
 import { liveCopy } from './i18n';
 import { recordApi, type MeetingRecord } from './record-api';
 import { useMeetingNotes } from './useMeetingNotes';
+import { transcriptErrorText } from './transcript-errors';
 import './meeting-record.css';
 
 // Sample AI-suggestion content, carried over verbatim from the design prototype
@@ -114,7 +115,7 @@ export function MeetingRecordPanel({ lang, onDirty, dirty, taskId, round, roundI
           : <>
             {transcript.data.status === 'idle' && <div className="record-empty">{zh ? '尚未开始：需要真实的 Zoom 会议触发 RTMS 才会产生实时转写。' : "Not started yet — a real Zoom meeting must trigger RTMS before a live transcript appears."}</div>}
             {transcript.data.status === 'connecting' && <div className="record-empty">{zh ? '正在连接实时转写…' : 'Connecting to the live transcript…'}</div>}
-            {transcript.data.status === 'error' && <div role="alert" className="record-error">{transcript.data.error || (zh ? '转写连接出错。' : 'Transcript connection failed.')}</div>}
+            {transcript.data.status === 'error' && <div role="alert" className="record-error">{transcriptErrorText(transcript.data.error, lang)}</div>}
             {transcript.data.lines.map((line, i) => <div className="transcript-row" key={i}>
               <div style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: 10.5, color: 'var(--ink-3)' }}>{new Date(line.createdAt).toLocaleTimeString(zh ? 'zh-CN' : 'en-US', { hour12: false })}</div>
               <div><b>{line.speaker}:</b> {line.text}</div>
