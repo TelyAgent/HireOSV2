@@ -57,6 +57,54 @@ const base = process.env.INTERVIEW_TEST_URL || 'http://127.0.0.1:5197/interview/
     await page.locator('#jdTextInput').fill('Platform engineer');
     assert.equal(await page.locator('#jdTextInput').getAttribute('aria-invalid'), null);
     console.log('PASS #227: empty/whitespace JD, linked error, no create request, correction clears error');
+    let release;
+    let pending = new Promise(resolve => { release = resolve; });
+    let failHome = false;
+    await page.route('**/interview/api/jobs', async route => { await pending; await route.fulfill(failHome ? { status: 503, json: { code: 'REQUEST_FAILED' } } : { json: [] }); });
+    await page.route('**/interview/api/tasks', async route => { await pending; await route.fulfill({ json: [] }); });
+    await page.goto(base);
+    await page.getByRole('table').getByRole('status').waitFor();
+    assert.equal(await page.getByText('No projects yet.', { exact: true }).count(), 0);
+    assert.ok((await page.getByTestId('home-metric').allTextContents()).every(v => /Loading/.test(v)));
+    assert.equal(await page.getByRole('button', { name: 'All projects', exact: true }).count(), 1);
+    release();
+    await page.getByText('No projects yet.', { exact: true }).waitFor();
+    assert.ok((await page.getByTestId('home-metric').allTextContents()).every(v => v === '0'));
+    await page.getByRole('button', { name: 'All projects (0)', exact: true }).waitFor();
+    failHome = true;
+    await page.reload();
+    await page.getByRole('table').getByRole('alert').waitFor();
+    assert.ok((await page.getByTestId('home-metric').allTextContents()).every(v => v === 'Unavailable'));
+    assert.equal(await page.getByText('No projects yet.', { exact: true }).count(), 0);
+    failHome = false;
+    pending = new Promise(resolve => { release = resolve; });
+    await page.getByRole('button', { name: 'Retry', exact: true }).click();
+    await page.getByRole('table').getByRole('status').waitFor();
+    assert.ok((await page.getByTestId('home-metric').allTextContents()).every(v => /Loading/.test(v)));
+    release();
+    await page.getByText('No projects yet.', { exact: true }).waitFor();
+    console.log('PASS #300: slow requests, no false zero/empty, real zero, failure, slow retry');
+    let rubric = { id: 'rubric-1', versionNumber: 1, status: 'confirmed', confirmedBy: 'reviewer-1', confirmedAt: '2026-10-15T12:00:00Z', sourceJdVersion: 2, cards: [] };
+    await page.route('**/interview/api/tasks/project', route => route.fulfill({ json: {
+      id: 'project', status: 'draft', job: { ...job, jdVersion: 9, jdText: 'Engineer' }, candidate: { id: 'candidate', name: 'Test' },
+      stages: ['overview', 'rubric', 'plan', 'live', 'review', 'debrief', 'decision', 'package'].map(stage => ({ stage, done: false, unlocked: true })), rounds: [], materials: [], parseJobs: [], resume: null,
+    } }));
+    await page.route('**/interview/api/jobs/job/rubric', route => route.fulfill({ json: { jobId: 'job', jdVersion: 9, locked: false, generation: null, rubric } }));
+    await page.goto(`${base}project/project/rubric`);
+    const confirmation = page.locator('dl[aria-label="Rubric confirmation record"]');
+    await confirmation.getByText('reviewer-1', { exact: true }).waitFor();
+    await confirmation.getByText('v2', { exact: true }).waitFor();
+    assert.doesNotMatch(await confirmation.innerText(), /v9|Not recorded/);
+    rubric = { ...rubric, id: 'rubric-2', versionNumber: 2, confirmedBy: 'reviewer-2', confirmedAt: null, sourceJdVersion: null };
+    await page.reload();
+    await confirmation.getByText('reviewer-2', { exact: true }).waitFor();
+    assert.equal(await confirmation.getByText('Not recorded', { exact: true }).count(), 2);
+    assert.doesNotMatch(await confirmation.innerText(), /reviewer-1|v2/);
+    rubric = { ...rubric, status: 'draft', confirmedBy: null };
+    await page.reload();
+    await page.getByText('Confirm rubric', { exact: true }).waitFor();
+    assert.equal(await confirmation.count(), 0);
+    console.log('PASS #254: confirmed source JD, refreshed version, missing metadata, draft hides confirmation');
     assert.deepEqual(errors, []);
   } finally { await browser.close(); }
 })().catch(error => { console.error(error); process.exitCode = 1; });

@@ -36,6 +36,8 @@ export function HomePage() {
   const [loadError, setLoadError] = useState('');
   const [loading, setLoading] = useState(true);
   const [reload, setReload] = useState(0);
+  const dataReady = !loading && !loadError;
+  const metricValue = (value: number) => loading ? it.loading : loadError ? (state.lang === 'zh' ? '暂不可用' : 'Unavailable') : value;
   const [expandedRoles, setExpandedRoles] = useState<Record<string, boolean>>({});
   const [resumeTaskId, setResumeTaskId] = useState<string | null>(null);
   useEffect(() => {
@@ -276,8 +278,8 @@ export function HomePage() {
           {myWorkCards.map((c, i) => (
             <div key={i} style={statsCard}>
               <div>
-                <div style={{ fontSize: 22, fontWeight: 700, lineHeight: 1.15 }}>
-                  {c.value}
+                <div data-testid="home-metric" style={{ fontSize: dataReady ? 22 : 12, minHeight: 26, fontWeight: 700, lineHeight: 1.15 }}>
+                  {metricValue(c.value)}
                 </div>
                 <div style={{ fontWeight: 500 }}>{c.label}</div>
                 <div
@@ -345,8 +347,8 @@ export function HomePage() {
             {overviewCards.map((c, i) => (
               <div key={i} style={statsCard}>
                 <div>
-                  <div style={{ fontSize: 22, fontWeight: 700, lineHeight: 1.15 }}>
-                    {c.value}
+                  <div data-testid="home-metric" style={{ fontSize: dataReady ? 22 : 12, minHeight: 26, fontWeight: 700, lineHeight: 1.15 }}>
+                    {metricValue(c.value)}
                   </div>
                   <div
                     style={{
@@ -422,8 +424,8 @@ export function HomePage() {
             {moreCards.map((c, i) => (
               <div key={i} style={statsCard}>
                 <div>
-                  <div style={{ fontSize: 22, fontWeight: 700, lineHeight: 1.15 }}>
-                    {c.value}
+                  <div data-testid="home-metric" style={{ fontSize: dataReady ? 22 : 12, minHeight: 26, fontWeight: 700, lineHeight: 1.15 }}>
+                    {metricValue(c.value)}
                   </div>
                   <div
                     style={{
@@ -473,7 +475,7 @@ export function HomePage() {
                 return (
                   <Chip
                     key={f}
-                    label={`${state.lang === 'zh' ? ({ 'All projects': '全部项目', 'Needs my confirmation': '待我确认', Draft: '草稿', Published: '已发布' })[f] : f} (${counts[f]})`}
+                    label={`${state.lang === 'zh' ? ({ 'All projects': '全部项目', 'Needs my confirmation': '待我确认', Draft: '草稿', Published: '已发布' })[f] : f}${dataReady ? ` (${counts[f]})` : ''}`}
                     active={active}
                     onClick={() => set({ homeFilter: f })}
                   />
@@ -527,9 +529,9 @@ export function HomePage() {
                 <button onClick={() => setReload((n) => n + 1)} style={{ color: "var(--brand)", background: "none", border: 0, cursor: "pointer", padding: 0 }}>{it.retry}</button>
               </div>
             )}
-            {!jobs.length && <div style={{ padding: 18 }}>{it.empty}</div>}
+            {dataReady && !jobs.length && <div style={{ padding: 18 }}>{it.empty}</div>}
 
-            {jobs.length > 0 && state.homeViewMode !== "cluster" && (
+            {dataReady && jobs.length > 0 && state.homeViewMode !== "cluster" && (
               <>
                 <div
                   style={{
@@ -638,7 +640,7 @@ export function HomePage() {
               </>
             )}
 
-            {jobs.length > 0 && state.homeViewMode === "cluster" && (
+            {dataReady && jobs.length > 0 && state.homeViewMode === "cluster" && (
               <>
                 <div
                   style={{

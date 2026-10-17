@@ -14,18 +14,21 @@ export function useRubric(jobId: string | null) {
   const [loading, setLoading] = useState(!!jobId);
   const [error, setError] = useState("");
   const pollTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const currentJob = useRef(jobId);
+  currentJob.current = jobId;
 
   const load = useCallback(() => {
     if (!jobId) return Promise.resolve(null);
     return api<RubricState>(`/jobs/${jobId}/rubric`)
-      .then((s) => { setState(s); setError(""); return s; })
-      .catch((e: ApiError) => { setError(e.code); return null; });
+      .then((s) => { if (currentJob.current === jobId) { setState(s); setError(""); } return s; })
+      .catch((e: ApiError) => { if (currentJob.current === jobId) setError(e.code); return null; });
   }, [jobId]);
 
   useEffect(() => {
     if (!jobId) { setState(null); setLoading(false); setError(""); return; }
     setLoading(true);
-    load().finally(() => setLoading(false));
+    setState(null); setError('');
+    load().finally(() => { if (currentJob.current === jobId) setLoading(false); });
   }, [jobId, load]);
 
   // Re-poll while a generation is queued/parsing; stop as soon as it lands.
@@ -62,5 +65,5 @@ export function useRubric(jobId: string | null) {
     await load();
   }, [jobId, load]);
 
-  return { state, loading, error, generate, updateCards, confirm, newVersion, reload: load };
+  return { state: state?.jobId === jobId ? state : null, loading, error, generate, updateCards, confirm, newVersion, reload: load };
 }

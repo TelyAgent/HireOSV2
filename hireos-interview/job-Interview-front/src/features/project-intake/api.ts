@@ -73,6 +73,7 @@ export type CardInput = {
   competencyTags: string[]; expectedEvidence: string; levelAnchors: LevelAnchors; weight: number;
 };
 export type RubricVersion = {
+  sourceJdVersion?: number | null;
   id: string; jobId: string; versionNumber: number; status: 'draft' | 'confirmed'; version: number;
   confirmedBy: string | null; confirmedAt: string | null; createdAt: string; cards: CapabilityCard[];
 };
