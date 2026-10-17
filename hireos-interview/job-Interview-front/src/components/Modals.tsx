@@ -73,6 +73,8 @@ export function CreateProjectModal() {
           <div style={{ marginTop: 3, fontSize: 11, fontWeight: 700, color: "var(--bad)", letterSpacing: ".02em" }}>{t.required}</div>
           <textarea
             id="jdTextInput"
+            aria-invalid={form.jdRequired || undefined}
+            aria-describedby={form.jdRequired ? 'jdRequiredError' : undefined}
             value={form.jdText}
             onChange={(e) => form.editJdText(e.target.value)}
             placeholder={t.jdPlaceholder}
@@ -82,6 +84,7 @@ export function CreateProjectModal() {
               resize: "none", boxSizing: "border-box", outline: "none", fontFamily: "inherit",
             }}
           />
+          {form.jdRequired && <div id="jdRequiredError" role="alert" style={{ marginTop: 6, color: 'var(--bad)', fontSize: 12.5 }}>{form.error}</div>}
           <label
             htmlFor="jdFileInput"
             style={{
@@ -204,7 +207,7 @@ export function CreateProjectModal() {
         </div>
       )}
 
-      {form.error && <div role="alert" style={{ marginTop: 12, fontSize: 12.5, color: "var(--bad)" }}>{form.error}</div>}
+      {form.error && !form.jdRequired && <div role="alert" style={{ marginTop: 12, fontSize: 12.5, color: "var(--bad)" }}>{form.error}</div>}
       <div style={{ marginTop: 22, paddingTop: 16, borderTop: "1px solid var(--line)", display: "flex", alignItems: "center", justifyContent: "flex-end", gap: 16 }}>
         <button
           onClick={close_}

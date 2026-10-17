@@ -35,7 +35,7 @@ const zh: typeof en = {
 const errors: Record<string, [string, string]> = {
   NETWORK_ERROR: ['Unable to reach the server. Your input is retained.', '无法连接服务器，输入已保留。'],
   REQUEST_FAILED: ['Request failed. Please retry.', '请求失败，请重试。'],
-  JD_REQUIRED: ['Provide a job description.', '请提供岗位描述。'],
+  JD_REQUIRED: ['A job description is required before a project can be created.', '创建项目之前必须提供岗位描述。'],
   JOB_NOT_PUBLISHED: ['This job is not published yet. Publish it in JD Management or paste its JD.', '该岗位尚未发布，请先在职位管理中发布，或粘贴 JD 新建。'],
   JD_NOT_RECOGNIZED: ['AI found no job title or job content in this text. Check the JD and try again.', 'AI 没有从这段文字中识别到职位名称和岗位内容，请检查 JD 后重试。'],
   LLM_INVALID_OUTPUT: ['AI returned an unreadable result. Nothing was created — please retry.', 'AI 返回结果无法解析，未创建任何内容，请重试。'],

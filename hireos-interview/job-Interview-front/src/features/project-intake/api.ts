@@ -38,6 +38,7 @@ export type Job = JobSummary & {
 
 // GET /tasks — the flat, candidate-centric side. Each row is a unique (Job, Candidate) pair.
 export type TaskSummary = {
+  resume: { material: { id: string; name: string } } | null;
   id: string; jobId: string; status: string; reviewed: boolean; version: number;
   matchScore: number | null; matchRecommendation: string | null; createdAt: string;
   job: { title: string }; candidate: CandidateRef & { possibleDuplicate?: boolean };

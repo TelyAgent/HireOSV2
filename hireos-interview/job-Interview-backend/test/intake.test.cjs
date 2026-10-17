@@ -170,6 +170,13 @@ test('intake persistence, validation, parsing and recovery', async (t) => {
       const row = await db.interviewTask.findUnique({ where: { id: body.task.id } });
       assert.equal(row.origin, 'quick_start'); assert.ok(row.coreApplicationId);
       assert.equal([...coreApplications.values()].at(-1).origin, 'interview_quick_start');
+      const listed = await (await fetch(`${base}/tasks`)).json();
+      assert.equal(listed.find(t => t.id === body.task.id).resume.material.id, resume.id);
+      assert.equal(listed.find(t => t.id === body.task.id).resume.material.name, 'Lin_Chen.txt');
+      await db.interviewTask.update({ where: { id: body.task.id }, data: { resumeId: null } });
+      const withoutResume = await (await fetch(`${base}/tasks`)).json();
+      assert.equal(withoutResume.find(t => t.id === body.task.id).resume, null);
+      await db.interviewTask.update({ where: { id: body.task.id }, data: { resumeId: row.resumeId } });
     });
     await t.test('quick start: a résumé another subsystem already knows reuses that Core candidate', async () => {
       const form = new FormData(); form.append('file', new Blob(['Wen Shared\n\nKnown to Written already.']), 'Wen_Shared.txt');

@@ -123,6 +123,7 @@ export class TasksService {
         matchScore: true, matchRecommendation: true, createdAt: true,
         job: { select: { title: true } },
         candidate: { select: { id: true, name: true, email: true, possibleDuplicate: true } },
+        resume: { select: { material: { select: { id: true, name: true } } } },
         rounds: { select: { status: true } },
       } });
   }

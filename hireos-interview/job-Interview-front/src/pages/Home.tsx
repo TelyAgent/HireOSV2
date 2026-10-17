@@ -18,6 +18,7 @@ import {
   TrendSvg,
 } from "../components/ui/Icons";
 import { characters, initials } from "../lib/initials";
+import { ResumePreview } from '../features/project-intake/ResumePreview';
 
 // By whole characters, never half of one (#240).
 function initialsFromTitle(title: string) {
@@ -36,6 +37,7 @@ export function HomePage() {
   const [loading, setLoading] = useState(true);
   const [reload, setReload] = useState(0);
   const [expandedRoles, setExpandedRoles] = useState<Record<string, boolean>>({});
+  const [resumeTaskId, setResumeTaskId] = useState<string | null>(null);
   useEffect(() => {
     let active = true;
     setLoading(true);
@@ -70,6 +72,7 @@ export function HomePage() {
   const jobsById = new Map(jobs.map((j) => [j.id, j]));
   // Phase-1 dedupe flag from the backend: the résumé's email matches another Core Record candidate.
   const duplicateCandidateIds = new Set(savedTasks.filter((t) => t.candidate.possibleDuplicate).map((t) => t.candidate.id));
+  const resumeTaskIds = new Set(savedTasks.filter(t => t.resume?.material?.id).map(t => t.id));
 
   const taskRows = tasks.map((task) => {
     const job = jobsById.get(task.jobId);
@@ -86,6 +89,7 @@ export function HomePage() {
       role: job?.title || it.notLinked,
       candidate: candidate?.name || it.notLinked,
       candidateLinked: !!candidate,
+      hasResume: resumeTaskIds.has(task.id),
       possibleDuplicate: duplicateCandidateIds.has(task.candidateId),
       status: task.status,
       statusLabel: state.lang === "zh" ? meta.zh : meta.en,
@@ -555,7 +559,7 @@ export function HomePage() {
                     role="button"
                     tabIndex={0}
                     onClick={() => p.open()}
-                    onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); p.open(); } }}
+                    onKeyDown={(e) => { if (e.target === e.currentTarget && (e.key === "Enter" || e.key === " ")) { e.preventDefault(); p.open(); } }}
                     style={{
                       display: "grid",
                       gridTemplateColumns: "1.75fr 1.15fr 1.15fr .82fr .74fr",
@@ -611,13 +615,9 @@ export function HomePage() {
                       <button
                         onClick={(e) => {
                           e.stopPropagation();
-                          say(
-                            p.candidateLinked
-                              ? (state.lang === "zh" ? "简历预览功能即将上线。" : "Résumé preview is coming soon.")
-                              : (state.lang === "zh" ? "请先关联候选人简历。" : "Link a candidate résumé first."),
-                          );
+                          setResumeTaskId(p.id);
                         }}
-                        disabled={!p.candidateLinked}
+                        disabled={!p.hasResume}
                         style={{
                           height: 30,
                           width: "100%",
@@ -625,12 +625,12 @@ export function HomePage() {
                           border: "1px solid var(--line)",
                           borderRadius: 8,
                           background: "var(--surface)",
-                          color: p.candidateLinked ? "var(--brand)" : "var(--ink-3)",
+                          color: p.hasResume ? "var(--brand)" : "var(--ink-3)",
                           fontSize: 11.5,
-                          cursor: p.candidateLinked ? "pointer" : "not-allowed",
+                          cursor: p.hasResume ? "pointer" : "not-allowed",
                         }}
                       >
-                        {t.viewResume}
+                        {p.hasResume ? t.viewResume : (state.lang === 'zh' ? '未提供简历' : 'No resume')}
                       </button>
                     </div>
                   </div>
@@ -730,10 +730,11 @@ export function HomePage() {
                                     {c.currentRound && <div style={{ fontSize: 10.5, color: "var(--ink-3)" }}>{c.currentRound.interviewer}</div>}
                                   </div>
                                   <button
-                                    onClick={() => say(state.lang === "zh" ? "简历预览功能即将上线。" : "Résumé preview is coming soon.")}
+                                    disabled={!c.hasResume}
+                                    onClick={() => setResumeTaskId(c.id)}
                                     style={{ height: 28, padding: "0 8px", border: "1px solid var(--line)", borderRadius: 7, background: "var(--surface)", color: "var(--brand)", fontSize: 10.5, cursor: "pointer" }}
                                   >
-                                    {t.viewResume}
+                                    {c.hasResume ? t.viewResume : (state.lang === 'zh' ? '未提供简历' : 'No resume')}
                                   </button>
                                 </div>
                               ))}
@@ -791,6 +792,7 @@ export function HomePage() {
           </div>
         </div>
       </div>
+      {resumeTaskId && <ResumePreview key={resumeTaskId} taskId={resumeTaskId} lang={state.lang} onClose={() => setResumeTaskId(null)} />}
     </div>
   );
 }

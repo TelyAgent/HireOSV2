@@ -49,6 +49,7 @@ export function useCreateProject() {
   // Editing the text by hand means it no longer is the file's text.
   function editJdText(text: string) {
     setJdText(text);
+    if (error === 'JD_REQUIRED' && text.trim()) setError('');
     if (jdFile?.materialId) setJdFile(undefined);
   }
 
@@ -134,6 +135,7 @@ export function useCreateProject() {
     resume, pickResume, removeResume,
     create, creating, reset,
     error: error ? errorText(error, state.lang) : '',
+    jdRequired: error === 'JD_REQUIRED',
     busy: creating || jdFileBusy || Boolean(resume?.uploading),
   };
 }
