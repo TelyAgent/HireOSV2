@@ -73,10 +73,10 @@ export function RubricPage() {
   const saveCard = async () => {
     if (!draft || !rubric) return;
     if (!draft.requirement.trim()) { say(zh ? "请填写 JD 要求。" : "Enter the JD requirement."); return; }
-    const others = rubric.cards.filter((c) => c.id !== draft.id).map((c) => draftToInput(draftFromCard(c)));
+    const cards = rubric.cards.map((c) => c.id === draft.id ? draftToInput(draft) : draftToInput(draftFromCard(c)));
     setSaving(true);
     try {
-      await updateCards(rubric.version, [...others, draftToInput(draft)]);
+      await updateCards(rubric.version, cards);
       closeDrawer();
     } catch (e) {
       say(errorText((e as { code?: string }).code || "REQUEST_FAILED", state.lang));

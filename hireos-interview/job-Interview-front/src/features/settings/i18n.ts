@@ -23,6 +23,9 @@ const ZH: Record<string, string> = {
   Theme: "主题",
   Accent: "强调色",
   "Text size": "文字大小",
+  "Text size preview": "字号预览",
+  "Review the details below before you continue. This preview updates immediately when you change the text size.":
+    "继续之前请核对下面的详细信息。切换字号后，此预览会立即更新。",
   Light: "浅色",
   Dark: "深色",
   Deep: "深蓝",
