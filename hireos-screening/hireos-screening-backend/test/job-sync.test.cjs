@@ -16,7 +16,8 @@ function setup(remoteCount, { deletedRemotely = 0, closedRemotely = 0, delayMs =
       findMany: async ({ where }) => local.filter((r) => match(r, where)).map((r) => ({ ...r, criteriaVersions: [] })),
       update: async ({ where, data }) => { count.updates++; Object.assign(local.find((r) => r.id === where.id), data); },
     },
-    preLinkMatchEvaluation: { findMany: async () => [] }, candidateJobRecommendation: { findMany: async () => [] }, application: { findMany: async () => [] }, resumeVersion: { findMany: async () => [] },
+    // The funnels are counted in SQL (#414); no rows behind them here.
+    $queryRaw: async () => [],
   };
   const directory = () => [...remote].sort((a, b) => b.createdAt - a.createdAt).slice(0, 100);
   const core = {

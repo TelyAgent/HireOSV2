@@ -8,7 +8,7 @@ import { criteriaSchema, validate, type CriteriaInput } from './contracts';
 import { CoreRecordClient } from '../core-record/core-record.client';
 import { JobCriteriaFacade, type RemoteCriteriaProjection } from './job-criteria.facade';
 import { invalidSchemaFromZod } from '../http/invalid-schema';
-import { computeJobFunnels, type ResumeInfo } from './job-funnels';
+import { aggregateJobFunnels } from './job-funnels';
 
 const DEFAULT_DIMENSIONS = [
   { id: 'dim-skills', name: 'Skills', weight: 0.25, rubric: 'How closely the candidate skills match the role.' },
@@ -49,37 +49,10 @@ export class JobsService {
    * Resumes (candidates actually evaluated against the job, plus anyone already matched/linked) → Matched (live AI recommendation, incl. already linked)
    * → Linked (an Application exists). Each stage is a subset of the previous one.
    */
-  private async jobFunnels(workspaceId: string, jobIds: string[]) {
-    const [evaluations, recs, applications] = await Promise.all([
-      this.db.preLinkMatchEvaluation.findMany({
-        where: { workspaceId, jobId: { in: jobIds } },
-        distinct: ['candidateId', 'jobId'],
-        select: { candidateId: true, jobId: true },
-      }),
-      this.db.candidateJobRecommendation.findMany({
-        where: { workspaceId, jobId: { in: jobIds }, status: { in: ['proposed', 'deferred', 'confirmed'] } },
-        select: { candidateId: true, jobId: true, status: true },
-      }),
-      this.db.application.findMany({ where: { workspaceId, jobId: { in: jobIds } }, select: { candidateId: true, jobId: true } }),
-    ]);
-    const allIds = [...new Set([...evaluations.map((e) => e.candidateId), ...recs.map((r) => r.candidateId), ...applications.map((a) => a.candidateId)])];
-    const versions = await this.db.resumeVersion.findMany({
-      where: { workspaceId, candidateId: { in: allIds } },
-      select: { candidateId: true, isLatest: true, version: true, uploadedAt: true, material: { select: { sourceType: true } } },
-    });
+  private jobFunnels(workspaceId: string, jobIds: string[]) {
     const startOfToday = new Date();
     startOfToday.setHours(0, 0, 0, 0);
-    const resumeInfo = new Map<string, ResumeInfo>();
-    for (const v of versions) {
-      const prev = resumeInfo.get(v.candidateId);
-      const today = (prev?.today ?? false) || v.uploadedAt >= startOfToday;
-      const better = !prev || (v.isLatest && !prev.isLatest) || (v.isLatest === prev.isLatest && v.version > prev.version);
-      resumeInfo.set(v.candidateId, better
-        ? { source: v.material?.sourceType || 'manual_upload', version: v.version, isLatest: v.isLatest, today }
-        : { ...prev, today });
-    }
-
-    return computeJobFunnels(jobIds, evaluations, recs, applications, resumeInfo);
+    return aggregateJobFunnels(this.db, workspaceId, jobIds, startOfToday);
   }
 
   /**
