@@ -35,7 +35,7 @@ import { mergeVoiceTranscript } from "../../lib/voice-stream";
 import { fmtRelative } from "../../lib/format";
 import type { Audience, Requirement } from "../../data/types";
 import type { ConversationActionOption, FieldMetaMap, GeminiCreatePath, GeminiCreateRetry, GeminiDraft, GeminiMsg, GeminiOrigin, GeminiRequestRetry, GeminiVariant } from "../../store/types";
-import { ATTACHMENT_FILE_EMPTY, ATTACHMENT_TOO_LARGE, MAX_ATTACHMENT_MB, describeCopilotError } from "./copilotErrors";
+import { ATTACHMENT_FILE_EMPTY, ATTACHMENT_TOO_LARGE, HISTORY_ROUNDS, HISTORY_TRIMMED, MAX_ATTACHMENT_MB, describeCopilotError } from "./copilotErrors";
 import { toGroupedLines, toLines } from "./formLines";
 import { safeRandomUUID } from "../../lib/uuid";
 
@@ -1112,7 +1112,9 @@ export function GeminiPanel({ ctx }: { ctx: GeminiCtx }) {
           {msgs.length === 0 ? (
             <CreateHub onStart={startPath} />
           ) : (
-            msgs.map((m, i) => (
+            <>
+            {msgs.filter((m) => m.role === "user").length > HISTORY_ROUNDS && <div className="tiny muted" role="note">{t(HISTORY_TRIMMED)}</div>}
+            {msgs.map((m, i) => (
               <GeminiMessage
                 key={i}
                 msg={m}
@@ -1130,7 +1132,8 @@ export function GeminiPanel({ ctx }: { ctx: GeminiCtx }) {
                 onRetryRequest={() => retryRequest(i)}
                 onStartOver={startNewConversation}
               />
-            ))
+            ))}
+            </>
           )}
         </div>
       )}

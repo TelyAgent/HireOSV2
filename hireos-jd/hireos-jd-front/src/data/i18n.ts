@@ -1168,6 +1168,8 @@ export const ZH: Record<string, string> = {
   "No change needed — nothing was proposed.": "无需改动，没有生成修改建议。",
   "Copilot couldn’t answer that. Please try again.": "Copilot 暂时无法回答，请重试。",
   "Copilot is temporarily unavailable. Your input is kept — retry in a moment.": "Copilot 暂时不可用，你的输入已保留，请稍后重试。",
+  "This conversation is too long for AI to continue. Start a new conversation — the draft fields are saved.": "对话太长，AI 无法继续处理。请开始新的对话——草稿字段已保存。",
+  "This conversation is long, so AI reads only the latest 10 rounds plus the draft’s confirmed fields.": "对话较长，AI 只参考最近 10 轮对话和草稿中已确认的字段。",
   "Couldn’t reach Copilot. Check your connection, then retry.": "无法连接到 Copilot，请检查网络后重试。",
   "Sorry, Copilot couldn’t process that just now. Your input is kept — please retry.": "抱歉，Copilot 暂时无法处理这条请求，你的输入已保留，请重试。",
   "Choose the file again": "重新选择文件",

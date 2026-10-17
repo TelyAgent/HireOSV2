@@ -11,6 +11,7 @@ import { LlmProvider, type ChatTurn, type WebAnswer } from './llm-provider';
 import { PromptRegistry } from './prompt-registry';
 import { fieldsToDraftContent } from './draft-mapping';
 import { ReplyStreamExtractor } from './reply-stream-extractor';
+import { historyTurns } from './history-budget';
 import { asFieldMeta, confirmFields, recordChanges } from './field-meta';
 import { QUICK_START_ASSESS_PROMPT, TITLE_UNCONFIRMED, followUp, parseAssessment, tooThinToAssess } from './quick-start';
 import { factsInstruction, pickFacts, pinFacts, type JobFacts } from './variant-facts';
@@ -159,7 +160,7 @@ export class CopilotService {
 
     const history = await this.db.copilotMessage.findMany({ where: { conversationId: id }, orderBy: { sequence: 'asc' } });
     const turns: ChatTurn[] = [
-      ...historyTurns(history),
+      ...historyTurns(history, asRecord(conversation.fields) as JdFields),
       { role: 'user', content: input.text },
     ];
     return {
@@ -411,7 +412,7 @@ export class CopilotService {
   ) {
     const history = await this.db.copilotMessage.findMany({ where: { conversationId: id }, orderBy: { sequence: 'asc' } });
     const turns: ChatTurn[] = [
-      ...historyTurns(history),
+      ...historyTurns(history, asRecord(conversation.fields) as JdFields),
       { role: 'user', content: source.llmContent },
     ];
     const parsed = await this.runFileExtractTurn(identity, id, turns);
@@ -1059,13 +1060,6 @@ function draftChanged(fields: string[]) {
 }
 
 /** Conversation history as model turns; an upload is shown without its file name, which says nothing reliable about the job (#80). */
-function historyTurns(history: Array<{ role: string; text: string | null; attachments: unknown }>): ChatTurn[] {
-  return history.map((message) => {
-    const isUpload = Array.isArray(message.attachments) && message.attachments.some((a) => asRecord(a).filename !== undefined);
-    return { role: message.role as 'user' | 'assistant', content: isUpload ? '[已上传文件]' : message.text || '' };
-  });
-}
-
 /**
  * Source material (an uploaded file, a job page, pasted text) framed as data. It is untrusted: an instruction
  * inside it ("ignore the previous instructions…") is text to read past, never something to do (#80 AC-2).

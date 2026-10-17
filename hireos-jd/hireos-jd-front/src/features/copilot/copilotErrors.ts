@@ -14,6 +14,8 @@ export function describeCopilotError(error: unknown): string {
     // Upload problems the user fixes by picking another file (#82).
     if (error.status === 413 || error.code === "ATTACHMENT_TOO_LARGE") return ATTACHMENT_TOO_LARGE;
     if (error.code === "ATTACHMENT_FILE_EMPTY") return ATTACHMENT_FILE_EMPTY;
+    // Retrying can't help: the conversation itself is longer than the model takes (#145).
+    if (error.code === "LLM_CONTEXT_TOO_LONG") return CONTEXT_TOO_LONG;
     if (error.status === 429) return "Copilot is getting too many requests right now. Wait a moment, then retry.";
     if (error.status === 0 || error.status >= 500 || error.code === "IDENTITY_UNAVAILABLE") {
       return "Copilot is temporarily unavailable. Your input is kept — retry in a moment.";
@@ -25,6 +27,12 @@ export function describeCopilotError(error: unknown): string {
   if (error instanceof Error && isReadable(error.message)) return error.message;
   return GENERIC;
 }
+
+export const CONTEXT_TOO_LONG = "This conversation is too long for AI to continue. Start a new conversation — the draft fields are saved.";
+
+/** Same as the backend's `HISTORY_ROUNDS`: the rounds AI reads as written; older ones are left out (#145). */
+export const HISTORY_ROUNDS = 10;
+export const HISTORY_TRIMMED = "This conversation is long, so AI reads only the latest 10 rounds plus the draft’s confirmed fields.";
 
 /** Same limit as the backend's `MAX_ATTACHMENT_BYTES`. */
 export const MAX_ATTACHMENT_MB = 10;

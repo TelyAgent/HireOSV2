@@ -48,8 +48,7 @@ export class LlmProvider {
       if (!content) throw new Error('LLM_EMPTY_RESPONSE');
       return content;
     } catch (error) {
-      const message = error instanceof Error ? error.message : 'LLM_REQUEST_FAILED';
-      throw new ServiceUnavailableException({ code: 'LLM_REQUEST_FAILED', message });
+      throw requestFailure(error);
     }
   }
 
@@ -67,8 +66,7 @@ export class LlmProvider {
         if (delta) yield delta;
       }
     } catch (error) {
-      const message = error instanceof Error ? error.message : 'LLM_REQUEST_FAILED';
-      throw new ServiceUnavailableException({ code: 'LLM_REQUEST_FAILED', message });
+      throw requestFailure(error);
     }
   }
 
@@ -98,8 +96,7 @@ export class LlmProvider {
       if (!text) throw new Error('LLM_EMPTY_RESPONSE');
       return { text, sources: [...sources.values()].slice(0, 5) };
     } catch (error) {
-      const message = error instanceof Error ? error.message : 'LLM_REQUEST_FAILED';
-      throw new ServiceUnavailableException({ code: 'LLM_REQUEST_FAILED', message });
+      throw requestFailure(error);
     }
   }
 }
@@ -111,4 +108,17 @@ function stripInlineMarkdown(text: string): string {
     .replace(/\[([^\]]+)\]\([^)]*\)/g, '$1')
     .replace(/\*\*([^*]+)\*\*/g, '$1')
     .trim();
+}
+
+/**
+ * The provider's error as the API's. A request longer than the model's context is told apart (#145): retrying it
+ * fails the same way, so the user is told to start a new conversation instead of being asked to retry.
+ */
+export function requestFailure(error: unknown): ServiceUnavailableException {
+  const message = error instanceof Error ? error.message : 'LLM_REQUEST_FAILED';
+  const code = (error as { code?: unknown } | null)?.code;
+  if (code === 'context_length_exceeded' || /maximum context length|context[_ ]length|too many tokens/i.test(message)) {
+    return new ServiceUnavailableException({ code: 'LLM_CONTEXT_TOO_LONG', message: 'This conversation is too long for AI to continue. Start a new conversation; the draft fields are saved.' });
+  }
+  return new ServiceUnavailableException({ code: 'LLM_REQUEST_FAILED', message });
 }
