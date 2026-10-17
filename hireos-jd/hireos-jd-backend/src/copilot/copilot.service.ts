@@ -6,7 +6,8 @@ import { extractTextFromLink } from './link-extract';
 import { CoreRecordClient } from '../core/core-record.client';
 import { DraftsService } from '../drafts/drafts.service';
 import { PrismaService } from '../persistence/prisma.service';
-import { findIdempotent, json, requestHash, storeIdempotency, type RequestMeta } from '../records';
+import { json, requestHash, storeIdempotency, type RequestMeta } from '../records';
+import { findLiveIdempotent, liveRun, replayRef } from './idempotency-replay';
 import { LlmProvider, type ChatTurn, type WebAnswer } from './llm-provider';
 import { PromptRegistry } from './prompt-registry';
 import { fieldsToDraftContent } from './draft-mapping';
@@ -81,13 +82,13 @@ export class CopilotService {
 
   async createConversation(identity: Identity, meta: RequestMeta) {
     return this.db.$transaction(async (tx) => {
-      const prior = await findIdempotent(tx, identity, 'copilot.conversation.create', meta, {});
-      if (prior.prior) return prior.prior.responseBody;
+      const prior = await findLiveIdempotent(tx, identity, 'copilot.conversation.create', meta, {});
+      if (prior.prior) return this.replay(identity, prior.prior.responseBody);
       const conversation = await tx.copilotConversation.create({
         data: { workspaceId: identity.workspaceId, actorId: identity.actorId },
       });
       const result = serializeConversation(conversation, []);
-      await storeIdempotency(tx, identity, 'copilot.conversation.create', prior.key, prior.hash, result);
+      await storeIdempotency(tx, identity, 'copilot.conversation.create', prior.key, prior.hash, replayRef(result));
       return result;
     });
   }
@@ -150,12 +151,10 @@ export class CopilotService {
     const operation = `copilot.message:${id}`;
     const hash = requestHash(input);
 
-    const existing = await this.db.idempotencyKey.findUnique({
-      where: { workspaceId_operation_key: { workspaceId: identity.workspaceId, operation, key } },
-    });
+    const existing = await liveRun(this.db, identity, operation, key);
     if (existing) {
       if (existing.requestHash !== hash) throw new ConflictException({ code: 'IDEMPOTENCY_CONFLICT' });
-      return { cached: existing.responseBody as unknown as SerializedConversation };
+      return { cached: (await this.replay(identity, existing.responseBody)) as SerializedConversation };
     }
 
     const history = await this.db.copilotMessage.findMany({ where: { conversationId: id }, orderBy: { sequence: 'asc' } });
@@ -204,12 +203,10 @@ export class CopilotService {
 
     try {
       return await this.db.$transaction(async (tx) => {
-        const prior = await tx.idempotencyKey.findUnique({
-          where: { workspaceId_operation_key: { workspaceId: identity.workspaceId, operation, key } },
-        });
+        const prior = await liveRun(tx, identity, operation, key);
         if (prior) {
           if (prior.requestHash !== hash) throw new ConflictException({ code: 'IDEMPOTENCY_CONFLICT' });
-          return prior.responseBody as unknown as SerializedConversation;
+          return (await this.replay(identity, prior.responseBody)) as SerializedConversation;
         }
         // This UPDATE is also the concurrency lock point: Postgres holds a row lock on the conversation
         // for the rest of this transaction, so a second concurrent turn on the same conversation blocks
@@ -252,7 +249,7 @@ export class CopilotService {
         const messages = await tx.copilotMessage.findMany({ where: { conversationId: id }, orderBy: { sequence: 'asc' } });
         const result = serializeConversation(updated, messages);
         await tx.idempotencyKey.create({
-          data: { workspaceId: identity.workspaceId, operation, key, requestHash: hash, responseBody: json(result) },
+          data: { workspaceId: identity.workspaceId, operation, key, requestHash: hash, responseBody: json(replayRef(result)) },
         });
         return result;
       });
@@ -343,12 +340,10 @@ export class CopilotService {
     const attachmentMeta = { filename: file.originalname, mimeType: file.mimetype, size: file.size };
     const hash = requestHash(attachmentMeta);
 
-    const existing = await this.db.idempotencyKey.findUnique({
-      where: { workspaceId_operation_key: { workspaceId: identity.workspaceId, operation, key } },
-    });
+    const existing = await liveRun(this.db, identity, operation, key);
     if (existing) {
       if (existing.requestHash !== hash) throw new ConflictException({ code: 'IDEMPOTENCY_CONFLICT' });
-      return existing.responseBody;
+      return this.replay(identity, existing.responseBody);
     }
 
     const text = await extractTextFromFile(file.buffer, file.mimetype, file.originalname);
@@ -375,12 +370,10 @@ export class CopilotService {
     const operation = `copilot.import:${id}`;
     const hash = requestHash(input);
 
-    const existing = await this.db.idempotencyKey.findUnique({
-      where: { workspaceId_operation_key: { workspaceId: identity.workspaceId, operation, key } },
-    });
+    const existing = await liveRun(this.db, identity, operation, key);
     if (existing) {
       if (existing.requestHash !== hash) throw new ConflictException({ code: 'IDEMPOTENCY_CONFLICT' });
-      return existing.responseBody;
+      return this.replay(identity, existing.responseBody);
     }
 
     if (input.url) {
@@ -499,20 +492,18 @@ export class CopilotService {
     const operation = `copilot.refine:${id}`;
     const key = meta.idempotencyKey?.trim();
     if (!key) throw new ConflictException({ code: 'IDEMPOTENCY_KEY_REQUIRED' });
-    const existing = await this.db.idempotencyKey.findUnique({
-      where: { workspaceId_operation_key: { workspaceId: identity.workspaceId, operation, key } },
-    });
+    const existing = await liveRun(this.db, identity, operation, key);
     if (existing) {
       if (existing.requestHash !== requestHash(input)) throw new ConflictException({ code: 'IDEMPOTENCY_CONFLICT' });
-      return existing.responseBody;
+      return this.replay(identity, existing.responseBody);
     }
 
     const answer = await this.answerIfQuestion(identity, id, current, input.note);
     if (answer) {
       // A question about the role, not an edit: answer it and leave the draft (fields, phase, revision) untouched.
       return this.db.$transaction(async (tx) => {
-        const prior = await findIdempotent(tx, identity, operation, meta, input);
-        if (prior.prior) return prior.prior.responseBody;
+        const prior = await findLiveIdempotent(tx, identity, operation, meta, input);
+        if (prior.prior) return this.replay(identity, prior.prior.responseBody);
         const latest = await tx.copilotMessage.findFirst({ where: { conversationId: id }, orderBy: { sequence: 'desc' } });
         const sequence = (latest?.sequence ?? 0) + 1;
         await tx.copilotMessage.create({ data: { conversationId: id, sequence, role: 'user', text: input.note, idempotencyKey: prior.key } });
@@ -521,7 +512,7 @@ export class CopilotService {
         });
         const messages = await tx.copilotMessage.findMany({ where: { conversationId: id }, orderBy: { sequence: 'asc' } });
         const result = { ...serializeConversation(conversation, messages), answer };
-        await storeIdempotency(tx, identity, operation, prior.key, prior.hash, result);
+        await storeIdempotency(tx, identity, operation, prior.key, prior.hash, replayRef(result));
         return result;
       });
     }
@@ -530,8 +521,8 @@ export class CopilotService {
     // Nothing really changed: keep the draft and its revision as they are, and say so in the history (#99).
     const changed = changedJdFields(current, fields).length > 0;
     return this.db.$transaction(async (tx) => {
-      const prior = await findIdempotent(tx, identity, operation, meta, input);
-      if (prior.prior) return prior.prior.responseBody;
+      const prior = await findLiveIdempotent(tx, identity, operation, meta, input);
+      if (prior.prior) return this.replay(identity, prior.prior.responseBody);
       // Conditional on the draft the refine started from: two overlapping refines can't both write the next
       // revision of a field, so a stale page can't confirm content it never saw (#68 review).
       const updated = changed
@@ -552,7 +543,7 @@ export class CopilotService {
       });
       const messages = await tx.copilotMessage.findMany({ where: { conversationId: id }, orderBy: { sequence: 'asc' } });
       const result = serializeConversation(updated, messages);
-      await storeIdempotency(tx, identity, operation, prior.key, prior.hash, result);
+      await storeIdempotency(tx, identity, operation, prior.key, prior.hash, replayRef(result));
       return result;
     });
   }
@@ -649,8 +640,8 @@ export class CopilotService {
 
     return this.db.$transaction(async (tx) => {
       const operation = `copilot.fields:${id}`;
-      const prior = await findIdempotent(tx, identity, operation, meta, input);
-      if (prior.prior) return prior.prior.responseBody;
+      const prior = await findLiveIdempotent(tx, identity, operation, meta, input);
+      if (prior.prior) return this.replay(identity, prior.prior.responseBody);
       // The user wrote or picked these: changed fields become theirs; saving also confirms the title (#66 #68).
       const fieldMeta = confirmFields(
         recordChanges(asFieldMeta(conversation.fieldMeta), asRecord(conversation.fields), input.fields, () => 'user'),
@@ -672,7 +663,7 @@ export class CopilotService {
       });
       const messages = await tx.copilotMessage.findMany({ where: { conversationId: id }, orderBy: { sequence: 'asc' } });
       const result = serializeConversation(updated, messages);
-      await storeIdempotency(tx, identity, operation, prior.key, prior.hash, result);
+      await storeIdempotency(tx, identity, operation, prior.key, prior.hash, replayRef(result));
       return result;
     });
   }
@@ -731,12 +722,10 @@ export class CopilotService {
     const userText = input.text || '自动补全并优化内容';
     const hash = requestHash({ userText });
 
-    const existing = await this.db.idempotencyKey.findUnique({
-      where: { workspaceId_operation_key: { workspaceId: identity.workspaceId, operation, key } },
-    });
+    const existing = await liveRun(this.db, identity, operation, key);
     if (existing) {
       if (existing.requestHash !== hash) throw new ConflictException({ code: 'IDEMPOTENCY_CONFLICT' });
-      return existing.responseBody;
+      return this.replay(identity, existing.responseBody);
     }
 
     const history = await this.db.copilotMessage.findMany({ where: { conversationId: id }, orderBy: { sequence: 'asc' } });
@@ -783,12 +772,10 @@ export class CopilotService {
     if (!key) throw new ConflictException({ code: 'IDEMPOTENCY_KEY_REQUIRED' });
     const operation = `copilot.quick-start:${id}`;
     const hash = requestHash({ answers: input.answers });
-    const existing = await this.db.idempotencyKey.findUnique({
-      where: { workspaceId_operation_key: { workspaceId: identity.workspaceId, operation, key } },
-    });
+    const existing = await liveRun(this.db, identity, operation, key);
     if (existing) {
       if (existing.requestHash !== hash) throw new ConflictException({ code: 'IDEMPOTENCY_CONFLICT' });
-      return existing.responseBody;
+      return this.replay(identity, existing.responseBody);
     }
 
     // The answers so far live in the conversation, not the browser: a closed panel or a reload loses nothing.
@@ -872,6 +859,19 @@ export class CopilotService {
     } catch (error) {
       throw await this.recordLlmFailure(identity, id, 'jd_quick_start_assess', error);
     }
+  }
+
+  /**
+   * What a replayed request returns (#142): the conversation as it is now. Requests store only a reference to it;
+   * a row written before that still holds a full snapshot, which is returned as it was.
+   */
+  private async replay(identity: Identity, body: unknown): Promise<unknown> {
+    const ref = asRecord(body);
+    if (ref.replay !== 'conversation' || typeof ref.id !== 'string') return body;
+    const conversation = await this.loadConversation(identity, ref.id);
+    const messages = await this.db.copilotMessage.findMany({ where: { conversationId: ref.id }, orderBy: { sequence: 'asc' } });
+    const result = serializeConversation(conversation, messages);
+    return ref.answer ? { ...result, answer: ref.answer } : result;
   }
 
   private async loadConversation(identity: Identity, id: string): Promise<ConversationRow> {

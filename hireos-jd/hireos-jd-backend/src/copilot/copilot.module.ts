@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common';
+import { CopilotIdempotencyRetention } from './idempotency-replay';
 import { AuthModule } from '../auth/auth.module';
 import { CoreRecordClient } from '../core/core-record.client';
 import { DraftsModule } from '../drafts/drafts.module';
@@ -16,6 +17,6 @@ import { PromptRegistry } from './prompt-registry';
 @Module({
   imports: [AuthModule, DraftsModule],
   controllers: [CopilotController, CopilotObservabilityController, DocRewriteController, DocAiController],
-  providers: [PrismaService, LlmProvider, PromptRegistry, CoreRecordClient, CopilotService, DocRewriteService, DocAiService],
+  providers: [PrismaService, LlmProvider, PromptRegistry, CoreRecordClient, CopilotService, DocRewriteService, DocAiService, CopilotIdempotencyRetention],
 })
 export class CopilotModule {}
