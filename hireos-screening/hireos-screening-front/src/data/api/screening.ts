@@ -54,6 +54,9 @@ export async function getApplicationDetail(id: string): Promise<ApplicationDetai
 export interface ApplicationWithNames extends Application {
   candidateName?: string;
   jobTitle?: string;
+  /** The candidate's owner and latest résumé source, for the workspace filters (#198). */
+  candidateOwnerId?: string;
+  candidateSource?: string;
 }
 
 /** Confirmed candidates for one job -- the "Linked candidates" table on the

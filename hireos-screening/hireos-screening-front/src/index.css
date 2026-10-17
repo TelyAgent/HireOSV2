@@ -597,3 +597,32 @@ a:focus-visible,button:focus-visible,[tabindex]:focus-visible,input:focus-visibl
 .library-filters label{ white-space:nowrap; }
 .info-inline{ display:flex; align-items:center; gap:8px; flex-wrap:wrap; color:var(--info-text); font-size:var(--fs-sm); background:var(--info-bg); border:1px solid var(--info-border); padding:10px 14px; border-radius:6px; }
 .input-invalid, input[aria-invalid="true"].input-invalid{ border-color: var(--danger-text) !important; }
+
+/* The linked-candidates table at laptop widths (#203): no horizontal scroll at 1024px. The avatar goes, the AI
+   column folds into the status cell, and the Open column stays in view even when a zoomed table must scroll. */
+.linked-candidates-table .coverage-col{ min-width:120px; }
+.linked-candidates-table .ai-inline{ display:none; margin-top:4px; }
+.linked-candidates-table .open-col{ position:sticky; right:0; background:var(--surface); }
+.linked-candidates-table th.open-col{ background:var(--surface-2); }
+.linked-candidates-table tr.clickable:hover .open-col{ background:var(--surface-alt); }
+@media (max-width:1280px){
+  .linked-candidates-table thead th:first-child, .linked-candidates-table tbody tr.clickable > td:first-child{ display:none; }
+  .linked-candidates-table .secondary-col{ display:none; }
+  .linked-candidates-table .ai-inline{ display:block; }
+  .linked-candidates-table th, .linked-candidates-table td{ padding:8px 8px; }
+  .linked-candidates-table th:nth-child(2), .linked-candidates-table td:nth-child(2){ padding-left:14px; }
+  .linked-candidates-table td:nth-child(2) label{ min-width:0; }
+  .linked-candidates-table .candidate-name{ min-width:0; overflow-wrap:anywhere; word-break:break-word; }
+  .linked-candidates-table .coverage-col{ min-width:84px; }
+  .linked-candidates-table .table-head-filter{ max-width:140px; text-overflow:ellipsis; }
+}
+
+/* Filters above the linked-candidates table (#198). */
+.workspace-filters{ display:flex; flex-wrap:wrap; gap:8px; align-items:center; margin:0 0 10px; }
+.workspace-filters select{ max-width:180px; }
+
+/* Page breadcrumbs (#209). */
+.breadcrumbs ol{ display:flex; flex-wrap:wrap; gap:6px; list-style:none; margin:0 0 6px; padding:0; font-size:var(--fs-sm); color:var(--text-secondary); }
+.breadcrumbs li + li::before{ content:"›"; margin-right:6px; color:var(--text-tertiary); }
+.breadcrumbs a{ color:var(--accent-text, var(--text-secondary)); text-decoration:none; }
+.breadcrumbs a:hover{ text-decoration:underline; }

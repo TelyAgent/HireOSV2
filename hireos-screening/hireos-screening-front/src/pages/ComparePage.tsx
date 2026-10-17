@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { useParams } from "react-router-dom";
+import { useLocation, useParams } from "react-router-dom";
 import { useStore } from "../store/StoreContext";
 import {
   addCandidateToComparison,
@@ -18,6 +18,7 @@ import { Badge, Button, CandidateAvatar, EligibilityBadge, EmptyState, Freshness
 import { EvidenceCard } from "../components/ui/EvidenceCard";
 import { Icon } from "../components/ui/Icons";
 import { Drawer, Modal } from "../components/ui/Overlays";
+import { purposeLabel, roundChangesView } from "../lib/snapshotChanges";
 import { PageSkeleton } from "../components/ui/PageSkeleton";
 
 type CompareMode = "same_stage" | "current_summary" | "round_changes";
@@ -31,7 +32,7 @@ interface Member {
 /* ---------------------------------------------------------------
    Key differences / round changes narrative
    --------------------------------------------------------------- */
-function computeKeyDifferences(job: Job, members: Member[], lang: "en" | "zh"): string[] {
+function computeKeyDifferences(job: Job, members: Member[], lang: "en" | "zh", t: (s: string) => string): string[] {
   const diffs: string[] = [];
   for (const d of job.dimensions) {
     const vals = members
@@ -46,8 +47,8 @@ function computeKeyDifferences(job: Job, members: Member[], lang: "en" | "zh"): 
     if (max.score - min.score >= 15) {
       diffs.push(
         lang === "zh"
-          ? `在「${d.name}」维度上，${max.cand.displayName} 的证据更强（${max.score}），高于 ${min.cand.displayName}（${min.score}）。如果该维度对本职位最重要，这会更有利于 ${max.cand.displayName} —— 但在将其视为决定性因素前，请先查看关联证据。`
-          : `On ${d.name}, ${max.cand.displayName} shows stronger evidence (${max.score}) than ${min.cand.displayName} (${min.score}). If this dimension matters most for the role, that favors ${max.cand.displayName} — but confirm via the linked evidence before treating it as decisive.`,
+          ? `在「${t(d.name)}」维度上，${max.cand.displayName} 的证据更强（${max.score}），高于 ${min.cand.displayName}（${min.score}）。如果该维度对本职位最重要，这会更有利于 ${max.cand.displayName} —— 但在将其视为决定性因素前，请先查看关联证据。`
+          : `On ${t(d.name)}, ${max.cand.displayName} shows stronger evidence (${max.score}) than ${min.cand.displayName} (${min.score}). If this dimension matters most for the role, that favors ${max.cand.displayName} — but confirm via the linked evidence before treating it as decisive.`,
       );
     }
   }
@@ -81,7 +82,7 @@ function computeKeyDifferences(job: Job, members: Member[], lang: "en" | "zh"): 
 
 function KeyDifferences({ job, members }: { job: Job; members: Member[] }) {
   const { t, state } = useStore();
-  const diffs = computeKeyDifferences(job, members, state.lang);
+  const diffs = computeKeyDifferences(job, members, state.lang, t);
   return (
     <div className="card card-pad" style={{ background: "var(--info-bg)", borderColor: "var(--info-border)" }}>
       <div className="flex items-center gap-8" style={{ color: "var(--info-text)", fontWeight: 600, fontSize: "var(--fs-sm)", marginBottom: 8 }}>
@@ -102,27 +103,30 @@ function KeyDifferences({ job, members }: { job: Job; members: Member[] }) {
   );
 }
 
-function RoundChanges({ cmp }: { cmp: ComparisonSet }) {
+function RoundChanges({ snap }: { snap: ComparisonSet["snapshots"][number] }) {
   const { t } = useStore();
-  const snap = cmp.snapshots[cmp.snapshots.length - 1];
+  // The snapshot chosen in the picker, not always the newest (#206).
+  const view = roundChangesView(snap, t);
   return (
     <div className="card card-pad" style={{ background: "var(--info-bg)", borderColor: "var(--info-border)" }}>
       <div className="flex items-center gap-8" style={{ color: "var(--info-text)", fontWeight: 600, fontSize: "var(--fs-sm)", marginBottom: 8 }}>
         <Icon name="history" size={18} />
         {t("Changes since last round")}
       </div>
-      {snap.changesSinceLast?.length ? (
+      {view.state === "changed" ? (
         <ul style={{ margin: 0, paddingLeft: 18, fontSize: "var(--fs-sm)" }}>
-          {snap.changesSinceLast.map((c, i) => (
-            <li key={i}>{c}</li>
+          {view.lines.map((line, i) => (
+            <li key={i}>{line}</li>
           ))}
         </ul>
+      ) : view.state === "unchanged" ? (
+        <p className="tiny">{t("No change since v{n}: the same members, scores and ranks.").replace("{n}", String(view.previousVersion))}</p>
       ) : (
         <p className="tiny">{t("This is the first snapshot for this comparison set.")}</p>
       )}
       {snap.note && (
         <p className="tiny" style={{ marginTop: 8 }}>
-          {snap.note}
+          {t(snap.note)}
         </p>
       )}
     </div>
@@ -137,7 +141,7 @@ function MatrixEvidenceDrawer({ member, dimension, onClose }: { member: Member; 
   const ds = member.ev?.dimensionScores.find((x) => x.id === dimension.id);
   const items = ds ? [...ds.supporting.map((id) => ({ id, rel: "Supports" as const })), ...ds.counter.map((id) => ({ id, rel: "Contradicts" as const }))] : [];
   return (
-    <Drawer open onClose={onClose} title={`${member.cand.displayName} — ${dimension.name}`}>
+    <Drawer open onClose={onClose} title={`${member.cand.displayName} — ${t(dimension.name)}`}>
       <p className="tiny" style={{ marginBottom: 14 }}>
         {t("Requirement → rubric → rationale → evidence → source excerpt.")}
       </p>
@@ -178,7 +182,7 @@ function CompareMatrix({ job, members, diffOnly, onOpenEvidence }: { job: Job; m
       ),
     },
     ...job.dimensions.map((d) => ({
-      label: d.name,
+      label: t(d.name),
       dimId: d.id,
       render: (m: Member) => {
         const ds = m.ev?.dimensionScores.find((x) => x.id === d.id);
@@ -367,6 +371,7 @@ export function ComparePage() {
   const [mode, setMode] = useState<CompareMode>("current_summary");
   const [diffOnly, setDiffOnly] = useState(false);
   const [snapIdx, setSnapIdx] = useState(0);
+  const workspaceSearch = (useLocation().state as { workspaceSearch?: string } | null)?.workspaceSearch ?? "";
   const [evidenceTarget, setEvidenceTarget] = useState<{ member: Member; dimension: Dimension } | null>(null);
   const [showAdd, setShowAdd] = useState(false);
   const [showExport, setShowExport] = useState(false);
@@ -415,6 +420,8 @@ export function ComparePage() {
     return { app, cand: getCandidate(app.candidateId)!, ev: getEvaluation(appId) };
   });
   const snap = cmp.snapshots[snapIdx] ?? cmp.snapshots[cmp.snapshots.length - 1];
+  // Back to the job's workspace with the filters it was opened from (#209 AC-3).
+  const workspaceUrl = `/jobs/${job.id}/screening${workspaceSearch ? `?${workspaceSearch}` : ""}`;
 
   const handleRefresh = async () => {
     say(t("Refreshing comparison with latest inputs…"));
@@ -428,8 +435,15 @@ export function ComparePage() {
     <>
       <PageHeader
         title={t("Compare candidates")}
-        subtitle={`${job.title} · ${cmp.purpose}`}
-        back={`/jobs/${job.id}/screening`}
+        subtitle={
+          <>
+            {job.title} · {purposeLabel(cmp.purpose, t)}
+            <br />
+            {t("Members:")} {members.map((m) => m.cand.displayName).join(", ")}
+          </>
+        }
+        back={workspaceUrl}
+        crumbs={[{ label: t("Jobs"), to: "/jobs" }, { label: job.title, to: workspaceUrl }, { label: t("Compare") }]}
         actions={
           <>
             <Button variant="secondary" icon="person_add" onClick={() => setShowAdd(true)}>
@@ -486,7 +500,7 @@ export function ComparePage() {
         </div>
       )}
 
-      {mode === "round_changes" ? <RoundChanges cmp={cmp} /> : <KeyDifferences job={job} members={members} />}
+      {mode === "round_changes" ? <RoundChanges snap={snap} /> : <KeyDifferences job={job} members={members} />}
 
       <div className="card" style={{ overflowX: "auto", marginTop: 18 }}>
         <CompareMatrix job={job} members={members} diffOnly={diffOnly} onOpenEvidence={(member, dimension) => setEvidenceTarget({ member, dimension })} />

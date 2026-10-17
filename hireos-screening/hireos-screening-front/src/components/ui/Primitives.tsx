@@ -1,5 +1,6 @@
 import { useEffect } from "react";
 import type { ButtonHTMLAttributes, CSSProperties, ReactNode } from "react";
+import { Link } from "react-router-dom";
 import { Icon } from "./Icons";
 import { useGoBack } from "../../lib/navigation";
 import { useStore } from "../../store/StoreContext";
@@ -169,16 +170,30 @@ export function PageHeader({
   subtitle,
   actions,
   back,
+  crumbs,
 }: {
   title: string;
   subtitle?: ReactNode;
   actions?: ReactNode;
   /** Shows a back arrow; the value is the fallback parent route when there's no history. */
   back?: string;
+  /** Where this page sits, e.g. Jobs › a job › Compare (#209); the last one is this page and has no link. */
+  crumbs?: Array<{ label: string; to?: string }>;
 }) {
   return (
     <>
       {back && <BackButton fallback={back} />}
+      {crumbs && crumbs.length > 0 && (
+        <nav aria-label="Breadcrumb" className="breadcrumbs">
+          <ol>
+            {crumbs.map((crumb, i) => (
+              <li key={i}>
+                {crumb.to && i < crumbs.length - 1 ? <Link to={crumb.to}>{crumb.label}</Link> : <span aria-current={i === crumbs.length - 1 ? "page" : undefined}>{crumb.label}</span>}
+              </li>
+            ))}
+          </ol>
+        </nav>
+      )}
       <div className="page-header">
         <div>
           <h1 className="page-title">{title}</h1>

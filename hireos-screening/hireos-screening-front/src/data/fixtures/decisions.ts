@@ -14,6 +14,8 @@ export interface Decision {
   overrideAi: boolean;
   nextStepTarget?: "record_only" | "send_assessment" | "move_to_interview";
   exceptionRef?: string;
+  /** Where the decision's handoff stands (#214); absent on older payloads and withdrawn history. */
+  handoffStatus?: "none" | "queued" | "sent" | "failed";
   /** Set once the decision was withdrawn (issue #23); a withdrawn decision stays readable as history. */
   withdrawnAt?: string;
   withdrawnBy?: string;
