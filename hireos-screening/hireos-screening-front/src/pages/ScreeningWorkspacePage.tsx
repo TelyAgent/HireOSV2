@@ -36,6 +36,15 @@ import { WithDisabledReason } from "../components/ui/DisabledReason";
 type EligFilter = "all" | EligibilityStatus;
 // Where the list was scrolled, per job, to return to after a candidate's page (#198).
 const scrollKey = (jobId: string) => `screening-workspace-scroll:${jobId}`;
+const scrollReturnKey = (jobId: string) => `screening-workspace-return:${jobId}`;
+
+function markWorkspaceReturn(jobId: string) {
+  try {
+    sessionStorage.setItem(scrollReturnKey(jobId), "1");
+  } catch {
+    // no-op: returning to the list simply starts at the top
+  }
+}
 
 type WorkspaceRowData = { app: ApplicationWithNames; ev: Evaluation | undefined; openConcerns: number; concerns: Concern[] };
 
@@ -67,7 +76,7 @@ function WorkspaceRow({ app, ev, openConcerns, concerns, selected, onToggle }: W
   );
 
   return (
-    <tr className="clickable" onClick={() => navigate(`/applications/${app.id}`)}>
+    <tr className="clickable" onClick={() => { markWorkspaceReturn(app.jobId); navigate(`/applications/${app.id}`); }}>
       <td>
         <CandidateAvatar id={app.candidateId} name={app.candidateName || app.candidateId} />
       </td>
@@ -110,7 +119,7 @@ function WorkspaceRow({ app, ev, openConcerns, concerns, selected, onToggle }: W
         )}
       </td>
       <td className="text-right open-col">
-        <Link className="btn btn-sm btn-secondary" to={`/applications/${app.id}`} onClick={(e) => e.stopPropagation()}>
+        <Link className="btn btn-sm btn-secondary" to={`/applications/${app.id}`} onClick={(e) => { e.stopPropagation(); markWorkspaceReturn(app.jobId); }}>
           {t("Open", "Open (action)")}
         </Link>
       </td>
@@ -225,6 +234,11 @@ export function ScreeningWorkspacePage() {
   useLayoutEffect(() => {
     if (!loaded || navigationType !== "POP") return;
     try {
+      // A full refresh keeps URL filters but intentionally starts at the top.
+      // Only a candidate-detail departure marks this history entry for scroll
+      // restoration, so this does not depend on browser navigation timing.
+      if (sessionStorage.getItem(scrollReturnKey(id)) !== "1") return;
+      sessionStorage.removeItem(scrollReturnKey(id));
       const top = Number(sessionStorage.getItem(scrollKey(id)));
       if (top > 0) document.querySelector<HTMLElement>("main.main")?.scrollTo({ top });
     } catch {
