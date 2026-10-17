@@ -614,3 +614,13 @@ a:focus-visible,button:focus-visible,[tabindex]:focus-visible,input:focus-visibl
   .linked-candidates-table .coverage-col{ min-width:84px; }
   .linked-candidates-table .table-head-filter{ max-width:140px; text-overflow:ellipsis; }
 }
+
+/* Filters above the linked-candidates table (#198). */
+.workspace-filters{ display:flex; flex-wrap:wrap; gap:8px; align-items:center; margin:0 0 10px; }
+.workspace-filters select{ max-width:180px; }
+
+/* Page breadcrumbs (#209). */
+.breadcrumbs ol{ display:flex; flex-wrap:wrap; gap:6px; list-style:none; margin:0 0 6px; padding:0; font-size:var(--fs-sm); color:var(--text-secondary); }
+.breadcrumbs li + li::before{ content:"›"; margin-right:6px; color:var(--text-tertiary); }
+.breadcrumbs a{ color:var(--accent-text, var(--text-secondary)); text-decoration:none; }
+.breadcrumbs a:hover{ text-decoration:underline; }

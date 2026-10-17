@@ -11,8 +11,15 @@ export class ComparisonsService {
 
   async create(identity: Identity, raw: { jobId?: string; purpose?: string; applicationIds?: string[] }) {
     if (!raw.jobId || !raw.purpose?.trim()) throw new BadRequestException({ code: 'INVALID_COMPARISON' });
-    const applications = await this.loadApplications(identity, raw.applicationIds || []);
-    if (!applications.length || applications.some((application) => application.jobId !== raw.jobId)) {
+    // Exactly the people chosen, each still linked to this job, and at least two of them (#209): an unknown,
+    // withdrawn or other job's application is refused, never dropped quietly.
+    const ids = [...new Set(raw.applicationIds || [])];
+    if (ids.length < 2) throw new BadRequestException({ code: 'COMPARISON_NEEDS_TWO_MEMBERS', message: 'Choose at least two linked candidates to compare.' });
+    const applications = await this.loadApplications(identity, ids);
+    if (applications.length !== ids.length || applications.some((application) => application.status === 'withdrawn')) {
+      throw new ConflictException({ code: 'APPLICATION_NOT_LINKED', message: 'Every candidate compared must be currently linked to this job.' });
+    }
+    if (applications.some((application) => application.jobId !== raw.jobId)) {
       throw new ConflictException({ code: 'APPLICATIONS_MUST_SHARE_JOB' });
     }
     const job = await this.db.job.findFirst({ where: { id: raw.jobId, workspaceId: identity.workspaceId } });
@@ -81,6 +88,7 @@ export class ComparisonsService {
       where: { id: applicationId, workspaceId: identity.workspaceId },
     });
     if (!application) throw new NotFoundException({ code: 'NOT_FOUND' });
+    if (application.status === 'withdrawn') throw new ConflictException({ code: 'APPLICATION_NOT_LINKED', message: 'Every candidate compared must be currently linked to this job.' });
     if (application.jobId !== comparison.jobId) throw new ConflictException({ code: 'APPLICATIONS_MUST_SHARE_JOB' });
     await this.db.comparisonMember.upsert({
       where: { comparisonSetId_applicationId: { comparisonSetId: comparisonId, applicationId } },

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { useParams } from "react-router-dom";
+import { useLocation, useParams } from "react-router-dom";
 import { useStore } from "../store/StoreContext";
 import {
   addCandidateToComparison,
@@ -371,6 +371,7 @@ export function ComparePage() {
   const [mode, setMode] = useState<CompareMode>("current_summary");
   const [diffOnly, setDiffOnly] = useState(false);
   const [snapIdx, setSnapIdx] = useState(0);
+  const workspaceSearch = (useLocation().state as { workspaceSearch?: string } | null)?.workspaceSearch ?? "";
   const [evidenceTarget, setEvidenceTarget] = useState<{ member: Member; dimension: Dimension } | null>(null);
   const [showAdd, setShowAdd] = useState(false);
   const [showExport, setShowExport] = useState(false);
@@ -419,6 +420,8 @@ export function ComparePage() {
     return { app, cand: getCandidate(app.candidateId)!, ev: getEvaluation(appId) };
   });
   const snap = cmp.snapshots[snapIdx] ?? cmp.snapshots[cmp.snapshots.length - 1];
+  // Back to the job's workspace with the filters it was opened from (#209 AC-3).
+  const workspaceUrl = `/jobs/${job.id}/screening${workspaceSearch ? `?${workspaceSearch}` : ""}`;
 
   const handleRefresh = async () => {
     say(t("Refreshing comparison with latest inputs…"));
@@ -432,8 +435,15 @@ export function ComparePage() {
     <>
       <PageHeader
         title={t("Compare candidates")}
-        subtitle={`${job.title} · ${purposeLabel(cmp.purpose, t)}`}
-        back={`/jobs/${job.id}/screening`}
+        subtitle={
+          <>
+            {job.title} · {purposeLabel(cmp.purpose, t)}
+            <br />
+            {t("Members:")} {members.map((m) => m.cand.displayName).join(", ")}
+          </>
+        }
+        back={workspaceUrl}
+        crumbs={[{ label: t("Jobs"), to: "/jobs" }, { label: job.title, to: workspaceUrl }, { label: t("Compare") }]}
         actions={
           <>
             <Button variant="secondary" icon="person_add" onClick={() => setShowAdd(true)}>

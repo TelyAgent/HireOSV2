@@ -644,6 +644,18 @@ export const ZH: Record<string, string> = {
   "Generated from the current screening evaluation baseline.": "基于当前的初筛评估基线生成。",
   "Shortlist review": "候选名单评审",
   "AI:": "AI：",
+  // Job workspace selection and filters (#198 #209).
+  "Select {name} for comparison": "选择 {name} 加入对比",
+  "Tick at least two candidates to compare.": "请至少勾选两名候选人进行对比。",
+  "Compare {n} selected": "对比已选 {n} 人",
+  "All statuses": "全部状态",
+  Decided: "已决定",
+  "Minimum coverage": "最低覆盖率",
+  "Any coverage": "不限覆盖率",
+  "Coverage ≥ {n}%": "覆盖率 ≥ {n}%",
+  "Select all shown": "全选当前显示",
+  "{n} linked candidates are hidden by the filters above.": "共 {n} 名已关联候选人，均被上方筛选条件隐藏。",
+  "Members:": "成员：",
   // Decision process states (#214).
   "Awaiting exception approval": "待例外审批",
   "No longer in effect": "已失效",
