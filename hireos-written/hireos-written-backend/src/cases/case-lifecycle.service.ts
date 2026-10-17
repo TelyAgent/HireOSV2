@@ -42,6 +42,8 @@ type Db = PrismaService | Prisma.TransactionClient;
 export const CLOSE_REASONS = ['passed', 'rejected', 'withdrawn'] as const;
 export type CloseReason = (typeof CLOSE_REASONS)[number];
 
+// Interview's handoff answer is awaited this long when INTERVIEW_HANDOFF_TIMEOUT_MS isn't set (#388).
+const HANDOFF_TIMEOUT_MS = 30_000;
 @Injectable()
 export class CaseLifecycleService {
   private readonly logger = new Logger(CaseLifecycleService.name);
@@ -223,6 +225,8 @@ export class CaseLifecycleService {
           ...(this.config.get<string>('SERVICE_TOKEN') ? { 'x-hireos-service-token': this.config.get<string>('SERVICE_TOKEN') as string } : {}),
         },
         body: JSON.stringify(payload),
+        // Under the gateway's 60 s, so the user always gets an answer they can retry from (#388).
+        signal: AbortSignal.timeout(Number(this.config.get<string>('INTERVIEW_HANDOFF_TIMEOUT_MS', '')) || HANDOFF_TIMEOUT_MS),
       });
       if (!response.ok) throw new Error(`HTTP ${response.status}: ${(await response.text()).slice(0, 300)}`);
       const body = (await response.json()) as { taskId?: string };
@@ -236,14 +240,22 @@ export class CaseLifecycleService {
 
     // Only a case still released is handed off, together with completing its task (#118 #131). If it changed
     // meanwhile the interview task already exists; Interview's intake is idempotent, so a retry finds it again.
-    const handedOff = await this.db.$transaction(async (tx) => {
-      const { count } = await tx.case.updateMany({
-        where: { id: caseId, status: 'released' },
-        data: { status: 'handed_off', statusBeforeHold: null, handedOffAt: new Date(), interviewTaskId },
+    let handedOff: boolean;
+    try {
+      handedOff = await this.db.$transaction(async (tx) => {
+        const { count } = await tx.case.updateMany({
+          where: { id: caseId, status: 'released' },
+          data: { status: 'handed_off', statusBeforeHold: null, handedOffAt: new Date(), interviewTaskId },
+        });
+        if (count) await this.completeTask(caseId, tx);
+        return count > 0;
       });
-      if (count) await this.completeTask(caseId, tx);
-      return count > 0;
-    });
+    } catch (error) {
+      // The interview task exists but this case doesn't say so yet: the same retryable answer as a failed call,
+      // since retrying finds that same task (#388).
+      this.logger.error(`Interview task ${interviewTaskId} created but case ${caseId} could not record it: ${error instanceof Error ? error.message : String(error)}`);
+      throw new BadGatewayException({ code: 'INTERVIEW_HANDOFF_FAILED', message: 'The handoff could not be saved. Try again.' });
+    }
     const after = await this.current(caseId);
     if (!handedOff) throw new ConflictException({ code: 'CASE_CHANGED', status: after.status, message: 'This case changed while it was being handed off. Refresh and try again.' });
     return this.serialize(after);
