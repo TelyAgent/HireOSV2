@@ -171,8 +171,9 @@ export class DecisionsService {
       }
       return created;
     });
-    // The handoff itself is the outbox event above; there is no separate "delivery package" any more.
-    return { decision: serializeDecision(decision) };
+    // The handoff itself is the outbox event above; there is no separate "delivery package" any more. Just written,
+    // so it is queued (or there is none) (#214).
+    return { decision: serializeDecision(decision, handoffStatusOf(decision, [])) };
   }
 
   /**
@@ -284,8 +285,19 @@ export class DecisionsService {
   }
 }
 
-export function serializeDecision(decision: any) {
+/** Where a decision's handoff stands (#214): none for record-only, else its outbox event's state. */
+export type HandoffStatus = 'none' | 'queued' | 'sent' | 'failed';
+
+export function handoffStatusOf(decision: { nextStepTarget: string }, events: Array<{ status: string }>): HandoffStatus {
+  if (decision.nextStepTarget === 'record_only') return 'none';
+  if (events.some((event) => event.status === 'dispatched')) return 'sent';
+  if (events.some((event) => event.status === 'failed')) return 'failed';
+  return 'queued';
+}
+
+export function serializeDecision(decision: any, handoffStatus?: HandoffStatus) {
   return {
+    ...(handoffStatus ? { handoffStatus } : {}),
     id: decision.id,
     applicationId: decision.applicationId,
     outcome: decision.outcome,

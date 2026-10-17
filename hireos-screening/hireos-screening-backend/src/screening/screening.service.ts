@@ -8,7 +8,7 @@ import { PrismaService } from '../persistence/prisma.service';
 import type { Identity } from '../auth/workspace.guard';
 import { AiScreeningEvaluatorService } from './ai-screening-evaluator.service';
 import { AiCallError } from '../shared/ai-json-client';
-import { serializeDecision } from '../decisions/decisions.service';
+import { handoffStatusOf, serializeDecision, type HandoffStatus } from '../decisions/decisions.service';
 import { AI_EVALUATOR, LOCAL_EVALUATOR, canReuseEvaluation, evaluationInputHash, evaluationMetadata } from './evaluation-identity';
 
 type DimensionInput = { id: string; name: string; weight: number; rubric: string };
@@ -68,12 +68,24 @@ export class ScreeningService {
       orderBy: { version: 'desc' },
       select: { id: true, version: true, overallScore: true, coverage: true, completedAt: true, createdAt: true, modelVersion: true, evaluationMode: true, aiStatus: true, freshness: true },
     });
-    const detail = this.serializeDetail(application, evaluation, decision);
+    // The decision's handoff, written with it in one transaction, so the page can say whether it was sent (#214).
+    const handoffEvents = decision
+      ? await this.db.screeningOutboxEvent.findMany({
+          where: {
+            workspaceId: identity.workspaceId,
+            aggregateId: applicationId,
+            eventType: { in: ['candidate.advanced_to_interview', 'candidate.assessment_requested'] },
+            createdAt: { gte: decision.createdAt },
+          },
+          select: { status: true },
+        })
+      : [];
+    const detail = this.serializeDetail(application, evaluation, decision, decision ? handoffStatusOf(decision, handoffEvents) : undefined);
     return {
       ...detail,
       // Each evidence item with the paragraph it came from, so "Evidence (N)" opens real excerpts (#192).
       evaluation: detail.evaluation && evaluation ? { ...detail.evaluation, evidence: await this.evidenceOf(identity.workspaceId, evaluation) } : detail.evaluation,
-      withdrawnDecisions: withdrawnDecisions.map(serializeDecision),
+      withdrawnDecisions: withdrawnDecisions.map((withdrawn) => serializeDecision(withdrawn)),
       history: history.map(serializeSnapshotSummary),
       screeningInProgress: this.inFlight.has(applicationId),
     };
@@ -653,14 +665,14 @@ export class ScreeningService {
     };
   }
 
-  private serializeDetail(application: ApplicationInput, evaluation: EvaluationRecord | null, decision: unknown | null) {
+  private serializeDetail(application: ApplicationInput, evaluation: EvaluationRecord | null, decision: unknown | null, handoffStatus?: HandoffStatus) {
     return {
       application: serializeApplication(application),
       evaluation: evaluation ? serializeEvaluation(evaluation) : null,
       concerns: evaluation?.concerns.map(serializeConcern) || [],
       verificationItems: evaluation?.verificationItems.map(serializeVerificationItem) || [],
       humanAssessments: evaluation?.humanAssessments.map(serializeHumanAssessment) || [],
-      decision: decision ? serializeDecision(decision) : null,
+      decision: decision ? serializeDecision(decision, handoffStatus) : null,
     };
   }
 
