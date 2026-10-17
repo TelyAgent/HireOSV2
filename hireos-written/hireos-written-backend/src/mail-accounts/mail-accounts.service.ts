@@ -3,6 +3,7 @@ import { PrismaService } from '../persistence/prisma.service';
 import type { Identity } from '../auth/workspace.guard';
 import { MailApiError, MailService } from './mail.service';
 import type { CreateMailAccountDto, TestMailAccountDto, UpdateMailAccountDto } from './mail-account.dto';
+import { decryptCredential, encryptCredential } from './mail-credential-cipher';
 import { invalidSchema } from '../http/invalid-schema';
 
 @Injectable()
@@ -57,7 +58,7 @@ export class MailAccountsService {
         name: dto.name,
         provider: dto.provider,
         email: dto.email,
-        password: dto.password,
+        password: encryptCredential(dto.password),
         smtpHost: dto.smtpHost,
         smtpPort: dto.smtpPort,
         smtpSecure: dto.smtpSecure,
@@ -85,12 +86,12 @@ export class MailAccountsService {
     if (changed && !dto.password) {
       throw invalidSchema({ password: ['Enter the password again: the server or account changed, so the saved one is not sent to it.'] });
     }
-    const merged = { ...target, password: dto.password ?? existing.password };
+    const merged = { ...target, password: dto.password ?? decryptCredential(existing.password) };
     await this.mail.testConnection(merged);
 
     const account = await this.db.mailAccount.update({
       where: { id },
-      data: { name: dto.name ?? existing.name, provider: dto.provider ?? existing.provider, ...merged, status: 'connected', lastError: null },
+      data: { name: dto.name ?? existing.name, provider: dto.provider ?? existing.provider, ...merged, password: encryptCredential(merged.password), status: 'connected', lastError: null },
     });
     return this.serialize(account);
   }
@@ -120,10 +121,11 @@ export class MailAccountsService {
     const account = await this.senderAccount(identity.workspaceId);
     if (!account) return { sent: false, error: 'NO_MAILBOX_CONFIGURED' };
     try {
-      await this.mail.send(account, message);
+      await this.mail.send({ ...account, password: decryptCredential(account.password) }, message);
       return { sent: true };
     } catch (error) {
-      const errMessage = error instanceof MailApiError ? error.message : 'SEND_FAILED';
+      // A password this server can't read (#387) says so, rather than a bare SEND_FAILED.
+      const errMessage = error instanceof MailApiError ? error.message : ((error as { response?: { code?: string } }).response?.code ?? 'SEND_FAILED');
       await this.db.mailAccount.update({ where: { id: account.id }, data: { status: 'error', lastError: errMessage } }).catch(() => {});
       return { sent: false, error: errMessage };
     }

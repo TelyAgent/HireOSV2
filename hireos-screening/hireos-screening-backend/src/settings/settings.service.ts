@@ -8,6 +8,7 @@ import { PrismaService } from '../persistence/prisma.service';
 import type { Identity } from '../auth/workspace.guard';
 import { MailService, MailApiError, type MailInboxMessage, type MailAttachmentScan, type MailboxCredentials } from './mail.service';
 import { ImportsService } from '../intake/imports.service';
+import { decryptCredential, encryptCredential } from './mail-credential-cipher';
 import { invalidSchema, invalidSchemaFromZod } from '../http/invalid-schema';
 
 const corporateMailboxSchema = z.object({
@@ -55,7 +56,7 @@ function savedPasswordFor(prev: Record<string, unknown> | null, next: Record<str
   if (connectionChanged(prev, next)) {
     throw invalidSchema({ password: ['Enter the password again: the server or account changed, so the saved one is not sent to it.'] });
   }
-  return prev.password as string;
+  return decryptCredential(prev.password as string);
 }
 
 @Injectable()
@@ -234,7 +235,7 @@ export class SettingsService {
       name: input.name || input.email,
       provider: input.provider,
       email: input.email,
-      password,
+      password: encryptCredential(password),
       imapHost: input.imapHost,
       imapPort: input.imapPort,
       imapTls: input.imapTls,
@@ -276,7 +277,7 @@ export class SettingsService {
     const prev = existing.payload as any;
     let recentMessages: MailInboxMessage[] = [];
     if (prev.purposes?.inbound) {
-      const creds: MailboxCredentials = { email: prev.email, password: prev.password, imapHost: prev.imapHost, imapPort: prev.imapPort, imapTls: prev.imapTls, smtpHost: prev.smtpHost, smtpPort: prev.smtpPort, smtpSecure: prev.smtpSecure };
+      const creds: MailboxCredentials = { email: prev.email, password: decryptCredential(prev.password), imapHost: prev.imapHost, imapPort: prev.imapPort, imapTls: prev.imapTls, smtpHost: prev.smtpHost, smtpPort: prev.smtpPort, smtpSecure: prev.smtpSecure };
       try {
         recentMessages = await this.mail.listRecentInbox(creds, 10);
       } catch (error) {
@@ -305,7 +306,7 @@ export class SettingsService {
     if (!payload.purposes?.inbound) {
       throw new BadRequestException({ code: 'INBOUND_NOT_ENABLED', message: '请先为该邮箱启用"用于收件 / Recruiting Inbox"。' });
     }
-    const creds: MailboxCredentials = { email: payload.email, password: payload.password, imapHost: payload.imapHost, imapPort: payload.imapPort, imapTls: payload.imapTls, smtpHost: payload.smtpHost, smtpPort: payload.smtpPort, smtpSecure: payload.smtpSecure };
+    const creds: MailboxCredentials = { email: payload.email, password: decryptCredential(payload.password), imapHost: payload.imapHost, imapPort: payload.imapPort, imapTls: payload.imapTls, smtpHost: payload.smtpHost, smtpPort: payload.smtpPort, smtpSecure: payload.smtpSecure };
     let scan: MailAttachmentScan;
     try {
       scan = await this.mail.listUnseenResumeAttachments(creds, 20);
