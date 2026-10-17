@@ -8,11 +8,27 @@ const BATCH_SIZE = 10;
 // After this many failed attempts, stop retrying automatically -- a human can requeue
 // (reset status to 'pending') once whatever was wrong with Interview is fixed.
 const MAX_ATTEMPTS = 10;
+// One delivery may take this long before it counts as a failed attempt (#384); HANDOFF_DISPATCH_TIMEOUT_MS overrides.
+const DEFAULT_TIMEOUT_MS = 10_000;
+// A failed event waits 5 s, 10 s, 20 s ... (at most 10 minutes) before its next attempt (#384).
+const BACKOFF_BASE_MS = 5_000;
+const BACKOFF_MAX_MS = 10 * 60_000;
+
+type Target = { baseUrlEnvKey: string; baseUrlDefault: string; endpoint: string };
+// Each destination is dispatched on its own, so a slow one holds up only its own events (#384).
+const TARGETS: Record<string, Target> = {
+  'candidate.advanced_to_interview': { baseUrlEnvKey: 'INTERVIEW_BASE_URL', baseUrlDefault: 'http://127.0.0.1:3001/api', endpoint: '/screening-handoff' },
+  'candidate.assessment_requested': { baseUrlEnvKey: 'WRITTEN_BASE_URL', baseUrlDefault: 'http://127.0.0.1:3008/api', endpoint: '/intake/screening-handoff' },
+};
+
+export function retryDelayMs(attempt: number) {
+  return Math.min(BACKOFF_BASE_MS * 2 ** (attempt - 1), BACKOFF_MAX_MS);
+}
 
 /**
  * Delivers ScreeningOutboxEvent rows to whichever subsystem needs to know about them --
  * despite the class name (kept to avoid an unrelated rename churning this file), it now
- * routes more than one event type/destination via `targetFor()`: "advanced_to_interview"
+ * routes more than one event type/destination via `TARGETS`: "advanced_to_interview"
  * goes to hireos-interview, "assessment_requested" goes to hireos-written. This is the
  * "transport" half of the outbox pattern described in
  * docs/HireOS-Database-Architecture-Decision.md §7/§9 -- plain HTTP today because no
@@ -55,26 +71,32 @@ export class InterviewHandoffDispatcherService implements OnModuleInit, OnModule
     if (this.running) return;
     this.running = true;
     try {
-      const events = await this.db.screeningOutboxEvent.findMany({
-        where: { status: 'pending', attempt: { lt: MAX_ATTEMPTS } },
-        orderBy: { createdAt: 'asc' },
-        take: BATCH_SIZE,
-      });
-      for (const event of events) {
-        // One event's failure — even failing to record that it failed — doesn't stop the others (#116).
-        try {
-          await this.dispatchOne(event);
-        } catch (error) {
-          this.logger.error(`Handoff event ${event.id} (${event.eventType}) could not be dispatched or its failure recorded: ${describe(error)}`);
-        }
-      }
+      const eventTypes = Object.keys(TARGETS);
+      // One queue per destination, plus the events nothing subscribes to; the queues run side by side.
+      await Promise.all([...eventTypes.map((type) => ({ eventType: type })), { eventType: { notIn: eventTypes } }].map((where) => this.dispatchQueue(where)));
     } finally {
       this.running = false;
     }
   }
 
+  private async dispatchQueue(where: { eventType: string | { notIn: string[] } }) {
+    const events = await this.db.screeningOutboxEvent.findMany({
+      where: { ...where, status: 'pending', attempt: { lt: MAX_ATTEMPTS }, OR: [{ nextAttemptAt: null }, { nextAttemptAt: { lte: new Date() } }] },
+      orderBy: { createdAt: 'asc' },
+      take: BATCH_SIZE,
+    });
+    for (const event of events) {
+      // One event's failure — even failing to record that it failed — doesn't stop the others (#116).
+      try {
+        await this.dispatchOne(event);
+      } catch (error) {
+        this.logger.error(`Handoff event ${event.id} (${event.eventType}) could not be dispatched or its failure recorded: ${describe(error)}`);
+      }
+    }
+  }
+
   private async dispatchOne(event: { id: string; workspaceId: string; eventType: string; payload: unknown; attempt: number }) {
-    const target = this.targetFor(event.eventType);
+    const target = TARGETS[event.eventType];
     if (!target) {
       // No receiver registered for this event type -- not a delivery failure, just
       // nothing subscribes to it (yet). Mark dispatched so it stops being polled.
@@ -92,6 +114,7 @@ export class InterviewHandoffDispatcherService implements OnModuleInit, OnModule
           ...(process.env.SERVICE_TOKEN ? { 'x-hireos-service-token': process.env.SERVICE_TOKEN } : {}),
         },
         body: JSON.stringify(event.payload),
+        signal: AbortSignal.timeout(Number(this.config.get<string>('HANDOFF_DISPATCH_TIMEOUT_MS', String(DEFAULT_TIMEOUT_MS)))),
       });
       if (!response.ok) throw new Error(`HTTP ${response.status}`);
       await this.db.screeningOutboxEvent.update({ where: { id: event.id }, data: { status: 'dispatched', dispatchedAt: new Date() } });
@@ -101,18 +124,8 @@ export class InterviewHandoffDispatcherService implements OnModuleInit, OnModule
       this.logger.warn(`Failed to dispatch ${event.eventType} (${event.id}), attempt ${attempt}: ${message}`);
       await this.db.screeningOutboxEvent.update({
         where: { id: event.id },
-        data: { attempt, status: attempt >= MAX_ATTEMPTS ? 'failed' : 'pending', lastError: message },
+        data: { attempt, status: attempt >= MAX_ATTEMPTS ? 'failed' : 'pending', lastError: message, nextAttemptAt: new Date(Date.now() + retryDelayMs(attempt)) },
       });
     }
-  }
-
-  private targetFor(eventType: string): { baseUrlEnvKey: string; baseUrlDefault: string; endpoint: string } | null {
-    if (eventType === 'candidate.advanced_to_interview') {
-      return { baseUrlEnvKey: 'INTERVIEW_BASE_URL', baseUrlDefault: 'http://127.0.0.1:3001/api', endpoint: '/screening-handoff' };
-    }
-    if (eventType === 'candidate.assessment_requested') {
-      return { baseUrlEnvKey: 'WRITTEN_BASE_URL', baseUrlDefault: 'http://127.0.0.1:3008/api', endpoint: '/intake/screening-handoff' };
-    }
-    return null;
   }
 }

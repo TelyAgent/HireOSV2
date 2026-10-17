@@ -15,6 +15,8 @@ function dispatcher(db) {
   return { service, logged };
 }
 const event = (id) => ({ id, workspaceId: 'ws-1', eventType: 'candidate.advanced_to_interview', payload: { id }, attempt: 0 });
+// The dispatcher reads each destination's queue on its own (#384); these events all go to Interview.
+const forQueue = (where, events) => (where.eventType === 'candidate.advanced_to_interview' ? events : []);
 
 test('#116 AC-1: in a separate process, every poll\'s timer callback survives a database that is down', () => {
   const out = execFileSync(process.execPath, [path.join(__dirname, 'fixtures/f116/poll-crash.cjs'), path.join(__dirname, '../dist')], { encoding: 'utf8' });
@@ -25,7 +27,7 @@ test('#116 AC-1/AC-2: a failed round is logged without event data, then the next
   let up = false;
   const updates = [];
   const db = { screeningOutboxEvent: {
-    findMany: async () => { if (!up) throw new Error("Can't reach database server"); return [event('e-1')]; },
+    findMany: async ({ where }) => { if (!up) throw new Error("Can't reach database server"); return forQueue(where, [event('e-1')]); },
     update: async ({ where, data }) => { updates.push([where.id, data.status]); },
   } };
   const realFetch = globalThis.fetch;
@@ -46,7 +48,7 @@ test('#116 AC-1/AC-2: a failed round is logged without event data, then the next
 test('#116 AC-1/AC-3: one event whose failure can\'t be recorded doesn\'t stop the others; attempts and give-up are unchanged', async () => {
   const updates = [];
   const db = { screeningOutboxEvent: {
-    findMany: async () => [event('e-1'), { ...event('e-2'), attempt: 9 }, event('e-3')],
+    findMany: async ({ where }) => forQueue(where, [event('e-1'), { ...event('e-2'), attempt: 9 }, event('e-3')]),
     update: async ({ where, data }) => {
       if (where.id === 'e-1') throw new Error('write failed');
       updates.push([where.id, data.status, data.attempt]);

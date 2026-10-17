@@ -946,6 +946,8 @@ model ScreeningOutboxEvent {
   status       String    @default("pending") // pending | dispatched | failed
   attempt      Int       @default(0)
   lastError    String?
+  /// When a failed event may be retried (#384); null means at once.
+  nextAttemptAt DateTime?
   createdAt    DateTime  @default(now())
   dispatchedAt DateTime?
 
