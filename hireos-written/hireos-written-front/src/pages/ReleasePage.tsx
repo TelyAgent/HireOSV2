@@ -79,6 +79,14 @@ export function ReleaseContent({
   const feedbackText = feedbackDraft ?? (evaluation.summary ?? "");
   const nextStepText = nextStepDraft ?? t("HR will follow up with next steps.");
 
+  const missingToPublish = [
+    ...(chk1 ? [] : ["Internal review complete"]),
+    ...(chk2 ? [] : ["Disclosure content approved for release"]),
+    ...(outcomeText.trim() ? [] : ["Outcome"]),
+    ...(feedbackText.trim() ? [] : ["Feedback"]),
+    ...(nextStepText.trim() ? [] : ["Next step"]),
+  ];
+
   async function publish() {
     if (busy) return;
     if (!chk1 || !chk2) {
@@ -102,7 +110,7 @@ export function ReleaseContent({
       const { overall, showScore, outcomeText, feedbackText, nextStepText } = rel;
       setBusy(true);
       try {
-        await releaseCaseResult(caseId, { overall, showScore, outcomeText, feedbackText, nextStepText, invitationId: result!.invitationId });
+        await releaseCaseResult(caseId, { overall, showScore, outcomeText, feedbackText, nextStepText, invitationId: result!.invitationId, reviewComplete: chk1, disclosureApproved: chk2 });
       } catch {
         say(t("Could not save to the server. Please refresh and try again."), { type: "danger" });
         return;
@@ -235,7 +243,13 @@ export function ReleaseContent({
           <label className="checkbox-row" style={{ marginBottom: 12, display: "flex" }}>
             <input type="checkbox" checked={chk2} onChange={(e) => setChk2(e.target.checked)} /> {t("Disclosure content approved for release")}
           </label>
-          <Button variant="primary" disabled={busy} onClick={() => void publish()}>{t("Finalize & publish result")}</Button>
+          {/* Publishing waits for both approvals and the three texts, and says which are still missing (#393). */}
+          {missingToPublish.length > 0 && (
+            <div className="tiny" role="status" style={{ marginBottom: 8, color: "var(--text-secondary)" }}>
+              {t("Still needed before publishing:")} {missingToPublish.map((m) => t(m)).join(t(", "))}
+            </div>
+          )}
+          <Button variant="primary" disabled={busy || missingToPublish.length > 0} onClick={() => void publish()}>{t("Finalize & publish result")}</Button>
         </div>
       ) : (
         <>

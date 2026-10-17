@@ -125,7 +125,7 @@ test('written case concurrency', { skip: !process.env.DATABASE_URL && 'DATABASE_
         const sub = await dbA.submission.findFirst({ where: { invitation: { caseId: kase.id } } });
         assert.equal(sub.finalEvaluation.overall, results[0] === 'ok' ? 60 : 90, 'the saved score is the winner\'s');
         assert.equal((await dbA.case.findUnique({ where: { id: kase.id } })).status, 'finalized');
-        const rel = (text) => ({ overall: 60, showScore: true, outcomeText: text, feedbackText: '', nextStepText: '' });
+        const rel = (text) => ({ overall: 60, showScore: true, outcomeText: text, feedbackText: '', nextStepText: '', reviewComplete: true, disclosureApproved: true });
         const published = await Promise.all([outcome(A.invitations.releaseResult(identity, kase.id, rel('A'))), outcome(B.invitations.releaseResult(identity, kase.id, rel('B')))]);
         assert.deepEqual(published.slice().sort(), ['409:ALREADY_RELEASED', 'ok']);
         const released = await dbA.submission.findFirst({ where: { invitation: { caseId: kase.id } } });

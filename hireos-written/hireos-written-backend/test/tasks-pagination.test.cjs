@@ -18,6 +18,9 @@ test('task pages and stats (#412)', { skip: !process.env.DATABASE_URL && 'DATABA
   const schema = `written_pages_${randomUUID().replaceAll('-', '')}`;
   const url = new URL(process.env.DATABASE_URL);
   url.searchParams.set('schema', schema);
+  // The suite runs test files side by side against one Postgres: wait longer for a connection than the 10 s default.
+  url.searchParams.set('connection_limit', '10');
+  url.searchParams.set('pool_timeout', '60');
   process.env.DATABASE_URL = url.toString();
   const { PrismaService } = require('../dist/persistence/prisma.service');
   const { TasksService } = require('../dist/tasks/tasks.service');

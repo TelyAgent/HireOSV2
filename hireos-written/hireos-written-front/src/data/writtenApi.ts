@@ -237,7 +237,7 @@ export async function finalizeCaseEvaluation(
 }
 
 /** Persists the published result on the case's latest submission (must already be finalized). */
-export async function releaseCaseResult(caseId: string, input: RealReleaseInput & { invitationId?: string }): Promise<{ releasedAt: string }> {
+export async function releaseCaseResult(caseId: string, input: RealReleaseInput & { invitationId?: string; reviewComplete: boolean; disclosureApproved: boolean }): Promise<{ releasedAt: string }> {
   const response = await authFetch(`${BASE}/cases/${encodeURIComponent(caseId)}/result/release`, {
     method: "POST",
     headers: { "content-type": "application/json" },

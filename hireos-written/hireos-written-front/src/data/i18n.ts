@@ -124,6 +124,7 @@ export const ZH: Record<string, string> = {
   "Reusable questions, mapped to multiple roles and competencies. Publishing a question doesn't send it to anyone — candidates get it only through an invitation, a separate step.":
     "可复用的题目，已映射到多个岗位与能力项。发布题目不会发给任何人——候选人只能通过邀请收到题目，邀请是单独的一步。",
   "Clear filters": "清除筛选", "Question preview": "题目预览", "Close preview": "关闭预览", "Open details": "打开详情",
+  "Still needed before publishing:": "发布前还需要：", "Outcome": "结果", "Next step": "下一步", ", ": "、",
   "Add to plan": "加入计划", "Question added to the plan.": "题目已加入计划。",
   "Loading the question bank…": "正在加载题库…",
   "Couldn't load the question bank, so the preset questions aren't known yet.": "题库加载失败，暂时无法列出预设题目。",
