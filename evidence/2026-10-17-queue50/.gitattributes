@@ -1,1 +1,3 @@
 *.pdf binary
+# Preserve exact command output, including its final blank lines.
+*.log whitespace=-blank-at-eof
