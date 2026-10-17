@@ -1,4 +1,5 @@
-import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
 import { PrismaService } from '../persistence/prisma.service';
 import type { Identity } from '../auth/workspace.guard';
 import type { CreatePlanItemDto, UpdatePlanItemDto } from './plan-item.dto';
@@ -12,9 +13,11 @@ export class PlanItemsService {
     id: string; kind: string; status: string; questionCode: string; questionTitle: string;
     questionPrompt: string; customPrompt: string | null; competencies: unknown; deliverables: unknown; createdAt: Date;
     invitationId: string | null; invitation?: { round: number } | null;
+    bankQuestionVersionId?: string | null;
   }) {
     return {
       id: item.id,
+      bankQuestionVersionId: item.bankQuestionVersionId ?? null,
       kind: item.kind,
       status: item.status,
       questionCode: item.questionCode,
@@ -61,19 +64,37 @@ export class PlanItemsService {
       throw new ConflictException({ code: 'NO_DRAFT_ROUND', message: 'Open a supplemental round before adding questions.' });
     }
 
-    const item = await this.db.planItem.create({
+    if (/^Q-\d+$/.test(dto.questionCode) && !dto.bankQuestionId) {
+      throw new BadRequestException({ code: 'QUESTION_VERSION_REQUIRED' });
+    }
+    const create = async (db: Prisma.TransactionClient) => {
+      let source: { id: string; content: Prisma.JsonValue } | null = null;
+      if (dto.bankQuestionId) {
+        await db.$queryRaw`SELECT id FROM "Question" WHERE id = ${dto.bankQuestionId} AND "workspaceId" = ${identity.workspaceId} FOR SHARE`;
+        const question = await db.question.findFirst({ where: { id: dto.bankQuestionId, workspaceId: identity.workspaceId, deletedAt: null } });
+        if (!question) throw new NotFoundException({ code: 'QUESTION_NOT_FOUND' });
+        if (question.status !== 'published') throw new ConflictException({ code: 'QUESTION_NOT_PUBLISHED' });
+        if (question.version !== dto.bankQuestionVersion) throw new ConflictException({ code: 'QUESTION_VERSION_CONFLICT' });
+        source = await db.questionVersion.findUnique({ where: { questionId_version: { questionId: question.id, version: question.version } } });
+        if (!source) throw new ConflictException({ code: 'QUESTION_VERSION_UNAVAILABLE' });
+      }
+      const content = source?.content as { code: string; title: string; prompt: string; competencies: Prisma.InputJsonValue; deliverables?: Prisma.InputJsonValue } | undefined;
+      return db.planItem.create({
       data: {
         workspaceId: identity.workspaceId,
         caseId,
         kind: dto.kind,
-        questionCode: dto.questionCode,
-        questionTitle: dto.questionTitle,
-        questionPrompt: dto.questionPrompt,
+        bankQuestionVersionId: source?.id,
+        questionCode: content?.code ?? dto.questionCode,
+        questionTitle: content?.title ?? dto.questionTitle,
+        questionPrompt: content?.prompt ?? dto.questionPrompt,
         customPrompt: dto.customPrompt,
-        competencies: dto.competencies as unknown as object,
-        deliverables: dto.deliverables as unknown as object,
+        competencies: content?.competencies ?? dto.competencies as unknown as object,
+        deliverables: content?.deliverables ?? dto.deliverables as unknown as object,
       },
-    });
+      });
+    };
+    const item = dto.bankQuestionId ? await this.db.$transaction(create) : await create(this.db);
     return this.serialize(item);
   }
 

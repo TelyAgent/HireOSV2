@@ -1,8 +1,9 @@
-import { Body, Controller, ForbiddenException, HttpCode, Post, Req, ServiceUnavailableException } from '@nestjs/common';
+import { BadRequestException, Body, Controller, ForbiddenException, HttpCode, Post, Req, ServiceUnavailableException } from '@nestjs/common';
 import type { Request } from 'express';
 import { timingSafeEqual } from 'node:crypto';
 import { IdentityConfig } from '../identity.config';
 import { SessionsService } from '../sessions/sessions.service';
+import { PrismaService } from '../persistence/prisma.service';
 
 /**
  * Backend-to-backend only. The gateways never forward `/account/api/internal/*`, and every call
@@ -13,7 +14,22 @@ export class InternalController {
   constructor(
     private readonly sessions: SessionsService,
     private readonly config: IdentityConfig,
+    private readonly db: PrismaService,
   ) {}
+
+  @Post('memberships/verify')
+  @HttpCode(200)
+  async verifyMember(@Req() req: Request, @Body() body: { workspaceId?: unknown; userId?: unknown }) {
+    this.assertInternal(req);
+    if (typeof body?.workspaceId !== 'string' || typeof body?.userId !== 'string' ||
+        !body.workspaceId.trim() || !body.userId.trim() || body.workspaceId.length > 200 || body.userId.length > 200) {
+      throw new BadRequestException({ code: 'INVALID_REQUEST' });
+    }
+    const member = await this.db.membership.findFirst({ where: {
+      workspaceId: body.workspaceId, userId: body.userId, status: 'active', user: { status: 'active' },
+    }, select: { userId: true, workspaceId: true } });
+    return { active: Boolean(member), ...(member ?? {}) };
+  }
 
   @Post('sessions/introspect')
   @HttpCode(200)

@@ -57,6 +57,7 @@ export const PROJECT = { id: "prj_fin", name: "Finance Operations Hiring", jobId
 
 export interface Competency { name: string; fraction: number }
 export interface Question {
+  revision?: number;
   id: string; code: string; title: string; type: string; roles: string[]; competencies: Competency[];
   difficulty: string; estMinutes: number; language: string; version: number;
   status: "published" | "draft_review" | "internal_only" | "concept";

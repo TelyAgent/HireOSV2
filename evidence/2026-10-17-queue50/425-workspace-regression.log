@@ -1,0 +1,6 @@
+node test/workspace-flow.cjs http://localhost:8080/screening/jobs/j198/screening
+exit=0
+PASS: #198 refresh keeps filters and starts at top {"before":{"url":"status=awaiting","rows":25,"statusSelect":"awaiting"},"scrolled":300,"afterRefresh":{"url":"status=awaiting","rows":25,"statusSelect":"awaiting","scrollTop":0}}
+filter+scroll {"before":{"url":"status=awaiting","rows":25,"statusSelect":"awaiting"},"scrolled":300,"after":{"url":"status=awaiting","rows":25,"statusSelect":"awaiting","scrollTop":619}}
+PASS: #198 empty results explain the active filter and expose Clear filters
+selection {"s0":{"text":"Compare candidates","disabled":true},"s1":{"text":"Compare 1 selected","disabled":true},"s2":{"text":"Compare 2 selected","disabled":false},"stayedOnPage":true}

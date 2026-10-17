@@ -1,0 +1,22 @@
+[
+  {
+    "command": "npm run build",
+    "exit": 0,
+    "log": "424-build.log"
+  },
+  {
+    "command": "npm run lint",
+    "exit": 0,
+    "log": "424-lint.log"
+  },
+  {
+    "command": "npm run typecheck",
+    "exit": 0,
+    "log": "424-typecheck.log"
+  },
+  {
+    "command": "npm run test",
+    "exit": 0,
+    "log": "424-test.log"
+  }
+]

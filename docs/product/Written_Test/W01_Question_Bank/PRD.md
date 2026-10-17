@@ -98,7 +98,26 @@
 
 ## 10. 待确认
 
-1. 原型 Settings 写明「任何在职员工都可以创建 / 编辑 / 发布题目，没有审批队列」，而 PRD §12 有「题目发布复核」任务、Brief 预置了 reviewer queue 任务 t4。题目发布是否需要他人复核？
-2. 现有 `Question` 表只有整数版本号，需要确认是否按 Spec 拆出 QuestionVersion、RoleMapping、ScoringProfile（涉及 Prisma 迁移）。
+1. 已由 Owner 在 #365 确认直接发布，不新增审批队列；不在本轮扩展身份、角色及权限模型。
+2. #365 先落地 QuestionVersion，RoleMapping、ScoringProfile 不随本轮重构。
 3. 题目语言默认值：后端默认「中文」，PRD §14 要求英文界面；题目内容语言与界面语言是否分开。
 4. 收藏是个人偏好还是团队共享（后端 `favorite` 字段在题目上，即团队共享）。
+
+## 11. #368 停用契约（2026-10-17）
+
+- Owner 确认 Estimate 5，沿用工作区访问规则，不扩展角色权限。
+- `POST /api/questions/:id/deprecate` 携带 `expectedRevision`，仅停用当前已发布版本；原子保存状态与 `QuestionDeprecation`（操作者、版本、时间）。同版本重复停用返回 replay，过期修订返回 409。
+- `GET /api/questions/:id/deprecations` 返回当前工作区题目的停用历史。新计划 UI 排除停用题，服务端同时拒绝引用；旧邀请保留原有快照。
+- 停用后不能直接重新发布旧修订，必须编辑保存为新草稿，再显式发布新版本。历史版本及停用记录不变。
+- 部署先执行 `20261017230000_question_deprecations`，再更新服务。回滚时保留审计表并暂停题库写入，避免旧代码绕过停用状态保护。
+
+## 12. #365 实施边界（2026-10-17）
+
+- 新建题目保存为草稿（存储值 `draft_review`），首次发布前版本号为 0；详情可复核提示与能力占比，然后直接发布。标题、题干和非空能力列表必填，能力占比必须为正且总和为 100%。
+- `Question.revision` 是可变草稿的并发令牌，`Question.version` 是最近发布版本号。内容编辑必须携带 `expectedRevision`，保存后递增修订号并回到草稿；收藏不改变修订号或发布状态。
+- `POST /api/questions/:id/publish` 携带 `expectedRevision`，锁定题目后生成不可变 `QuestionVersion`；重复发布同一修订返回 `replayed: true`，不生成第二份。过期修订返回 409，失败事务不留下半发布状态。
+- `GET /api/questions/:id/versions` 返回版本内容、发布人和时间。编辑没有修改版本快照的接口；删除题目为软删除，不删除计划或版本记录。
+- 新增题库计划项必须携带 `bankQuestionId` 与 `bankQuestionVersion`。服务端校验当前已发布版本，使用服务器快照内容并保存 `bankQuestionVersionId`，拒绝草稿、过期版本及跨工作区引用。已有计划和邀请继续保留各自快照，不随题库编辑变化。
+- 迁移 `20261017210000_question_versions` 仅保留现存已发布内容，标记 `historicalBaseline`；原发布人和时间未知时保持空值，不生成虚构旧版本。历史计划不反推版本外键。迁移基线的创建时间不等于原发布时间。
+- 本轮没有补全 W01 全部长期范围，例如 ZIP、材料与内部答案建模、停用工作流、RoleMapping/ScoringProfile；#365 的验收范围以上述已确认行为为准。
+- 部署须先备份并执行兼容迁移，再启动新后端与前端；不要只更新前端。回滚应用不能删除已产生的版本快照，旧应用会绕过草稿发布约束，因此需暂停题库写入后回滚，恢复版本感知代码前保持只读。

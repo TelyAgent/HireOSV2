@@ -106,6 +106,8 @@ model PlanItem {
   // The round this question was sent in (#48). Null = it is in the case's current draft round and
   // still editable; once set, the item is frozen with that invitation and read-only.
   invitationId   String?
+  bankQuestionVersionId String?
+  bankQuestionVersion QuestionVersion? @relation(fields: [bankQuestionVersionId], references: [id], onDelete: Restrict)
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
   case           Case        @relation(fields: [caseId], references: [id], onDelete: Cascade)
@@ -233,14 +235,51 @@ model Question {
   difficulty   String   @default("Medium")
   estMinutes   Int      @default(120)
   language     String   @default("中文")
-  version      Int      @default(1)
-  status       String   @default("published")
+  version      Int      @default(0)
+  revision     Int      @default(1)
+  status       String   @default("draft_review")
+  deletedAt    DateTime?
   author       String?
   deliverables Json?
   favorite     Boolean  @default(false)
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
+  versions     QuestionVersion[]
+  deprecations QuestionDeprecation[]
+
   @@unique([workspaceId, code])
   @@index([workspaceId, createdAt])
+}
+
+model QuestionVersion {
+  id            String @id @default(uuid())
+  workspaceId   String
+  questionId    String
+  version       Int
+  draftRevision Int
+  content       Json
+  historicalBaseline Boolean @default(false)
+  publishedBy   String?
+  publishedAt   DateTime?
+  createdAt     DateTime @default(now())
+  question      Question @relation(fields: [questionId], references: [id], onDelete: Restrict)
+  planItems     PlanItem[]
+
+  @@unique([questionId, version])
+  @@unique([questionId, draftRevision])
+  @@index([workspaceId, questionId])
+}
+
+model QuestionDeprecation {
+  id          String @id @default(uuid())
+  workspaceId String
+  questionId  String
+  version     Int
+  actorId     String
+  createdAt   DateTime @default(now())
+  question    Question @relation(fields: [questionId], references: [id], onDelete: Restrict)
+
+  @@unique([questionId, version])
+  @@index([workspaceId, questionId])
 }

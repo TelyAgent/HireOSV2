@@ -5,6 +5,10 @@ import { useProjectTask } from "../../features/project-intake/useTask";
 import { useDebriefSummary } from "../../features/project-intake/useDebriefSummary";
 import type { Screen } from "../../store/types";
 import type { Material } from "../../features/project-intake/api";
+import { RecordedActivity } from "../../features/project-intake/RecordedActivity";
+import { ScreeningReports } from "../../features/project-intake/ScreeningReports";
+import { MaterialTriage } from "../../features/project-intake/MaterialTriage";
+import { useState } from 'react';
 
 const row = { padding: "12px 16px", borderBottom: "1px solid var(--line)", display: "flex", alignItems: "center", gap: 10 } as const;
 const emptyRow = { padding: "11px 16px", fontSize: 13, color: "var(--ink-3)" } as const;
@@ -13,7 +17,8 @@ export function ProjectOverviewPage() {
   const { state, t, go } = useStore();
   const zh = state.lang === "zh";
   const L = (en: string, zhText: string) => (zh ? zhText : en);
-  const { task, advance } = useProjectTask();
+  const { task, advance, reload } = useProjectTask();
+  const [materialRefresh, setMaterialRefresh] = useState(0);
   const summary = useDebriefSummary(state.currentTaskId);
 
   if (!task) return <div style={emptyRow}>{L("Loading…", "加载中…")}</div>;
@@ -41,7 +46,6 @@ export function ProjectOverviewPage() {
     task.resume ? { name: L("Résumé", "简历"), ...readTag(task.resume.material.readStatus), files: [task.resume.material] } : { name: L("Résumé", "简历"), tag: L("Not provided", "未提供"), tone: "unknown" as Tone },
     materialRow(L("Screening package", "初筛资料包"), "screening"),
     materialRow(L("Assessment results", "测评结果"), "assessment"),
-    ...(attached("other").length ? [materialRow(L("Other attachments", "其他附件"), "other")] : []),
   ];
 
   // Requirement coverage — each confirmed capability card with its latest human score.
@@ -125,7 +129,7 @@ export function ProjectOverviewPage() {
       <div
         style={{
           display: "grid",
-          gridTemplateColumns: "repeat(auto-fit,minmax(280px,1fr))",
+          gridTemplateColumns: "repeat(auto-fit,minmax(min(280px,100%),1fr))",
           gap: 16,
           alignItems: "start",
         }}
@@ -138,6 +142,9 @@ export function ProjectOverviewPage() {
                 {m.files?.map(file => (
                   <div key={file.id} data-testid="source-material" style={{ marginTop: 8, overflowWrap: "anywhere" }}>
                     <div>{file.name || L("Filename not recorded", "文件名未记录")}</div>
+                    {task.materials.filter(m => m.material.id === file.id && m.triagedAt).map(m => <div key={file.id} style={{ fontSize: 12 }}>
+                      {L('Classified', '已归类')} · {m.triagedBy || L('Actor not recorded', '操作人未记录')} · {fmt(m.triagedAt!)}
+                    </div>)}
                     <div style={{ fontSize: 12, color: "var(--ink-2)" }}>{readTag(file.readStatus).tag} · {file.id}</div>
                     <div style={{ fontSize: 12, color: "var(--ink-2)" }}>{L("Source and version not recorded", "来源与版本未记录")}</div>
                   </div>
@@ -239,6 +246,13 @@ export function ProjectOverviewPage() {
           )}
         </OverviewCard>
       </div>
+      <RecordedActivity taskId={task.id} zh={zh} />
+      <MaterialTriage key={task.id} taskId={task.id} materials={task.materials} zh={zh} onChanged={async () => {
+        const updated = await reload();
+        if (!updated) throw new Error('Task reload failed');
+        setMaterialRefresh(n => n + 1);
+      }} />
+      <ScreeningReports key={`${task.id}:${materialRefresh}`} taskId={task.id} zh={zh} />
     </>
   );
 }

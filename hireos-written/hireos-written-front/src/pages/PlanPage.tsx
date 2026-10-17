@@ -191,6 +191,7 @@ export function PlanPage() {
     const q = newQuestion ?? QUESTIONS[questionId];
     try {
       const created = await createPlanItem(caseId, {
+        ...(!newQuestion && !q.caseScoped ? { bankQuestionId: q.id, bankQuestionVersion: q.version } : {}),
         kind, questionCode: q.code, questionTitle: q.title, questionPrompt: q.prompt,
         customPrompt: customPrompt ?? undefined, competencies: q.competencies, deliverables: q.deliverables,
       });

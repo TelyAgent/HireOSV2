@@ -58,6 +58,8 @@ const assert = require('node:assert/strict');
   assert.ok(beforeBack > 0, `expected a scroll position before Back, got ${beforeBack}`);
   await page.click('.linked-candidates-table tbody tr.clickable td:nth-child(3)');
   await page.waitForURL(/\/applications\//);
+  const departure = await page.evaluate(() => Number(sessionStorage.getItem('screening-workspace-scroll:j198')));
+  if (process.env.SYNTHETIC === '1') assert.ok(departure >= beforeBack - 2, 'departure position must be captured before loading the detail');
   await page.waitForTimeout(800);
   await page.goBack({ waitUntil: 'networkidle' });
   await page.waitForSelector('.linked-candidates-table tbody tr');
@@ -67,6 +69,7 @@ const assert = require('node:assert/strict');
   assert.equal(after.rows, before.rows);
   assert.equal(after.statusSelect, 'awaiting');
   assert.ok(after.scrollTop >= beforeBack - 2, `Back should restore scroll ${beforeBack}, got ${after.scrollTop}`);
+  if (process.env.SYNTHETIC === '1') assert.ok(Math.abs(after.scrollTop - departure) <= 2, `Back should restore actual departure ${departure}, got ${after.scrollTop}`);
   console.log('filter+scroll', JSON.stringify({ before, scrolled, after }));
 
   await page.goto(`${base}?status=decided&source=__missing_source__`, { waitUntil: 'networkidle' });

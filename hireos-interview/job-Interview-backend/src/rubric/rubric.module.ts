@@ -4,9 +4,10 @@ import { WorkspaceGuard } from '../intake/workspace.guard';
 import { RubricController } from './rubric.controller';
 import { RubricService } from './rubric.service';
 import { JdContentFacade } from '../core-record/jd-content.facade';
+import { RubricExportService } from './rubric-export.service';
 
 // Generation actually runs on the shared ParsingService worker loop registered in
 // IntakeModule (it ticks over the ParseJob table regardless of which module created a
 // row); this module only owns the Requirements & Rubric API surface and business logic.
-@Module({ controllers: [RubricController], providers: [PrismaService, WorkspaceGuard, RubricService, JdContentFacade] })
+@Module({ controllers: [RubricController], providers: [PrismaService, WorkspaceGuard, RubricService, RubricExportService, JdContentFacade] })
 export class RubricModule {}

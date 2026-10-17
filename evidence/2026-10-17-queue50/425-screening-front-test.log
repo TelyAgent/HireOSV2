@@ -1,0 +1,73 @@
+npm run test
+exit=0
+
+> hireos-screening-frontend@0.1.0 test
+> node --test test/unit/*.test.mjs
+
+✔ #214 AC-1/AC-2/AC-4: each state has its own label and none says Approved (0.543125ms)
+✔ #180 AC-1: the default wording no longer claims authorization, in English and Chinese (1.091625ms)
+✔ #180 AC-1/AC-2: a new draft starts from the current wording; custom wording is kept; old wording is flagged (0.126917ms)
+✔ #151 AC-3: the review shows every signal with its points, the total and the policy version the API returned (130.939417ms)
+✔ #151 AC-3: both sides' files, sources, versions, the existing history and the paragraph differences are the API's (77.208292ms)
+✔ #151 AC-3: a check stored before scoring shows its readable basis instead of a score table (78.60125ms)
+✔ #195 AC-2: an AI snapshot shows its recorded model; a rules snapshot says no AI was used (0.824208ms)
+✔ #195 AC-3: an AI snapshot without a model says its source can't be traced, without inventing one (0.13075ms)
+✔ keeps pdf/docx/txt in any case and in subfolders (1.051792ms)
+✔ skips other formats, hidden files and folders, and Office lock files (0.1575ms)
+✔ the 20 MB limit (minus multipart headroom) is inclusive (0.103875ms)
+✔ batches respect the 20-file limit and keep order (0.215708ms)
+✔ batches respect the byte budget; an oversized file gets its own batch (0.112208ms)
+✔ runWithConcurrency never exceeds the limit and runs every item once (43.218291ms)
+✔ #162: an over-long PDF says it has more than 10 pages (0.569708ms)
+✔ #163: a password-protected PDF shows as quarantined for its encryption, not as an unreadable scan (0.164708ms)
+✔ #165: a damaged PDF and a scan without text are told apart, each with a way forward (0.099417ms)
+✔ #166: an empty file and an unsupported type read as such, never as an internal error (0.148292ms)
+✔ every file-error text has its Chinese translation (0.080292ms)
+✔ #154 AC-1: same email and same phone never read as different contact details (0.463709ms)
+✔ #154 AC-2: only the field that differs is called different; a missing value is called missing (2.310792ms)
+✔ #154 AC-3: every phrase, and the reworded duplicate copy, has its Chinese text (0.423583ms)
+✔ #240 AC-1: extension-B Han characters, combining accents and emoji are never cut (17.389834ms)
+✔ #240 AC-2: words give their first characters; a name without spaces gives its first two (0.523917ms)
+✔ #240 AC-3: empty names give the fallback; without Intl.Segmenter code points are used, still never half a pair (0.549042ms)
+✔ #240 AC-2: every frontend uses the same module (2.22425ms)
+✔ #176 AC-1: known sources read as channel names, in English and Chinese (0.567834ms)
+✔ #176 AC-2: an unknown source isn't guessed and a missing one says so (0.07775ms)
+✔ #174: every match status has its own label, distinct from the linked-role count, with Chinese (0.16175ms)
+✔ every page request stays within the server's limit, however far the user scrolls (0.932583ms)
+✔ a page is appended after what is shown, without repeating anyone, with the latest counts (0.497667ms)
+✔ a late response for an earlier search or page is dropped; only the latest request counts (0.092208ms)
+✔ "Show more" waits for the new search's first page and never extends a list from an earlier search (0.079208ms)
+✔ coming back from a candidate brings back as many as were loaded, in pages the server accepts (0.138708ms)
+✔ #155 AC-1/AC-2: the complete résumé shows all 12 fields as known, each with a link to its paragraph (1.048083ms)
+✔ #155 AC-1: the sparse résumé shows the name, and every other field as not provided with no link or note (0.194208ms)
+✔ #155 AC-2: a value that isn't in the source is named; an unreadable source says so instead of linking (0.185625ms)
+✔ #155 AC-3: the same payload always gives the same rows (a refresh shows the same) (0.965167ms)
+✔ #155 AC-3: the complete résumé — every field rendered with the API's values, status and source locations (4.954583ms)
+✔ #155 AC-3: the sparse résumé — what it doesn't give is shown as not provided, with no made-up value or link (0.810792ms)
+✔ #155 AC-3: a reload shows the same page — the same fields, statuses and locations (2.118667ms)
+✔ #182 AC-1/AC-2: a stale recommendation reads as expired and replaced, never as pending, and can't be acted on (0.45325ms)
+✔ #181 AC-2: a not-eligible recommendation shows no confidence level (0.076584ms)
+✔ #184 AC-1/AC-2: statuses, the stale reason and the no-match reasons have Chinese text (0.210583ms)
+✔ #179 AC-1/AC-2/AC-4: same verdicts as the server rules (4.228542ms)
+✔ #179: every reason, attribute and alternative has Chinese text (0.155625ms)
+✔ #194 AC-4: the five bands follow BR-6 (2.453791ms)
+✔ #194 AC-1: a high score with an open high-severity concern and eligibility needing verification is capped at review (0.21675ms)
+✔ #194 AC-2: once the concern is handled the recommendation follows the score again (0.085084ms)
+✔ #194 AC-3: not eligible and low coverage come before the score (0.140583ms)
+✔ #187 AC-1/AC-2: until a person decides, the status is 'awaiting next step', whatever the AI screening did (0.639625ms)
+✔ #196 AC-1/AC-2: AI 'do not advance' vs a person's 'strong advance' is called out; agreement or no decision isn't (0.096625ms)
+✔ #194 (review): every page shows the rule's outcome — not eligible stays 'do not advance' even with thin evidence (0.535792ms)
+✔ #206 AC-1: v1 is the first snapshot; a later one without changes says so instead (0.76775ms)
+✔ #206 AC-2: each change of a later snapshot is listed; old English sentences are kept as they are (0.217583ms)
+✔ #208 AC-1/AC-2: the same changes read in Chinese, names and user text untouched (0.132917ms)
+✔ #208 AC-3: every built-in dimension name, change template and snapshot note has a Chinese translation (0.080333ms)
+✔ AC-1: filters survive the URL round trip; unset ones stay out of it, other parameters are kept (0.862708ms)
+✔ AC-3: each filter alone, combined, and cleared (0.1855ms)
+ℹ tests 59
+ℹ suites 0
+ℹ pass 59
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 480.302333

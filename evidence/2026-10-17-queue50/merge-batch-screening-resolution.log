@@ -1,0 +1,3 @@
+node test/screening-resolution.browser.cjs
+exit=0
+PASS #246 duplicate selection, cancel, conflict/input retention, reload, history, retained content, new attachment and narrow panel

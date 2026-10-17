@@ -19,6 +19,7 @@ export function toBankQuestion(q: RealBankQuestion): Question {
     estMinutes: q.estMinutes,
     language: q.language,
     version: q.version,
+    revision: q.revision,
     status: q.status,
     author: q.author ?? "system",
     favorite: q.favorite,

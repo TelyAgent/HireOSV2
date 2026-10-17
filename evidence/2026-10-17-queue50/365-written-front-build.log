@@ -1,0 +1,21 @@
+npm run build
+exit=0
+
+> hireos-written-frontend@0.1.0 build
+> node scripts/check-i18n.mjs && tsc -b && vite build
+
+i18n: all literal t() keys have zh translations (850 entries).
+vite v7.3.6 building client environment for production...
+transforming...
+✓ 1543 modules transformed.
+rendering chunks...
+computing gzip size...
+dist/index.html                     0.80 kB │ gzip:   0.48 kB
+dist/assets/index-D3CTV9Vb.css     30.03 kB │ gzip:   7.02 kB
+dist/assets/index-Rmj6nW0L.js   1,130.18 kB │ gzip: 357.27 kB
+✓ built in 2.47s
+
+(!) Some chunks are larger than 500 kB after minification. Consider:
+- Using dynamic import() to code-split the application
+- Use build.rollupOptions.output.manualChunks to improve chunking: https://rollupjs.org/configuration-options/#output-manualchunks
+- Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.

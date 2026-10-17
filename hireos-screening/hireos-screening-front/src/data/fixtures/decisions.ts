@@ -6,6 +6,9 @@ export type DecisionStatus = "pending_approval" | "approved" | "superseded" | "r
 export interface Decision {
   id: string;
   applicationId: string;
+  evaluationId?: string | null;
+  evaluationVersion?: number | null;
+  evaluationCompletedAt?: string | null;
   outcome: DecisionOutcome;
   reason: string;
   decidedBy: PersonId;

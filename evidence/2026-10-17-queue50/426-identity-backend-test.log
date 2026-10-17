@@ -1,0 +1,56 @@
+npm run test
+exit=0
+
+> hireos-identity-backend@0.1.0 test
+> npm run build && node --test test/*.test.cjs
+
+
+> hireos-identity-backend@0.1.0 build
+> nest build
+
+▶ identity sign-in rules (issue #16)
+  ✔ AC-2: a member gets a 6-digit code by email and signs in with it (16.877ms)
+  ✔ AC-2: an invited member becomes active on first sign-in (10.660333ms)
+  ✔ AC-3: valid 10 minutes, single use (8.577125ms)
+  ✔ AC-3: resending invalidates the previous code at once (12.849083ms)
+  ✔ AC-3: five wrong attempts kill the code, even the right one afterwards (15.806916ms)
+  ✔ AC-3: an expired code says so (4.510667ms)
+  ✔ AC-4: an uninvited email looks exactly like a member, but never gets a code or a session (9.783791ms)
+  ✔ AC-5: 60-second resend cooldown, enforced by the server (4.879708ms)
+  ✔ AC-5: at most 5 codes per email per hour (2.683958ms)
+  ✔ AC-5: at most 20 codes per email per day (8.675041ms)
+  ✔ AC-5: at most 20 code requests per IP per hour (6.540042ms)
+  ✔ AC-6: a session unused for 7 days ends (7.884709ms)
+  ✔ AC-6: 30 days after sign-in the session ends however actively it is used (6.430542ms)
+  ✔ AC-6: sliding renewal never reaches past 30 days from sign-in (13.594125ms)
+  ✔ AC-7: signing out revokes the session on the server (14.821042ms)
+  ✔ AC-7: signing out everywhere revokes every session of the user (16.248041ms)
+  ✔ AC-8: a removed member loses their sessions at once and can no longer get a code (14.964375ms)
+  ✔ #233: the code email is in the sign-in page language, even when the account chose another (6.826334ms)
+  ✔ #233: an account that never chose a language takes the sign-in page language; one that did keeps its own (20.253292ms)
+  ✔ #233: choosing a language in any module makes it the account language (41.150667ms)
+✔ identity sign-in rules (issue #16) (499.487625ms)
+▶ #133 code requests under concurrency
+  ✔ AC-1: same email at once from two instances — one code within the cooldown, the rest 429 (24.977041ms)
+  ✔ AC-3: after the cooldown, concurrent resends leave exactly one valid code; the older one is superseded (20.659541ms)
+  ✔ AC-2: different emails from one IP at once never exceed the hourly IP limit (73.343583ms)
+✔ #133 code requests under concurrency (380.78775ms)
+✔ identity app module compiles (256.980291ms)
+✔ sign-in codes are 6 digits and only their HMAC is comparable (0.855208ms)
+✔ session tokens are random and stored only as a hash (0.273083ms)
+✔ emails are normalized before lookup (0.134625ms)
+✔ returnTo only accepts same-site paths into known subsystems (0.176792ms)
+✔ cookie header parsing keeps the first value and tolerates junk (0.443583ms)
+✔ roles are filtered to the known set (0.0905ms)
+✔ sign-in email puts the code first in the subject, in both languages (0.166334ms)
+✔ invite email is a short invitation with a sign-in link, in both languages (0.181791ms)
+✔ client IP skips exactly the trusted proxy hops and ignores forged X-Forwarded-For entries (0.269917ms)
+✔ #426 internal verification: trusted token, active account and exact active workspace membership (55.202791ms)
+ℹ tests 36
+ℹ suites 0
+ℹ pass 36
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 553.145458

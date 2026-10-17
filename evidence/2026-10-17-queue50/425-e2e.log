@@ -1,0 +1,3 @@
+node test/screening-batches-e2e.cjs
+exit=0
+PASS #425 real local HTTP + PostgreSQL browser E2E: 3 members, 1 AI failure, retry only failed item, reload completed=3, 3 Applications, 3 evaluations, provider calls [1,1,2].

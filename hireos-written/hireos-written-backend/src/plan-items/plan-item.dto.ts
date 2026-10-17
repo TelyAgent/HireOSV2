@@ -1,5 +1,5 @@
 import { Type } from 'class-transformer';
-import { IsArray, IsIn, IsNumber, IsOptional, IsString, ValidateNested } from 'class-validator';
+import { IsArray, IsIn, IsInt, Min, IsNumber, IsOptional, IsString, ValidateNested } from 'class-validator';
 
 class CompetencyDto {
   @IsString()
@@ -10,6 +10,14 @@ class CompetencyDto {
 }
 
 export class CreatePlanItemDto {
+  @IsOptional()
+  @IsString()
+  bankQuestionId?: string;
+
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  bankQuestionVersion?: number;
   @IsIn(['required', 'optional'])
   kind!: 'required' | 'optional';
 

@@ -4,8 +4,9 @@ import { useStore } from "../store/StoreContext";
 import { recordDecision, sendDeclineNotice, withdrawDecision, type NextStepTarget } from "../data/api/decisions";
 import { getApplicationDetail } from "../data/api/screening";
 import { ApiError } from "../data/api/shared";
-import { db, getApplication, getCandidate, getConcerns, getEvaluation, getJob } from "../data/db";
+import { db, getApplication, getCandidate, getConcerns, getJob } from "../data/db";
 import type { Application } from "../data/fixtures/applications";
+import type { Evaluation } from "../data/fixtures/evaluations";
 import type { Decision, DecisionOutcome } from "../data/fixtures/decisions";
 import type { ConcernSeverity } from "../data/fixtures/concerns";
 import { fmtDateTime } from "../lib/format";
@@ -180,6 +181,9 @@ function AlreadyDecidedView({ app, withdrawn, onWithdrawn }: { app: Application;
         <p className="tiny">
           {t("Decided by")} {db.people[decision.decidedBy]?.name} · {fmtDateTime(decision.decidedAt, state.lang)} · {t("Status:")} {t(decisionStateLabel(decision))}
         </p>
+        <p className="tiny" data-testid="decision-basis">
+          {t("Evaluation basis")}: {decision.evaluationId ?? t("Not recorded")} · {decision.evaluationVersion != null ? `v${decision.evaluationVersion}` : t("Not recorded")} · {decision.evaluationCompletedAt ? fmtDateTime(decision.evaluationCompletedAt, state.lang) : t("Not recorded")}
+        </p>
         {decision.exceptionRef && (
           <p className="tiny" style={{ color: "var(--warning-text)" }}>
             {t("Exception approved by HR + HM to route around the required-assessment policy.")}
@@ -273,6 +277,7 @@ export function DecisionPage() {
   const [loadFailed, setLoadFailed] = useState(false);
   const [submitError, setSubmitError] = useState("");
   const [conflictingDecision, setConflictingDecision] = useState<Decision | null>(null);
+  const [basis, setBasis] = useState<Evaluation | null>(null);
   const fields = useFieldValidation({ reason: () => (!reason.trim() ? t("Explain the basis for this decision.") : null) });
   /** Second confirmation when a blocker concern is still open (#27 AC-2). */
   const [blockerAcknowledged, setBlockerAcknowledged] = useState(false);
@@ -284,6 +289,7 @@ export function DecisionPage() {
     try {
       const detail = await getApplicationDetail(id);
       setWithdrawn(detail.withdrawnDecisions ?? []);
+      setBasis(detail.evaluation);
       setApp(getApplication(id) ?? null);
     } catch (err) {
       if (err instanceof ApiError && (err.code === "HTTP_404" || err.code.endsWith("NOT_FOUND"))) setApp(null);
@@ -314,7 +320,8 @@ export function DecisionPage() {
 
   const cand = getCandidate(app.candidateId)!;
   const job = getJob(app.jobId)!;
-  const ev = getEvaluation(app.id);
+  const ev = basis;
+  const validBasis = ev?.applicationId === app.id && ev.status === "completed" && ev.freshness === "current" && Number.isSafeInteger(ev.version) && (ev.version ?? 0) > 0;
   // The same rule, with the same open concerns, as the screening detail and the workspace (#194).
   const aiRec = inferRecommendation(ev, getConcerns(app.id));
 
@@ -324,6 +331,11 @@ export function DecisionPage() {
 
   const finalize = async (exceptionApproved: boolean) => {
     if (!outcome || submitting) return;
+    if (!validBasis || !ev) {
+      setSubmitError(t("A completed, current screening evaluation is required for every decision. Refresh the evaluation and confirm again."));
+      setConfirmOpen(false);
+      return;
+    }
     const overrideAi = !!aiRec && aiRec !== outcome && !(aiRec === "strong_advance" && outcome === "advance");
     setSubmitting(true);
     setSubmitError("");
@@ -336,6 +348,9 @@ export function DecisionPage() {
         nextStepTarget: toNextStepTarget(target ?? "none"),
         overrideAi,
         exceptionApproved,
+        expectedEvaluationId: ev.id,
+        expectedEvaluationVersion: ev.version!,
+        expectedDecisionId: withdrawn[0]?.id ?? null,
       });
       say(t(result.replayed ? "This decision was already recorded; no new decision was created." : "Decision recorded"), { type: "success" });
       setConfirmOpen(false);
@@ -345,8 +360,10 @@ export function DecisionPage() {
         setSubmitError(t("Another decision or update conflicts with this submission. Your input was not submitted and is preserved below."));
         setConflictingDecision((err.details.decision as Decision | null) ?? null);
         setConfirmOpen(false);
-      } else if (err instanceof ApiError && err.code === "CURRENT_EVALUATION_REQUIRED") {
-        setSubmitError(t("A completed, current screening evaluation is required before advancing. Refresh the evaluation and confirm again."));
+      } else if (err instanceof ApiError && ["CURRENT_EVALUATION_REQUIRED", "EVALUATION_VERSION_CONFLICT", "DECISION_PRECONDITION_REQUIRED"].includes(err.code)) {
+        setSubmitError(t(err.code === "EVALUATION_VERSION_CONFLICT"
+          ? "The evaluation changed since you reviewed it. Review the current evaluation and confirm again."
+          : "A completed, current screening evaluation is required for every decision. Refresh the evaluation and confirm again."));
         setConfirmOpen(false);
       } else {
         say(decisionErrorMessage(err, t), { type: "error" });
@@ -358,6 +375,10 @@ export function DecisionPage() {
 
   const submit = () => {
     if (!outcome) return;
+    if (!validBasis) {
+      setSubmitError(t("A completed, current screening evaluation is required for every decision. Refresh the evaluation and confirm again."));
+      return;
+    }
     if (!fields.validateAll()) return;
     const meta = OUTCOME_META[outcome];
     if (meta.needsTarget && !target) {
@@ -387,6 +408,7 @@ export function DecisionPage() {
           <p>{submitError}</p>
           {conflictingDecision && <p>{conflictingDecision.outcome} · {conflictingDecision.reason} · {db.people[conflictingDecision.decidedBy]?.name ?? conflictingDecision.decidedBy} · {fmtDateTime(conflictingDecision.decidedAt, state.lang)}</p>}
           <Link to={`/applications/${app.id}`} target="_blank" rel="noopener noreferrer">{t("View current application in a new tab")}</Link>
+          <Button icon="refresh" onClick={() => void load()}>{t("Reload evaluation")}</Button>
         </div>
       )}
 
@@ -410,6 +432,9 @@ export function DecisionPage() {
           </p>
           <p className="tiny">
             {t("Assessment:")} {app.assessmentStatus === "completed" ? t("Completed") : t("Not administered")}
+          </p>
+          <p className="tiny" data-testid="evaluation-basis">
+            {t("Evaluation basis")}: {ev?.id ?? t("Not recorded")} · {ev?.version != null ? `v${ev.version}` : t("Not recorded")} · {ev?.completedAt ? fmtDateTime(ev.completedAt, state.lang) : t("Not recorded")}
           </p>
           <OpenConcernList applicationId={app.id} />
         </div>

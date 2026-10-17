@@ -1,0 +1,74 @@
+[
+  {
+    "name": "screening-backend-build",
+    "command": "npm run build",
+    "exit": 0,
+    "log": "425-screening-backend-build.log"
+  },
+  {
+    "name": "screening-backend-lint",
+    "command": "npm run lint",
+    "exit": 0,
+    "log": "425-screening-backend-lint.log"
+  },
+  {
+    "name": "screening-backend-typecheck",
+    "command": "npm run typecheck",
+    "exit": 0,
+    "log": "425-screening-backend-typecheck.log"
+  },
+  {
+    "name": "screening-backend-test",
+    "command": "npm run test",
+    "exit": 0,
+    "log": "425-screening-backend-test.log"
+  },
+  {
+    "name": "screening-front-build",
+    "command": "npm run build",
+    "exit": 0,
+    "log": "425-screening-front-build.log"
+  },
+  {
+    "name": "screening-front-lint",
+    "command": "npm run lint",
+    "exit": 0,
+    "log": "425-screening-front-lint.log"
+  },
+  {
+    "name": "screening-front-typecheck",
+    "command": "npm run typecheck",
+    "exit": 0,
+    "log": "425-screening-front-typecheck.log"
+  },
+  {
+    "name": "screening-front-test",
+    "command": "npm run test",
+    "exit": 0,
+    "log": "425-screening-front-test.log"
+  },
+  {
+    "name": "browser",
+    "command": "node test/screening-batches.browser.cjs",
+    "exit": 0,
+    "log": "425-browser.log"
+  },
+  {
+    "name": "e2e",
+    "command": "node test/screening-batches-e2e.cjs",
+    "exit": 0,
+    "log": "425-e2e.log"
+  },
+  {
+    "name": "workspace-regression",
+    "command": "node test/workspace-flow.cjs http://localhost:8080/screening/jobs/j198/screening",
+    "exit": 0,
+    "log": "425-workspace-regression.log"
+  },
+  {
+    "name": "decision-regression",
+    "command": "node test/decision-conflict.browser.cjs",
+    "exit": 0,
+    "log": "425-decision-regression.log"
+  }
+]

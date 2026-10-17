@@ -41,6 +41,7 @@ export async function getApplicationDetail(id: string): Promise<ApplicationDetai
   if (existingApplication >= 0) db.applications[existingApplication] = detail.application;
   else db.applications.push(detail.application);
   if (detail.evaluation) db.evaluations[id] = detail.evaluation;
+  else delete db.evaluations[id];
   // The evidence behind each dimension, so its drawer can show the excerpts (#192).
   for (const item of (detail.evaluation as { evidence?: Evidence[] } | null)?.evidence ?? []) db.evidence[item.id] = item;
   db.concerns[id] = detail.concerns;

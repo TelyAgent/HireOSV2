@@ -1,0 +1,50 @@
+[
+  {
+    "name": "426",
+    "command": "node evidence/2026-10-17-queue50/verify-426.cjs",
+    "exit": 0,
+    "log": "merge-batch-426.log"
+  },
+  {
+    "name": "425",
+    "command": "node evidence/2026-10-17-queue50/verify-425.cjs",
+    "exit": 0,
+    "log": "merge-batch-425.log"
+  },
+  {
+    "name": "365",
+    "command": "node evidence/2026-10-17-queue50/verify-365.cjs",
+    "exit": 0,
+    "log": "merge-batch-365.log"
+  },
+  {
+    "name": "rubric-source",
+    "command": "node test/rubric-source.browser.cjs",
+    "exit": 0,
+    "log": "merge-batch-rubric-source.log"
+  },
+  {
+    "name": "activity",
+    "command": "node test/activity.browser.cjs",
+    "exit": 0,
+    "log": "merge-batch-activity.log"
+  },
+  {
+    "name": "screening-resolution",
+    "command": "node test/screening-resolution.browser.cjs",
+    "exit": 0,
+    "log": "merge-batch-screening-resolution.log"
+  },
+  {
+    "name": "material-triage",
+    "command": "node test/material-triage.browser.cjs",
+    "exit": 0,
+    "log": "merge-batch-material-triage.log"
+  },
+  {
+    "name": "task-entry-materials",
+    "command": "node test/task-entry-materials.browser.cjs",
+    "exit": 0,
+    "log": "merge-batch-task-entry-materials.log"
+  }
+]
