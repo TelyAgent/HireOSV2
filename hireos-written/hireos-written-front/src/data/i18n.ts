@@ -378,7 +378,7 @@ export const ZH: Record<string, string> = {
   "This assessment did not meet the bar for this role.": "本次测评未达到该岗位的要求标准。",
   "Fill in the outcome, feedback and next step before publishing.": "请先填写结论、反馈和下一步，再发布。",
   "Both review and disclosure approval are required to publish.": "需要勾选「内部评审已完成」和「披露内容已批准发布」后才能发布。",
-  "Result finalized and published. Candidate portal and notification queued.": "结果已定稿并发布。",
+  "Result finalized and published.": "结果已定稿并发布。",
   "Write feedback on this candidate's answers.": "请填写针对该候选人作答的反馈。",
   "Pre-filled from the AI evaluation of these answers — check it reads well for the candidate before publishing.": "已根据 AI 对本次作答的评估预填，发布前请确认内容适合给候选人看。",
   "No AI summary for these answers — please write the feedback yourself.": "本次作答没有 AI 评估摘要，请手动填写反馈。",
@@ -386,8 +386,6 @@ export const ZH: Record<string, string> = {
   "Approve & publish": "批准并发布", "Internal review complete": "内部评审已完成",
   "Disclosure content approved for release": "披露内容已批准发布", "Finalize & publish result": "定稿并发布结果",
   "Published": "已发布",
-  "Delivery does not guarantee delivery — a bounce would still leave the result visible internally.":
-    "发布不等于送达 —— 即便退信，结果在内部仍然可见。",
   "Next action": "下一步操作",
   "A proposal is prepared first; sending only happens after approval — sorting or comparing candidates never triggers a send.":
     "系统会先准备好方案；只有获批后才会发送 —— 排序或对比候选人本身不会触发发送。",

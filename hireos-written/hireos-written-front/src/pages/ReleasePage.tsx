@@ -117,7 +117,7 @@ export function ReleaseContent({
     if (isLatestRound) c.status = "released";
     forceTick();
     onChanged?.();
-    say(t("Result finalized and published. Candidate portal and notification queued."), { type: "success" });
+    say(t("Result finalized and published."), { type: "success" });
   }
 
   /** Runs a lifecycle action against the backend and mirrors the resulting state onto CASES. */
@@ -240,7 +240,9 @@ export function ReleaseContent({
       ) : (
         <>
           <div className="banner success" style={{ marginTop: 16 }}>
-            {t("Published")} {fmtDate(release.publishedAt)}. {t("Delivery does not guarantee delivery — a bounce would still leave the result visible internally.")}
+            {/* No result notification is sent yet, so there is no delivery to qualify (#358). Once one is, add:
+                "Publishing doesn't guarantee delivery — if the email bounces, the result stays published and visible internally." */}
+            {t("Published")} {fmtDate(release.publishedAt)}.
           </div>
           {isLatestRound && (
           <div className="card card-pad" style={{ marginTop: 16 }}>
