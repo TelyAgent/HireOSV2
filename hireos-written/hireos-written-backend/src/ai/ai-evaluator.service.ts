@@ -3,13 +3,20 @@ import { percentScore } from '../invitations/scores';
 import { ConfigService } from '@nestjs/config';
 import { z } from 'zod';
 import { callAiForJson, isAiConfigured } from './ai-json-client';
+import { placeQuotes, type QuoteRef } from './answer-quotes';
 
 const MAX_ANSWER_CHARS = 12000;
 const MAX_PROMPT_CHARS = 6000;
 
 const AiEvaluationSchema = z.object({
   summary: z.string().min(1).max(1000),
-  criteria: z.array(z.object({ name: z.string().min(1).max(60), score: z.number(), evidence: z.string().min(1).max(800) })).min(1).max(8),
+  criteria: z.array(z.object({
+    name: z.string().min(1).max(60),
+    score: z.number(),
+    evidence: z.string().min(1).max(800),
+    // Verbatim excerpts behind the score (#378); optional so a reply without them still scores.
+    quotes: z.array(z.object({ question: z.number().int().min(1), text: z.string().min(1).max(400) })).max(4).optional(),
+  })).min(1).max(8),
 });
 
 export interface EvaluationInput {
@@ -22,6 +29,10 @@ export interface EvaluatedCriterion {
   max: number;
   score: number;
   evidence: string;
+  /** Excerpts of the answers behind the score, each placed by question and lines (#378). */
+  quotes: QuoteRef[];
+  /** Excerpts the AI gave that the answers don't contain: left out, and counted. */
+  unlocatedQuotes: number;
 }
 
 export interface AiEvaluationResult {
@@ -35,12 +46,13 @@ const SYSTEM_PROMPT = `你是一名资深招聘评估专家。根据笔试题目
 规则：
 - 严格依据候选人的实际作答内容评分，不得脑补或假设作答中不存在的内容；如果候选人没有回答或明确表示不会，相关维度应给低分（甚至0分）并如实说明。
 - 每个维度的分值上限已给出（见"评分维度"部分的 max），你给出的 score 必须是 0 到该 max 之间的整数。
-- evidence 字段需引用候选人作答中的具体内容作为依据，而不是空泛评语。
+- evidence 字段说明评分理由，需结合候选人作答中的具体内容，而不是空泛评语。
+- quotes 字段给出 1-3 段支撑该维度评分的作答原文摘录：question 为题目编号（"题目 N" 中的 N），text 必须逐字复制候选人作答中的连续文字，不得改写、概括或拼接；作答中没有可引用的内容时给空数组。
 - summary 用 2-4 句话总结候选人的整体表现、突出优势与主要不足，语气客观专业。
 - 只返回一个JSON对象，严格符合以下结构，不要有多余文字：
 {
   "summary": string,
-  "criteria": [{ "name": string, "score": number, "evidence": string }]
+  "criteria": [{ "name": string, "score": number, "evidence": string, "quotes": [{ "question": number, "text": string }] }]
 }
 criteria 数组必须恰好包含"评分维度"部分列出的每一项，name 与给出的维度名称完全一致。`;
 
@@ -73,12 +85,13 @@ export class AiEvaluatorService {
     const rubricText = rubric.map((r) => `- ${r.name}（满分 ${r.max}）`).join('\n');
     const prompt = `${qaSections}\n\n# 评分维度\n${rubricText}`;
 
-    const result = await callAiForJson(this.config, SYSTEM_PROMPT, prompt, AiEvaluationSchema, { maxCompletionTokens: 3000 });
+    const result = await callAiForJson(this.config, SYSTEM_PROMPT, prompt, AiEvaluationSchema, { maxCompletionTokens: 4000 });
     const byName = new Map(result.criteria.map((c) => [c.name, c]));
     const criteria: EvaluatedCriterion[] = rubric.map((r) => {
       const match = byName.get(r.name);
       const score = match ? Math.max(0, Math.min(r.max, Math.round(match.score))) : 0;
-      return { name: r.name, max: r.max, score, evidence: match?.evidence ?? '（AI 未对该维度给出说明）' };
+      const placed = placeQuotes(match?.quotes ?? [], input.questions, input.answers);
+      return { name: r.name, max: r.max, score, evidence: match?.evidence ?? '（AI 未对该维度给出说明）', quotes: placed.quotes, unlocatedQuotes: placed.unlocated };
     });
     // Out of 100, whatever the rubric maxima add up to.
     const overall = percentScore(criteria);
