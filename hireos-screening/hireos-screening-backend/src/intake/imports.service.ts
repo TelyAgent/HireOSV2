@@ -13,6 +13,7 @@ import { confirmedIdentityOf, pasteImportSchema, pastePreviewSchema, type Confir
 import { invalidSchemaFromZod } from '../http/invalid-schema';
 import { splitText } from './materials.service';
 import { ProfilesService } from '../profiles/profiles.service';
+import { FairQueue } from '../shared/fair-queue';
 import { AUTO_MATCH_JOB } from '../discovery/discovery.service';
 
 type MulterFile = Express.Multer.File;
@@ -43,6 +44,8 @@ export class ImportsService implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(ImportsService.name);
   private timer?: ReturnType<typeof globalThis.setInterval>;
   private running = false;
+  // Workspaces take turns (#389).
+  private readonly queue = new FairQueue();
 
   constructor(
     private readonly db: PrismaService,
@@ -422,17 +425,14 @@ export class ImportsService implements OnModuleInit, OnModuleDestroy {
     this.running = true;
     try {
       const now = new Date();
-      const job = await this.db.processingJob.findFirst({
-        where: {
-          type: CANDIDATE_CREATION_JOB,
-          OR: [
-            { status: 'queued', nextRunAt: { lte: now } },
-            // Reclaim jobs whose worker died mid-flight: the lease expired without the
-            // job ever reaching a terminal status, so it is safe to run again.
-            { status: 'running', leaseUntil: { lt: now } },
-          ],
-        },
-        orderBy: { createdAt: 'asc' },
+      const job = await this.queue.next(this.db, {
+        type: CANDIDATE_CREATION_JOB,
+        OR: [
+          { status: 'queued', nextRunAt: { lte: now } },
+          // Reclaim jobs whose worker died mid-flight: the lease expired without the
+          // job ever reaching a terminal status, so it is safe to run again.
+          { status: 'running', leaseUntil: { lt: now } },
+        ],
       });
       if (!job) return;
       const leaseToken = randomUUID();

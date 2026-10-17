@@ -11,6 +11,7 @@ import type { Identity } from '../auth/workspace.guard';
 import { ProfileParserService } from './profile-parser.service';
 import { AiProfileParserService } from './ai-profile-parser.service';
 import { DiscoveryService } from '../discovery/discovery.service';
+import { FairQueue } from '../shared/fair-queue';
 import { invalidSchema, invalidSchemaFromZod } from '../http/invalid-schema';
 
 // A parse is one AI call (HIREOS_AI_TIMEOUT_SECONDS, 60s by default) plus a few writes, so
@@ -31,6 +32,8 @@ export class ProfilesService implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(ProfilesService.name);
   private timer?: ReturnType<typeof globalThis.setInterval>;
   private running = false;
+  // Workspaces take turns (#389).
+  private readonly queue = new FairQueue();
 
   constructor(
     private readonly db: PrismaService,
@@ -371,10 +374,7 @@ export class ProfilesService implements OnModuleInit, OnModuleDestroy {
           { status: 'running', leaseUntil: { lt: now } },
         ],
       };
-      const job = await this.db.processingJob.findFirst({
-        where: { type: 'resume_parse', ...claimable },
-        orderBy: { createdAt: 'asc' },
-      });
+      const job = await this.queue.next(this.db, { type: 'resume_parse', ...claimable });
       if (!job) return;
       const leaseToken = randomUUID();
       const claimed = await this.db.processingJob.updateMany({

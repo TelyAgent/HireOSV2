@@ -4,6 +4,7 @@ import { randomUUID } from 'node:crypto';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../persistence/prisma.service';
 import type { Identity } from '../auth/workspace.guard';
+import { FairQueue } from '../shared/fair-queue';
 import { AiMatcherService, AiMatchError, type JobDimensionInput, type JobRequirementInput } from './ai-matcher.service';
 
 export const AUTO_MATCH_JOB = 'job_discovery_match';
@@ -42,6 +43,8 @@ export class DiscoveryService implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(DiscoveryService.name);
   private timer?: ReturnType<typeof globalThis.setInterval>;
   private running = false;
+  // Workspaces take turns (#389).
+  private readonly queue = new FairQueue();
 
   constructor(
     private readonly db: PrismaService,
@@ -314,15 +317,12 @@ export class DiscoveryService implements OnModuleInit, OnModuleDestroy {
     this.running = true;
     try {
       const now = new Date();
-      const job = await this.db.processingJob.findFirst({
-        where: {
-          type: AUTO_MATCH_JOB,
-          OR: [
-            { status: 'queued', nextRunAt: { lte: now } },
-            { status: 'running', leaseUntil: { lt: now } },
-          ],
-        },
-        orderBy: { createdAt: 'asc' },
+      const job = await this.queue.next(this.db, {
+        type: AUTO_MATCH_JOB,
+        OR: [
+          { status: 'queued', nextRunAt: { lte: now } },
+          { status: 'running', leaseUntil: { lt: now } },
+        ],
       });
       if (!job) return;
       const leaseToken = randomUUID();
