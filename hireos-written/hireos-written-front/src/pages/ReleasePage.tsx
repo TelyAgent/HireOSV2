@@ -37,6 +37,9 @@ const CLOSE_REASONS: { value: CloseReason; label: string }[] = [
  * hand off to Interview (a real call that creates the interview task), hold / resume, and close
  * testing with a reason. Handed-off and closed are terminal -- no further actions are offered.
  */
+
+// Before 2026-10-14 every published result carried this prototype sentence as its feedback (#398).
+const LEGACY_DEMO_FEEDBACK = "Clear structure; accounting treatment mostly correct with one gap in variance analysis.";
 export function ReleaseContent({
   caseId, invitationId, isLatestRound = true, inline = false, onGoToPlan, onChanged,
 }: {
@@ -195,7 +198,23 @@ export function ReleaseContent({
 
         <div className="card card-pad">
           <h4 style={{ marginBottom: 8 }}>{t("Candidate preview")}</h4>
-          <div className="tiny" style={{ marginBottom: 8 }}>{t("Disclosure policy:")} {disclosure === "score_and_summary" ? t("Score + summary") : t("Summary only")}</div>
+          {/* Published: the policy is what that release stored, not the invitation's setting today (#395). */}
+          <div className="tiny" style={{ marginBottom: 8 }}>
+            {t("Disclosure policy:")}{" "}
+            {release
+              ? typeof release.showScore === "boolean"
+                ? release.showScore ? t("Score + summary") : t("Summary only")
+                : t("Not recorded for this release — check what the candidate was sent.")
+              : disclosure === "score_and_summary" ? t("Score + summary") : t("Summary only")}
+          </div>
+          {release && release.showScore && typeof release.overall !== "number" && (
+            <div className="banner warning" style={{ marginBottom: 8 }}>{t("This release is marked Score + summary but no score was stored with it — check what the candidate was sent.")}</div>
+          )}
+          {release && release.feedbackText.trim() === LEGACY_DEMO_FEEDBACK && (
+            <div className="banner warning" style={{ marginBottom: 8 }}>
+              {t("This feedback is the demo sentence that releases published before 14 Oct 2026 carried by mistake — it was not written for this candidate.")}
+            </div>
+          )}
           {release ? (
             // Published: show exactly what was released (older releases stored the English defaults).
             <div className="card card-pad" style={{ background: "var(--canvas)", whiteSpace: "pre-wrap" }}>
