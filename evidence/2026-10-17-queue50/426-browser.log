@@ -1,0 +1,3 @@
+node test/interviewer-binding.browser.cjs
+exit=0
+PASS #426 browser: selection, cancellation, failure preservation, retry, read-only audit, reload, narrow and non-admin

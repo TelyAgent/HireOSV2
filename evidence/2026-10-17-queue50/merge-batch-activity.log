@@ -1,0 +1,3 @@
+node test/activity.browser.cjs
+exit=0
+PASS #243 populated, empty, failure/retry, loading, task-switch stale response, narrow layout, read-only

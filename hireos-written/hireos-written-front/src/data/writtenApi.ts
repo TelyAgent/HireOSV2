@@ -81,6 +81,7 @@ export interface GeneratedQuestion {
 }
 
 export interface RealBankQuestion {
+  revision: number;
   id: string;
   code: string;
   title: string;
@@ -122,10 +123,10 @@ export async function createBankQuestion(input: {
   return response.json() as Promise<RealBankQuestion>;
 }
 
-/** Any subset -- a content change (title/prompt/competencies) bumps the question's version server-side. */
+/** Content edits create a draft revision; publishing allocates the immutable version. */
 export async function updateBankQuestion(
   id: string,
-  input: { title?: string; prompt?: string; roles?: string[]; competencies?: { name: string; fraction: number }[]; favorite?: boolean },
+  input: { expectedRevision?: number; title?: string; prompt?: string; roles?: string[]; competencies?: { name: string; fraction: number }[]; favorite?: boolean },
 ): Promise<RealBankQuestion> {
   const response = await authFetch(`${BASE}/questions/${encodeURIComponent(id)}`, {
     method: "PATCH",
@@ -139,6 +140,33 @@ export async function updateBankQuestion(
 export async function deleteBankQuestion(id: string): Promise<void> {
   const response = await authFetch(`${BASE}/questions/${encodeURIComponent(id)}`, { method: "DELETE" });
   if (!response.ok) await throwWithMessage(response);
+}
+
+export interface BankQuestionVersion {
+  id: string; version: number; content: RealBankQuestion; historicalBaseline: boolean;
+  publishedBy: string | null; publishedAt: string | null; createdAt: string;
+}
+export async function listBankQuestionVersions(id: string): Promise<BankQuestionVersion[]> {
+  const response = await authFetch(`${BASE}/questions/${encodeURIComponent(id)}/versions`);
+  if (!response.ok) await throwWithMessage(response);
+  return response.json();
+}
+export async function publishBankQuestion(id: string, expectedRevision: number): Promise<{ question: RealBankQuestion; replayed: boolean }> {
+  const response = await authFetch(`${BASE}/questions/${encodeURIComponent(id)}/publish`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ expectedRevision }) });
+  if (!response.ok) await throwWithMessage(response);
+  return response.json();
+}
+
+export interface QuestionDeprecation { id: string; version: number; actorId: string; createdAt: string }
+export async function listQuestionDeprecations(id: string): Promise<QuestionDeprecation[]> {
+  const response = await authFetch(`${BASE}/questions/${encodeURIComponent(id)}/deprecations`);
+  if (!response.ok) await throwWithMessage(response);
+  return response.json();
+}
+export async function deprecateBankQuestion(id: string, expectedRevision: number): Promise<{ question: RealBankQuestion; replayed: boolean }> {
+  const response = await authFetch(`${BASE}/questions/${encodeURIComponent(id)}/deprecate`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ expectedRevision }) });
+  if (!response.ok) await throwWithMessage(response);
+  return response.json();
 }
 
 /** Scoring competencies for a hand-written Question Bank question, derived by AI from its content. */
@@ -510,6 +538,8 @@ export async function listPlanItems(caseId: string): Promise<RealPlanItem[]> {
 export async function createPlanItem(
   caseId: string,
   input: {
+    bankQuestionId?: string;
+    bankQuestionVersion?: number;
     kind: "required" | "optional";
     questionCode: string;
     questionTitle: string;

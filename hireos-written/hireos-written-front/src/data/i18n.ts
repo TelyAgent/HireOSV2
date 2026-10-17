@@ -127,7 +127,7 @@ export const ZH: Record<string, string> = {
   "Needs confirmation": "待确认", "Quarantined": "已隔离", "Duplicate": "重复项",
   "Final": "已定稿", "AI draft — not final": "AI 草稿 — 未定稿", "Draft": "草稿",
   "Active": "进行中", "Evaluated": "已评估", "Review pending": "待评审", "Issue open": "存在问题",
-  "Concept": "构思中", "In review": "评审中",
+  "Concept": "构思中", "In review": "评审中", "Deprecated": "已停用",
   "Internal only": "仅限内部", "Final — not released": "已定稿 — 未发布", "Awaiting confirmation": "待确认",
   "Released": "已发布", "Linked — no plan yet": "已关联 — 尚无方案",
   "Planned": "已规划", "Ready to release": "可发布", "Invited": "已邀请",

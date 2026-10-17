@@ -12,6 +12,9 @@ export interface RecordDecisionInput {
   nextStepTarget: NextStepTarget;
   overrideAi?: boolean;
   exceptionApproved?: boolean;
+  expectedEvaluationId: string;
+  expectedEvaluationVersion: number;
+  expectedDecisionId: string | null;
 }
 
 /** The shared decision-recording core — used both by the single-application

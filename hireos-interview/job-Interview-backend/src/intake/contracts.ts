@@ -30,6 +30,8 @@ export const createTaskSchema = z.object({ materialId: z.string().uuid() }).stri
 // Attaches a task-specific material (screening report, assessment result, other) —
 // résumés are attached via createTaskSchema instead, since they always create a task.
 export const attachTaskMaterialSchema = z.object({ materialId: z.string().uuid(), kind: taskMaterialKindSchema }).strict();
+export const resolveScreeningSchema = z.object({ materialId: z.string().uuid(), expectedRevision: z.number().int().min(0) }).strict();
+export const triageMaterialSchema = z.object({ materialId: z.string().uuid(), kind: z.enum(['screening', 'assessment']) }).strict();
 
 // Received from Screening's outbox dispatcher when a decision's next step is
 // "move to interview". Carries only stable Core Record ids and a display summary —

@@ -11,7 +11,10 @@
 export const ZH: Record<string, string> = {
   "This decision was already recorded; no new decision was created.": "该决定此前已记录，本次没有创建新决定。",
   "Another decision or update conflicts with this submission. Your input was not submitted and is preserved below.": "已有决定或更新与本次提交冲突。本次输入未提交，已保留在下方。",
-  "A completed, current screening evaluation is required before advancing. Refresh the evaluation and confirm again.": "推进前需要已完成且有效的筛选评估。请重新评估后再次确认。",
+  "A completed, current screening evaluation is required for every decision. Refresh the evaluation and confirm again.": "所有正式决定都需要已完成且有效的筛选评估。请重新评估后再次确认。",
+  "The evaluation changed since you reviewed it. Review the current evaluation and confirm again.": "评估已发生变化，请查看当前评估后再次确认。",
+  "Evaluation basis": "评估依据",
+  "Reload evaluation": "重新加载评估",
   "View current application in a new tab": "在新标签页查看当前申请",
   // New job entry (NewJobModal)
   "Start with a job description": "从职位描述开始",

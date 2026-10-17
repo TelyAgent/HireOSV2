@@ -937,6 +937,43 @@ model WorkspaceSetting {
 // to the receiving subsystem; this table is the durability/retry backstop for that delivery,
 // not a replacement for a real event bus -- swapping the transport later doesn't change
 // this schema or the payload envelope.
+model ScreeningBatch {
+  id             String @id @default(uuid())
+  workspaceId    String
+  jobId          String
+  actorId        String
+  idempotencyKey String
+  requestHash    String
+  cancelledAt    DateTime?
+  createdAt      DateTime @default(now())
+  items          ScreeningBatchItem[]
+
+  @@unique([workspaceId, idempotencyKey])
+  @@index([workspaceId, jobId, createdAt])
+}
+
+model ScreeningBatchItem {
+  id            String @id @default(uuid())
+  batchId       String
+  workspaceId   String
+  applicationId String
+  snapshot      Json
+  status        String @default("queued")
+  attempt       Int @default(0)
+  leaseToken    String?
+  leaseUntil    DateTime?
+  evaluationId  String?
+  errorCode     String?
+  retryKeys     String[] @default([])
+  startedAt     DateTime?
+  completedAt   DateTime?
+  createdAt     DateTime @default(now())
+  batch         ScreeningBatch @relation(fields: [batchId], references: [id], onDelete: Restrict)
+
+  @@unique([batchId, applicationId])
+  @@index([workspaceId, status, createdAt])
+}
+
 model ScreeningOutboxEvent {
   id           String    @id @default(uuid())
   workspaceId  String

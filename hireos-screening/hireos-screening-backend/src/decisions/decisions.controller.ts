@@ -1,6 +1,6 @@
 import { Body, Controller, Param, Post, Req, UseGuards } from '@nestjs/common';
 import { WorkspaceGuard, type Identity } from '../auth/workspace.guard';
-import { DecisionsService } from './decisions.service';
+import { DecisionsService, type DecisionInput } from './decisions.service';
 
 @Controller()
 @UseGuards(WorkspaceGuard)
@@ -11,13 +11,7 @@ export class DecisionsController {
   record(
     @Req() req: { identity: Identity },
     @Param('id') id: string,
-    @Body() body: {
-      outcome?: string;
-      reason?: string;
-      nextStepTarget?: string;
-      overrideAi?: boolean;
-      exceptionApproved?: boolean;
-    },
+    @Body() body: DecisionInput,
   ) {
     return this.decisions.record(req.identity, id, body);
   }

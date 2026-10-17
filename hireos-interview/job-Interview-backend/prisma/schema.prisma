@@ -19,7 +19,18 @@ model Interviewer {
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
   rounds      InterviewRound[]
+  accountBinding InterviewerAccountBinding?
   @@index([workspaceId, createdAt])
+}
+
+model InterviewerAccountBinding {
+  interviewerId String @id
+  workspaceId String
+  accountId String
+  boundBy String
+  boundAt DateTime @default(now())
+  interviewer Interviewer @relation(fields: [interviewerId], references: [id], onDelete: Restrict)
+  @@index([workspaceId, accountId])
 }
 
 // A Job never originates in Interview: its identity (title/department/location/level)
@@ -97,6 +108,9 @@ model Resume {
 // The Application: one Job + one Candidate is one unique interview task. This is the
 // row everything else (sessions, revisions, task-specific materials) hangs off of.
 model InterviewTask {
+  screeningRevision    Int       @default(0)
+  currentScreeningId   String?
+  screeningResolutions ScreeningResolution[]
   id                   String    @id @default(uuid())
   workspaceId          String
   createdBy            String
@@ -406,12 +420,46 @@ model JobMaterial {
 }
 
 model TaskMaterial {
+  triagedBy  String?
+  triagedAt  DateTime?
   taskId     String
   materialId String
   kind       String
   task       InterviewTask @relation(fields: [taskId], references: [id], onDelete: Cascade)
   material   Material      @relation(fields: [materialId], references: [id])
   @@id([taskId, materialId])
+}
+
+model ScreeningResolution {
+  id String @id @default(uuid())
+  taskId String
+  revision Int
+  selectedMaterialId String
+  memberIds Json
+  actorId String
+  createdAt DateTime @default(now())
+  task InterviewTask @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  @@unique([taskId, revision])
+}
+
+model RubricExport {
+  id String @id @default(uuid())
+  workspaceId String
+  jobId String
+  actorId String
+  requestId String
+  rubricId String
+  revision Int
+  versionNumber Int
+  rubricStatus String
+  snapshot Json
+  status String @default("pending")
+  errorCode String?
+  pdf Bytes?
+  createdAt DateTime @default(now())
+  completedAt DateTime?
+  @@unique([workspaceId, actorId, requestId])
+  @@index([workspaceId, jobId, createdAt])
 }
 
 // One shared parse queue for JD, requirements and résumé extraction. Exactly one of

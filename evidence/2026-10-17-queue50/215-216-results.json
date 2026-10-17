@@ -1,0 +1,56 @@
+[
+  {
+    "name": "screening-backend-build",
+    "command": "npm run build",
+    "exit": 0,
+    "log": "215-216-screening-backend-build.log"
+  },
+  {
+    "name": "screening-backend-lint",
+    "command": "npm run lint",
+    "exit": 0,
+    "log": "215-216-screening-backend-lint.log"
+  },
+  {
+    "name": "screening-backend-typecheck",
+    "command": "npm run typecheck",
+    "exit": 0,
+    "log": "215-216-screening-backend-typecheck.log"
+  },
+  {
+    "name": "screening-backend-test",
+    "command": "npm run test",
+    "exit": 0,
+    "log": "215-216-screening-backend-test.log"
+  },
+  {
+    "name": "screening-front-build",
+    "command": "npm run build",
+    "exit": 0,
+    "log": "215-216-screening-front-build.log"
+  },
+  {
+    "name": "screening-front-lint",
+    "command": "npm run lint",
+    "exit": 0,
+    "log": "215-216-screening-front-lint.log"
+  },
+  {
+    "name": "screening-front-typecheck",
+    "command": "npm run typecheck",
+    "exit": 0,
+    "log": "215-216-screening-front-typecheck.log"
+  },
+  {
+    "name": "screening-front-test",
+    "command": "npm run test",
+    "exit": 0,
+    "log": "215-216-screening-front-test.log"
+  },
+  {
+    "name": "browser",
+    "command": "node test/decision-conflict.browser.cjs",
+    "exit": 0,
+    "log": "215-216-browser.log"
+  }
+]

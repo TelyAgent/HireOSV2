@@ -1,0 +1,3 @@
+node test/rubric-source.browser.cjs
+exit=0
+PASS #251/#253 provenance, PDF generation retry key, download transport, history reload, truthful status and narrow layout

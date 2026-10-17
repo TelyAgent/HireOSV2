@@ -1,0 +1,3 @@
+node test/screening-batches.browser.cjs
+exit=0
+PASS #425 workspace: fixed selection, lost response + reload same key, failed-only retry, cancellation, unknown no retry, read failure/recovery, desktop/mobile bounds.

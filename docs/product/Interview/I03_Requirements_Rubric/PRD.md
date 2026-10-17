@@ -1,5 +1,11 @@
 # I03 产品文档：要求与评分标准
 
+## 2026-10-17 来源契约补充（#251）
+
+Owner 确认 5 点：每张卡片显示生成时保留的 JD 输入快照版本、分段 ID 和逐字原文，而不是用当前 JD 反推。`GET jobs/:id/rubric` 在卡片上返回 `source`（`status=verified/not_recorded`、`jdVersion`、`parseJobId`、`refs`）。同工作区、同岗位的 `sourceParseJobId` 必须对应能力生成输入，引用分段唯一、原文逐字匹配且要求仍与原生成结果一致，才可展示为已验证来源。此版本是 Interview 保存的 JD 输入快照版本，不冒充 JD Management 发布版本。
+
+人工新增或修改要求时不保留旧 JD 引用；只修改权重等不改变要求的操作保留来源。历史缺失、损坏、失配或跨范围的引用返回未记录和空引用，页面明确显示人工补充或来源未记录。JD 更新后保留旧快照引用并标注非当前版本。无新表、无历史回填，不改变 JD 权威内容。
+
 ## 2026-10-17 确认补充（#325 / #250）
 
 每卡 Required L 从 JD 结构化 requirement 的 `requiredLevel`（整数 1 至 5）取得，通过 requirement ID 和原文引用绑定并随生成输入冻结；不得由 AI 自行指定，也不在 Rubric 独立编辑。缺失等级或无法匹配来源显示未知，不默认 L3。既有已确认版本不自动改写；修改要求文案导致来源失配时清空等级与来源绑定。结构化 JD API 接受等级，当前没有新增 JD 等级编辑控件。
@@ -105,3 +111,12 @@ STAR 复用现有 Brief 的生成 schema、引用校验和模型调用。草稿�
 2. 确认人是 HR、HM 任一方即可，还是需要 HM 确认（原型显示「Rubric confirmed by David Kim」，即 HM）。
 3. 集成模式下 AI 补充的要求如何回写 JD Management 确认。
 4. 能力验证卡和 Rubric 是同一页的两种视图，还是两份独立对象。
+
+## 11. #253 第一段：PDF 快照与生成记录
+
+- Owner 确认第一段 Estimate 5；完整 I13 Activity/DownloadAttempt 仍未接入，#253 保持打开。
+- `POST /api/jobs/:id/rubric/exports` 输入 requestId、rubricId、revision，只导出服务端已保存版本，页面旧版本返回 409 RUBRIC_EXPORT_STALE。创建快照采用可重复读事务，后续编辑不会改变产物。相同操作者/工作区/requestId 重试返回原记录，改变该请求参数返回冲突。
+- PDF 包含状态、版本号、修订号、能力/权重/要求等级/等级锚点、期望证据、经过 #251 校验的 JD 来源及确认信息；未知来源不反推，草稿明确标记。
+- `GET /api/jobs/:id/rubric/exports` 返回最近 50 条生成记录；`GET /api/jobs/:id/rubric/exports/:exportId/pdf` 只下载该记录持久保存的 PDF。记录与产物均按工作区隔离。
+- pending 表示生成尚未确认，succeeded 表示产物已持久保存，failed 表示生成失败。生成失败保留记录；生成后的数据库写入失败或进程中断保持 pending/未知，不自动再生成，不提供下载。用户可新发起一次生成，旧记录保留。没有宣称浏览器保存成功的审计状态。
+- 第一段采用数据库保存快照和 PDF，不新增外部文件服务。迁移 `20261018000500_rubric_exports` 后生成 Prisma client，再启动新代码。回滚应用时保留导出记录和产物，不删除数据。历史记录没有自动清理策略，统一生命周期管理留待 I13。

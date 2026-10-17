@@ -1,6 +1,6 @@
 import { Body, Controller, Delete, Get, Param, Patch, Post, Req, UseGuards } from '@nestjs/common';
 import { WorkspaceGuard, type Identity } from '../auth/workspace.guard';
-import { CreateQuestionDto, UpdateQuestionDto } from './question.dto';
+import { CreateQuestionDto, UpdateQuestionDto, PublishQuestionDto } from './question.dto';
 import { QuestionsService } from './questions.service';
 
 @Controller('questions')
@@ -31,5 +31,25 @@ export class QuestionsController {
   @Delete(':id')
   remove(@Param('id') id: string, @Req() req: { identity: Identity }) {
     return this.questions.remove(req.identity, id);
+  }
+
+  @Get(':id/versions')
+  versions(@Param('id') id: string, @Req() req: { identity: Identity }) {
+    return this.questions.versions(req.identity, id);
+  }
+
+  @Post(':id/publish')
+  publish(@Param('id') id: string, @Body() dto: PublishQuestionDto, @Req() req: { identity: Identity }) {
+    return this.questions.publish(req.identity, id, dto.expectedRevision);
+  }
+
+  @Get(':id/deprecations')
+  deprecations(@Param('id') id: string, @Req() req: { identity: Identity }) {
+    return this.questions.deprecations(req.identity, id);
+  }
+
+  @Post(':id/deprecate')
+  deprecate(@Param('id') id: string, @Body() dto: PublishQuestionDto, @Req() req: { identity: Identity }) {
+    return this.questions.deprecate(req.identity, id, dto.expectedRevision);
   }
 }

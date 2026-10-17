@@ -1,0 +1,6 @@
+npm run build
+exit=0
+
+> hireos-resume-screening-backend@0.1.0 build
+> nest build
+

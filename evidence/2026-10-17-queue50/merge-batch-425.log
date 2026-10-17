@@ -1,0 +1,14 @@
+node evidence/2026-10-17-queue50/verify-425.cjs
+exit=0
+screening-backend-build: 0
+screening-backend-lint: 0
+screening-backend-typecheck: 0
+screening-backend-test: 0
+screening-front-build: 0
+screening-front-lint: 0
+screening-front-typecheck: 0
+screening-front-test: 0
+browser: 0
+e2e: 0
+workspace-regression: 0
+decision-regression: 0

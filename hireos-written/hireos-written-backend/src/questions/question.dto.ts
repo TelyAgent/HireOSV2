@@ -59,6 +59,10 @@ export class CreateQuestionDto {
 /** Every field optional -- the bank page toggles `favorite` alone; the edit drawer sends content. */
 export class UpdateQuestionDto {
   @IsOptional()
+  @IsInt()
+  @Min(1)
+  expectedRevision?: number;
+  @IsOptional()
   @IsString()
   @MinLength(1)
   @MaxLength(200)
@@ -84,4 +88,10 @@ export class UpdateQuestionDto {
   @IsOptional()
   @IsBoolean()
   favorite?: boolean;
+}
+
+export class PublishQuestionDto {
+  @IsInt()
+  @Min(1)
+  expectedRevision!: number;
 }

@@ -203,7 +203,7 @@ export function AssessmentQuestionDrawer({
           </select>
           {roleQuestions.length ? (
             <div className="tiny" style={{ marginTop: 8, color: "var(--text-tertiary)" }}>
-              {t("Approved v1; edits below only apply to this candidate's draft and never change the role preset.")}
+              {selectedQuestionId ? `${zh ? '已发布版本' : 'Published version'} v${QUESTIONS[selectedQuestionId].version}` : (zh ? '已发布题目' : 'Published questions')}
             </div>
           ) : (
             <BankEmpty

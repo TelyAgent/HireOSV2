@@ -1,0 +1,56 @@
+[
+  {
+    "name": "written-backend-build",
+    "command": "npm run build",
+    "exit": 0,
+    "log": "365-written-backend-build.log"
+  },
+  {
+    "name": "written-backend-lint",
+    "command": "npm run lint",
+    "exit": 0,
+    "log": "365-written-backend-lint.log"
+  },
+  {
+    "name": "written-backend-typecheck",
+    "command": "npm run typecheck",
+    "exit": 0,
+    "log": "365-written-backend-typecheck.log"
+  },
+  {
+    "name": "written-backend-test",
+    "command": "npm run test",
+    "exit": 0,
+    "log": "365-written-backend-test.log"
+  },
+  {
+    "name": "written-front-build",
+    "command": "npm run build",
+    "exit": 0,
+    "log": "365-written-front-build.log"
+  },
+  {
+    "name": "written-front-lint",
+    "command": "npm run lint",
+    "exit": 0,
+    "log": "365-written-front-lint.log"
+  },
+  {
+    "name": "written-front-typecheck",
+    "command": "npm run typecheck",
+    "exit": 0,
+    "log": "365-written-front-typecheck.log"
+  },
+  {
+    "name": "written-front-test",
+    "command": "npm run test",
+    "exit": 0,
+    "log": "365-written-front-test.log"
+  },
+  {
+    "name": "browser",
+    "command": "node test/question-versions.browser.cjs",
+    "exit": 0,
+    "log": "365-browser.log"
+  }
+]

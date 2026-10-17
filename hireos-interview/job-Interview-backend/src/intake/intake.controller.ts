@@ -49,10 +49,18 @@ export class IntakeController {
   listTasks(@Req() req: { identity: Identity }) { return this.tasks.list(req.identity.workspaceId); }
   @Get('tasks/:id')
   task(@Req() req: { identity: Identity }, @Param('id') id: string) { return this.tasks.get(req.identity.workspaceId, id); }
+  @Get('tasks/:id/activity')
+  activity(@Req() req: { identity: Identity }, @Param('id') id: string) { return this.tasks.activity(req.identity.workspaceId, id); }
   @Patch('tasks/:id/intake')
   reviewTask(@Req() req: { identity: Identity }, @Param('id') id: string, @Body() body: unknown) { return this.tasks.review(req.identity, id, body); }
   @Post('tasks/:id/materials')
   attachTaskMaterial(@Req() req: { identity: Identity }, @Param('id') id: string, @Body() body: unknown) { return this.tasks.attach(req.identity, id, body); }
+  @Post('tasks/:id/materials/triage')
+  triageMaterial(@Req() req: { identity: Identity }, @Param('id') id: string, @Body() body: unknown) { return this.tasks.triageMaterial(req.identity, id, body); }
+  @Get('tasks/:id/screening-reports')
+  screeningReports(@Req() req: { identity: Identity }, @Param('id') id: string) { return this.tasks.screeningReports(req.identity.workspaceId, id); }
+  @Post('tasks/:id/screening-reports/resolve')
+  resolveScreening(@Req() req: { identity: Identity }, @Param('id') id: string, @Body() body: unknown) { return this.tasks.resolveScreening(req.identity, id, body); }
 
   @Get('tasks/:id/rounds')
   listRounds(@Req() req: { identity: Identity }, @Param('id') id: string) { return this.rounds.listForTask(req.identity.workspaceId, id); }

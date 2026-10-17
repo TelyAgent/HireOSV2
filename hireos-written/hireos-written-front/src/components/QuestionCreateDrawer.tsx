@@ -104,9 +104,9 @@ export function QuestionCreateDrawer({
     let question: Question;
     try {
       const saved = editing
-        ? await updateBankQuestion(editing.id, contentChanged
+        ? await updateBankQuestion(editing.id, { expectedRevision: editing.revision, ...(contentChanged
           ? { title: title.trim(), prompt: prompt.trim(), roles: finalRoles, competencies }
-          : { roles: finalRoles })
+          : { roles: finalRoles }) })
         : await createBankQuestion({
           title: title.trim(), prompt: prompt.trim(), roles: finalRoles, competencies: competencies!,
           language: zh ? "中文" : "English", author: state.currentUser,
@@ -134,7 +134,7 @@ export function QuestionCreateDrawer({
         <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
           <Button variant="ghost" onClick={onClose}>{t("Cancel")}</Button>
           <Button variant="primary" onClick={handleCreate} disabled={busy}>
-            {creating ? t("Saving…") : t(editing ? "Save changes" : "Create question")}
+            {creating ? t("Saving…") : (zh ? "保存草稿" : "Save draft")}
           </Button>
         </div>
       }

@@ -1,6 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { BadRequestException, ConflictException, Injectable, NotFoundException, ServiceUnavailableException } from '@nestjs/common';
 import { z } from 'zod';
+import { isDeepStrictEqual } from 'node:util';
 import { invalidSchemaFromZod } from '../http/invalid-schema';
 import { asSegments, locateQuote } from '../shared/locate-quote';
 import { Prisma } from '@prisma/client';
@@ -56,11 +57,13 @@ export class ScreeningService {
     const decision = await this.db.screeningDecision.findFirst({
       where: { workspaceId: identity.workspaceId, applicationId, status: 'approved' },
       orderBy: { createdAt: 'desc' },
+      include: { evaluation: true },
     });
     // Withdrawn decisions stay readable as history (issue #23).
     const withdrawnDecisions = await this.db.screeningDecision.findMany({
       where: { workspaceId: identity.workspaceId, applicationId, status: 'withdrawn' },
       orderBy: { withdrawnAt: 'desc' },
+      include: { evaluation: true },
     });
     // Every snapshot, newest first (#19): earlier results stay readable after a refresh.
     const history = await this.db.screeningEvaluation.findMany({
@@ -143,6 +146,25 @@ export class ScreeningService {
   async run(identity: Identity, applicationId: string, purpose: string) {
     const application = await this.findApplication(identity, applicationId);
     return this.singleFlight(applicationId, () => this.runFor(identity, application, purpose));
+  }
+
+  async captureBatchInput(identity: Identity, applicationId: string, tx: Prisma.TransactionClient) {
+    const input = await this.loadInputs(identity.workspaceId, applicationId, tx);
+    if (input.job.criteriaStatus !== 'confirmed' || !input.criteria) throw new ConflictException({ code: 'CRITERIA_NOT_CONFIRMED' });
+    if (input.profile?.parseStatus !== 'succeeded') throw new ConflictException({ code: 'PROFILE_NOT_READY' });
+    return json(JSON.parse(JSON.stringify({ schemaVersion: 1, input, aiConfigured: this.aiEvaluator.isConfigured(), model: this.aiEvaluator.isConfigured() ? this.aiEvaluator.modelName() : null,
+      evaluator: this.aiEvaluator.isConfigured() ? AI_EVALUATOR : LOCAL_EVALUATOR })));
+  }
+
+  async runBatchInput(identity: Identity, snapshot: Prisma.JsonValue, itemId: string, leaseToken: string) {
+    const saved = snapshot as unknown as { schemaVersion: number; input: EvaluationInputs; aiConfigured: boolean; model: string | null; evaluator: string };
+    if (saved.input?.application?.workspaceId !== identity.workspaceId) throw new ConflictException({ code: 'BATCH_SNAPSHOT_INVALID' });
+    if (saved.schemaVersion !== 1 || saved.aiConfigured !== this.aiEvaluator.isConfigured() ||
+      saved.model !== (this.aiEvaluator.isConfigured() ? this.aiEvaluator.modelName() : null) ||
+      saved.evaluator !== (this.aiEvaluator.isConfigured() ? AI_EVALUATOR : LOCAL_EVALUATOR)) {
+      throw new ConflictException({ code: 'BATCH_EVALUATOR_CHANGED' });
+    }
+    return this.createEvaluation(identity, saved.input.application, saved.input, 1, 'batch', { itemId, leaseToken });
   }
 
   private async runFor(identity: Identity, application: ApplicationInput, purpose: string) {
@@ -373,6 +395,7 @@ export class ScreeningService {
     input: EvaluationInputs,
     version: number,
     purpose: string,
+    batch?: { itemId: string; leaseToken: string },
   ) {
     const dimensions = asDimensions(input.criteria?.dimensions);
     const requirements = asRequirements(input.criteria?.requirements);
@@ -401,6 +424,11 @@ export class ScreeningService {
       include: { dimensionScores: true },
     });
     if (canReuseEvaluation(latest, inputHash)) {
+      if (batch) await this.db.$transaction(async tx => {
+        const changed = await tx.screeningBatchItem.updateMany({ where: { id: batch.itemId, workspaceId: identity.workspaceId, leaseToken: batch.leaseToken, status: { in: ['running', 'unknown'] } },
+          data: { status: 'completed', evaluationId: latest!.id, completedAt: new Date(), leaseUntil: null, errorCode: null } });
+        if (changed.count !== 1) throw new ConflictException({ code: 'BATCH_LEASE_LOST' });
+      });
       return { ...serializeEvaluation(latest), reused: true, snapshotCount: await this.snapshotCount(identity.workspaceId, application.id) };
     }
 
@@ -438,11 +466,25 @@ export class ScreeningService {
       evaluator: evaluatorVersion,
       modelVersion,
       inputHash,
+      ...(batch ? { batchItemId: batch.itemId } : {}),
       ...(useAi ? {} : { aiSkippedReason: aiConfigured ? 'no_resume_text' : 'ai_not_configured' }),
     };
 
     const evaluation = await this.db.$transaction(async (tx) => {
-      await tx.screeningEvaluation.updateMany({
+      let freshness = 'current';
+      if (batch) {
+        await tx.$queryRaw`SELECT id FROM "ScreeningBatchItem" WHERE id = ${batch.itemId} FOR UPDATE`;
+        const item = await tx.screeningBatchItem.findFirst({ where: { id: batch.itemId, workspaceId: identity.workspaceId, leaseToken: batch.leaseToken, status: { in: ['running', 'unknown'] } } });
+        if (!item) throw new ConflictException({ code: 'BATCH_LEASE_LOST' });
+        await tx.$queryRaw`SELECT id FROM "Application" WHERE id = ${application.id} FOR UPDATE`;
+        const live = await this.loadInputs(identity.workspaceId, application.id, tx);
+        if (live.criteria?.id !== input.criteria?.id || live.profile?.id !== input.profile?.id || live.material?.id !== input.material?.id ||
+          live.job.title !== input.job.title || live.job.criteriaStatus !== 'confirmed' ||
+          !isDeepStrictEqual(JSON.parse(JSON.stringify({ criteria: live.criteria, profile: live.profile, material: live.material })), JSON.parse(JSON.stringify({ criteria: input.criteria, profile: input.profile, material: input.material })))) freshness = 'stale';
+        const last = await tx.screeningEvaluation.aggregate({ where: { workspaceId: identity.workspaceId, applicationId: application.id }, _max: { version: true } });
+        version = (last._max.version ?? 0) + 1;
+      }
+      if (freshness === 'current') await tx.screeningEvaluation.updateMany({
         where: { workspaceId: identity.workspaceId, applicationId: application.id, freshness: 'current' },
         data: { freshness: 'stale' },
       });
@@ -461,6 +503,7 @@ export class ScreeningService {
           sessionId: session.id,
           version,
           status: 'completed',
+          freshness,
           evaluationMode: metadata.evaluationMode,
           aiStatus: metadata.aiStatus,
           inputManifest: json(inputManifest),
@@ -480,11 +523,11 @@ export class ScreeningService {
       // Any earlier "AI evaluation issue" task for this application is superseded by this
       // run actually completing (confident or not) -- nobody acted on it, it was just
       // overtaken by a newer attempt, so it's cancelled rather than completed.
-      await tx.humanTask.updateMany({
+      if (freshness === 'current') await tx.humanTask.updateMany({
         where: { workspaceId: identity.workspaceId, applicationId: application.id, taskType: 'screening_evaluation_issue', status: { notIn: ['completed', 'cancelled'] } },
         data: { status: 'cancelled' },
       });
-      if (overall == null) {
+      if (overall == null && freshness === 'current') {
         await tx.humanTask.create({
           data: {
             workspaceId: identity.workspaceId,
@@ -601,7 +644,7 @@ export class ScreeningService {
           data: { verificationItemIds: json([verificationItems[index].id]) },
         })));
       }
-      await tx.application.update({
+      if (freshness === 'current') await tx.application.update({
         where: { id: application.id },
         data: { screeningStatus: 'review_pending' },
       });
@@ -615,6 +658,9 @@ export class ScreeningService {
           payload: json({ applicationId: application.id, version, inputManifest }),
         },
       });
+      if (batch) await tx.screeningBatchItem.update({ where: { id: batch.itemId }, data: {
+        status: 'completed', evaluationId: created.id, completedAt: new Date(), leaseUntil: null, errorCode: null,
+      } });
       return { ...created, dimensionScores: scores, evidenceItems: allEvidenceItems, verificationItems, concerns, humanAssessments: [] };
     });
     return { ...serializeEvaluation(evaluation), reused: false, snapshotCount: await this.snapshotCount(identity.workspaceId, application.id) };
@@ -646,8 +692,8 @@ export class ScreeningService {
     return application;
   }
 
-  private async loadInputs(workspaceId: string, applicationId: string): Promise<EvaluationInputs> {
-    const application = await this.db.application.findFirst({
+  private async loadInputs(workspaceId: string, applicationId: string, db: Prisma.TransactionClient = this.db): Promise<EvaluationInputs> {
+    const application = await db.application.findFirst({
       where: { id: applicationId, workspaceId },
       include: {
         candidate: { include: { profiles: { orderBy: { version: 'desc' }, take: 1 }, resumeVersions: { where: { isLatest: true }, take: 1, include: { material: true } } } },

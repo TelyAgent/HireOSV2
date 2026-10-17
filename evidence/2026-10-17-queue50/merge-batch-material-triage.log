@@ -1,0 +1,3 @@
+node test/material-triage.browser.cjs
+exit=0
+PASS #247 unassigned exclusion, two permitted types, cancel, conflict/input retention, category refresh, screening refresh, audit and reload

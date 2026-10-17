@@ -11,6 +11,7 @@ import { cardLevel, jdRequirements, requirementSegmentId } from './required-leve
 import { JdContentFacade, formatJdText } from '../core-record/jd-content.facade';
 import { createHash } from 'node:crypto';
 import { claimGenerationSchema } from './claim-contracts';
+import { rubricCardSource } from './rubric-source';
 
 const RUBRIC_SELECT = {
   id: true, jobId: true, versionNumber: true, status: true, version: true,
@@ -118,10 +119,16 @@ export class RubricService {
     await this.materializeIfReady(workspaceId, jobId, job);
     const rubric = await this.db.rubricVersion.findFirst({ where: { workspaceId, jobId }, orderBy: { versionNumber: 'desc' }, select: RUBRIC_SELECT });
     const generationJob = job.parseJobs.find((j) => j.type === 'capability_cards' && j.inputVersion === job.jdVersion) ?? null;
+    const sourceJob = job.parseJobs.find(p => p.id === rubric?.sourceParseJobId);
     return {
       jobId, jdVersion: job.jdVersion, locked: await this.isLocked(workspaceId, jobId),
       generation: generationJob ? { id: generationJob.id, status: generationJob.status, errorCode: generationJob.errorCode } : null,
-      rubric: rubric ? { ...rubric, sourceJdVersion: job.parseJobs.find(p => p.id === rubric.sourceParseJobId)?.inputVersion ?? null } : null,
+      rubric: rubric ? { ...rubric, sourceJdVersion: sourceJob?.inputVersion ?? null,
+        cards: rubric.cards.map(card => {
+          const source = rubricCardSource(card, sourceJob);
+          return { ...card, sourceRefs: source.refs, source };
+        }),
+      } : null,
     };
   }
 
@@ -137,7 +144,7 @@ export class RubricService {
         const prior = draft.cards.find(card => card.id === c.id);
         if (c.id && !prior) throw new BadRequestException({ code: 'CARD_NOT_IN_RUBRIC' });
         const data = {
-          ...(prior && prior.requirement !== c.requirement ? { requiredLevel: null, sourceRequirementId: null } : {}),
+          ...(prior && prior.requirement !== c.requirement ? { requiredLevel: null, sourceRequirementId: null, sourceRefs: [] } : {}),
           requirement: c.requirement, responsibilityType: c.responsibilityType, cardPriority: c.cardPriority,
           competencyTags: c.competencyTags.join(','), expectedEvidence: c.expectedEvidence,
           levelAnchors: c.levelAnchors as unknown as Prisma.InputJsonValue, weight: c.weight,
@@ -230,7 +237,7 @@ export class RubricService {
       where: { id: jobId, workspaceId },
       select: {
         id: true, title: true, coreJobId: true, jdText: true, jdVersion: true, jdRequirements: true,
-        parseJobs: { where: { type: 'capability_cards' }, orderBy: { createdAt: 'desc' }, select: { id: true, type: true, inputVersion: true, status: true, errorCode: true, result: true, input: true } },
+        parseJobs: { where: { workspaceId, type: 'capability_cards' }, orderBy: { createdAt: 'desc' }, select: { id: true, type: true, inputVersion: true, status: true, errorCode: true, result: true, input: true } },
       },
     });
     if (!job) throw new NotFoundException({ code: 'NOT_FOUND' });

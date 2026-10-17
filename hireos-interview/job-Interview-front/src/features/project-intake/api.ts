@@ -51,7 +51,7 @@ export type Task = {
   job: { id: string; title: string; department: string | null; location: string | null; level: string | null; jdText: string; jdVersion: number };
   candidate: CandidateRef & { phone: string | null };
   resume: { material: Material; parseJobs: { status: string; result: ParseResult | null }[] } | null;
-  materials: { kind: string; material: Material }[];
+  materials: { kind: string; material: Material; triagedBy?: string | null; triagedAt?: string | null }[];
   parseJobs: ParseJob[];
   rounds: Round[];
   decision: Decision | null; hrConfirmedAt: string | null; hmConfirmedAt: string | null;
@@ -65,6 +65,7 @@ export type ResponsibilityType = 'lead' | 'collaborate' | 'support';
 export type CardPriority = 'P0' | 'P1' | 'P2';
 export type LevelAnchors = { l1: string; l2: string; l3: string; l4: string; l5: string };
 export type CapabilityCard = {
+  source?: { status: 'verified' | 'not_recorded'; jdVersion: number | null; parseJobId: string | null; refs: { segmentId: string; quote: string }[] };
   requiredLevel?: number | null; sourceRequirementId?: string | null;
   id: string; requirement: string; responsibilityType: ResponsibilityType; cardPriority: CardPriority;
   competencyTags: string; expectedEvidence: string; levelAnchors: LevelAnchors; weight: number;

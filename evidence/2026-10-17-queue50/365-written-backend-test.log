@@ -1,0 +1,115 @@
+npm run test
+exit=0
+
+> hireos-written-backend@0.1.0 test
+> npm run build && node --test test/*.test.cjs
+
+
+> hireos-written-backend@0.1.0 build
+> nest build
+
+✔ #120 AC-1: headers at once, then a slow body — stopped at the budget (513.713167ms)
+✔ #120 AC-2: success, HTTP error, invalid body and a slow error body keep their errors and leave no timer behind (313.636333ms)
+✔ AC-2: an excerpt is placed on the line, or the shortest run of lines, that holds it (1.858083ms)
+✔ AC-2/AC-3: text the answer does not contain, or too short to place, is not placed (0.138041ms)
+✔ AC-2: excerpts are placed in the question they name; the rest are counted as left out (0.238208ms)
+✔ AC-1: the evaluator returns each criterion with its rationale and placed excerpts (226.662791ms)
+▶ written case concurrency
+  ✔ #119 #131 AC-1: a progress event racing a close never brings the closed case back; its task is completed (193.991959ms)
+  ✔ #130 AC-1/AC-3: a submission racing a close is either accepted before it or refused with nothing kept (500.931584ms)
+  ✔ #132 AC-1/AC-2: two finalizations or two publications at once — one wins, the other is a conflict, nothing overwritten (97.404167ms)
+  ✔ #131 AC-2: hold racing a submission keeps the progress for resuming (62.610542ms)
+  ✔ #119 AC-2: opening the link after the answers came in never turns "submitted" back into "opened" (7.297291ms)
+  ✔ #118 AC-1: a failure at the case step keeps nothing; the retry is accepted and moves the case (13.262875ms)
+  ✔ #118 AC-1: answers saved by an older version whose case step failed are caught up by the retry (3.876333ms)
+  ✔ #118 AC-2: closing completes the task in the same step, and a second close is a conflict (6.489709ms)
+  ✔ #397/#399: outcome snapshot, required override reason, actor/time and task commit atomically (37.733208ms)
+  ✔ #397: close audit rolls back with task failure and refuses another workspace (7.017042ms)
+✔ written case concurrency (1351.596375ms)
+✔ rule: accepted until the deadline plus one minute, refused after (0.728208ms)
+✔ a late submission is refused and nothing is stored (0.434333ms)
+✔ #134 AC-1: a finalizedBy naming someone else is not recorded — the session user is (0.859166ms)
+✔ #134 AC-2: without finalizedBy the real actor is recorded; a trusted service call records the user it acts for (0.18325ms)
+✔ #134 AC-3: an already finalized evaluation is left as it is — nothing is rewritten (0.722ms)
+✔ AC-1: Interview not answering ends at the deadline with INTERVIEW_HANDOFF_FAILED; the case stays released (212.064917ms)
+✔ AC-2: the local write failing after Interview succeeded answers INTERVIEW_HANDOFF_FAILED; a retry hands off with the same task (11.070875ms)
+✔ AC-3: a normal handoff still works, and a case no longer released is refused (4.772417ms)
+✔ a zod failure becomes 422 INVALID_SCHEMA with dotted field paths (3.714541ms)
+✔ class-validator errors (ValidationPipe) flatten nested properties the same way (0.232208ms)
+✔ greets the candidate by name and signs off as the sending HR mailbox (0.927375ms)
+✔ falls back to the hiring team when no mailbox is configured (0.102333ms)
+✔ email carries the letter and the link, without the "system generated" footer (0.382ms)
+✔ #229 AC-1: an English invitation — subject, letter, deadline and timing all in English, the zone named (0.320666ms)
+✔ #229 AC-1/AC-2: the Chinese branch is unchanged, and an invitation without a language is Chinese (0.14575ms)
+✔ #229 AC-1/AC-3: the send drawer previews exactly the letter the backend writes, in both languages (0.286208ms)
+✔ #229 AC-2: the language is stored with the invitation when it is sent; left out, it is Chinese (164.004083ms)
+✔ AC-1: a saved password is ciphertext that decrypts back, and differs every time it is saved (1.010875ms)
+✔ AC-2: plain text saved before encryption is read as it is (0.083584ms)
+✔ AC-3: after a rotation values under either key are read; new ones go under the new key (0.498875ms)
+✔ AC-3: in production without a key, saving and reading fail clearly; a malformed key is refused (0.171583ms)
+✔ outside production a development key stands in, still encrypting (0.12875ms)
+✔ a tampered value is rejected, not decrypted (0.140792ms)
+✔ AC-1: the service stores ciphertext, verifies and sends with the real password, and never returns it (33.744958ms)
+✔ #125/#127 AC-1: a new host, port, security mode or account without a new password is refused before any connection (1.845958ms)
+✔ #125/#127 AC-2: a rename keeps the stored password for the same server; a new password goes to the new one (0.856834ms)
+✔ #125/#127 AC-3: another workspace's account is not found and nothing connects (0.178167ms)
+✔ #128: internal addresses are refused for SMTP; a public server is connected at the checked address (4.183625ms)
+▶ #365 immutable question versions
+  ✔ migration preserves only surviving published version without invented audit (7.028709ms)
+  ✔ creation cannot bypass draft; plan requires a published version (13.184083ms)
+  ✔ concurrent publish returns one version and one replay with actor/time (15.689917ms)
+  ✔ concurrent edits reject stale writer; old plan and invitation survive republish (47.384917ms)
+  ✔ favorite does not draft; invalid publication and foreign workspace fail closed (26.668084ms)
+  ✔ snapshot write failure rolls publication back completely (13.978167ms)
+  ✔ #368 deprecates once, refuses new plans, preserves invitation, requires a new draft/version (65.551292ms)
+  ✔ #368 audit failure rolls deprecation back; missing revision is rejected (11.669125ms)
+  ✔ soft deletion retains immutable versions and invitation contents (2.861916ms)
+✔ #365 immutable question versions (593.112791ms)
+▶ quick start creates a case from a JD and a résumé
+  ✔ upload stores the file in Core Record and returns its text (0.802542ms)
+  ✔ new JD text + résumé creates the job via JD, the Core application, and one linked case with its task (12.479166ms)
+  ✔ the same JD and résumé again reuse the job, candidate and case, flagged as a duplicate JD (5.106334ms)
+  ✔ a résumé another subsystem already linked to a candidate keeps that candidate (3.727209ms)
+  ✔ an existing Core Record job can be picked instead of new JD text (3.503875ms)
+  ✔ choosing an existing job: only published jobs are offered or accepted (0.718042ms)
+  ✔ a résumé is required and must be readable; nothing is created upstream otherwise (0.839625ms)
+  ✔ text extraction: DOCX is read, binary junk is reported as unreadable (6.953125ms)
+✔ quick start creates a case from a JD and a résumé (1502.142416ms)
+✔ #393 AC-3: without one or both approvals the request is refused with 422 and nothing is read or written (1.263708ms)
+✔ #393: the HTTP validation also requires both to be true (163.153459ms)
+✔ #397: new releases require a structured human outcome; free text and score cannot substitute (0.690917ms)
+✔ rule: one draft round -- before the first send, after "add supplemental test", or while it holds questions (3.335042ms)
+✔ AC-1/AC-2: sending freezes the draft questions into round N; earlier rounds are untouched (1.256875ms)
+✔ AC-3: no second send without a new draft round, and an opened round must have questions (0.279083ms)
+✔ AC-3: opening a supplemental round is idempotent -- there is never more than one draft (0.724334ms)
+✔ a supplemental round can only follow a finalized round (0.246875ms)
+✔ AC-1: a sent question cannot be edited or deleted; draft questions can (0.251459ms)
+✔ AC-5: finalizing an older round touches only that round and never moves the case status back (0.625416ms)
+✔ a question can only be added while a draft round is open (0.332959ms)
+✔ a concurrent second send of the same round is a readable 409, not a 500 (0.145417ms)
+✔ the overall is points over the total maximum, scaled to 100 (0.5135ms)
+✔ in-range whole scores whose sum is the overall are accepted (0.152125ms)
+✔ a score above the max, below zero or fractional is refused (0.268458ms)
+✔ an overall that is not the out-of-100 score is refused (0.127666ms)
+✔ #136 AC-1/AC-2: unknown, repeated, missing or blank answers are refused; the asked questions answered once pass (1.043667ms)
+✔ #129 AC-1/AC-2: timed mode is due at the opening time plus its duration, or the deadline if sooner (0.360584ms)
+✔ #129 AC-2: the clock starts on the first open only — opening again does not restart it (0.661291ms)
+[Nest] 32973  - 10/17/2026, 11:54:01 PM    WARN [InvitationsService] Automatic scoring failed for submission s-1: AI_TIMEOUT
+✔ #121 AC-1: the submission is confirmed without waiting for a slow automatic scoring, which then runs on its own (25.952083ms)
+✔ #121 AC-2/AC-3: a failing AI is recorded as failed and retried; once a reviewer finalizes, scoring is skipped and never overwrites (0.756708ms)
+✔ #136 AC-1: refused answers change nothing — no transaction, no submission, no scoring (0.206417ms)
+[Nest] 32975  - 10/17/2026, 11:54:01 PM    WARN [TasksService] Skipping Core Record job sync: CORE_RECORD_UNAVAILABLE
+✔ job fields changed in Core Record are copied to the local job; Core being down is harmless (2.815541ms)
+▶ task pages and stats (#412)
+  ✔ AC-1: pages of 5 cover all 23 tasks once each, newest first, then end (12.181875ms)
+  ✔ AC-1: the default page is 50; a bad limit or cursor is 422 INVALID_SCHEMA (3.37325ms)
+  ✔ AC-2: the stats equal counting every task (10.153958ms)
+✔ task pages and stats (#412) (250.421083ms)
+ℹ tests 91
+ℹ suites 0
+ℹ pass 91
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 2038.616833

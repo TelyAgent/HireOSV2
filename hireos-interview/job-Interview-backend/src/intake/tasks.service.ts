@@ -29,6 +29,7 @@ import { buildPackagePdf, packagePdfLines } from './package-pdf';
 import { mergeTranscriptLines } from '../rubric/summary-contracts';
 import { CoreRecordClient } from '../core-record/core-record.client';
 import type { Identity } from './workspace.guard';
+import { resolveScreeningSchema, triageMaterialSchema } from './contracts';
 
 
 @Injectable()
@@ -125,6 +126,22 @@ export class TasksService {
       } });
   }
 
+  async activity(workspaceId: string, id: string) {
+    if (!await this.db.interviewTask.findFirst({ where: { id, workspaceId }, select: { id: true } })) {
+      throw new NotFoundException({ code: 'NOT_FOUND' });
+    }
+    const records = await this.db.revision.findMany({
+      where: { taskId: id, task: { workspaceId } },
+      orderBy: [{ createdAt: 'desc' }, { id: 'desc' }], take: 20,
+      select: { id: true, actorId: true, createdAt: true, payload: true },
+    });
+    return records.map(({ payload, ...record }) => {
+      const data = payload && typeof payload === 'object' && !Array.isArray(payload) ? payload : {};
+      const event = data.kind === 'stage_decision' ? 'decision_recorded' : data.action === 'reviewed' ? 'review_recorded' : 'unknown';
+      return { ...record, event };
+    });
+  }
+
   async get(workspaceId: string, id: string) {
     const task = await this.db.interviewTask.findFirst({ where: { id, workspaceId }, include: {
       job: { select: { id: true, title: true, department: true, location: true, level: true, jdText: true, jdVersion: true } },
@@ -181,11 +198,78 @@ export class TasksService {
     await this.get(identity.workspaceId, id);
     const material = await this.db.material.findFirst({ where: { id: input.materialId, workspaceId: identity.workspaceId } });
     if (!material) throw new NotFoundException({ code: 'NOT_FOUND' });
-    await this.db.taskMaterial.upsert({
-      where: { taskId_materialId: { taskId: id, materialId: material.id } }, update: {},
-      create: { taskId: id, materialId: material.id, kind: input.kind },
+    await this.db.$transaction(async tx => {
+      await tx.$queryRaw`SELECT id FROM "InterviewTask" WHERE id = ${id} AND "workspaceId" = ${identity.workspaceId} FOR UPDATE`;
+      const existing = await tx.taskMaterial.findUnique({ where: { taskId_materialId: { taskId: id, materialId: material.id } } });
+      if (existing) return;
+      if (input.kind === 'screening') {
+        const prior = await tx.taskMaterial.findMany({ where: { taskId: id, kind: 'screening' } });
+        const task = await tx.interviewTask.findUniqueOrThrow({ where: { id } });
+        await tx.interviewTask.update({ where: { id }, data: {
+          screeningRevision: { increment: 1 },
+          currentScreeningId: task.currentScreeningId ?? (prior.length === 1 ? prior[0].materialId : prior.length === 0 ? material.id : null),
+        } });
+      }
+      await tx.taskMaterial.create({ data: { taskId: id, materialId: material.id, kind: input.kind } });
     });
     return this.get(identity.workspaceId, id);
+  }
+
+  async screeningReports(workspaceId: string, id: string) {
+    const task = await this.db.$transaction(tx => tx.interviewTask.findFirst({ where: { id, workspaceId }, include: {
+      materials: { where: { kind: 'screening' }, include: { material: { select: { id: true, name: true, text: true, readStatus: true } } } },
+      screeningResolutions: { orderBy: { revision: 'desc' } },
+    } }), { isolationLevel: Prisma.TransactionIsolationLevel.RepeatableRead });
+    if (!task) throw new NotFoundException({ code: 'NOT_FOUND' });
+    const currentId = task.currentScreeningId ?? (task.materials.length === 1 ? task.materials[0].materialId : null);
+    const resolved = new Set((task.screeningResolutions[0]?.memberIds as string[] | undefined) ?? []);
+    const reports = task.materials.map(({ material }) => ({ ...material,
+      state: material.id === currentId ? 'current' : resolved.has(material.id) ? 'superseded' : 'unresolved',
+    }));
+    return { revision: task.screeningRevision, currentId, needsResolution: reports.length > 1 && reports.some(r => r.state === 'unresolved'), reports, history: task.screeningResolutions };
+  }
+
+  async triageMaterial(identity: Identity, id: string, raw: unknown) {
+    const input = validate(triageMaterialSchema, raw);
+    return this.db.$transaction(async tx => {
+      await tx.$queryRaw`SELECT id FROM "InterviewTask" WHERE id = ${id} AND "workspaceId" = ${identity.workspaceId} FOR UPDATE`;
+      const task = await tx.interviewTask.findFirst({ where: { id, workspaceId: identity.workspaceId } });
+      if (!task) throw new NotFoundException({ code: 'NOT_FOUND' });
+      const link = await tx.taskMaterial.findFirst({ where: { taskId: id, materialId: input.materialId, material: { workspaceId: identity.workspaceId } } });
+      if (!link) throw new NotFoundException({ code: 'NOT_FOUND' });
+      if (link.kind !== 'other') {
+        if (link.kind === input.kind && link.triagedBy === identity.actorId && link.triagedAt) return { replayed: true, kind: link.kind, triagedBy: link.triagedBy, triagedAt: link.triagedAt };
+        throw new ConflictException({ code: 'MATERIAL_ALREADY_CLASSIFIED' });
+      }
+      if (input.kind === 'screening') {
+        const prior = await tx.taskMaterial.findMany({ where: { taskId: id, kind: 'screening' } });
+        await tx.interviewTask.update({ where: { id }, data: {
+          screeningRevision: { increment: 1 },
+          currentScreeningId: task.currentScreeningId ?? (prior.length === 1 ? prior[0].materialId : prior.length === 0 ? link.materialId : null),
+        } });
+      }
+      const result = await tx.taskMaterial.update({ where: { taskId_materialId: { taskId: id, materialId: link.materialId } },
+        data: { kind: input.kind, triagedBy: identity.actorId, triagedAt: new Date() } });
+      return { replayed: false, kind: result.kind, triagedBy: result.triagedBy, triagedAt: result.triagedAt };
+    });
+  }
+
+  async resolveScreening(identity: Identity, id: string, raw: unknown) {
+    const input = validate(resolveScreeningSchema, raw);
+    return this.db.$transaction(async tx => {
+      await tx.$queryRaw`SELECT id FROM "InterviewTask" WHERE id = ${id} AND "workspaceId" = ${identity.workspaceId} FOR UPDATE`;
+      const task = await tx.interviewTask.findFirst({ where: { id, workspaceId: identity.workspaceId } });
+      if (!task) throw new NotFoundException({ code: 'NOT_FOUND' });
+      const prior = await tx.screeningResolution.findUnique({ where: { taskId_revision: { taskId: id, revision: input.expectedRevision + 1 } } });
+      if (prior && task.screeningRevision === prior.revision && prior.actorId === identity.actorId && prior.selectedMaterialId === input.materialId) return { replayed: true, revision: prior.revision };
+      if (task.screeningRevision !== input.expectedRevision) throw new ConflictException({ code: 'SCREENING_REPORTS_CHANGED' });
+      const members = await tx.taskMaterial.findMany({ where: { taskId: id, kind: 'screening' }, select: { materialId: true } });
+      if (!members.some(m => m.materialId === input.materialId)) throw new BadRequestException({ code: 'INVALID_SCREENING_REPORT' });
+      const revision = task.screeningRevision + 1;
+      await tx.interviewTask.update({ where: { id }, data: { currentScreeningId: input.materialId, screeningRevision: revision } });
+      await tx.screeningResolution.create({ data: { taskId: id, revision, selectedMaterialId: input.materialId, memberIds: members.map(m => m.materialId).sort(), actorId: identity.actorId } });
+      return { replayed: false, revision };
+    });
   }
 
   /** Debrief roll-up: the job's confirmed capability cards, each paired with its latest

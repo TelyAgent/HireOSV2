@@ -3,6 +3,7 @@ import { App as AntApp, Button, Checkbox, Form, Input, Modal, Select, Tag } from
 import { ACCOUNT_URL, authFetch, useSessionUser } from "../../lib/session";
 import { useSettingsT } from "./i18n";
 import { initials } from "../../lib/initials";
+import { InterviewerBindings } from './InterviewerBindings';
 
 const icon = (name: string) => <span className="material-symbols-rounded" style={{ fontSize: 18 }}>{name}</span>;
 
@@ -225,6 +226,8 @@ export function MembersSection() {
           </div>
         </>
       )}
+
+      {!blocked && members !== null && me?.roles.includes('admin') && <InterviewerBindings members={members} />}
 
       <Modal
         open={inviting}

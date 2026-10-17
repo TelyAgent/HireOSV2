@@ -10,6 +10,7 @@ import { errorText } from "../../features/project-intake/i18n";
 import { saveCardInputs } from '../../features/project-intake/rubric-card-inputs';
 import { useCandidateClaims } from '../../features/project-intake/useCandidateClaims';
 import { useBrief } from '../../features/project-intake/useBrief';
+import { RubricExports } from '../../features/project-intake/RubricExports';
 
 const PRIORITY_TONE: Record<CardPriority, Tone> = { P0: "bad", P1: "warn", P2: "unknown" };
 const RESPONSIBILITY_OPTIONS: ResponsibilityType[] = ["lead", "collaborate", "support"];
@@ -129,6 +130,7 @@ export function RubricPage() {
 
   return (
     <>
+      {jobId && rubric && <RubricExports key={jobId} jobId={jobId} rubric={rubric} zh={zh} />}
       <div
         className={
           "flex items-center gap-2 rounded-xl border px-3.5 py-2.5 text-[12.5px] " +
@@ -224,6 +226,18 @@ export function RubricPage() {
                 <div className="mt-2 text-[12.5px] leading-[1.55] text-[var(--ink-2)]">
                   <span className="text-[var(--ink-3)]">{t.expectedEvidenceLabel}: </span>{c.expectedEvidence}
                   <div>{c.requiredLevel == null ? (zh ? "要求等级未记录" : "Required level not recorded") : (zh ? `JD 要求等级 L${c.requiredLevel}` : `JD Required L${c.requiredLevel}`)}{c.sourceRequirementId ? ` · ${c.sourceRequirementId}` : ""}</div>
+                  <div className="mt-3 border-t border-[var(--line)] pt-3" data-testid={`jd-source-${c.id}`}>
+                    <strong>{zh ? "JD 原文来源" : "JD source"}</strong>
+                    {c.source?.status === 'verified' && c.source.refs.length > 0 ? <>
+                      <p>{zh ? `生成时 JD 输入快照 v${c.source.jdVersion}` : `JD input snapshot v${c.source.jdVersion}`}
+                        {c.source.jdVersion !== rubricState?.jdVersion && <span> · {zh ? "非当前 JD 版本" : "Not the current JD version"}</span>}
+                      </p>
+                      {c.source.refs.map((ref, index) => <blockquote key={`${ref.segmentId}-${index}`} className="my-2 whitespace-pre-wrap break-words">
+                        <div>{ref.quote}</div>
+                        <div className="text-[var(--ink-3)]">{zh ? "分段" : "Segment"}: {ref.segmentId}</div>
+                      </blockquote>)}
+                    </> : <p>{zh ? "手工补充或来源未记录，无法核对 JD 原文。" : "Manually supplied or source not recorded; JD origin cannot be verified."}</p>}
+                  </div>
                   <div className="mt-3 border-t border-[var(--line)] pt-3">
                     <strong>{zh ? "简历经历 · 待核实" : "Resume claims · Unverified"}</strong>
                     {claims.error ? <p role="alert">{zh ? "简历匹配读取失败" : "Could not load resume matches"}</p>

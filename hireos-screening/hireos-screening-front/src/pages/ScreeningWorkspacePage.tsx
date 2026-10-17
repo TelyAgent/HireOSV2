@@ -32,6 +32,7 @@ import { NO_FILTERS, isFiltered, matchesFilters, readFilters, writeFilters, type
 import { sourceLabel } from "../features/imports/sources";
 import { getPerson } from "../data/db";
 import { WithDisabledReason } from "../components/ui/DisabledReason";
+import { BatchScreeningPanel } from '../features/screening/BatchScreeningPanel';
 
 type EligFilter = "all" | EligibilityStatus;
 // Where the list was scrolled, per job, to return to after a candidate's page (#198).
@@ -40,6 +41,8 @@ const scrollReturnKey = (jobId: string) => `screening-workspace-return:${jobId}`
 
 function markWorkspaceReturn(jobId: string) {
   try {
+    const scroller = document.querySelector<HTMLElement>("main.main");
+    if (scroller) sessionStorage.setItem(scrollKey(jobId), String(scroller.scrollTop));
     sessionStorage.setItem(scrollReturnKey(jobId), "1");
   } catch {
     // no-op: returning to the list simply starts at the top
@@ -222,6 +225,8 @@ export function ScreeningWorkspacePage() {
     if (!scroller) return;
     const remember = () => {
       try {
+        // Preserve the departure position while the returning list is loading.
+        if (sessionStorage.getItem(scrollReturnKey(id)) === "1") return;
         sessionStorage.setItem(scrollKey(id), String(scroller.scrollTop));
       } catch {
         // not kept -- the list just opens at the top
@@ -427,6 +432,7 @@ export function ScreeningWorkspacePage() {
           </WithDisabledReason>
         </div>
       </div>
+      <BatchScreeningPanel key={id} jobId={id} chosen={rows.filter(row => selected.has(row.app.id)).map(row => row.app.id)} names={Object.fromEntries(rows.map(row => [row.app.id, row.app.candidateName || row.app.candidateId]))} onCompleted={load} />
       <div className="workspace-filters">
         <select aria-label={t("Human status")} value={filters.status} onChange={(e) => setFilters({ ...filters, status: e.target.value as WorkspaceFilters["status"] })}>
           <option value="all">{t("All statuses")}</option>
