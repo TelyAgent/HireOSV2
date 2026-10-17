@@ -27,6 +27,9 @@ const NON_RETRYABLE_ERRORS = new Set(['SOURCE_MATERIAL_NOT_READY', 'AI_NOT_CONFI
 /** Currencies offered when correcting a salary expectation. */
 export const COMPENSATION_CURRENCIES = ['CNY', 'USD', 'HKD', 'EUR', 'GBP', 'SGD', 'JPY'] as const;
 
+
+/** This worker's lease ran out and another worker took the job over: what it was writing is dropped (#385). */
+class LeaseLostError extends Error {}
 @Injectable()
 export class ProfilesService implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(ProfilesService.name);
@@ -456,8 +459,9 @@ export class ProfilesService implements OnModuleInit, OnModuleDestroy {
             phone: candidate.phone || parsed.phone,
           },
         });
-        await tx.processingJob.update({
-          where: { id: job.id },
+        // Still this worker's job, or nothing here is kept: another worker took it over after the lease ran out (#385).
+        const { count } = await tx.processingJob.updateMany({
+          where: { id: job.id, leaseToken },
           data: {
             status: 'succeeded',
             result: { profileId: created.id, parserVersion: parsed.parserVersion, dataStatus: created.dataStatus },
@@ -465,6 +469,7 @@ export class ProfilesService implements OnModuleInit, OnModuleDestroy {
             leaseUntil: null,
           },
         });
+        if (count !== 1) throw new LeaseLostError();
         return created;
       });
       // PRD: matching runs automatically once a profile exists, not on a manual button
@@ -474,10 +479,11 @@ export class ProfilesService implements OnModuleInit, OnModuleDestroy {
       await this.discovery.enqueueAutoMatch(job.workspaceId, candidate.id, targetJobId);
       return profile;
     } catch (error) {
+      if (error instanceof LeaseLostError) return;
       const errorCode = error instanceof Error ? error.message : 'PROFILE_PARSE_FAILED';
       if (job.attempt < MAX_ATTEMPTS && !NON_RETRYABLE_ERRORS.has(errorCode)) {
-        await this.db.processingJob.update({
-          where: { id: job.id },
+        await this.db.processingJob.updateMany({
+          where: { id: job.id, leaseToken },
           data: {
             status: 'queued',
             nextRunAt: new Date(Date.now() + RETRY_BASE_DELAY_MS * job.attempt),
@@ -488,8 +494,8 @@ export class ProfilesService implements OnModuleInit, OnModuleDestroy {
         });
         return;
       }
-      await this.db.processingJob.update({
-        where: { id: job.id },
+      const { count } = await this.db.processingJob.updateMany({
+        where: { id: job.id, leaseToken },
         data: {
           status: 'failed',
           errorCode,
@@ -497,6 +503,7 @@ export class ProfilesService implements OnModuleInit, OnModuleDestroy {
           leaseUntil: null,
         },
       });
+      if (count !== 1) return;
       await this.db.resumeVersion.updateMany({
         where: { id: resumeVersionId },
         data: { parseStatus: 'failed' },

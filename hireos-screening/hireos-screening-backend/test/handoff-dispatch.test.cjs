@@ -4,18 +4,30 @@ const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const { InterviewHandoffDispatcherService, retryDelayMs } = require('../dist/decisions/interview-handoff-dispatcher.service');
 
+/** Enough of Prisma's where for the dispatcher's queries: equality, notIn, lt/lte, null and OR. */
+function matches(row, where) {
+  return Object.entries(where).every(([key, cond]) => {
+    if (key === 'OR') return cond.some((sub) => matches(row, sub));
+    if (cond === null) return row[key] == null;
+    if (cond && typeof cond === 'object' && !(cond instanceof Date)) {
+      if ('notIn' in cond) return !cond.notIn.includes(row[key]);
+      if ('lt' in cond) return row[key] != null && row[key] < cond.lt;
+      if ('lte' in cond) return row[key] != null && row[key] <= cond.lte;
+    }
+    return row[key] === cond;
+  });
+}
 function memoryDb(events) {
-  const matches = (e, where) => {
-    if (typeof where.eventType === 'string' ? e.eventType !== where.eventType : where.eventType.notIn.includes(e.eventType)) return false;
-    if (e.status !== where.status || !(e.attempt < where.attempt.lt)) return false;
-    return !e.nextAttemptAt || e.nextAttemptAt <= where.OR[1].nextAttemptAt.lte;
-  };
   return { events, screeningOutboxEvent: {
     findMany: async ({ where, take }) => events.filter((e) => matches(e, where)).sort((a, b) => a.createdAt - b.createdAt).slice(0, take),
-    update: async ({ where, data }) => Object.assign(events.find((e) => e.id === where.id), data),
+    updateMany: async ({ where, data }) => {
+      const hit = events.filter((e) => matches(e, where));
+      for (const e of hit) Object.assign(e, data);
+      return { count: hit.length };
+    },
   } };
 }
-const event = (id, eventType, extra = {}) => ({ id, workspaceId: 'w', eventType, payload: { id }, status: 'pending', attempt: 0, createdAt: new Date(), nextAttemptAt: null, ...extra });
+const event = (id, eventType, extra = {}) => ({ id, workspaceId: 'w', eventType, payload: { id }, status: 'pending', attempt: 0, createdAt: new Date(), nextAttemptAt: null, leaseToken: null, leaseUntil: null, ...extra });
 const config = (env = {}) => ({ get: (key, fallback) => env[key] ?? fallback });
 
 function stubFetch(handler) {

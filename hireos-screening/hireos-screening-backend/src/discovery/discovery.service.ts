@@ -348,10 +348,11 @@ export class DiscoveryService implements OnModuleInit, OnModuleDestroy {
       if (!candidate) throw new Error('CANDIDATE_NOT_FOUND');
       const targetJobId = (job.input as { jobId?: string } | null)?.jobId;
       await this.runMatchForCandidate(job.workspaceId, candidate, targetJobId);
-      await this.db.processingJob.update({ where: { id: job.id }, data: { status: 'succeeded', leaseToken: null, leaseUntil: null } });
+      // Conditional on the lease (#385): a worker whose lease ran out doesn't overwrite the one that took over.
+      await this.db.processingJob.updateMany({ where: { id: job.id, leaseToken }, data: { status: 'succeeded', leaseToken: null, leaseUntil: null } });
     } catch (error) {
-      await this.db.processingJob.update({
-        where: { id: job.id },
+      await this.db.processingJob.updateMany({
+        where: { id: job.id, leaseToken },
         data: { status: 'failed', errorCode: error instanceof Error ? error.message.slice(0, 100) : 'MATCH_FAILED', leaseToken: null, leaseUntil: null },
       });
     }

@@ -28,7 +28,8 @@ test('#116 AC-1/AC-2: a failed round is logged without event data, then the next
   const updates = [];
   const db = { screeningOutboxEvent: {
     findMany: async ({ where }) => { if (!up) throw new Error("Can't reach database server"); return forQueue(where, [event('e-1')]); },
-    update: async ({ where, data }) => { updates.push([where.id, data.status]); },
+    // Claims (status sending, #385) succeed and aren't recorded; settled outcomes are.
+    updateMany: async ({ where, data }) => { if (data.status !== 'sending') updates.push([where.id, data.status]); return { count: 1 }; },
   } };
   const realFetch = globalThis.fetch;
   globalThis.fetch = async () => ({ ok: true, status: 200 });
@@ -49,9 +50,10 @@ test('#116 AC-1/AC-3: one event whose failure can\'t be recorded doesn\'t stop t
   const updates = [];
   const db = { screeningOutboxEvent: {
     findMany: async ({ where }) => forQueue(where, [event('e-1'), { ...event('e-2'), attempt: 9 }, event('e-3')]),
-    update: async ({ where, data }) => {
+    updateMany: async ({ where, data }) => {
       if (where.id === 'e-1') throw new Error('write failed');
-      updates.push([where.id, data.status, data.attempt]);
+      if (data.status !== 'sending') updates.push([where.id, data.status, data.attempt]);
+      return { count: 1 };
     },
   } };
   const realFetch = globalThis.fetch;

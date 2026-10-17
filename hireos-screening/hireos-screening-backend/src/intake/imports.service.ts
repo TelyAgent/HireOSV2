@@ -455,14 +455,16 @@ export class ImportsService implements OnModuleInit, OnModuleDestroy {
   private async processClaimedCandidateJob(jobId: string, leaseToken: string) {
     const job = await this.db.processingJob.findFirst({ where: { id: jobId, leaseToken } });
     if (!job || !job.materialId) return;
+    // Job status writes below are conditional on the lease (#385): a worker whose lease ran out doesn't
+    // overwrite the one that took over.
     const input = job.input as unknown as CandidateCreationJobInput;
 
     // The batch or item may have been cancelled while this job sat in the queue. Honor
     // that instead of resurrecting a cancelled item by writing a candidate into it.
     const currentItem = await this.db.importItem.findUnique({ where: { id: input.itemId }, select: { status: true } });
     if (!currentItem || currentItem.status === 'cancelled') {
-      await this.db.processingJob.update({
-        where: { id: job.id },
+      await this.db.processingJob.updateMany({
+        where: { id: job.id, leaseToken },
         data: { status: 'cancelled', leaseToken: null, leaseUntil: null },
       });
       return;
@@ -492,8 +494,8 @@ export class ImportsService implements OnModuleInit, OnModuleDestroy {
         businessConsumeStatus: 'completed',
         completedAt: new Date(),
       });
-      await this.db.processingJob.update({
-        where: { id: job.id },
+      await this.db.processingJob.updateMany({
+        where: { id: job.id, leaseToken },
         data: { status: 'succeeded', result: { candidateId: candidate.id }, leaseToken: null, leaseUntil: null },
       });
       await this.db.ingestionAttempt.update({ where: { id: attempt.id }, data: { status: 'succeeded', finishedAt: new Date() } });
@@ -509,8 +511,8 @@ export class ImportsService implements OnModuleInit, OnModuleDestroy {
         businessConsumeStatus: 'failed',
         completedAt: new Date(),
       });
-      await this.db.processingJob.update({
-        where: { id: job.id },
+      await this.db.processingJob.updateMany({
+        where: { id: job.id, leaseToken },
         data: { status: 'failed', errorCode: code, leaseToken: null, leaseUntil: null },
       });
       await this.db.ingestionAttempt.update({ where: { id: attempt.id }, data: { status: 'failed', errorCode: code, finishedAt: new Date() } });

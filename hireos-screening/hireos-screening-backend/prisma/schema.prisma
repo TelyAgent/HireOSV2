@@ -943,11 +943,14 @@ model ScreeningOutboxEvent {
   eventType    String
   aggregateId  String
   payload      Json
-  status       String    @default("pending") // pending | dispatched | failed
+  status       String    @default("pending") // pending | sending | dispatched | failed
   attempt      Int       @default(0)
   lastError    String?
   /// When a failed event may be retried (#384); null means at once.
   nextAttemptAt DateTime?
+  /// The dispatcher holding a `sending` event, and until when (#385); past it another may claim the event.
+  leaseToken   String?
+  leaseUntil   DateTime?
   createdAt    DateTime  @default(now())
   dispatchedAt DateTime?
 
