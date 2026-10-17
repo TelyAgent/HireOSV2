@@ -2,6 +2,7 @@
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const { separateUnsourced } = require('../dist/copilot/unsourced-facts');
+const { keepSourced } = require('../dist/copilot/sourced-fields');
 const { DocAiService } = require('../dist/copilot/doc-ai.service');
 
 const identity = { workspaceId: 'ws-1', actorId: 'hr-1', roles: ['hr'], kind: 'session' };
@@ -24,6 +25,25 @@ test('in a paragraph only the sentence carrying an unsourced figure moves', () =
   assert.doesNotMatch(items[0], /3\+ years/);
   assert.match(items[0], /review product data weekly/);
   assert.deepEqual(toConfirm, ['You need 3+ years of experience.']);
+});
+
+test('#67: Quick Start-style output never turns missing years into a hard requirement', () => {
+  const fields = { mustHave: ['3 年及以上运营经验', '熟悉 SQL'] };
+  const result = keepSourced(fields, '团队缺少人负责日常运营，希望他组建运营团队，负责产品日常运营');
+  assert.deepEqual(result.fields.mustHave, ['熟悉 SQL']);
+  assert.deepEqual(result.toConfirm, ['3 年及以上运营经验']);
+});
+
+test('#67: a one-character input cannot justify an invented year requirement', () => {
+  const result = keepSourced({ mustHave: ['1 年以上相关经验', '沟通能力强'] }, 'a');
+  assert.deepEqual(result.fields.mustHave, ['沟通能力强']);
+  assert.deepEqual(result.toConfirm, ['1 年以上相关经验']);
+});
+
+test('#67: a year supplied by the user remains a valid sourced requirement', () => {
+  const result = keepSourced({ mustHave: ['5+ years in B2B sales'] }, 'We need someone with 5+ years in B2B sales.');
+  assert.deepEqual(result.fields.mustHave, ['5+ years in B2B sales']);
+  assert.deepEqual(result.toConfirm, []);
 });
 
 test('#95 AC-1/AC-3: two runs on the minimal seed never write unsourced years or pay; the model’s own suggestions come back as toConfirm', async () => {
