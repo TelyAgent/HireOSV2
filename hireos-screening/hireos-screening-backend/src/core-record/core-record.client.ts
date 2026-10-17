@@ -103,6 +103,30 @@ export class CoreRecordClient {
     return this.request<CoreJob[]>('/jobs', identity, { method: 'GET' });
   }
 
+  /**
+   * The Core Record jobs with these ids, of any status and age; deleted ones are absent (#143). Asked in groups
+   * of 100. A Core Record from before #143 ignores `ids` and answers with its directory -- jobs that weren't
+   * asked for -- so that group is checked one job at a time instead.
+   */
+  async listJobsByIds(identity: Identity, ids: string[]): Promise<CoreJob[]> {
+    if (this.mode === 'mock' || !ids.length) return [];
+    const found: CoreJob[] = [];
+    for (let i = 0; i < ids.length; i += 100) {
+      const group = ids.slice(i, i + 100);
+      const jobs = await this.request<CoreJob[]>(`/jobs?ids=${group.map(encodeURIComponent).join(',')}`, identity, { method: 'GET' });
+      const asked = new Set(group);
+      if (jobs.every((job) => asked.has(job.id))) {
+        found.push(...jobs);
+        continue;
+      }
+      for (const id of group) {
+        const job = await this.getJob(identity, id);
+        if (job) found.push(job);
+      }
+    }
+    return found;
+  }
+
   /** One Core Record job, or null once it no longer exists (HireOS JD hard-deletes unused jobs). */
   async getJob(identity: Identity, id: string): Promise<CoreJob | null> {
     if (this.mode === 'mock') return null;

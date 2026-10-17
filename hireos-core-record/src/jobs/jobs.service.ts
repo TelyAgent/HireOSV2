@@ -6,6 +6,9 @@ import { assertVersion, findIdempotent, notFound, storeIdempotency, type Request
 import { writeAudit } from '../audit/audit.service';
 import { writeOutbox } from '../outbox/outbox.service';
 
+// Enough for any page of jobs and short enough for a URL (100 uuids are about 3.7 KB).
+const MAX_IDS_PER_REQUEST = 100;
+
 const createSchema = z.object({
   title: z.string().trim().min(1).max(200),
   team: z.string().trim().max(200).optional(),
@@ -81,6 +84,18 @@ export class JobsService {
       orderBy: { createdAt: 'desc' },
       take: 100,
     });
+    return jobs.map(serialize);
+  }
+
+  /**
+   * The jobs with these ids (comma-separated), whatever their status or age -- the directory above stops at the
+   * newest 100. Ids that don't exist (deleted) are simply absent (#143).
+   */
+  async listByIds(identity: Identity, raw: string) {
+    const ids = [...new Set(raw.split(',').map((id) => id.trim()).filter(Boolean))];
+    z.array(z.string().max(64)).max(MAX_IDS_PER_REQUEST).parse(ids);
+    if (!ids.length) return [];
+    const jobs = await this.db.job.findMany({ where: { workspaceId: identity.workspaceId, id: { in: ids } }, orderBy: { createdAt: 'desc' } });
     return jobs.map(serialize);
   }
 

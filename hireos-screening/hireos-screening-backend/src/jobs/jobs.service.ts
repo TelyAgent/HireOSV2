@@ -17,9 +17,14 @@ const DEFAULT_DIMENSIONS = [
   { id: 'dim-complocation', name: 'Compensation & Location Fit', weight: 0.25, rubric: 'Whether the salary expectation and the work location (country + city) fit the role.' },
 ];
 
+// At most one Core Record sync per workspace in this window; list requests in between, and concurrent ones,
+// share it, so a list is at most this stale (#143).
+export const JOB_SYNC_INTERVAL_MS = 30_000;
+
 @Injectable()
 export class JobsService {
   private readonly logger = new Logger(JobsService.name);
+  private readonly syncs = new Map<string, { startedAt: number; done: Promise<void> }>();
 
   constructor(
     private readonly db: PrismaService,
@@ -84,7 +89,19 @@ export class JobsService {
    * closed job drops out of the list and out of matching. A Core Record outage only skips the sync —
    * the last mirrored state is still returned.
    */
-  private async syncPublishedJobs(identity: Identity) {
+  private syncPublishedJobs(identity: Identity): Promise<void> {
+    const last = this.syncs.get(identity.workspaceId);
+    if (last && Date.now() - last.startedAt < JOB_SYNC_INTERVAL_MS) return last.done;
+    const done = this.syncWithCore(identity).catch((error: unknown) => {
+      // A failed sync isn't kept for the window: the next list tries again.
+      this.syncs.delete(identity.workspaceId);
+      throw error;
+    });
+    this.syncs.set(identity.workspaceId, { startedAt: Date.now(), done });
+    return done;
+  }
+
+  private async syncWithCore(identity: Identity) {
     let coreJobs: Awaited<ReturnType<CoreRecordClient['listJobs']>>;
     try {
       coreJobs = await this.coreRecord.listJobs(identity);
@@ -125,21 +142,27 @@ export class JobsService {
 
   /**
    * A job deleted in HireOS JD disappears from Core Record entirely, so the status sync above never
-   * sees it. Archive any still-listed local job missing from Core Record's directory — checked one by
-   * one, since the directory is capped and absence from it alone doesn't prove deletion.
+   * sees it. Local open jobs missing from Core Record's directory (it stops at the newest 100) are looked
+   * up together: absent means deleted and archived; present takes its Core status. Only a change is written,
+   * and a failed lookup leaves them as they are (#143).
    */
   private async archiveDeletedJobs(identity: Identity, coreIds: string[]) {
     const missing = await this.db.job.findMany({
       where: { workspaceId: identity.workspaceId, status: 'open', id: { notIn: coreIds } },
       select: { id: true, origin: true },
     });
+    if (!missing.length) return;
+    let found: Map<string, { status: string }>;
+    try {
+      found = new Map((await this.coreRecord.listJobsByIds(identity, missing.map((job) => job.id))).map((job) => [job.id, job]));
+    } catch (error) {
+      this.logger.warn(`Could not check ${missing.length} Core Record job(s): ${error instanceof Error ? error.message : String(error)}`);
+      return;
+    }
     for (const { id, origin } of missing) {
-      try {
-        const core = await this.coreRecord.getJob(identity, id);
-        await this.db.job.update({ where: { id }, data: { status: core ? screeningStatus(core.status, origin) : 'archived' } });
-      } catch (error) {
-        this.logger.warn(`Could not check Core Record job ${id}: ${error instanceof Error ? error.message : String(error)}`);
-      }
+      const core = found.get(id);
+      const status = core ? screeningStatus(core.status, origin) : 'archived';
+      if (status !== 'open') await this.db.job.update({ where: { id }, data: { status } });
     }
   }
 

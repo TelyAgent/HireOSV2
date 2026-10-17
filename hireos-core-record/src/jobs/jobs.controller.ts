@@ -14,8 +14,8 @@ export class JobsController {
   }
 
   @Get()
-  list(@Req() req: { identity: Identity }, @Query('q') q?: string, @Query('status') status?: string) {
-    return this.jobs.list(req.identity, q, status);
+  list(@Req() req: { identity: Identity }, @Query('q') q?: string, @Query('status') status?: string, @Query('ids') ids?: string) {
+    return ids === undefined ? this.jobs.list(req.identity, q, status) : this.jobs.listByIds(req.identity, ids);
   }
 
   @Get(':id')
